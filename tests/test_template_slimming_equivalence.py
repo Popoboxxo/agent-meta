@@ -121,6 +121,32 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   stay at their frozen values; no other golden changed. AC-01 hashes
   rebaselined separately (see the rebaseline log in
   ``tests/test_ac01_render_identity.py``).
+* Task 16 (SPEC-tmp-sink-injection, AC-19): the tmp-sink injection replaced the
+  system-temp literals in the deployed agent text, so ten goldens were
+  rebaselined. The diff was reviewed line by line first (red run recorded in
+  ``docs/plans/2026-10-24-tmp-sink-injection-status.md``, Evidence Task 16) and
+  contains only these categories:
+  * ``docker logs`` / ``tail`` / ``tee`` / ``npm run …`` log destinations move
+    from ``/tmp/...`` to ``.tmp/...`` (``{{TMP_SINK_PATH}}``) — ``tester``,
+    ``e2e-tester``, ``devops-engineer``, ``docker``, ``code-reviewer``,
+    ``developer`` and the matching inline code samples in ``validator``;
+  * the resolved ``--basetemp`` now has the ``--basetemp="…"`` shape from
+    ``TEST_COMMANDS`` (``tester``, ``test-executor``, ``e2e-tester``,
+    ``documenter``); the golden freezes it as ``{{PYTEST_BASETEMP}}`` and
+    ``_port_golden_pytest_basetemp`` substitutes the resolved value, because a
+    concrete ``<tempdir>/<user>`` path would bind the committed fixture to one
+    machine/CI user;
+  * the scratch-path prose in ``test-executor`` names the configured sink
+    (``.tmp/runs/``) instead of a generic "scratch/output path";
+  * frontmatter pins (``version:`` / ``based-on:`` / ``generated-from: …@x``)
+    for the ten templates whose version was bumped by Tasks 4/6 (and
+    ``app-lifecycle-governor``, whose only change is the ``1.4.0 -> 1.4.1`` pin).
+  The ``_NORMALIZATIONS`` entries ``OG-TAIL-DOCKER``, ``OG-TAIL-DEV`` and
+  ``OG-PASS-CODE-REVIEWER`` were moved to the ``.tmp`` form in the same step so
+  their B2b attribution keeps matching the rebaselined region. The frozen meta
+  tokens (``1.2.0-beta.2`` / ``2026-09-13``) and the ``model:`` pins stay at
+  their frozen values. AC-01 hashes rebaselined separately (see the rebaseline
+  log in ``tests/test_ac01_render_identity.py``).
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
@@ -174,6 +200,17 @@ _GOLDEN_ROLE_COUNT = 58
 #: still asserted against the golden.
 _GOLDEN_META_VERSION = "1.2.0-beta.2"
 _GOLDEN_META_DATE = "2026-09-13"
+
+#: The frozen goldens carry the resolved pytest basetemp as this token instead
+#: of a concrete ``<tempdir>/<user>/pytest-agent-meta`` path. The fixture set is
+#: committed, so a literal path would bind the gate to one machine/user (CI runs
+#: under another); ``_port_golden_pytest_basetemp`` substitutes the current
+#: render's ``PYTEST_BASETEMP``. The ``--basetemp="…"`` shape itself stays
+#: frozen, so a template that drops the token or the quoting still fails.
+#: The token uses the framework's ``{{…}}`` form (not ``<…>``): the shipped-text
+#: scan treats ``{{…}}`` values as absolute tokens, so the fixture neither
+#: trips the system-temp nor the relative-pin guard.
+_GOLDEN_PYTEST_BASETEMP_TOKEN = "{{PYTEST_BASETEMP}}"
 
 # ---------------------------------------------------------------------------
 # Shared-gate registries (extended by Tasks 13/14/15)
@@ -902,9 +939,9 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'NAME=verify-$RANDOM' "\n"
             'docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container' "\n"
             'RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive' "\n"
-            'docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
+            'docker logs "$NAME" > .tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
             'docker rm "$NAME"' "\n"
-            'echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log' "\n"
+            'echo "container exit code: $RC" && tail -20 .tmp/"$NAME".log' "\n"
             '```' "\n"
             '</output-guard>'
         ),
@@ -915,9 +952,9 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'NAME=verify-$RANDOM' "\n"
             'docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container' "\n"
             'RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive' "\n"
-            'docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
+            'docker logs "$NAME" > .tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
             'docker rm "$NAME"' "\n"
-            'echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log' "\n"
+            'echo "container exit code: $RC" && tail -20 .tmp/"$NAME".log' "\n"
             '```',
         ),
         paths=(
@@ -940,7 +977,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
             '' "\n"
             '```bash' "\n"
-            'npm run e2e > /tmp/e2e.log 2>&1 &' "\n"
+            'npm run e2e > .tmp/e2e.log 2>&1 &' "\n"
             'PID=$!' "\n"
             'TIMEOUT=600' "\n"
             'for i in $(seq 1 "$TIMEOUT"); do' "\n"
@@ -949,7 +986,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'done' "\n"
             'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }' "\n"
             'wait "$PID"; RC=$?' "\n"
-            'tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            'tail -50 .tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
             '```' "\n"
             '</output-guard>'
         ),
@@ -957,7 +994,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
             '' "\n"
             '```bash' "\n"
-            'npm run e2e > /tmp/e2e.log 2>&1 &' "\n"
+            'npm run e2e > .tmp/e2e.log 2>&1 &' "\n"
             'PID=$!' "\n"
             'TIMEOUT=600' "\n"
             'for i in $(seq 1 "$TIMEOUT"); do' "\n"
@@ -966,7 +1003,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'done' "\n"
             'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }' "\n"
             'wait "$PID"; RC=$?' "\n"
-            'tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            'tail -50 .tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
             '```',
         ),
         paths=(
@@ -1043,7 +1080,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'Beispiel — prüfenden Prozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
             '' "\n"
             '```bash' "\n"
-            'npm run lint > /tmp/lint.log 2>&1 &' "\n"
+            'npm run lint > .tmp/lint.log 2>&1 &' "\n"
             'PID=$!' "\n"
             'for i in $(seq 1 300); do' "\n"
             '  kill -0 "$PID" 2>/dev/null || break         # lint finished' "\n"
@@ -1051,7 +1088,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             'done' "\n"
             'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "lint TIMEOUT after 300s" >&2; exit 124; }' "\n"
             'wait "$PID"; RC=$?' "\n"
-            'tail -50 /tmp/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            'tail -50 .tmp/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder' "\n"
             '```' "\n"
             '</output-guard>'
         ),
@@ -1228,6 +1265,19 @@ def _port_golden_meta_tokens(text: str, variables: dict) -> str:
     return text
 
 
+def _port_golden_pytest_basetemp(text: str, variables: dict) -> str:
+    """Port the golden's ``{{PYTEST_BASETEMP}}`` token to the resolved value.
+
+    The token stands in for the one sanctioned system-temp path (AC-13/AC-19);
+    only that value is ported, the surrounding ``--basetemp="…"`` argv shape is
+    compared byte-exactly.
+    """
+    current = str(variables.get("PYTEST_BASETEMP", ""))
+    if not current:
+        return text
+    return text.replace(_GOLDEN_PYTEST_BASETEMP_TOKEN, current)
+
+
 _MODEL_LINE = re.compile(r"^model: (.*)$", re.MULTILINE)
 
 # Fixed old->new Claude generation map for the frozen goldens' ``model:``
@@ -1321,6 +1371,7 @@ def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
             (_GOLDEN_DIR / f"{role}.md").read_text(encoding="utf-8"),
             render_env.variables,
         )
+        golden = _port_golden_pytest_basetemp(golden, render_env.variables)
         current = _strip_auto_commit_tail(
             render_env.rendered[role], role, render_env.variables
         )
@@ -1375,8 +1426,13 @@ def test_no_declared_normalization_is_dead(render_env: RenderEnv):
             # attribution is asserted by the golden-equivalence test).
             alive = bool(registry)
         if not alive:
+            # Match against the *rendered* template. A declared inline variant
+            # now carries the resolved sink form (``.tmp``), while the raw
+            # template still has ``{{TMP_SINK_PATH}}`` — the same text the
+            # golden comparison sees. Static prose variants render unchanged,
+            # so this is not a looser check than reading the raw file.
             for template in sorted((_REPO_ROOT / "agents").rglob("*.md")):
-                text = template.read_text(encoding="utf-8")
+                text = _render_template(template, render_env.variables)
                 if any(
                     _dedent(r.text) == variant.inline
                     for r in _LOCATORS[variant.kind](text)

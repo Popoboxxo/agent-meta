@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.7.1"
+version: "4.7.2"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -73,10 +73,10 @@ When validating behavior via ad-hoc container runs (e.g. `docker run`), diagnost
   ```
   NAME=verify-$RANDOM
   docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
-  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1      # capture BEFORE removal
   docker rm "$NAME"                                # cleanup only after capture
   ```
-- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee {{TMP_SINK_PATH}}/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
 - On failure, reference the captured log path in your findings — the implementer needs those diagnostics.
 
 ## 7. Verdict

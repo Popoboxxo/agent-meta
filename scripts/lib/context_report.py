@@ -46,8 +46,8 @@ from lib.repo_containment import (
     TmpSinkError,
     resolve_output_dir,
     resolve_work_dir,
-    work_dir_env,
 )
+from lib.tmp_paths import TmpPaths, resolve_tmp_paths, tmp_env
 
 REPORT_SUBDIR = "context-report"
 BYTES_PER_TOKEN = 4
@@ -323,21 +323,28 @@ def _write_render_config(config_path: Path, target_cfg: Path, profile: str) -> d
 
 
 def render_into_work_dir(
-    agent_meta_root: Path, config_path: Path, work_dir: Path, *, profile: str = "full"
+    agent_meta_root: Path,
+    config_path: Path,
+    work_dir: Path,
+    *,
+    profile: str = "full",
+    paths: TmpPaths,
 ) -> dict:
     """Render the project config into *work_dir* via the regular sync codepath.
 
-    The sync runs as a subprocess with *work_dir* as cwd and as its temp-dir
-    environment, so nothing lands in the real project or in the system temp
-    directory (IC-34). *profile* injects ``context-profile`` into the work-dir
-    copy only; returns the rendered config mapping.
+    The sync runs as a subprocess with *work_dir* as cwd and with *paths* pinned
+    as its temp-dir environment (:func:`lib.tmp_paths.tmp_env`, IC-34/IC-18), so
+    nothing lands in the real project or in the system temp directory. *paths*
+    is the single resolved sink of the caller -- this function never resolves or
+    re-reads the config itself (ADR-01). *profile* injects ``context-profile``
+    into the work-dir copy only; returns the rendered config mapping.
     """
     work_dir.mkdir(parents=True, exist_ok=True)
     cfg_dir = work_dir / ".meta-config"
     cfg_dir.mkdir(exist_ok=True)
     target_cfg = cfg_dir / "project.yaml"
     rendered_config = _write_render_config(config_path, target_cfg, profile)
-    env = work_dir_env(work_dir)
+    env = tmp_env(paths)
     sync_script = Path(agent_meta_root) / "scripts" / "sync.py"
     subprocess.run(["git", "init", "-q"], cwd=str(work_dir), check=False,
                    capture_output=True, env=env, timeout=GIT_INIT_TIMEOUT_S)
@@ -378,6 +385,7 @@ def run_context_report(
     run_id = "{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.getpid())
     render_profiles = ["full", "compact"] if profile == "both" else [profile]
     try:
+        paths = resolve_tmp_paths(project_root, config)
         output_dir = resolve_output_dir(project_root, config, REPORT_SUBDIR)
         work_dirs = {
             name: resolve_work_dir(project_root, config, REPORT_SUBDIR,
@@ -392,7 +400,7 @@ def run_context_report(
     try:
         for name in render_profiles:
             rendered_config = render_into_work_dir(
-                agent_meta_root, config_path, work_dirs[name], profile=name)
+                agent_meta_root, config_path, work_dirs[name], profile=name, paths=paths)
             effective[name] = _effective_profiles(rendered_config, providers)
             measured[name] = measure_artifacts(work_dirs[name], list(providers), mappings)
     except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, yaml.YAMLError) as exc:

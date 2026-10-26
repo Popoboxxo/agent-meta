@@ -1,6 +1,6 @@
 # Agent Meta Scout — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.2 (role: `agent-meta-scout`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.3 (role: `agent-meta-scout`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -68,7 +68,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <context>
 **Project context:** (not provided — ask the user for a short project description if you need it)
 
-**agent-meta repo:** [AGENT_META_REPO — not available outside a full agent-meta install] (v2.0.0-beta.2)
+**agent-meta repo:** [AGENT_META_REPO — not available outside a full agent-meta install] (v2.0.0-beta.3)
 
 **Existing skills:** see `[AGENT_META_REL_PATH — not available outside a full agent-meta install]config/skills-registry.yaml`
 

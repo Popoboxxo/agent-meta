@@ -14,6 +14,8 @@ from scripts.lib.knowledge import (
     generate_schema,
 )
 
+from tests.timeouts import SYNC_VALIDATE_TIMEOUT
+
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
 # --- repo-copy helpers ------------------------------------------------------
@@ -78,7 +80,8 @@ def _assert_copy_dest_is_safe(src, dest):
             f"refusing to copy {src} into {dest}: the destination is inside the "
             f"copied source tree but not under an ignored path, so copytree "
             f"would recurse without bound. Put pytest's basetemp outside the "
-            f"repo (e.g. --basetemp=/tmp/<user>) or under one of "
+            f"repo (e.g. --basetemp=\"<PYTEST_BASETEMP>\", the value sync.py "
+            f"resolves) or under one of "
             f"{sorted(_COPY_IGNORED_TOP_LEVEL)}."
         )
 
@@ -300,9 +303,12 @@ def test_knowledge_indexer_has_routing_keywords():
 def test_knowledge_roles_pass_schema_validation():
     import sys
     import subprocess
+    # Hang guard only: --validate runs the repo-wide consistency suite
+    # (see tests/timeouts.py for why 60 s was not enough on CI).
     result = subprocess.run(  # noqa: PLW1510
         [sys.executable, str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
         cwd=_AGENT_META_ROOT, capture_output=True, text=True,
+        timeout=SYNC_VALIDATE_TIMEOUT,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

@@ -360,7 +360,7 @@ pipeline_stages:
 - [x] Step 5: commit (nur falls Nachzügler-Fixes oder Bericht-Änderungen entstanden) `test: record follow-up search and final verification for #1006`
 
 ### Task 16: Folge-Issue anlegen (nach Merge von Plan A) — Rollback-Lücke OQ-4
-**Agent:** documenter · **Issue:** #1006 (Folge-Issue, noch nicht angelegt) · **AC:** — (Nicht-Ziel der Spec, OQ-4, vom Nutzer bestätigt 2026-10-22)
+**Agent:** documenter · **Issue:** #1006 · **Folge-Issue:** #1020 · **AC:** — (Nicht-Ziel der Spec, OQ-4, vom Nutzer bestätigt 2026-10-22)
 **Depends on:** 15
 **Gate:** Dieser Task startet ERST nach dem Merge von Plan A auf `main`. Er ändert keinen Code und blockiert den PR-Hand-off nicht. Das Issue wird NICHT in diesem Plan/Spec-Lauf angelegt, sondern nur hier dokumentiert; die Anlage erfolgt später über den Orchestrator (Skill `issue-lifecycle`).
 **Files:**
@@ -380,10 +380,12 @@ pipeline_stages:
 > **Proposal:** (1) Decouple the rollback call from the tier condition: call the rollback path (with `desired=None`, empty entries) whenever a `runtime-gate-deny` / `default-agent` state entry exists, independent of `provider_runtime_gate_tier`; keep the provider-agnostic gate (no hard-wired `.opencode/...` for foreign providers; derive the state path from resolved data). (2) Add a rollback helper that `_sync_stage_legacy_cleanup` calls before the state file is deleted, so a removed provider leaves no managed denies behind. (3) Tests: tier change `permission` -> `advisory` and provider removal both restore `prior` values and remove the namespaces; foreign providers stay untouched.
 >
 > **References:** #1006, `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Nicht-Ziele, OQ-4).
-- [ ] Step 1: Bestätigen, dass Plan A gemergt ist (`git log --oneline main --grep "1006"` liefert einen Treffer); sonst Task nicht starten.
-- [ ] Step 2: Vor der Anlage Evidenz erneut gegen `main` prüfen (Zeilenangaben können driften): `Grep` `provider_runtime_gate_tier\(pc, caps\) == "permission"` in `scripts/lib/sync_pipeline.py` und `scripts/lib/cli_commands.py` -> je genau 1 Treffer; `Grep` `def _sync_stage_legacy_cleanup` -> 1 Treffer. Abweichungen im Issue-Text anpassen.
-- [ ] Step 3: Issue mit dem Text oben anlegen (Orchestrator, Skill `issue-lifecycle`; Labels `bug`, `opencode`); Issue-Nummer unter dieses Task-Ergebnis schreiben und in der Spec (Offene Fragen, OQ-4) ergänzen.
-- [ ] Step 4: Kein Code-Commit; nur falls die Spec/der Plan die Issue-Nummer erhält: commit `docs: link follow-up issue for opencode rollback gap`
+- [x] Step 1: Bestätigen, dass Plan A gemergt ist (`git log --oneline main --grep "1006"` liefert einen Treffer); sonst Task nicht starten.
+- [x] Step 2: Vor der Anlage Evidenz erneut gegen `main` prüfen (Zeilenangaben können driften): `Grep` `provider_runtime_gate_tier\(pc, caps\) == "permission"` in `scripts/lib/sync_pipeline.py` und `scripts/lib/cli_commands.py` -> je genau 1 Treffer; `Grep` `def _sync_stage_legacy_cleanup` -> 1 Treffer. Abweichungen im Issue-Text anpassen.
+- [x] Step 3: Issue mit dem Text oben anlegen (Orchestrator, Skill `issue-lifecycle`; Labels `bug`, `opencode`); Issue-Nummer unter dieses Task-Ergebnis schreiben und in der Spec (Offene Fragen, OQ-4) ergänzen.
+- [x] Step 4: Kein Code-Commit; nur falls die Spec/der Plan die Issue-Nummer erhält: commit `docs: link follow-up issue for opencode rollback gap`
+
+**Ergebnis (2026-10-24):** Folge-Issue **#1020** angelegt (Labels `bug`, `opencode`) und mit dem Orchestrator verlinkt. Evidenz gegen `main` @ `31a4c6ba` erneut geprüft: alle Aussagen bestätigt, Zeilenangaben gedriftet und im Issue-Text korrigiert (`sync_pipeline.py:1320`, `cli_commands.py:293`, `_sync_stage_legacy_cleanup` 844–905, `isolation.py` 685–689 und 690–703, Isolations-Denies 290–335/342–393, Datei jetzt 1428 Zeilen); zusätzlich im Issue vermerkt: `is_v2_surface`-Guard (`isolation.py:671`) und v2-Rollback über `reconcile_opencode_surface_gate` (`sync_pipeline.py:1331-1335`). Der Issue-Text-Entwurf oben bleibt als historischer Entwurf unverändert; maßgeblich ist der angelegte Text.
 
 ## Self-Review
 

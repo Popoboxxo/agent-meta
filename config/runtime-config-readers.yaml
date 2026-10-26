@@ -16,7 +16,7 @@ registry-version: 1
 readers:
   - key: repo_containment
     reader: hooks/1-generic/repo-containment-impl.sh
-    evidence: ".claude/hooks/repo-containment-impl.sh:267"
+    evidence: ".claude/hooks/repo-containment-impl.sh:412"
     effect: "Schreib-Containment der Agenten"
   - key: orchestrator
     reader: hooks/1-generic/orchestrator-guard-impl.sh
@@ -36,11 +36,11 @@ readers:
     effect: "Hauptzweig-Erkennung"
   - key: admin-ui
     reader: scripts/admin-server.py
-    evidence: "scripts/admin-server.py:515"
+    evidence: "scripts/admin-server.py:542"
     effect: "Bind-Host, Token/Token-Datei, Allowed-Hosts, Port der Admin-UI"
   - key: viz
     reader: scripts/admin-server.py
-    evidence: "scripts/admin-server.py:472"
+    evidence: "scripts/admin-server.py:499"
     effect: "Viz-/MCP-Server-Ports, Event-Log, Retention"
   - key: lifecycle-triggers
     reader: scripts/lifecycle_check.py

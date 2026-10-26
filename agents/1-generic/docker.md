@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.9.0"
+version: "1.9.1"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
@@ -125,9 +125,9 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 {{TMP_SINK_PATH}}/"$NAME".log
 ```
 
 {{#if AUTO_COMMIT_ENABLED}}

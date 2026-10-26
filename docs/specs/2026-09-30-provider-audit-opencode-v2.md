@@ -704,3 +704,34 @@ No `DECISION-NEEDED` marker remains; none of the options was deleted (§4 retain
 ## Trace anchor
 
 `spec-id: SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30`
+
+---
+
+## Amendment 2026-10-22 — IC-15 Nr. 16 reversed (opencode v2 surface)
+
+> Docs-only amendment propagated by `SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+> (Rev. 1.5, Amendment B1). `Status: APPROVED (2026-10-01)` is unchanged; no AC
+> is renumbered and no historical statement is deleted.
+
+- **IC-15 Nr. 16 is REVERSED.** The v2 settings document carries the orchestrator
+  dispatch depth as `experimental.subagent_depth`. A top-level `subagent_depth`
+  key is removed and is no longer emitted on the `opencode-json-v2` surface.
+  Reason: the C0 spike
+  (`docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md`) showed
+  the v2 parser discards the v1 top-level `subagent_depth`, so retaining it
+  would silently lose the depth.
+- **Code:** `scripts/lib/context.py::apply_settings_surface_shape` removes the
+  top-level key and writes `experimental.subagent_depth` (value
+  `required_depth_int(capabilities)`, else the template value) when the resolved
+  `mcp-config.format` is `opencode-json-v2`; every other format stays
+  byte-identical. The IC-15 Nr. 16 comment in
+  `scripts/lib/artifact_validate.py` is updated accordingly (validator behaviour
+  is unchanged by this amendment).
+- **Superseded statement:** §5's "contains no v1-only keys (e.g.
+  `subagent_depth`, flat `mcp`)" is narrowed for the top-level depth key by the
+  rule above; the flat-`mcp` prohibition is unaffected.
+- **Docs/tests:** scenario `69-opencode-v2-surface` asserts
+  `experimental.subagent_depth >= 2` plus the absence of the top-level key;
+  `tests/scenarios/registry.md` uses the amended wording.
+- **Trace:** `SPEC-OPENCODE-V2-SUPPORT-2026-10-22` §3.2 ("Amendment zu IC-15
+  Nr. 16"), AC-B1, AC-B2 and AC-T1.

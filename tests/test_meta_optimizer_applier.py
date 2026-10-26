@@ -370,9 +370,9 @@ def test_preview_writes_only_preview_json(preview, proposed):
 def applied(proposed, preview, tmp_path_factory):
     """One real application plus the two preview-tamper probes (AC-90).
 
-    Uses an explicit ``pytest.MonkeyPatch`` for the system-temp guard, records
-    every observation and restores the shared ``project.yaml`` before returning,
-    so the module's cases stay order-independent.
+    Uses an explicit ``pytest.MonkeyPatch`` for the system-temp *creation* guard,
+    records every observation and restores the shared ``project.yaml`` before
+    returning, so the module's cases stay order-independent.
     """
     root = proposed["root"]
     ids = list(proposed["deterministic_ids"])
@@ -383,7 +383,12 @@ def applied(proposed, preview, tmp_path_factory):
     def boom(*_args, **_kwargs):
         raise AssertionError("system temp must not be used")
 
-    for name in ("mkdtemp", "mkstemp", "gettempdir", "NamedTemporaryFile", "TemporaryDirectory"):
+    # Creation APIs only: ``tempfile.gettempdir()`` is a pure read that the
+    # central resolver queries for the "sink not in system temp" check
+    # (``tmp_sink_location_error``, spec §IC-01) and for the sanctioned
+    # pytest-basetemp precedence (IC-04/ADR-01) -- it never creates an entry.
+    # Same deviation as ``tests/test_context_report.py`` (Task 10).
+    for name in ("mkdtemp", "mkstemp", "NamedTemporaryFile", "TemporaryDirectory"):
         monkey.setattr(tempfile, name, boom)
     try:
         # (d) a preview with a flipped hash is rejected before any recomputation
@@ -564,7 +569,7 @@ def test_collect_candidates_removes_its_own_scratch(tmp_path, monkeypatch):
     active = compute_active_set(config, REPO_ROOT, tmp_path, warn_sink=[])
     calls = []
 
-    def fake_render(_agent_meta_root, _config_text, work_dir):
+    def fake_render(_agent_meta_root, _config_text, work_dir, _paths=None):
         work_dir = Path(work_dir)
         calls.append(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -590,7 +595,7 @@ def test_artifact_write_failure_is_out_write_failed(tmp_path, monkeypatch):
     config = yaml.safe_load(cfg.read_text(encoding="utf-8"))
     active = compute_active_set(config, REPO_ROOT, tmp_path, warn_sink=[])
 
-    def fake_render(_agent_meta_root, _config_text, work_dir):
+    def fake_render(_agent_meta_root, _config_text, work_dir, _paths=None):
         work_dir = Path(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
         (work_dir / "CLAUDE.md").write_text("x\n", encoding="utf-8")

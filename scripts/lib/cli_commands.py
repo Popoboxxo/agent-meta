@@ -57,6 +57,10 @@ from lib.harnesses import ensure_write_isolation, resolve_active_harness
 from lib.hooks import create_hook
 from lib.io import SyncError
 from lib.log import SyncLog
+from lib.opencode_v2_config import (
+    sync_opencode_cli_file,
+    sync_opencode_v2_managed_keys,
+)
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -173,9 +177,33 @@ def _run_consistency_checks(agent_meta_root: Path) -> int:
     from lib.consistency.report import Severity, print_report
 
     findings = module.run_checks(agent_meta_root, changed_only=False,
-                                 specific_file=None)
+                                 specific_file=None, include_temp_literals=False)
     print_report(findings, agent_meta_root, changed_only=False)
     return sum(1 for f in findings if f.severity == Severity.ERROR)
+
+
+def _admin_tmp_env(root: Path) -> dict | None:
+    """Return a tmp-sink-pinned env for the admin-server child, else ``None``.
+
+    The pin comes from :func:`lib.tmp_paths.tmp_env` (IC-18/ADR-12): TMPDIR,
+    TEMP and TMP point at the absolute sink while PATH/HOME are inherited.
+    ``None`` means "inherit the parent environment" and is returned for a
+    disabled sink (a supported state, ``tmp-sink.disabled`` must not block the
+    admin lifecycle) or an unresolvable configuration — those are reported by
+    ``sync.py --validate`` already, so a CLI start never fails because of it.
+    """
+    config_path = Path(root) / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        from lib.tmp_paths import resolve_tmp_paths, tmp_env
+
+        paths = resolve_tmp_paths(Path(root), load_config(config_path))
+        if not paths.enabled:
+            return None
+        return tmp_env(paths)
+    except Exception:  # noqa: BLE001 - admin lifecycle must not depend on the sink
+        return None
 
 
 def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict,
@@ -205,7 +233,10 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.dod import resolve_release_gates
     from lib.hook_plugins import sync_hook_lib, sync_release_gates
     from lib.hooks import sync_hooks
-    from lib.isolation import _sync_opencode_runtime_gate
+    from lib.isolation import (
+        _sync_opencode_runtime_gate,
+        reconcile_opencode_surface_gate,
+    )
     from lib.providers import (
         load_provider_capabilities,
         load_providers_config,
@@ -230,6 +261,9 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
 
     validation_errors = 0
     errors_before = len(log.errors)
+    # N-M2 (3) / AC-B20: run-scoped ownership registry mirroring the production
+    # per-provider stage — exactly one owner acts per managed opencode file.
+    test_repo_claimed_files: set[str] = set()
     for provider in providers:
         pc = provider_config[provider]
         caps = capabilities.get(provider, {}) if isinstance(capabilities, dict) else {}
@@ -286,6 +320,27 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
             )
+        # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: same tier-independent surface
+        # reconcile as the production per-provider stage (mirrored so a
+        # --test-generated repo matches), before the managed-key merge.
+        reconcile_opencode_surface_gate(
+            test_repo_path, config, provider, provider_config,
+            agent_meta_root, log, dry_run,
+            active_set=active_set,
+        )
+        # B.7 / AC-B13/B18/B20: same tier-independent call as the production
+        # per-provider stage (mirrored so a --test-generated repo matches).
+        sync_opencode_v2_managed_keys(
+            test_repo_path, config, provider, provider_config,
+            agent_meta_root, log, dry_run,
+            claimed_files=test_repo_claimed_files,
+        )
+        # D2 / AC-D7: same dedicated ``cli_file`` writer as the production
+        # per-provider stage (mirrored so a --test-generated repo matches).
+        sync_opencode_cli_file(
+            test_repo_path, config, provider, provider_config,
+            log, dry_run,
+        )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
                                        dry_run, provider, provider_config=provider_config,
@@ -499,6 +554,7 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
              "--port", str(args.admin_port),
              "--root", str(agent_meta_root)],
             check=False,
+            env=_admin_tmp_env(agent_meta_root),
         )
         return None
 
@@ -1390,6 +1446,11 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # disk or unregistered in settings.json fails OPEN otherwise.
     from lib.consistency.hook_drift import check_hook_enablement_consistency
     _strict_findings += check_hook_enablement_consistency(project_root, agent_meta_root, config, _provider_config)
+    # Temp-literal family (SPEC-tmp-sink-injection AC-21/IC-11/IC-18): WARNING
+    # only, never an exit-code change (ADR-06). Reported here -- and skipped by
+    # `_run_consistency_checks` -- so --validate prints the family exactly once.
+    from lib.consistency.temp_literals import check_temp_literals
+    _strict_findings += check_temp_literals(agent_meta_root, project_root, config)
     _strict_exit_code = 0
     if _strict_findings:
         _strict_exit_code = print_report(_strict_findings, project_root, changed_only=False)
@@ -1606,6 +1667,7 @@ def _run_common_tail(ctx: _SyncContext) -> None:
                  "--port", str(args.admin_port),
                  "--root", str(agent_meta_root)],
                 check=False,
+                env=_admin_tmp_env(agent_meta_root),
             )
 
     if not getattr(args, "check", False) and not getattr(args, "admin", False) and not args.dry_run:

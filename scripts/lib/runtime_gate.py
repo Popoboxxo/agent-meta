@@ -92,6 +92,16 @@ def weakest_runtime_gate_tier(tiers: Iterable[str]) -> str:
 
 PLUGIN_TEMPLATE_BY_PROTOCOL: Dict[str, str] = {
     "opencode-plugin-js": "templates/plugins/runtime-gate.opencode-plugin.js.tmpl",
+    # v2 reads the default export as an object with ``id``/``setup(ctx)`` and
+    # registers hooks via ``ctx.tool.hook(…)``; the v1 factory is ignored
+    # (SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.6; spike Q4). Activation is
+    # justified by the reproducible Q3 probe in
+    # ``docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md``
+    # (``VERDICT-C3: GO``; Lauf 17 shows the hook firing in a subagent session
+    # with a distinguishable parent/child ``sessionID``).
+    "opencode-plugin-v2-js": (
+        "templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl"
+    ),
 }
 
 PLUGIN_STEM = "agent-meta-runtime-gate"

@@ -65,9 +65,33 @@ from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
+from lib.consistency.temp_literals import check_temp_literals
 from lib.io import load_yaml_file
 
 # ── git helpers ───────────────────────────────────────────────────────────────
+
+def _tmp_sink_env(root: Path) -> dict | None:
+    """Return a git-subprocess env pinned to the project tmp-sink.
+
+    ``None`` means "inherit the parent environment": the sink may legitimately
+    be disabled, and a read-only consistency run must still work then (the
+    repository rollback lever is ``tmp-sink.enabled: false``). Configuration
+    errors are reported by ``sync.py --validate``; this helper never raises.
+    """
+    config_path = Path(root) / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        from lib.config import load_config
+        from lib.tmp_paths import resolve_tmp_paths, tmp_env
+
+        paths = resolve_tmp_paths(Path(root), load_config(config_path))
+        if not paths.enabled:
+            return None
+        return tmp_env(paths)
+    except Exception:  # noqa: BLE001 - a read-only check must not depend on the sink
+        return None
+
 
 def get_changed_files(root: Path) -> set[str]:
     """Return set of files changed vs HEAD (staged + unstaged + untracked agents/commands)."""
@@ -76,13 +100,15 @@ def get_changed_files(root: Path) -> set[str]:
         # Tracked changes vs HEAD
         for flag in [["git", "diff", "--name-only", "HEAD"],
                      ["git", "diff", "--name-only", "--cached"]]:
-            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, timeout=10)  # noqa: PLW1510
+            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, timeout=10,  # noqa: PLW1510
+                               env=_tmp_sink_env(root))
             if r.returncode == 0:
                 changed.update(l.strip() for l in r.stdout.splitlines() if l.strip())
         # Untracked new files (agents + commands only)
         r = subprocess.run(  # noqa: PLW1510
             ["git", "ls-files", "--others", "--exclude-standard", "agents/", "commands/"],
             cwd=str(root), capture_output=True, text=True, timeout=10,
+            env=_tmp_sink_env(root),
         )
         if r.returncode == 0:
             changed.update(l.strip() for l in r.stdout.splitlines() if l.strip())
@@ -98,6 +124,7 @@ def get_new_files_vs_main(root: Path) -> list[str]:
             r = subprocess.run(  # noqa: PLW1510
                 ["git", "diff", "--name-only", "--diff-filter=A", f"{base}...HEAD"],
                 cwd=str(root), capture_output=True, text=True, timeout=10,
+                env=_tmp_sink_env(root),
             )
             if r.returncode == 0:
                 return [l.strip() for l in r.stdout.splitlines() if l.strip()]
@@ -144,7 +171,16 @@ def run_checks(
     root: Path,
     changed_only: bool = False,
     specific_file: Path | None = None,
+    include_temp_literals: bool = True,
 ) -> list[Finding]:
+    """Run every framework consistency check and return the findings.
+
+    ``include_temp_literals=False`` lets ``sync.py --validate`` skip the
+    ``temp-literal.*`` family here because it reports that family from its own
+    ``_strict_findings`` block (single report, no duplicate warnings). The
+    standalone ``consistency-check.py`` CLI keeps the default and therefore
+    always includes it.
+    """
     findings: list[Finding] = []
 
     changed_files: set[str] | None = None
@@ -205,6 +241,11 @@ def run_checks(
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)
         findings += check_based_on_stale(root)  # ERROR since IC-15 Nr. 24 (#885 F-09)
+
+        # Temp-literal check (SPEC-tmp-sink-injection AC-21/IC-11, WARNING only):
+        # shipped text must not point at the machine temp directory.
+        if include_temp_literals:
+            findings += check_temp_literals(root, root, project_config)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))

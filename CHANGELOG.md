@@ -9,6 +9,89 @@
   name-only addressable (no keyword rule, `orchestrator_only: true`), each with its own
   output-contract id and handoff targets. Registered across schema enum, addressability pins,
   standalone export, eight scenarios and the README role table.
+- **Tmp-sink injection (`SPEC-tmp-sink-injection`, spec Rev. 3)**: system temp literals in
+  shipped framework text are replaced by the configured sink (`{{TMP_SINK_PATH}}` /
+  `{{TMP_SINK_ABS_PATH}}`), and the pytest basetemp as well as the child-process environment are
+  derived from `repo_containment.tmp-sink.system-temp-exception`. The suite command renders the
+  basetemp as `{{PYTEST_BASETEMP}}` instead of a machine path. A new `temp-literal.*`
+  consistency family (WARNING) reports remaining literals in the scanned framework text, and the
+  `tmp-sink` config keys (`system-temp-exception`, `toolchain-caches` opt-in) are documented in
+  the example config.
+
+## [2.0.0-beta.3] - 2026-10-23
+
+### Added
+- **Opencode v2 surface (opt-in, #1007, `VERDICT-C3: GO`)**: five new
+  `provider-options.Opencode` keys that only take effect with `surface-version: v2` —
+  `experimental-subagent-depth` (writes `experimental.subagent_depth`; default is the capability
+  `required_depth`), `experimental-todo` (writes `experimental.todo`), `providers` (one entry per
+  provider ID, passthrough in the documented inner form `settings.baseURL` + `env`),
+  `model-variants` (role → variant, appended to the model ID as `#variant`) and `cli` (content of
+  `cli.json`). A v2 option in a v1 project writes nothing and warns
+  `opencode-v2-option-ignored`. `experimental-subagent-depth`, `experimental-todo`, `providers`
+  and the `cli.json` file/format are **DOKU**-backed by the C0 spike — documented in v2, not
+  measured in this environment; `system` (body instead of a frontmatter field), `variant` and the
+  `permissions[]` evaluation are VERIFIED.
+- **Managed merge for `opencode.json` (v2)**: agent-meta owns only its own paths
+  (`experimental.subagent_depth`, `experimental.todo`, `providers.<id>`, the gate triples in
+  `permissions[]`, `mcp.servers.<name>`) and records `{value, prior, prior_absent}` per path in
+  `.opencode/agent-meta-state.json` (namespaces `opencode-v2-keys`, `opencode-v2-permissions`,
+  `opencode-v2-mcp`). User keys (`$schema`, `model`, `plugins`, `instructions`, foreign MCP
+  servers, user `permissions[]` entries) survive a sync unchanged; a diverging user value is kept
+  with a WARNING instead of being overwritten, and a v2 → v1 switch restores the prior or removes
+  the key.
+- **Native `permissions[]` gate with the surface-wide rollback (v2, C1)**: the closed-world
+  builder emits exactly one entry per action (`edit`, `shell`, `subagent`; `allow` when the tool is
+  mapped, otherwise `deny`), so a read-only role inherits no write access. The managed `*` deny
+  triple is appended to the **end** of `permissions[]` (last match wins, spike Q3) and the rollback
+  identifies it by its exact value instead of a list index. When the gate stops being effective
+  (surface or tier switch), the triples are removed again **surface-wide**, even when the Spec-A
+  writer never ran.
+- **MCP v2 connection fields (C2, DOKU)**: `mcp.servers.<name>` accepts `timeout` (`startup`
+  alongside `catalog`/`execution`, milliseconds), `oauth` (`client_id`, `client_secret`, `scope`)
+  and `disabled`; the v2 entry carries no `enabled`. Every server name from the active catalog
+  becomes a managed path, foreign servers stay untouched. All three fields are documented in v2
+  but were not probed here; `oauth` deliberately supports only the three named keys and reports
+  the other documented keys (`callback_port`, `redirect_uri`, `auth_server_metadata_url`,
+  `oauth: false`) as a visible finding instead of guessing.
+- **`cli.json` as a managed file (D2, DOKU)**: created only on v2 and only when
+  `provider-options.Opencode.cli` is set; the writer passes the user's top-level keys through
+  generically and manages them per key, so a v2 → v1 switch rolls the file back. `tui.json` is
+  never created, changed or deleted. Documented is only the top-level key `plugins`; `theme` and
+  `autoupdate` are not documented and are not claimed as supported.
+- **Native v2 agent frontmatter (D1/D3)**: generated agents carry the v2 shape `permissions[]`
+  (closed-world, as above), `mode`, `model` with the `#variant` suffix and the `system` body
+  instead of the v1 `permission` map; the primary role receives an `edit: deny` (with the
+  configured `opencode_primary_edit_allow` path allows, here `.tmp/**` and `.meta-viz/**`) while
+  the gate is active. v1 artifacts stay byte-identical.
+- **Scenario 79** (`tests/scenarios/asserts/79-opencode-v2-full-surface.sh`): asserts the full v2 surface
+  end to end, together with the v1 ↔ v2 lab diff and the v2 → v1 switch rollback in
+  `tests/test_opencode_v2_surface.py`; scenario 69 keeps guarding the v2 config keys.
+- **C0 spike result**: `VERDICT-C3: GO` (the v2 plugin mechanism is real, probed on v2.1.3) and
+  `VERDICT-FIELDS: AMEND`, because `agents.title.model` could not be verified — the follow-up
+  Amendment B1 drops `small-model`/AC-B9 instead of inventing a replacement key.
+
+### Changed
+- **v2 settings carry `experimental.subagent_depth` instead of the top-level `subagent_depth`**
+  (IC-15 no. 16 amended): the v2 parser discards the dead top-level key, so the init transform only
+  removes it while the managed-key merge is the single writer of the `experimental` value
+  (Amendment B2 — a fresh project takes merge row 1 instead of adopting an untracked value).
+- **Gate permissions are rolled back surface-wide**: leaving the v2 surface or losing the gate
+  tier removes the managed `permissions[]` triples independent of position (by exact triple, not by
+  index) and clears their state, so a returned v1 document does not keep v2-only triples.
+- **`opencode.jsonc` removed from the repo root**: the C0 evidence
+  (`ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI`) showed the file carries nothing but comments and a
+  `$schema` already present in `opencode.json`, while a content-bearing JSONC would partly shadow
+  the managed JSON. Only this repo removes the file; consumer projects keep theirs.
+- **New warning `opencode-config-duplicate`**: a `.jsonc` twin next to a provider's resolved
+  `settings_file` is reported by `consistency-check.py` (WARNING, rc 1 only with `--strict`).
+- **The v2 runtime-gate plugin runs behind `VERDICT-C3: GO` — observe-only**: the generated
+  `.opencode/plugins/agent-meta-runtime-gate.js` annotates proposed tool calls and never blocks
+  one; enforcement stays with the `permissions[]` deny (`MODE=enforce` remains locked until P6).
+- **Accepted limit (Amendment B4)**: on tier `plugin` the `default_agent` managed merge does not
+  run — `settings-init` writes the value once, a deleted value is not restored, a diverging user
+  value raises no warning and a vanished `primary-role` does not revoke it; the protection then
+  rests on the agent-level `edit: deny` and the `permissions[]` triples.
 
 ### Fixed
 - **Opencode entry point (#1006)**: the orchestrator is now generated as `mode: primary` and

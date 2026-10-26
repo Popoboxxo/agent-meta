@@ -1,6 +1,6 @@
 #!/bin/bash
 # antigravity-json-adapter — Antigravity <-> Claude Code hook-contract adapter
-# version: 1.1.0
+# version: 1.2.0
 # hook_protocol: antigravity-hooks-json
 # description: Translates Google Antigravity's verified hook contract (hooks.json) to the Claude Code contract hooks/1-generic/*.sh are written against (issue #674 Phase 3.1)
 #
@@ -108,7 +108,7 @@ TOOL_MAP = {
     'manage_task': 'Task',
 }
 # Documented AGY run_command arguments (PascalCase) -> Claude tool_input keys.
-ARG_KEY_MAP = {'CommandLine': 'command', 'Cwd': 'cwd'}
+ARG_KEY_MAP = {'CommandLine': 'command', 'Cwd': 'cwd', 'FilePath': 'file_path'}
 
 event = str(d.get('hookEventName') or d.get('hook_event_name') or '')
 tool_call = d.get('toolCall') if isinstance(d.get('toolCall'), dict) else {}

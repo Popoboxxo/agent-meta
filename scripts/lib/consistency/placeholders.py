@@ -132,8 +132,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "AGENTS_DIR",
     # Release / plugin packaging
     "PLUGIN_DIR_NAME",
-    # Tmp-sink path (injected by build_variables; was a builder ratchet entry)
-    "TMP_SINK_PATH",
+    # Tmp-sink paths/env pin (injected by build_variables; was a builder
+    # ratchet entry). Absolute forms are omitted for a disabled sink (AC-25).
+    "TMP_SINK_PATH", "TMP_SINK_ABS_PATH", "TMP_SINK_ENV_PIN_BLOCK",
+    "PYTEST_BASETEMP",
 })
 
 # Placeholder families resolved downstream, not by build_variables():

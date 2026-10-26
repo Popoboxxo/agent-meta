@@ -13,7 +13,8 @@ artifact set identical to a fresh ``sync.py`` result. The original bug: after
 The tests below run the real CLI in a copied, self-hosting scratch tree with a
 minimal project config (single representative provider) so the artifact set is
 small and the run is fast. The scratch lives under pytest's ``tmp_path``
-(basetemp outside the repo, e.g. ``--basetemp=/tmp/$USER/pytest-805``); the copy
+(basetemp outside the repo, e.g. ``--basetemp="<PYTEST_BASETEMP>"``, the value
+sync.py resolves); the copy
 never recurses into ``.tmp`` and never follows symlinks.
 """
 from __future__ import annotations
@@ -62,7 +63,8 @@ def _copy_repo(dest: Path) -> Path:
             raise AssertionError(
                 f"refusing to copy {root} into {resolved}: destination is inside "
                 "the copied source but not under the ignored '.tmp' sink; put "
-                "pytest's basetemp outside the repo (e.g. --basetemp=/tmp/$USER)"
+                "pytest's basetemp outside the repo (e.g. "
+                '--basetemp="<PYTEST_BASETEMP>")'
             )
 
     def ignore(dirname: str, names: list[str]) -> set[str]:

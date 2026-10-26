@@ -1,6 +1,6 @@
 # Devops Engineer — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.2 (role: `devops-engineer`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.3 (role: `devops-engineer`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -182,7 +182,7 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > .tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 .tmp/"$NAME".log
 ```

@@ -1,6 +1,6 @@
 ---
 name: app-lifecycle-governor
-version: 1.4.0
+version: 1.4.1
 description: 'App lifecycle governance: ownership audit with orphan detection, SLA
   validation, data classification checks, lifecycle-stage tracking (prototype → staging
   → production → deprecated → archived), and deprecation-plan verification. Read-only
@@ -14,7 +14,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/app-lifecycle-governor.md@1.4.0
+generated-from: 1-generic/app-lifecycle-governor.md@1.4.1
 model: claude-sonnet-5
 memory: project
 ---

@@ -44,6 +44,26 @@ _STATE_RUNTIME_GATE_KEY = "runtime-gate-deny"
 # "prior": <str | None>}`` where ``value`` is the ``default_agent`` the merge
 # wrote and ``prior`` the user's previous value (``None`` = key was absent).
 _STATE_DEFAULT_AGENT_KEY = "default-agent"
+# Managed-merge namespaces for the opencode v2 surface (#1007/AC-B16), all
+# dict-valued. Declared here because ``isolation`` owns the state file: every
+# writer/reader (``opencode_v2_config``) imports these constants instead of
+# repeating the literals, which keeps one source of truth per namespace.
+_STATE_V2_KEYS = "opencode-v2-keys"
+_STATE_V2_PERMISSIONS = "opencode-v2-permissions"
+_STATE_V2_CLI = "opencode-v2-cli"
+_STATE_V2_MCP = "opencode-v2-mcp"
+
+# The dict-valued namespaces: ``_read_state`` returns ``{}`` (never ``[]``) for
+# these, so an absent/mis-typed record degrades to an empty mapping the callers
+# can use directly. Every other namespace is list-valued.
+_STATE_DICT_KEYS = frozenset((
+    _STATE_RUNTIME_GATE_KEY,
+    _STATE_DEFAULT_AGENT_KEY,
+    _STATE_V2_KEYS,
+    _STATE_V2_PERMISSIONS,
+    _STATE_V2_CLI,
+    _STATE_V2_MCP,
+))
 
 # A2 root-deny (IC-09): the managed glob and decision written INSIDE each
 # permission family mapping. The glob is disjoint from every ``_dir_to_glob``
@@ -191,10 +211,11 @@ def _read_state(state_path: Path, key: str = _STATE_ISOLATION_KEY):
 
     Returns the namespace's empty value when the file or the namespace is
     missing/unparseable: a dict for the dict-valued namespaces
-    (``runtime-gate-deny``, ``default-agent``), a list otherwise.
+    (``_STATE_DICT_KEYS``: ``runtime-gate-deny``, ``default-agent`` and the four
+    ``opencode-v2-*`` namespaces), a list otherwise.
     """
     value = _load_state_data(state_path).get(key)
-    if key in (_STATE_RUNTIME_GATE_KEY, _STATE_DEFAULT_AGENT_KEY):
+    if key in _STATE_DICT_KEYS:
         return value if isinstance(value, dict) else {}
     return value if isinstance(value, list) else []
 
@@ -604,6 +625,20 @@ def _sync_opencode_runtime_gate(
 
     entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
 
+    # v2 surface (#1007/Amendment B1): Spec-A step 4 (the ``permission`` map
+    # merge including its rollback branch) does NOT run here. On a v2 document
+    # the tier-independent ``reconcile_opencode_surface_gate`` is the single
+    # actor for ``permissions[]``; writing the v1 map next to it would produce
+    # a key the v2 schema does not carry (and vice versa on rollback). Steps 1-3
+    # and 5 — entry point, the coupling warning, ``default_agent`` — keep running
+    # unchanged under the unchanged tier call condition (IC-7).
+    #
+    # The import is function-local: ``opencode_v2_config`` imports ``isolation``
+    # at module level, so a top-level import here would be a cycle.
+    from . import opencode_v2_config
+
+    is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
+
     # Entry point (#1006/IC-6): an explicit AND generated primary role.
     entry = _opencode_entry_point(provider, provider_config, active_set)
 
@@ -628,45 +663,47 @@ def _sync_opencode_runtime_gate(
         existing, entry, da_state, bool(entries), log
     )
 
-    permission = existing.get("permission")
-    if not isinstance(permission, dict):
-        permission = {}
     permission_changed = False
     deny_written = False
     deny_removed = False
     state_changed = False
 
-    for family in _RUNTIME_GATE_FAMILIES:
-        mapping = _permission_mapping(permission.get(family))
-        current = mapping.get(_RUNTIME_GATE_GLOB)
+    if not is_v2_surface:
+        permission = existing.get("permission")
+        if not isinstance(permission, dict):
+            permission = {}
 
-        if entries:
-            # Strict: record the prior user value once, then claim the glob.
-            if family not in gate_state:
-                gate_state[family] = current
-                state_changed = True
-            if current != _RUNTIME_GATE_DECISION:
-                mapping[_RUNTIME_GATE_GLOB] = _RUNTIME_GATE_DECISION
-                permission[family] = mapping
-                permission_changed = True
-                deny_written = True
-        else:
-            # Non-strict rollback: only remove OUR deny, then restore the prior.
-            if family in gate_state:
-                if current == _RUNTIME_GATE_DECISION:
-                    prior = gate_state.get(family)
-                    if prior is None:
-                        mapping.pop(_RUNTIME_GATE_GLOB, None)
-                    else:
-                        mapping[_RUNTIME_GATE_GLOB] = prior
+        for family in _RUNTIME_GATE_FAMILIES:
+            mapping = _permission_mapping(permission.get(family))
+            current = mapping.get(_RUNTIME_GATE_GLOB)
+
+            if entries:
+                # Strict: record the prior user value once, then claim the glob.
+                if family not in gate_state:
+                    gate_state[family] = current
+                    state_changed = True
+                if current != _RUNTIME_GATE_DECISION:
+                    mapping[_RUNTIME_GATE_GLOB] = _RUNTIME_GATE_DECISION
                     permission[family] = mapping
                     permission_changed = True
-                    deny_removed = True
-                gate_state.pop(family, None)
-                state_changed = True
+                    deny_written = True
+            else:
+                # Non-strict rollback: only remove OUR deny, then restore the prior.
+                if family in gate_state:
+                    if current == _RUNTIME_GATE_DECISION:
+                        prior = gate_state.get(family)
+                        if prior is None:
+                            mapping.pop(_RUNTIME_GATE_GLOB, None)
+                        else:
+                            mapping[_RUNTIME_GATE_GLOB] = prior
+                        permission[family] = mapping
+                        permission_changed = True
+                        deny_removed = True
+                    gate_state.pop(family, None)
+                    state_changed = True
 
-    if permission_changed:
-        existing["permission"] = permission
+        if permission_changed:
+            existing["permission"] = permission
 
     settings_content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
     rel_settings = "opencode.json"
@@ -696,6 +733,561 @@ def _sync_opencode_runtime_gate(
         )
     if new_da_state != da_state:
         _write_state(state_path, new_da_state, dry_run, _STATE_DEFAULT_AGENT_KEY)
+
+
+# ---------------------------------------------------------------------------
+# Opencode v2: gate permissions in LIST form (#1007, C1)
+# ---------------------------------------------------------------------------
+#
+# The v2 surface expresses permissions as a LIST of
+# ``{action, resource, effect}`` objects (the v1 surface keeps the
+# ``permission`` mapping). Amendment B1 (Spike Q3, VERIFIED) fixed the
+# evaluation order: *last matching rule wins* and agent rules are appended last,
+# so a managed global ``deny`` is only effective at the END of the list — an
+# early entry would be overridden by every later rule, including an agent
+# ``allow``. The rollback therefore identifies its own entries by the exact
+# triple, never by a list index.
+
+_V2_PERMISSIONS_KEY = "permissions"
+# The gate families the list form manages: the same two families as the Spec-A
+# mapping form (``_RUNTIME_GATE_FAMILIES``), expressed with their v2 names.
+_V2_GATE_ACTIONS = ("edit", "shell")
+# v1 -> v2 action names. Data, not a code branch: a v1 family name is translated
+# through this map instead of comparing provider names or surface versions.
+_V2_ACTION_RENAME = {"bash": "shell", "task": "subagent", "edit": "edit"}
+_V2_GATE_RESOURCE = "**"
+_V2_GATE_EFFECT = "deny"
+# State shape: ``{"triples": [[action, resource, effect], ...]}``.
+_V2_TRIPLES_KEY = "triples"
+
+
+def permission_deny_required(
+    provider_config: dict,
+    capabilities: dict,
+    plugin_mode: str,
+) -> bool:
+    """True iff the deny must be enforced through permissions (IC-4 companion).
+
+    A pure function over already-resolved data: ``True`` iff the resolved gate
+    tier is ``"permission"``, or the tier is ``"plugin"`` while the baked plugin
+    runs in ``"observe"`` mode. A plugin in ``observe`` never blocks, so the
+    deny list stays additive; in ``"enforce"`` mode the plugin blocks on its own
+    and the redundant deny is dropped.
+
+    ``provider_config`` is ONE resolved provider entry (``pc``), ``capabilities``
+    its ``provider-capabilities.yaml`` record. ``plugin_mode`` comes from
+    ``runtime_gate._baked_plugin_mode``. Never a provider-name literal — the tier
+    comes from the shared IC-03 resolver.
+    """
+    pc = provider_config if isinstance(provider_config, dict) else {}
+    caps = capabilities if isinstance(capabilities, dict) else {}
+    tier = providers.provider_runtime_gate_tier(pc, caps)
+    if tier == "permission":
+        return True
+    return tier == "plugin" and plugin_mode == "observe"
+
+
+def _capabilities_for(capabilities: dict, provider: str) -> dict:
+    """The per-provider capability record out of either accepted shape.
+
+    Callers pass the full ``capabilities`` registry (``load_provider_capabilities``),
+    but a single per-provider record is tolerated as well — detected by the
+    absence of the provider key, never by a provider literal.
+    """
+    if not isinstance(capabilities, dict):
+        return {}
+    scoped = capabilities.get(provider)
+    if isinstance(scoped, dict):
+        return scoped
+    return capabilities
+
+
+def _v2_provider_entry(provider_config: dict, provider: str) -> dict:
+    """One provider entry out of a registry or a single entry (defensive)."""
+    if isinstance(provider_config, dict):
+        entry = provider_config.get(provider)
+        if isinstance(entry, dict):
+            return entry
+        return provider_config
+    return {}
+
+
+def _v2_committed_file(provider_config: dict) -> str | None:
+    """The owner's ``mcp-config.committed-file``, if declared.
+
+    Accepts a single provider entry or the resolved registry; a registry is
+    searched for the entry that declares the v2 surface format (the same marker
+    ``opencode_v2_config.owns_opencode_surface`` uses), never by provider name.
+    """
+
+    def _from_entry(entry: object) -> str | None:
+        if not isinstance(entry, dict):
+            return None
+        mcp_config = entry.get("mcp-config")
+        if not isinstance(mcp_config, dict):
+            return None
+        committed = mcp_config.get("committed-file")
+        return committed if isinstance(committed, str) and committed else None
+
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    direct = _from_entry(provider_config)
+    if direct is not None:
+        return direct
+    if isinstance(provider_config, dict):
+        for entry in provider_config.values():
+            if not isinstance(entry, dict):
+                continue
+            surface_formats = (entry.get("mcp-config") or {}).get("surface-formats")
+            if not (
+                isinstance(surface_formats, dict)
+                and opencode_v2_config.V2_MCP_FORMAT in surface_formats.values()
+            ):
+                continue
+            found = _from_entry(entry)
+            if found is not None:
+                return found
+    return None
+
+
+def _opencode_v2_gate_permissions(
+    config: dict,
+    provider: str,
+    agent_meta_root: Path,
+    provider_config: dict,
+    capabilities: dict,
+    plugin_mode: str,
+    *,
+    active_set,
+) -> list[dict]:
+    """The effective v2 deny triples for *provider*; empty when inactive.
+
+    Non-empty exactly when all of the following hold: the resolved surface is v2
+    (``opencode_v2_config.v2_active``), ``permission_deny_required`` is true, the
+    gate is effectively strict for this provider (``_resolve_effective_strict``,
+    the same three-tier precedence as IC-4) and an explicit AND generated entry
+    point exists (Spec A ``_opencode_entry_point``) — without it the deny would
+    lock every agent (Spec A IC-6 step 2).
+
+    ``active_set`` is a required keyword and must be the *same* value the Spec-A
+    writer receives (``_sync_opencode_runtime_gate(..., active_set=...)``): the
+    entry-point predicate is "explicit AND generated", so a role that is only
+    declared but not part of the active set never yields triples (QA-C-01). It
+    is deliberately not defaulted to ``None`` — that fail-open made this builder
+    contradict Spec A and write v2 denies for a role that was never generated.
+
+    The calculation is independent of ``_opencode_runtime_gate_entries`` (Spec-A
+    freeze): it produces the LIST form, never the v1 mapping, and never calls
+    the Spec-A decision function.
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    if not opencode_v2_config.v2_active(provider_config, provider):
+        return []
+
+    if not isinstance(capabilities, dict):
+        try:
+            capabilities = providers.load_provider_capabilities(agent_meta_root)
+        except Exception:  # noqa: BLE001 - unreadable registry degrades to advisory
+            capabilities = {}
+
+    pc = _v2_provider_entry(provider_config, provider)
+    if not permission_deny_required(pc, _capabilities_for(capabilities, provider), plugin_mode):
+        return []
+
+    orch = config.get("orchestrator", {}) if isinstance(config, dict) else {}
+    if not _resolve_effective_strict(orch, provider):
+        return []
+
+    if _opencode_entry_point(provider, provider_config, active_set) is None:
+        return []
+
+    return [
+        {"action": action, "resource": _V2_GATE_RESOURCE, "effect": _V2_GATE_EFFECT}
+        for action in _V2_GATE_ACTIONS
+    ]
+
+
+def _permission_triple(entry: object) -> tuple | None:
+    """``(action, resource, effect)`` of a permission list entry, else ``None``."""
+    if not isinstance(entry, dict):
+        return None
+    action = entry.get("action")
+    resource = entry.get("resource")
+    effect = entry.get("effect")
+    if all(isinstance(part, str) and part for part in (action, resource, effect)):
+        return (action, resource, effect)
+    return None
+
+
+def _triple_entry(triple: tuple) -> dict:
+    """The list entry for a ``(action, resource, effect)`` triple."""
+    action, resource, effect = triple
+    return {"action": action, "resource": resource, "effect": effect}
+
+
+def _triples_from_state(state: object) -> list[tuple]:
+    """The recorded triples of the ``opencode-v2-permissions`` namespace."""
+    if not isinstance(state, dict):
+        return []
+    raw = state.get(_V2_TRIPLES_KEY)
+    if not isinstance(raw, list):
+        return []
+    triples: list[tuple] = []
+    for item in raw:
+        if not isinstance(item, (list, tuple)) or len(item) != 3:
+            continue
+        triple = tuple(item)
+        if not all(isinstance(part, str) and part for part in triple):
+            continue
+        if triple not in triples:
+            triples.append(triple)
+    return triples
+
+
+def _last_triple_index(permissions: list, triple: tuple) -> int | None:
+    """Index of the LAST entry equal to *triple* (ours are appended last)."""
+    for index in range(len(permissions) - 1, -1, -1):
+        if _permission_triple(permissions[index]) == triple:
+            return index
+    return None
+
+
+def _sync_opencode_v2_gate_permissions(
+    project_root: Path,
+    provider_config: dict,
+    entries: list[dict],
+    log: SyncLog,
+    dry_run: bool,
+) -> bool:
+    """Merge/roll back the v2 gate triples in the owner's ``permissions[]``.
+
+    Writes only the triples in *entries* (the builder output) and removes only
+    the triples recorded in the ``opencode-v2-permissions`` state namespace:
+
+    - insertion at the END of the list (Amendment B1: last match wins);
+    - a triple that already exists — e.g. an identical user entry — is neither
+      duplicated nor claimed (it stays untracked and survives a rollback);
+    - the rollback is position-independent: it looks up the exact triple, so a
+      user reordering the list cannot make it delete the wrong entry;
+    - the user's entries keep their relative order and are never rewritten.
+
+    Returns ``True`` when the document or the state changed. ``dry_run`` reports
+    the change without touching the file or the state. An unparseable document
+    or a non-list ``permissions`` value is left untouched (data-loss guard).
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    root = Path(project_root)
+    committed = _v2_committed_file(provider_config)
+    if committed is None:
+        return False
+
+    try:
+        state_rel = opencode_v2_config.opencode_state_path(
+            root, provider_config
+        ).relative_to(root)
+    except ValueError:
+        return False
+    state_path = safe_path(root, state_rel)
+    file_path = safe_path(root, committed)
+
+    recorded = _triples_from_state(_read_state(state_path, _STATE_V2_PERMISSIONS))
+
+    wanted: list[tuple] = []
+    for entry in entries or []:
+        triple = _permission_triple(entry)
+        if triple is not None and triple not in wanted:
+            wanted.append(triple)
+
+    if not wanted and not recorded:
+        return False
+
+    existing = _read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return False  # parse error — warning already emitted
+        existing = {}
+    elif not isinstance(existing, dict):
+        return False  # not ours to rewrite
+
+    raw_permissions = existing.get(_V2_PERMISSIONS_KEY)
+    if raw_permissions is None:
+        permissions: list = []
+    elif isinstance(raw_permissions, list):
+        permissions = list(raw_permissions)
+    else:
+        log.warning(
+            f"{committed}: '{_V2_PERMISSIONS_KEY}' is not a list — "
+            "leaving the v2 gate permissions untouched"
+        )
+        return False
+
+    wanted_set = set(wanted)
+    file_changed = False
+
+    # Rollback: exactly the recorded triples that are no longer wanted, located
+    # by value (position-independent), last occurrence first (our entries are
+    # appended at the end).
+    for triple in recorded:
+        if triple in wanted_set:
+            continue
+        index = _last_triple_index(permissions, triple)
+        if index is not None:
+            del permissions[index]
+            file_changed = True
+
+    present = {
+        triple
+        for triple in (_permission_triple(item) for item in permissions)
+        if triple is not None
+    }
+    appended: set = set()
+    for triple in wanted:
+        if triple in present:
+            # An identical entry is already there (ours from an earlier sync, or
+            # a user's own) — never duplicate it and never move it.
+            continue
+        permissions.append(_triple_entry(triple))
+        present.add(triple)
+        appended.add(triple)
+        file_changed = True
+
+    recorded_set = set(recorded)
+    new_triples = [
+        triple
+        for triple in wanted
+        if triple in appended or triple in recorded_set
+    ]
+    new_state = (
+        {_V2_TRIPLES_KEY: [list(triple) for triple in new_triples]}
+        if new_triples
+        else {}
+    )
+    old_state = (
+        {_V2_TRIPLES_KEY: [list(triple) for triple in recorded]}
+        if recorded
+        else {}
+    )
+    state_changed = new_state != old_state
+
+    if file_changed:
+        if permissions:
+            existing[_V2_PERMISSIONS_KEY] = permissions
+        else:
+            # Prune the container we filled: an empty ``permissions`` list would
+            # be an unknown key on a v1 document after a surface switch.
+            existing.pop(_V2_PERMISSIONS_KEY, None)
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(
+            file_path,
+            content,
+            log,
+            committed,
+            allow_secrets=False,
+            config=None,
+            dry_run=dry_run,
+            verify_gitignored=False,
+        ):
+            log.action("WRITE", committed, "opencode-v2 gate permissions")
+        else:
+            log.skip(committed, "opencode-v2 gate permissions unchanged")
+
+    if state_changed:
+        _write_state(state_path, new_state, dry_run, _STATE_V2_PERMISSIONS)
+
+    return file_changed or state_changed
+
+
+def _rollback_opencode_v1_gate_map(
+    project_root: Path,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Take back the Spec-A ``permission`` map after a v1 → v2 surface switch.
+
+    Mirrors the else-branch of Spec A step 4 (``_sync_opencode_runtime_gate``)
+    without touching that frozen function: the ``**`` deny is removed only while
+    it still carries the managed decision, the recorded ``prior`` value is
+    restored, the family entry is dropped, empty containers are pruned and the
+    ``runtime-gate-deny`` namespace is emptied. A value the user changed is left
+    alone — only the state entry goes (we no longer own it). No state ⇒ no-op,
+    so the call can run on every v2 surface.
+
+    The state lives in the parent of the owner's committed file, never in a
+    hardcoded path (N-M2/§3.2).
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    root = Path(project_root)
+    committed = _v2_committed_file(provider_config)
+    if committed is None:
+        return
+    try:
+        state_rel = opencode_v2_config.opencode_state_path(
+            root, provider_config
+        ).relative_to(root)
+    except ValueError:
+        return
+    state_path = safe_path(root, state_rel)
+
+    state = _read_state(state_path, _STATE_RUNTIME_GATE_KEY)
+    gate_state = state.get(_RUNTIME_GATE_GLOB)
+    if not isinstance(gate_state, dict) or not gate_state:
+        return
+    before = dict(gate_state)
+
+    file_path = safe_path(root, committed)
+    existing = _read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, skip the write
+        existing = {}
+    elif not isinstance(existing, dict):
+        return  # not ours to rewrite
+
+    permission = existing.get("permission")
+    permission = permission if isinstance(permission, dict) else {}
+
+    file_changed = False
+    for family in _RUNTIME_GATE_FAMILIES:
+        if family not in gate_state:
+            continue
+        mapping = _permission_mapping(permission.get(family))
+        if mapping.get(_RUNTIME_GATE_GLOB) == _RUNTIME_GATE_DECISION:
+            prior = gate_state.get(family)
+            if prior is None:
+                mapping.pop(_RUNTIME_GATE_GLOB, None)
+            else:
+                mapping[_RUNTIME_GATE_GLOB] = prior
+            if mapping:
+                permission[family] = mapping
+            else:
+                permission.pop(family, None)
+            file_changed = True
+        # Whether or not the value was still ours, the record is stale now.
+        gate_state.pop(family, None)
+
+    if file_changed:
+        if permission:
+            existing["permission"] = permission
+        else:
+            existing.pop("permission", None)
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(file_path, content, log, committed, dry_run=dry_run):
+            log.action("WRITE", committed, "runtime-gate deny removed: permission map")
+        else:
+            log.skip(committed, "runtime-gate deny unchanged")
+
+    if gate_state != before:
+        _write_state(
+            state_path,
+            {_RUNTIME_GATE_GLOB: gate_state} if gate_state else {},
+            dry_run,
+            _STATE_RUNTIME_GATE_KEY,
+        )
+
+
+def reconcile_opencode_surface_gate(
+    project_root: Path,
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+    *,
+    active_set,
+) -> None:
+    """Reconcile the gate form with the active opencode surface (spec §3.4).
+
+    The single actor for the v2 ``permissions[]`` triples and for the surface
+    switch rollback. Tier-independent (it also runs when the Spec-A writer does
+    not) but provider-bound: a non-owner returns before any state or file read
+    (N-M2), so a Claude/Gemini iteration can never undo the opencode state.
+
+    ``active_set`` is a required keyword (QA-C-01): both production call sites
+    pass the same per-sync active set as the Spec-A writer
+    (``_sync_opencode_runtime_gate``), so the "explicit AND generated primary
+    role" predicate (``_opencode_entry_point``) is evaluated identically in both
+    writers. A fail-open default (``None``) is not acceptable here — it made
+    this function write deny triples for a declared-but-not-generated role while
+    Spec A refused its deny and warned "the gate would lock every agent".
+
+    Binding rollback matrix, in order:
+
+    1. v1 → v2: first take back the Spec-A ``permission`` map recorded in the
+       ``runtime-gate-deny`` namespace, then write the ``permissions[]`` triples.
+    2. v2 → v1: remove the triples recorded in ``opencode-v2-permissions`` (only
+       the unchanged ones) and empty the namespace — regardless of tier; the v1
+       map is then written by Spec A on the ``permission`` tier.
+    3. v2, tier ``permission``, strict off: entries ``[]`` → remove the triples.
+    4. v2, tier ``plugin`` + ``observe``, strict on: ``permission_deny_required``
+       true → the triples stay/get written (the plugin never weakens the gate).
+    5. v2, tier ``plugin`` + ``enforce`` or tier ``advisory``: entries ``[]`` →
+       remove the triples, even when the Spec-A writer never ran.
+    6. v2, no entry point: entries ``[]`` → remove the triples; when the tier is
+       not ``permission`` (Spec A step 2 does not run) this function emits the
+       ``primary-role`` warning itself, otherwise Spec A's warning stays the only
+       one.
+    7. v2, nothing in state, strict off: no-op.
+
+    ``plugin_mode`` comes from ``runtime_gate._baked_plugin_mode`` and
+    ``capabilities`` from ``providers.load_provider_capabilities``. Both imports
+    stay function-local: ``isolation`` ↔ ``opencode_v2_config`` would be an
+    import cycle, and the plugin mode is a sync-time constant.
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    if not opencode_v2_config.owns_opencode_surface(provider_config, provider):
+        return
+
+    from . import runtime_gate  # lazy: keeps the module import surface small
+
+    plugin_mode = runtime_gate._baked_plugin_mode()
+    try:
+        capabilities = providers.load_provider_capabilities(agent_meta_root)
+    except Exception:  # noqa: BLE001 - unreadable registry degrades to advisory
+        capabilities = {}
+
+    is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
+
+    # Row 1: the old v1 mapping must go before the v2 list is written.
+    if is_v2_surface:
+        _rollback_opencode_v1_gate_map(project_root, provider_config, log, dry_run)
+
+    entries = _opencode_v2_gate_permissions(
+        config, provider, agent_meta_root, provider_config, capabilities, plugin_mode,
+        active_set=active_set,
+    )
+
+    # Row 6 (AC-C15): on the ``permission`` tier Spec A's coupling warning is
+    # the single one; on every other tier Spec A never runs, so the consequence
+    # of a missing entry point would otherwise go untold. The predicate uses the
+    # same active set as the builder and the Spec-A writer (QA-C-01).
+    if is_v2_surface and not entries:
+        if _opencode_entry_point(provider, provider_config, active_set) is None:
+            pc = _v2_provider_entry(provider_config, provider)
+            tier = providers.provider_runtime_gate_tier(
+                pc, _capabilities_for(capabilities, provider)
+            )
+            if tier != "permission":
+                log.warning(
+                    "opencode-v2 gate (permissions deny) NOT written for "
+                    f"provider '{provider}': no explicit and generated "
+                    "primary-role — the gate would lock every agent; declare "
+                    "primary-role in config/ai-providers.yaml and keep that "
+                    "role in the active set"
+                )
+
+    _sync_opencode_v2_gate_permissions(
+        project_root, provider_config, entries, log, dry_run
+    )
 
 
 # ---------------------------------------------------------------------------

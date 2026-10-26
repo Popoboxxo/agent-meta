@@ -1,6 +1,6 @@
 # Se Requirements — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.2 (role: `se-requirements`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.3 (role: `se-requirements`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -170,7 +170,7 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: an `se-orchestr
 ## Step Persistence
 **Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md`
 **Frontmatter:** `step: requirements`, `agent: se-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus die Pflichtfelder des REQ-Frontmatter-Standards (siehe oben; `document_frontmatter`-Felder direkt in den YAML-Block übernehmen).
-**Atomic write:** temp → rename → `.se-state.yaml` `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
+**Atomic write:** write to `.tmp/se-requirements-<topic>.md` → rename → `.se-state.yaml` `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
 
 <output_contract>
 ```

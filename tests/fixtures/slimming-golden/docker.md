@@ -1,6 +1,6 @@
 ---
 name: docker
-version: 1.9.0
+version: 1.9.1
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 hint: Start/stop dev stack, Dockerfiles, binary management
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/docker.md@1.9.0
+generated-from: 1-generic/docker.md@1.9.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -132,9 +132,9 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > .tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 .tmp/"$NAME".log
 ```
 </output-guard>
 

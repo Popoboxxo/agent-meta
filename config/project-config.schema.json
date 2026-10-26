@@ -876,6 +876,37 @@
             "agent-discovery": {
               "type": "boolean",
               "description": "Provider-neutral discovery-surface opt-in. Default: false."
+            },
+            "experimental-subagent-depth": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "v2: experimental.subagent_depth. Default: capabilities required_depth (Quelle wie bisher subagent_depth)."
+            },
+            "experimental-todo": {
+              "type": "boolean",
+              "description": "v2: experimental.todo. Default: nicht gesetzt (Key wird nicht geschrieben)."
+            },
+            "providers": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9_-]+$"
+              },
+              "additionalProperties": {
+                "type": "object"
+              },
+              "description": "v2: Passthrough in den Top-Level-Key providers; Schluessel = Provider-ID."
+            },
+            "model-variants": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              "description": "v2: Rolle -> Variante; wird als '#variant' an die Modell-ID gehaengt."
+            },
+            "cli": {
+              "type": "object",
+              "description": "v2: Inhalt von cli.json (Passthrough). Fehlt der Key, wird keine cli.json geschrieben."
             }
           }
         },
@@ -1181,6 +1212,45 @@
                 },
                 "headers": {
                   "type": "object"
+                },
+                "timeout": {
+                  "type": "object",
+                  "description": "MCP tool-call timeouts in milliseconds (opencode v2). All keys are optional; each must be a positive integer. `startup` (Amendment B1) is the server startup budget.",
+                  "properties": {
+                    "startup": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "catalog": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "execution": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "oauth": {
+                  "type": "object",
+                  "description": "Managed OAuth credentials for the MCP server (opencode v2, snake_case). Deliberately limited to these three keys: the v2-documented but unsupported keys (callback_port, redirect_uri, auth_server_metadata_url) and `oauth: false` are rejected here so they fail visibly instead of being silently dropped. Secrets belong in `{env:VAR}` placeholders, never plaintext.",
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "client_secret": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Deactivate this MCP server for the opencode v2 surface. Absence means active."
                 }
               }
             },
@@ -1282,6 +1352,45 @@
                     },
                     "headers": {
                       "type": "object"
+                    },
+                    "timeout": {
+                      "type": "object",
+                      "description": "MCP tool-call timeouts in milliseconds (opencode v2). All keys are optional; each must be a positive integer. `startup` (Amendment B1) is the server startup budget.",
+                      "properties": {
+                        "startup": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "catalog": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "execution": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "oauth": {
+                      "type": "object",
+                      "description": "Managed OAuth credentials for the MCP server (opencode v2, snake_case). Deliberately limited to these three keys: the v2-documented but unsupported keys (callback_port, redirect_uri, auth_server_metadata_url) and `oauth: false` are rejected here so they fail visibly instead of being silently dropped. Secrets belong in `{env:VAR}` placeholders, never plaintext.",
+                      "properties": {
+                        "client_id": {
+                          "type": "string"
+                        },
+                        "client_secret": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "disabled": {
+                      "type": "boolean",
+                      "description": "Deactivate this MCP server for the opencode v2 surface. Absence means active."
                     }
                   }
                 },
@@ -2489,6 +2598,33 @@
               ],
               "default": "manual",
               "description": "manual = never delete contents automatically (safe default). on-sync = prune the directory on each sync run (opt-in, destructive)."
+            },
+            "system-temp-exception": {
+              "type": "object",
+              "description": "Named, documented exception for the only writes allowed to leave the repo: pytest's --basetemp (and, opt-in, pip/npm toolchain caches). Missing block = framework defaults (enabled true, pytest-basetemp true).",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable the system-temp exception. When false, no write may leave the repo and 'pytest-basetemp: true' is a config error."
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Why writes may leave the repo. Required by the sync-time validator whenever the exception is enabled (default)."
+                },
+                "pytest-basetemp": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Allow pytest --basetemp to use the platform temp root. Requires enabled: true; the rendered value is injected via {{PYTEST_BASETEMP}}."
+                },
+                "toolchain-caches": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Opt-in pip/npm cache redirection (PIP_CACHE_DIR, npm_config_cache). Default false; true requires enabled: true (validated in a later task)."
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

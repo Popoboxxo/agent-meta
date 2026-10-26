@@ -165,6 +165,11 @@ variables:
   TESTER_SNIPPETS_PATH: tester/bun-typescript.md
   DEVELOPER_SNIPPETS_PATH: developer/bun-typescript.md
 
+  # Token {{PYTEST_BASETEMP}}: wird beim Sync in TEST_COMMANDS und
+  # CODE_QUALITY_RULES durch den aufgelösten, shell-gequoteten pytest-Basetemp
+  # ersetzt (Quelle: repo_containment.tmp-sink.system-temp-exception).
+  # Kein Pfad-Literal und kein Shell-Variablen-Ausdruck eintragen — der Token
+  # ist die einzige erlaubte Quelle des Basetemp-Werts.
   TEST_COMMANDS: |
     bun test
     bun test --coverage

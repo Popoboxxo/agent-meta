@@ -138,6 +138,74 @@ def _apply_surface_mechanism_selection(provider_config: dict) -> dict:
     return provider_config
 
 
+def _apply_surface_aux_selection(provider_config: dict) -> dict:
+    """Resolve auxiliary surface values from ``surface-version``.
+
+    SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (plan Task 6; AC-B12 resolution,
+    AC-D7 resolution). Two generic per-surface maps are resolved with the same
+    lookup-by-value pattern as :func:`_apply_surface_format_selection`:
+
+    - ``entry["cli-files"][<surface-version>]`` → flat ``entry["cli_file"]``
+      (the committed CLI settings filename for that surface);
+    - ``entry["surface-plugin-protocols"][<surface-version>]`` → flat
+      ``entry["plugin_protocol"]`` (the verified plugin runtime protocol);
+    - ``entry["surface-has-plugins"][<surface-version>]`` → flat
+      ``entry["has_plugins"]`` (the capability flag of that surface);
+    - ``entry["agent-transform"]["surface-model-patterns"][<surface-version>]``
+      → ``entry["agent-transform"]["model-pattern"]`` (the model-id contract).
+
+    The plugin maps are the C3 activation channel: the static ``has_plugins``
+    stays ``false`` so a surface without an entry (``v1``) never resolves to
+    tier ``plugin`` (spec §3.1 B-1 / B-D7). Both values are type-checked; a
+    malformed map value leaves the statically declared key untouched.
+
+    Providers without the map, without the relevant block, or whose
+    ``surface-version`` is not a key of the map keep their statically declared
+    ``cli_file`` / ``model-pattern`` byte-for-byte (fail-safe, never raises —
+    a missing surface key is not an error). The mapping is looked up by value,
+    so no provider-name literal and no ``surface-version`` comparison is
+    involved; the writers dispatch on the resolved ``cli_file`` /
+    ``model-pattern`` values only.
+
+    Returns the same mapping object with per-entry dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or not surface_version:
+            continue
+        cli_files = entry.get("cli-files")
+        if isinstance(cli_files, dict) and cli_files:
+            selected_cli_file = cli_files.get(surface_version)
+            if isinstance(selected_cli_file, str) and selected_cli_file:
+                entry["cli_file"] = selected_cli_file
+        plugin_protocols = entry.get("surface-plugin-protocols")
+        if isinstance(plugin_protocols, dict) and plugin_protocols:
+            selected_protocol = plugin_protocols.get(surface_version)
+            if isinstance(selected_protocol, str) and selected_protocol:
+                entry["plugin_protocol"] = selected_protocol
+        has_plugins_by_surface = entry.get("surface-has-plugins")
+        if (
+            isinstance(has_plugins_by_surface, dict)
+            and has_plugins_by_surface
+            and isinstance(has_plugins_by_surface.get(surface_version), bool)
+        ):
+            entry["has_plugins"] = has_plugins_by_surface[surface_version]
+        transform = entry.get("agent-transform")
+        if not isinstance(transform, dict):
+            continue
+        model_patterns = transform.get("surface-model-patterns")
+        if not isinstance(model_patterns, dict) or not model_patterns:
+            continue
+        selected_pattern = model_patterns.get(surface_version)
+        if isinstance(selected_pattern, str) and selected_pattern:
+            transform["model-pattern"] = selected_pattern
+    return provider_config
+
+
 #: Value type per allow-listed override key. Used instead of an inline
 #: ``key == "surface-version"`` branch so the override stays data-driven and
 #: never appears as a surface-version comparison (AC-23 guard).
@@ -249,9 +317,11 @@ def load_providers_config(
 
     The returned registry is normalized once so ``mcp-config.format`` already
     reflects the ``surface-version`` selection (see
-    ``_apply_surface_format_selection``) and ``agent-transform.frontmatter-
+    ``_apply_surface_format_selection``), ``agent-transform.frontmatter-
     mechanism`` reflects the ``surface-version`` selection (see
-    ``_apply_surface_mechanism_selection``); the writers never read
+    ``_apply_surface_mechanism_selection``) and the auxiliary surface values
+    (``cli_file``, ``agent-transform.model-pattern``) reflect it too (see
+    ``_apply_surface_aux_selection``); the writers never read
     ``surface-version``.
 
     When *project_config* is given, the project ``provider-options`` surface
@@ -345,7 +415,8 @@ def load_providers_config(
     if project_config is not None:
         providers = _apply_project_surface_overrides(providers, project_config)
     providers = _apply_surface_format_selection(providers)
-    return _apply_surface_mechanism_selection(providers)
+    providers = _apply_surface_mechanism_selection(providers)
+    return _apply_surface_aux_selection(providers)
 
 
 def load_provider_capabilities(agent_meta_root: Path) -> dict:
@@ -619,10 +690,11 @@ def context_topology(config: Optional[dict], provider: Optional[str] = None) -> 
 SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json", "antigravity-hooks-json"}
 
 # Plugin analogue of SUPPORTED_HOOK_PROTOCOLS: only a `plugin_protocol` listed
-# here counts as a verified native plugin runtime. Phase 0 ships the machine
-# flag surface; no provider declares `has_plugins`/`plugin_protocol` yet, so
-# the plugin tier stays unreachable until the P6 verification (Phase 1).
-SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js"}
+# here counts as a verified native plugin runtime. `opencode-plugin-v2-js` is
+# added by SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.6 (phase C3) after the C0
+# spike recorded `VERDICT-C3: GO` with reproducible Q1–Q3 probes; the v1
+# protocol stays supported so both surfaces keep their verified runtime.
+SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js", "opencode-plugin-v2-js"}
 
 
 def provider_hooks_supported(pc: dict) -> bool:

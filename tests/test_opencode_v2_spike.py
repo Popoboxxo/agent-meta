@@ -194,10 +194,13 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
 
     The verdict is read from the spike document, never hard-coded. In the
     NO-GO case the permission-tier fallback is verified end-to-end on a v2
-    project fixture; in the GO case (current verdict) only the one-direction
-    invariant "C3 registry keys present => verdict is GO" is asserted. Task 19
-    tightens that to equivalence; the reverse direction is deliberately not
-    asserted here (the keys do not exist before Task 18).
+    project fixture. In the GO case (current verdict) the full equivalence of
+    AC-C2 is asserted: the C3 registry keys are present **exactly when** the
+    verdict is GO. C0 shipped only the implication "keys present => GO"; Task
+    19 sharpens it to "present <=> GO", so a registry that loses the keys while
+    the verdict stays GO fails just like keys without a GO verdict. The
+    equivalence is GLOBAL: it is evaluated for every registry entry that
+    declares one of the two keys (QA-D-04), not only for the v2 fixture below.
     """
     verdict = _c3_verdict()
     pc, caps = _resolved_v2_provider()
@@ -207,14 +210,37 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
     assert pc["mcp-config"]["format"] == "opencode-json-v2"
     assert pc["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
 
-    # Invariant that holds in BOTH verdict cases (AC-C2): declaring the C3
-    # surface keys without a GO verdict is a contract violation.
+    # AC-C2 equivalence (Task 19): C3 keys present <=> verdict is GO. The keys
+    # are both-or-none registry data, so a partial set is a contract violation
+    # under either verdict — the expected presence is compared as a list.
+    # QA-D-04: ``VERDICT-C3`` is GLOBAL, so the equivalence is checked for EVERY
+    # registry entry that declares one of the two keys, not just this fixture's
+    # provider. A second entry that carries only half the pair (or that keeps
+    # the keys under a NO-GO verdict) must fail as loudly as this one.
+    expected_keys = list(_C3_REGISTRY_KEYS) if verdict == "GO" else []
     present_keys = [key for key in _C3_REGISTRY_KEYS if key in pc]
-    if present_keys:
-        assert verdict == "GO", (
-            f"registry declares C3 surface keys {present_keys} but the spike "
-            f"verdict is {verdict!r}; C3 keys require VERDICT-C3: GO"
+    declaring = {
+        name: [key for key in _C3_REGISTRY_KEYS if key in entry]
+        for name, entry in load_providers_config(REPO_ROOT).items()
+        if isinstance(entry, dict) and any(key in entry for key in _C3_REGISTRY_KEYS)
+    }
+    if verdict == "GO":
+        assert declaring, (
+            "AC-C2 equivalence violated: VERDICT-C3 is 'GO', so at least one "
+            "registry entry must declare the C3 surface keys "
+            f"{expected_keys!r}, found none"
         )
+    for name, entry_keys in declaring.items():
+        assert entry_keys == expected_keys, (
+            f"AC-C2 equivalence violated for provider {name!r}: VERDICT-C3 is "
+            f"{verdict!r}, so the registry must declare the C3 surface keys "
+            f"{expected_keys!r}, found {entry_keys!r}"
+        )
+    assert present_keys == expected_keys, (
+        f"AC-C2 equivalence violated: VERDICT-C3 is {verdict!r}, so the registry "
+        f"must declare the C3 surface keys {expected_keys!r}, "
+        f"found {present_keys!r}"
+    )
 
     if verdict != "NO-GO":
         return

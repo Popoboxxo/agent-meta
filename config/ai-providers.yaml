@@ -276,16 +276,30 @@ providers:
     - AGENTS.md
     isolation-mechanism: opencode-permissions
     # Runtime-gate plugin capability (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13,
-    # IC-02). has_plugins stays false until the P6 real-repo verification
-    # (Task 9) records that tool.execute.before fires in subagent sessions and
-    # that the Main Chat is distinguishable — until then the resolved tier
-    # stays `permission` and no plugin artifact is generated. plugin_dir/
-    # plugin_ext/plugin_protocol document the capability the generator uses
-    # once the flag is unlocked.
+    # IC-02). This static default describes the v1 surface: with
+    # `has_plugins: false` v1 resolves to tier `permission` and never receives a
+    # plugin artifact. The v2 surface activates the plugin runtime through DATA
+    # in the Phase C3 block below (`surface-has-plugins` /
+    # `surface-plugin-protocols`), so a v2 project resolves to tier `plugin` and
+    # gets the observe artifact. The P6 real-repo verification (Task 9) now
+    # gates `MODE=enforce` only — the generated artifact stays observe-only and
+    # the blocking path is not implemented. plugin_dir/plugin_ext/
+    # plugin_protocol document the capability the generator uses.
     has_plugins: false
     plugin_dir: .opencode/plugins
     plugin_ext: .js
     plugin_protocol: opencode-plugin-js
+    # Phase C3 (SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1/§3.6): the v2 surface
+    # activates the native plugin runtime through DATA only. The static
+    # `has_plugins: false` above stays, so a v1 project keeps tier `permission`
+    # and never gets an artifact (B-D7/AC-C13). Activation is justified by the
+    # reproducible Q3 probe in
+    # docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md
+    # (`VERDICT-C3: GO`; Lauf 17 shows the hook firing in a subagent session).
+    surface-plugin-protocols:
+      v2: opencode-plugin-v2-js
+    surface-has-plugins:
+      v2: true
     runtime_gate-mechanism: opencode-plugin
     bash_tool_name: bash
     provider_root_dirs:
@@ -305,6 +319,12 @@ providers:
       surface-formats:
         v1: opencode-json
         v2: opencode-json-v2
+    # SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (Task 6): per-surface CLI
+    # settings filename. `surface-version` SELECTS it and the loader exposes
+    # the flat resolved key `cli_file`; no v1 entry means v1 writes no such
+    # file (v1 stays byte-frozen).
+    cli-files:
+      v2: cli.json
     skills_dir: .opencode/skills
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
@@ -321,6 +341,13 @@ providers:
       surface-mechanisms:
         v1: opencode-native
         v2: opencode-native-v2
+      # SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (Task 6): v2 model ids are
+      # `provider/model[#variant]`. `surface-version` SELECTS the pattern;
+      # `artifact_validate` reads the resolved `model-pattern` only.
+      surface-model-patterns:
+        v2: '^[^/#\s]+/[^#\s]+(#[A-Za-z0-9._-]+)?$'
+      # Allow-list source for the v2 native frontmatter fields (Spec §3.2, D1).
+      surface-v2-fields: [system, permissions, steps, variant]
       tools-format: keep
       tool-name-map: {}
       # §4.3: allow-list turns Opencode v2's silent frontmatter drop into a
@@ -348,6 +375,11 @@ providers:
       - subagent
       - hidden
       - color
+      # Task 22 (§4.3): `system` is a legitimate emitted key of the v1 surface
+      # (the v2 surface strips it — the Markdown body IS the system prompt,
+      # Spike Q5). The allow-list is the superset of both surfaces, so a v1
+      # artifact carrying `system` is not a sync-time finding.
+      - system
       reject-fields: []
     model-tiers:
       nano: opencode-go/deepseek-v4.1-flash

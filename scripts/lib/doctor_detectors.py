@@ -32,9 +32,8 @@ from .doctor_predicates import (
 )
 from .doctor_registry import COMMAND_ALLOWLIST, FORBIDDEN_ARGV
 from .frontmatter import parse_frontmatter_text, split_frontmatter
-from .repo_containment import (
-    DEFAULT_TMP_SINK_PATH, tmp_sink_location_error, tmp_sink_path_error,
-)
+from .repo_containment import TmpSinkError
+from .tmp_paths import resolve_tmp_paths
 
 PROJECT_CONFIG_REL = ".meta-config/project.yaml"
 RUNTIME_READERS_REL = "config/runtime-config-readers.yaml"
@@ -401,14 +400,24 @@ def _env_hits(env: Env) -> list:
 
 
 def _sink_hits(env: Env) -> list:
-    path = get_path(env.config, "repo_containment.tmp-sink.path", DEFAULT_TMP_SINK_PATH)
-    error = tmp_sink_path_error(path, env.project_root)
-    if error is None and isinstance(path, str):
-        error = tmp_sink_location_error(path, env.project_root)
-    if error is None:
-        return []
-    return [Hit(PROJECT_CONFIG_REL, quoted=clip(repr(path)), bindings={"reason": error},
-                severity=Severity.ERROR, ref_check=CHECK_TMP_SINK)]
+    """CHECK_TMP_SINK consumes the central resolver; it never re-reads the path.
+
+    ``resolve_tmp_paths`` raises ``tmp-sink.invalid-path`` with the validator's
+    reason text (AC-32), either as ``"'path' is invalid (<reason>); using …"``
+    or ``"repo_containment.tmp-sink.path '<rel>': <reason>"``. The doctor
+    message renders the bare reason, never the path context. Other resolver
+    error codes belong to the validator and must not fire this check.
+    """
+    try:
+        resolve_tmp_paths(env.project_root, env.config)
+    except TmpSinkError as exc:
+        if exc.code != "tmp-sink.invalid-path":
+            return []
+        match = re.search(r"\(([^()]*)\); using ", exc.message)
+        reason = match.group(1) if match else (exc.message.rpartition(": ")[2] or exc.message)
+        return [Hit(PROJECT_CONFIG_REL, quoted=clip(reason), bindings={"reason": reason},
+                    severity=Severity.ERROR, ref_check=CHECK_TMP_SINK)]
+    return []
 
 
 _RUNNER_OWNED = {CHECK_ENVIRONMENT: _env_hits, CHECK_TMP_SINK: _sink_hits}

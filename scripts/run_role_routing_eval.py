@@ -59,6 +59,7 @@ from scripts.lib.providers import (
     load_providers_config,
     resolve_providers,
 )
+from scripts.lib.tmp_paths import resolve_tmp_paths, tmp_env
 
 EVAL_DIR = _REPO_ROOT / "tests" / "routing-llm-eval"
 ROLES_DIR = EVAL_DIR / "roles"
@@ -693,6 +694,25 @@ def _shell() -> str:
     )
 
 
+def _tmp_sink_env(base: dict | None = None) -> dict:
+    """Merge the tmp-sink pin into a child-process environment (IC-18/ADR-12).
+
+    The provider wrappers are shell scripts that may create temp files, so
+    ``TMPDIR``/``TEMP``/``TMP`` must point at the absolute sink. A disabled
+    sink (or an unreadable config) keeps the inherited environment: this is a
+    paid, user-gated eval and must not fail merely because the sink is off.
+    """
+    env = dict(os.environ if base is None else base)
+    config_path = _REPO_ROOT / ".meta-config" / "project.yaml"
+    try:
+        paths = resolve_tmp_paths(_REPO_ROOT, load_config(config_path))
+        if not paths.enabled:
+            return env
+        return tmp_env(paths, env)
+    except Exception:  # noqa: BLE001 - eval must not fail on sink resolution
+        return env
+
+
 def call_provider(
     provider: str,
     model_id: str,
@@ -706,7 +726,7 @@ def call_provider(
     if not script.is_file():
         raise ProviderError("provider wrapper not found: {}".format(script))
     shell = _shell()
-    env = os.environ.copy()
+    env = _tmp_sink_env(os.environ.copy())
     prefix = re.sub(r"[^A-Za-z0-9]+", "_", provider).upper()
     model_var = "{}_ROUTING_EVAL_MODEL".format(prefix)
     env[model_var] = model_id

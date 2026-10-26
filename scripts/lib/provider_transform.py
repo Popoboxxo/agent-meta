@@ -30,7 +30,13 @@ from .frontmatter import (
     load_provider_tools_config,
 )
 from .log import SyncLog
-from .providers import explicit_primary_role, resolve_frontmatter_strip_fields
+from .providers import (
+    explicit_primary_role,
+    resolve_frontmatter_strip_fields,
+    resolve_provider_options,
+)
+from .repo_containment import TmpSinkError
+from .tmp_paths import resolve_tmp_paths
 
 def _validate_tools_against_whitelist(
     tools: list, provider: str, agent_meta_root: Path, log: SyncLog, role: str,
@@ -261,6 +267,40 @@ def _reassemble_body(content: str, body: str) -> str:
         return content[:fm_end + 4] + '\n' + body.lstrip('\n')
     return body.lstrip('\n')
 
+def _tmp_sink_edit_allow_paths(
+    config: dict,
+    project_root: Path | None,
+    log: SyncLog,
+) -> tuple[str, ...]:
+    """Derive the primary edit-scope glob from the tmp-sink resolver (IC-10).
+
+    The edit scope of a hook-less provider follows the configured sink instead
+    of a shipped literal: ``TmpPaths.relative`` is the single source of truth
+    (ADR-01), so a project with ``path: scratch/out`` gets
+    ``scratch/out/**`` and never a stale ``.tmp/**``.
+
+    A disabled sink contributes nothing; neither does an unresolvable sink
+    configuration (the render must not crash mid-sync — fail-closed means the
+    caller keeps only the static fallback or the scalar ``deny``).
+    """
+    if project_root is None or not isinstance(config, dict):
+        return ()
+    try:
+        paths = resolve_tmp_paths(project_root, config)
+    except TmpSinkError as exc:
+        log.warning(
+            f"opencode edit scope: tmp-sink not derivable ({exc}) - "
+            "falling back to the static allow-list",
+        )
+        return ()
+    if not paths.enabled:
+        return ()
+    relative = paths.relative.strip().strip("/")
+    if not relative:
+        return ()
+    return (f"{relative}/**",)
+
+
 def _apply_agent_transform(
     content: str,
     spec: dict,
@@ -426,10 +466,21 @@ def _apply_agent_transform(
         if spec.get('inject-subagent-depth'):
             subagent_depth = required_depth_int(_caps)
         # Write-scope lock (#1006, IC-3/ADR-5): the primary entry must not keep
-        # `permission.edit: allow` while the tier-`permission` gate is active —
-        # a primary agent that can write anywhere defeats the Main-Chat gate.
+        # a write-anywhere permission while the runtime gate is active — a
+        # primary agent that can write anywhere defeats the Main-Chat gate.
         # The gate decision has one source of truth (`lib/isolation`), imported
         # lazily here to avoid a load-time cycle.
+        # SPEC-OPENCODE-V2-SUPPORT Amendment B3 (AC-C14 applies to the agent
+        # level too): the AGENT level must use the SAME predicate as the v2
+        # config triples — `permission_deny_required`, i.e. tier `permission`
+        # OR tier `plugin` while the baked plugin only observes. The frozen
+        # `opencode_runtime_gate_wanted` (tier `permission` only) stays
+        # untouched for the Spec-A writer; it would leave `edit: allow` in
+        # place on tier `plugin` + `observe`, and that agent-level allow is
+        # appended last, overruling the global deny (last match wins).
+        # `capabilities` and `plugin_mode` are resolved HERE (Amendment
+        # B3-Folge): the transform itself never loads them. Without an
+        # effective strict gate no deny is emitted (AC-C16 b).
         # Known boundary: the lock keys off the DERIVED `mode` above. A project
         # override template that declares `mode: primary` for a role the
         # registry does not name as `primary-role` inherits the template value
@@ -437,19 +488,56 @@ def _apply_agent_transform(
         deny_edit = False
         edit_allow_paths: tuple[str, ...] = ()
         if mode == 'primary':
-            from .isolation import opencode_runtime_gate_wanted
+            from . import isolation
+            from . import providers as providers_lib
+            from . import runtime_gate
+            from .consistency.orchestrator_strict import _resolve_effective_strict
 
-            deny_edit = opencode_runtime_gate_wanted(
-                config, provider, agent_meta_root, provider_config,
+            capabilities = provider_capabilities
+            if capabilities is None:
+                try:
+                    capabilities = providers_lib.load_provider_capabilities(
+                        agent_meta_root,
+                    )
+                except Exception:  # noqa: BLE001 - unreadable registry degrades
+                    capabilities = {}
+            orch = config.get('orchestrator', {}) if isinstance(config, dict) else {}
+            deny_edit = _resolve_effective_strict(orch, provider) and (
+                isolation.permission_deny_required(
+                    # One resolved provider entry (registry or single entry).
+                    isolation._v2_provider_entry(provider_config, provider),
+                    isolation._capabilities_for(capabilities, provider),
+                    runtime_gate._baked_plugin_mode(),
+                )
             )
             if deny_edit:
                 allow_cfg = load_provider_tools_config(agent_meta_root).get(
                     'opencode_primary_edit_allow',
                 )
                 if isinstance(allow_cfg, list):
-                    edit_allow_paths = tuple(
+                    static_paths = tuple(
                         p for p in allow_cfg if isinstance(p, str) and p
                     )
+                    # IC-10: the sink glob comes from the single resolver, the
+                    # static list is only the context-free fallback. An
+                    # explicitly empty list stays the documented opt-out
+                    # (ADR-5 option A -> scalar `edit: deny`).
+                    if static_paths:
+                        edit_allow_paths = tuple(dict.fromkeys(
+                            _tmp_sink_edit_allow_paths(config, project_root, log)
+                            + static_paths
+                        ))
+        # Data-driven branch (SPEC 3.7): only the resolved v2 mechanism gets the
+        # native v2 builder. `opencode-native` (v1 and providers without a
+        # surface mechanism, e.g. the Mammouth fork) keeps the frozen v1 path.
+        if mechanism == 'opencode-native-v2':
+            return _transform_frontmatter_for_opencode_v2(
+                content, name, description, model, steps, generated_from,
+                agent_meta_root, temperature,
+                strip_fields=strip_fields, mode=mode,
+                variant=_resolve_v2_model_variant(config, provider, role),
+                deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
+            )
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
             strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,
@@ -783,6 +871,58 @@ def _map_claude_tools_to_opencode_permissions(
 
     return perms
 
+# v2 permission actions, in the order the emitted ``permissions[]`` list keeps
+# (SPEC-OPENCODE-V2-SUPPORT-2026-10-22, 3.7 / AC-D1).
+_V2_PERMISSION_ACTIONS = ("edit", "shell", "subagent")
+
+# Claude tool -> v2 action. Tools without a v2 counterpart (Read, Glob, Grep,
+# WebFetch, WebSearch, TodoWrite) carry no permission action in v2 and are
+# dropped; the closed-world builder below still emits a ``deny`` for their
+# action bucket.
+_V2_CLAUDE_TOOL_ACTIONS = {
+    "Write": "edit",
+    "Edit": "edit",
+    "Bash": "shell",
+    "Agent": "subagent",
+}
+
+def map_tools_to_opencode_v2_permissions(
+    tools: list,
+    deny_list: list[str] | None = None,
+) -> list[dict[str, str]]:
+    """Map Claude Code tool names to a closed-world opencode v2 permission list.
+
+    v2 replaces the v1 ``permission:`` map with an ordered ``permissions[]``
+    list of ``{action, resource, effect}`` entries. Mapping:
+
+      Write / Edit -> edit
+      Bash         -> shell
+      Agent        -> subagent
+
+    Every other Claude tool has no v2 permission counterpart and is dropped.
+    The result is CLOSED-WORLD: exactly one entry per action in the fixed order
+    ``edit``, ``shell``, ``subagent`` — ``allow`` when the template tools map
+    to that action, ``deny`` otherwise. A read-only role therefore gets
+    ``edit: deny`` instead of silently inheriting write rights.
+
+    ``deny_list`` (``opencode_deny_critical``) is accepted for signature parity
+    with the v1 mapper and deliberately has no effect: the v2 surface is closed
+    by construction, so there is nothing left for a deny list to close.
+    """
+    allowed = {
+        _V2_CLAUDE_TOOL_ACTIONS[tool]
+        for tool in tools
+        if isinstance(tool, str) and tool in _V2_CLAUDE_TOOL_ACTIONS
+    }
+    return [
+        {
+            "action": action,
+            "resource": "*",
+            "effect": "allow" if action in allowed else "deny",
+        }
+        for action in _V2_PERMISSION_ACTIONS
+    ]
+
 def _transform_frontmatter_for_opencode(
     content: str,
     name: str,
@@ -942,6 +1082,211 @@ def _transform_frontmatter_for_opencode(
         content = content[:fm_end + 4] + '\n' + new_body
 
     return content
+
+# Frontmatter keys a v2 artifact never carries (SPEC 3.7 b/d/e). `permission`
+# is the v1 map, `tools`/`maxSteps`/`subagent_depth` have no v2 counterpart and
+# the sampling fields (temperature/max_tokens/top_p/...) are v1 legacy. `system`
+# is deliberately absent: the Markdown body IS the system prompt (Spike Q5).
+_V2_OPENCODE_REMOVE_FIELDS = (
+    "tools",
+    "permission",
+    "maxSteps",
+    "subagent_depth",
+    "temperature",
+    "max_tokens",
+    "top_p",
+    "top_k",
+    "stop_sequences",
+    "max_output_tokens",
+    "system",
+    "generated_from",
+    "permissionMode",
+    "alwaysApply",
+    "hint",
+    "based-on",
+    "based_on",
+    "memory",
+)
+
+
+def _opencode_provenance_comment(
+    template_fm: dict,
+    strip_fields: list,
+    quiet_fields: frozenset[str] | None,
+    generated_from: str,
+) -> str | None:
+    """Build the `agent-meta-provenance` comment for stripped fields.
+
+    Shared by the opencode-native builders (v1 keeps its inline copy byte-frozen
+    for the v1 Freeze, the v2 builder calls this helper instead of duplicating
+    the logic). Same contract as `build_frontmatter`: only fields that exist in
+    the source are preserved, `quiet_fields` are never named, and the
+    `generated_from` value is preserved only when that key is being stripped.
+    """
+    if not strip_fields:
+        return None
+    quiet = _quiet_field_set(quiet_fields)
+    preserved = {
+        key: template_fm[key]
+        for key in strip_fields
+        if key in template_fm and key not in quiet
+    }
+    if (
+        generated_from
+        and "generated-from" in strip_fields
+        and "generated-from" not in quiet
+    ):
+        preserved["generated-from"] = generated_from
+    if not preserved:
+        return None
+    pairs = " ".join(f"{key}={value}" for key, value in preserved.items())
+    return f"<!-- agent-meta-provenance: {pairs} -->"
+
+def _resolve_v2_model_variant(
+    config: dict,
+    provider: str,
+    role: str,
+) -> str | None:
+    """Resolve the v2 `#variant` suffix source for one role.
+
+    Reads the project channel `provider-options.<provider>.model-variants[role]`
+    (SPEC 3.1/3.7 c). Fail-safe, never raises: a non-dict map, an absent role or
+    a non-string/empty value means "no variant" (the model ID stays unchanged).
+    """
+    options = resolve_provider_options(config, provider)
+    if not isinstance(options, dict):
+        return None
+    variants = options.get("model-variants")
+    if not isinstance(variants, dict):
+        return None
+    variant = variants.get(role)
+    if isinstance(variant, str) and variant:
+        return variant
+    return None
+
+def _v2_permissions_with_edit_deny(
+    permissions: list[dict[str, str]],
+    edit_allow_paths: tuple[str, ...],
+) -> list[dict[str, str]]:
+    """Close the primary `edit` action, keeping the configured path allows.
+
+    Spec A IC-3 on the v2 list surface: the `edit: allow` entry becomes
+    ``{action: edit, resource: "*", effect: deny}`` followed by one ``allow``
+    entry per ``edit_allow_paths`` path. The ``*`` deny MUST come FIRST: last
+    matching rule wins (Amendment B1 / Spike Q3 VERIFIED), so only this order
+    lets the specific allows win. A role without ``Write``/``Edit`` already
+    carries ``edit: deny`` and is returned unchanged — a lock never widens a
+    privilege. All other action entries keep their order and effect.
+    """
+    paths: list[str] = []
+    for path in edit_allow_paths:
+        if isinstance(path, str) and path and path not in paths:
+            paths.append(path)
+    scoped: list[dict[str, str]] = []
+    for entry in permissions:
+        if entry.get("action") != "edit" or entry.get("effect") != "allow":
+            scoped.append(entry)
+            continue
+        scoped.append({"action": "edit", "resource": "*", "effect": "deny"})
+        scoped.extend(
+            {"action": "edit", "resource": path, "effect": "allow"} for path in paths
+        )
+    return scoped
+
+
+def _transform_frontmatter_for_opencode_v2(
+    content: str,
+    name: str,
+    description: str,
+    model: str,
+    steps: str,
+    generated_from: str,
+    agent_meta_root: Path,
+    temperature: str = "",
+    strip_fields: list[str] | None = None,
+    quiet_fields: frozenset[str] | None = None,
+    mode: str | None = None,
+    variant: str | None = None,
+    deny_edit: bool = False,
+    edit_allow_paths: tuple[str, ...] = (),
+) -> str:
+    """Build the native opencode **v2** agent frontmatter.
+
+    Only reached through the `opencode-native-v2` frontmatter mechanism. It
+    differs from the v1 builder (SPEC 3.7) in exactly these points:
+
+    (a) `permissions:` (list of `{action, resource, effect}`) instead of the
+        `permission:` map; the list is CLOSED-WORLD (one entry per action in
+        `edit`, `shell`, `subagent`, `deny` for unmapped tools);
+    (b) `steps` only — no `maxSteps` alias and no `temperature`/`max_tokens`/
+        `top_p` legacy fields (the parameter `temperature` is accepted for
+        signature parity and intentionally never emitted);
+    (c) `model` carries a `#variant` suffix when the project configures
+        `provider-options.<provider>.model-variants[<role>]`;
+    (d) `tools` is never emitted;
+    (e) `subagent_depth` is never emitted;
+    (f) no separate `system:` field — the Markdown body is the system prompt.
+
+    Provenance comment, strip-fields and body cleanup reuse the shared helpers
+    instead of duplicating the v1 logic. `agent_meta_root` is accepted for
+    signature parity with the v1 builder: the closed-world permission list needs
+    no tool config (unmapped actions are denied, so no deny list is read).
+    `deny_edit=True` closes the primary role's `edit` scope (Spec A IC-3, §3.4
+    "Agent-Ebene"): the `edit` allow becomes a `*` deny followed by the
+    `edit_allow_paths` allows, so the gate survives on the agent level too.
+    """
+    body = _strip_frontmatter(content)
+    body = _strip_claude_specific_lines(body)
+
+    template_fm = _parse_frontmatter_yaml(content)
+    strip_fields = strip_fields or []
+    provenance_comment = _opencode_provenance_comment(
+        template_fm, strip_fields, quiet_fields, generated_from,
+    )
+
+    updates: dict = {
+        "name": name,
+        "description": description,
+        "mode": mode or template_fm.get("mode") or "subagent",
+    }
+    if template_fm.get("version") and "version" not in strip_fields:
+        updates["version"] = template_fm.get("version")
+    if generated_from and "generated-from" not in strip_fields:
+        updates["generated-from"] = generated_from
+    if model:
+        # `variant` is appended only to a resolved model ID and never doubles
+        # an existing `#` suffix (the model may already carry one).
+        updates["model"] = (
+            f"{model}#{variant}"
+            if variant and "#" not in model
+            else model
+        )
+    if steps:
+        updates["steps"] = steps
+    if "steps" in template_fm:
+        updates["steps"] = template_fm["steps"]
+    if "maxSteps" in template_fm:
+        updates["steps"] = template_fm["maxSteps"]
+
+    template_tools = template_fm.get("tools")
+    permissions = map_tools_to_opencode_v2_permissions(
+        template_tools if isinstance(template_tools, list) else [],
+    )
+    if deny_edit:
+        permissions = _v2_permissions_with_edit_deny(permissions, edit_allow_paths)
+    updates["permissions"] = permissions
+
+    removes = list(_V2_OPENCODE_REMOVE_FIELDS)
+    if strip_fields:
+        removes.extend(strip_fields)
+
+    content = _update_frontmatter_dict(content, updates, removes=removes)
+
+    # Replace body with stripped version (shared splice helper).
+    new_body = body.lstrip('\n')
+    if provenance_comment:
+        new_body = f"{provenance_comment}\n{new_body}"
+    return _reassemble_body(content, new_body)
 
 def _strip_claude_specific_lines(content: str) -> str:
     """Remove Claude Code-specific lines that are meaningless in other providers.

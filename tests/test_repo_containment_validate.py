@@ -255,3 +255,89 @@ def test_unreadable_registry_warns_but_does_not_fail(tmp_path, capsys, monkeypat
     err = capsys.readouterr().err
     assert "WARNING" in err
     assert "provider registry could not be read" in err
+
+
+# --- system-temp-exception (AC-15) -------------------------------------
+
+
+def _exception(**block) -> dict:
+    return {"repo_containment": {"tmp-sink": {"system-temp-exception": block}}}
+
+
+def test_system_temp_exception_full_block_is_accepted(tmp_path):
+    _validate(
+        _exception(
+            enabled=True,
+            reason="pytest basetemp must stay outside the repo",
+            **{"pytest-basetemp": True, "toolchain-caches": False},
+        ),
+        tmp_path,
+    )
+
+
+def test_system_temp_exception_rejects_invalid_config(tmp_path, capsys):
+    """AC-15: a non-mapping exception block is a hard config error."""
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            {"repo_containment": {"tmp-sink": {"system-temp-exception": "on"}}},
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "tmp-sink.system-temp-exception" in err
+    assert "expected a mapping, got str." in err
+
+
+def test_system_temp_exception_requires_enabled_for_pytest(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            _exception(enabled=False, **{"pytest-basetemp": True}),
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    assert "'pytest-basetemp: true' requires 'enabled: true'." in capsys.readouterr().err
+
+
+def test_toolchain_cache_requires_enabled_exception(tmp_path, capsys):
+    """AC-38: ``toolchain-caches: true`` without the exception is a config error.
+
+    The opt-in only has an effect while the system-temp exception is enabled;
+    without it the key is dead configuration, so the validator fails loudly
+    (same ``_fail``/Exit-1 path as the ``pytest-basetemp`` contradiction).
+    """
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            _exception(
+                enabled=False,
+                **{"pytest-basetemp": False, "toolchain-caches": True},
+            ),
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "invalid 'repo_containment.tmp-sink.system-temp-exception'" in err
+    assert "'toolchain-caches: true' requires 'enabled: true'." in err
+
+
+def test_system_temp_exception_requires_reason(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        _validate(_exception(enabled=True), tmp_path)
+    assert exc.value.code == 1
+    assert (
+        "invalid 'repo_containment.tmp-sink.system-temp-exception.reason': "
+        "required when the exception is enabled"
+    ) in capsys.readouterr().err
+
+
+def test_system_temp_exception_rejects_temp_root_inside_project(
+    tmp_path, capsys, monkeypatch
+):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    with pytest.raises(SystemExit) as exc:
+        _validate(_exception(enabled=True, reason="unit-test"), tmp_path)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "tmp-sink.system-temp-exception" in err
+    assert "inside the project root" in err

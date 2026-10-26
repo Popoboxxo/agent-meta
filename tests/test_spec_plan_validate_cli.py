@@ -123,3 +123,54 @@ def test_drift_finding_sets_exit_1(tmp_path, monkeypatch):
         tmp_path, {"platforms": [], "spec-plan-workflow": {"enabled": True}}, _log(tmp_path),
     )
     assert code == 1
+
+
+def _spec_plan_findings(tmp_path, config=None):
+    """Collect the validator's findings for a synthetic project.
+
+    ``validate_spec_plan`` only returns an exit code; isolating one check's
+    count (Task 18) needs the findings list itself.
+    """
+    from lib.consistency.spec_plan import check_spec_plan_workflow
+
+    return check_spec_plan_workflow(
+        tmp_path,
+        config or {"platforms": [], "spec-plan-workflow": {"enabled": True}},
+        agent_meta_root=REPO_ROOT,
+    )
+
+
+_UNAPPROVED_SPEC = _DRIFT_SPEC.replace(
+    "> Status: APPROVED (2026-09-13)", "> Status: geplant",
+)
+
+
+def _write_unapproved_spec_fixture(tmp_path):
+    """Plan WITH tasks referencing a spec that carries no approval marker."""
+    specs = tmp_path / "docs" / "specs"
+    plans = tmp_path / "docs" / "plans"
+    specs.mkdir(parents=True, exist_ok=True)
+    plans.mkdir(parents=True, exist_ok=True)
+    (specs / "2026-09-13-demo-design.md").write_text(
+        _UNAPPROVED_SPEC, encoding="utf-8",
+    )
+    (plans / "2026-09-13-demo.md").write_text(_DRIFT_PLAN, encoding="utf-8")
+
+
+def test_unapproved_spec_yields_exactly_one_approval_error(tmp_path):
+    """Task 18: a plan with tasks + an unapproved spec yields EXACTLY ONE
+    ``spec_plan_approval_marker`` ERROR — the count is isolated here, not just
+    the existence of *an* error (which the exit-code tests above only prove)."""
+    from lib.consistency.report import Severity
+
+    _write_unapproved_spec_fixture(tmp_path)
+
+    findings = _spec_plan_findings(tmp_path)
+
+    approval = [f for f in findings if f.check == "spec_plan_approval_marker"]
+    assert len(approval) == 1, [f.check for f in findings]
+    assert approval[0].file == "docs/plans/2026-09-13-demo.md"
+    assert approval[0].severity == Severity.ERROR
+    # No second finding may ride along on the same check (and this fixture is
+    # otherwise clean, so the approval ERROR is the only finding at all).
+    assert [f.check for f in findings] == ["spec_plan_approval_marker"]
