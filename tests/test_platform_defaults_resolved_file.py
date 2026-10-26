@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from tests.timeouts import SYNC_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _MINIMAL_PROJECT_YAML = """
@@ -36,7 +38,7 @@ def test_resolved_file_written_and_registered(tmp_path):
 
     result = subprocess.run(
         [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py")],
-        cwd=str(tmp_path), capture_output=True, text=True, timeout=60,
+        cwd=str(tmp_path), capture_output=True, text=True, timeout=SYNC_TIMEOUT,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -58,7 +60,7 @@ def test_resolved_file_not_written_in_dry_run(tmp_path):
 
     result = subprocess.run(
         [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--dry-run"],
-        cwd=str(tmp_path), capture_output=True, text=True, timeout=60,
+        cwd=str(tmp_path), capture_output=True, text=True, timeout=SYNC_TIMEOUT,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert not (tmp_path / ".meta-config" / "platform-defaults.resolved.yaml").exists()
