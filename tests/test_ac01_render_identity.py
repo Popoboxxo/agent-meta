@@ -290,6 +290,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   `se-validator` row in `reproducible-builds-engineer` are gated on their target role (`1.0.1 -> 1.0.2`).
   The AC-01 matrix has every role active, so only those two artifacts per provider change (2 x 9 = 18 of
   1085 hashes; 0 added/removed).
+- Rebaseline verification after the literature-round-2 fix series A-F (2026-10-26): a full re-render of the
+  provider matrix measured **0 of 1085 hashes changed**; `--write` was a byte-identical no-op. The fixes were
+  already covered by the two rebaselines above - D absorbed A's rendered-table change (name-only rows leave
+  the entry-file/orchestrator tables) together with the post-merge tmp-sink drift, E rebaselined its own gated
+  dispatch rows; C/D were part of D's rebaseline; B (routing eval catalog) and F (standalone README export)
+  are not part of the matrix render. No hash was absorbed silently and no exception was added.
 
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q

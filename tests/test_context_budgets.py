@@ -135,16 +135,46 @@ TOLERANCE_MAX_BYTES = 4096
 #   * ZCode/entry-file: 25073 -> 25937 (+864)
 #   * ZCode/harness-roster: 575003 -> 659467 (+84464)
 #   * ZCode/orchestrator: 70752 -> 76142 (+5390)
+# RE-PIN (literature round 2 follow-up, fixes A-F, 2026-10-26): every artifact re-measured
+# on the provider matrix, not extrapolated. Cause split, verified by re-rendering the
+# pre-fix merge state (c7be7616) and the working tree file by file:
+#   * A (name-only roles excluded from the rendered agent table): -1,177 B on the
+#     orchestrator of every provider and -1,177 B on each AGENTS.md entry file (Codex,
+#     Gemini, KimiCode, Mammouth, Opencode, ZCode). The table drops the 12 name-only rows
+#     active in the matrix (the eight literature roles plus intern-developer, meta-doctor,
+#     meta-optimizer, template-auditor). Claude's CLAUDE.md carries no agent table.
+#   * C/D (arrow decoupling in the literature templates): chaos-engineer -79 B,
+#     reproducible-builds-engineer -76 B, ux-researcher +29 B per provider artifact.
+#     E's gated dispatch rows are render-neutral in the matrix (every role active, so the
+#     rows stay), F only touches the standalone export: 0 B here.
+#   * Pre-existing post-merge drift (f9e3f3e5, tmp-sink): test-executor.md shrank 17 B
+#     (7,215 -> 7,198), so the roster/always-loaded pins were 17 B high before this
+#     re-pin. Absorbed here; not caused by A-F.
+# Absorbed deltas (old pin -> measured Ist), `full` profile:
+#   * orchestrator, all nine: -1,177 B each (Claude 91418 -> 90241, Codex 91033 -> 89856,
+#     Continue 75570 -> 74393, Copilot 75446 -> 74269, Gemini 91440 -> 90263,
+#     KimiCode 77499 -> 76322, Mammouth 75871 -> 74694, Opencode 91105 -> 89928,
+#     ZCode 76142 -> 74965).
+#   * entry-file, six AGENTS.md providers: -1,177 B each (Codex 25024 -> 23847,
+#     Gemini 33667 -> 32490, KimiCode 25038 -> 23861, Mammouth 25035 -> 23858,
+#     Opencode 25099 -> 23922, ZCode 25937 -> 24760); Claude/Continue/Copilot unchanged.
+#   * harness-roster, six roster providers: -1,303 B each (Claude 676259 -> 674939,
+#     Codex 669273 -> 667953, KimiCode 662493 -> 661173, Mammouth 657753 -> 656433,
+#     Opencode 672109 -> 670789, ZCode 659467 -> 658147) = -1,177 orchestrator -126 roles.
+#   * always-loaded: Claude 696038 -> 694718 (-1,303, roster only); Codex
+#     694297 -> 691800, KimiCode 687531 -> 685034, Mammouth 682788 -> 680291,
+#     Opencode 697208 -> 694711, ZCode 685404 -> 682907 (-2,480 each: entry + roster);
+#     Gemini 33667 -> 32490 (-1,177, entry only); Continue/Copilot unchanged.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 696038, "entry-file": 2511, "harness-roster": 676259, "orchestrator": 91418, "rules": 17268},
-    "Codex": {"always-loaded": 694297, "entry-file": 25024, "harness-roster": 669273, "orchestrator": 91033},
-    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 75570, "rules": 20140},
-    "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 75446, "rules": 19936},
-    "Gemini": {"always-loaded": 33667, "entry-file": 33667, "orchestrator": 91440},
-    "KimiCode": {"always-loaded": 687531, "entry-file": 25038, "harness-roster": 662493, "orchestrator": 77499},
-    "Mammouth": {"always-loaded": 682788, "entry-file": 25035, "harness-roster": 657753, "orchestrator": 75871},
-    "Opencode": {"always-loaded": 697208, "entry-file": 25099, "harness-roster": 672109, "orchestrator": 91105},
-    "ZCode": {"always-loaded": 685404, "entry-file": 25937, "harness-roster": 659467, "orchestrator": 76142},
+    "Claude": {"always-loaded": 694718, "entry-file": 2511, "harness-roster": 674939, "orchestrator": 90241, "rules": 17268},
+    "Codex": {"always-loaded": 691800, "entry-file": 23847, "harness-roster": 667953, "orchestrator": 89856},
+    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 74393, "rules": 20140},
+    "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 74269, "rules": 19936},
+    "Gemini": {"always-loaded": 32490, "entry-file": 32490, "orchestrator": 90263},
+    "KimiCode": {"always-loaded": 685034, "entry-file": 23861, "harness-roster": 661173, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 680291, "entry-file": 23858, "harness-roster": 656433, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 694711, "entry-file": 23922, "harness-roster": 670789, "orchestrator": 89928},
+    "ZCode": {"always-loaded": 682907, "entry-file": 24760, "harness-roster": 658147, "orchestrator": 74965},
 }
 
 
@@ -309,16 +339,27 @@ def test_ac07_missing_ceiling_is_a_violation():
 #   * ZCode/always-loaded: 539659 -> 621213 (+81554)
 #   * ZCode/harness-roster: 535333 -> 616887 (+81554)
 #   * ZCode/orchestrator: 32340 -> 33562 (+1222)
+# RE-PIN (literature round 2 follow-up, fixes A-F, 2026-10-26): measured, not extrapolated.
+# The compact orchestrator carries no agent table, so A (name-only exclusion) is 0 B here;
+# the only compact deltas are C/D role text plus the pre-existing 17 B tmp-sink drift.
+# Absorbed deltas (old pin -> measured Ist):
+#   * harness-roster, six roster providers: -143 B each (Claude 618872 -> 618729,
+#     Codex 611787 -> 611644, KimiCode 619917 -> 619774, Mammouth 615218 -> 615075,
+#     Opencode 614696 -> 614553, ZCode 616887 -> 616744) = -126 role text -17 pre-existing.
+#   * always-loaded: the same -143 B for those six (Claude 638601 -> 638458,
+#     Codex 615200 -> 615057, KimiCode 623340 -> 623197, Mammouth 618639 -> 618496,
+#     Opencode 618177 -> 618034, ZCode 621213 -> 621070).
+#   * entry-file, rules and orchestrator: unchanged on every provider (0 B).
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 638601, "entry-file": 2461, "harness-roster": 618872, "orchestrator": 34031, "rules": 17268},
-    "Codex": {"always-loaded": 615200, "entry-file": 3413, "harness-roster": 611787, "orchestrator": 33547},
+    "Claude": {"always-loaded": 638458, "entry-file": 2461, "harness-roster": 618729, "orchestrator": 34031, "rules": 17268},
+    "Codex": {"always-loaded": 615057, "entry-file": 3413, "harness-roster": 611644, "orchestrator": 33547},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 34621, "rules": 20140},
     "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 34495, "rules": 19936},
     "Gemini": {"always-loaded": 10948, "entry-file": 10948, "orchestrator": 35369},
-    "KimiCode": {"always-loaded": 623340, "entry-file": 3423, "harness-roster": 619917, "orchestrator": 34923},
-    "Mammouth": {"always-loaded": 618639, "entry-file": 3421, "harness-roster": 615218, "orchestrator": 33336},
-    "Opencode": {"always-loaded": 618177, "entry-file": 3481, "harness-roster": 614696, "orchestrator": 33692},
-    "ZCode": {"always-loaded": 621213, "entry-file": 4326, "harness-roster": 616887, "orchestrator": 33562},
+    "KimiCode": {"always-loaded": 623197, "entry-file": 3423, "harness-roster": 619774, "orchestrator": 34923},
+    "Mammouth": {"always-loaded": 618496, "entry-file": 3421, "harness-roster": 615075, "orchestrator": 33336},
+    "Opencode": {"always-loaded": 618034, "entry-file": 3481, "harness-roster": 614553, "orchestrator": 33692},
+    "ZCode": {"always-loaded": 621070, "entry-file": 4326, "harness-roster": 616744, "orchestrator": 33562},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -329,8 +370,11 @@ COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
 # The AGENTS.md providers share one context file; measured in a single project
 # with all of them active (`compact`).
 _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "ZCode")
-# RE-PIN (literature round 2, eight new review roles): the shared multi-provider AGENTS.md
-# gains eight rows in the agent table (+819 B, measured through the compact render seam).
+# RE-PIN (literature round 2 follow-up): the eight review roles are ``name_only``, so the
+# rendered-table filter (fix A) keeps them out of the shared multi-provider AGENTS.md -- and
+# the compact entry file never carried the agent table in the first place. The measured file
+# stays at 12,193 B (unchanged by A-F); the earlier "+819 B" note described an intermediate
+# state in which those rows still rendered there.
 _IST_COMPACT_MULTI_AGENTS_MD = 12193
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
