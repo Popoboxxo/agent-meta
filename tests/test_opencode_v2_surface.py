@@ -4987,7 +4987,7 @@ def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):
 _AC_D5_PROVIDERS = ("Opencode", "Claude", "Gemini", "Mammouth")
 
 _AC_D5_BASE_CONFIG = {
-    "agent-meta-version": "2.0.0-beta.3",
+    "agent-meta-version": "2.0.0-beta.4",
     "ai-providers": list(_AC_D5_PROVIDERS),
     "dod-preset": "rapid-prototyping",
     "platforms": [],
@@ -5189,10 +5189,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # rule text (relative to the branch) and its orchestrator golden losing the two
 # name-only table rows (fix A, reason in test_orchestrator_compact_sections.py;
 # relative to main). `compact-golden` remains unchanged.
+# Release 2.0.0-beta.4 (VERSION bump 2.0.0-beta.3 -> 2.0.0-beta.4): version
+# strings only, so `ac01-baseline` (its `hashes.json`) and `compact-golden`
+# (the `agent-meta vX` stamp) were re-pinned to the rebaselined trees;
+# `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "8fbb168951aef72034ff11c141e3da72c0a74ab184345cc196419bf20090ebe1",
+    "ac01-baseline": "ac6288e60cb3e92c3ffb15e32ece5a094805ecebf5ebda1c4b959f8445849de4",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
-    "compact-golden": "3d8acdcbce82305680c7b0bb936940488142d81bc455779177715761532c4878",
+    "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }
 
 

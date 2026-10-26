@@ -200,7 +200,7 @@ def test_disabled_sink_omits_absolute_variables(tmp_path):
 def _scratch_project(tmp_path: Path) -> Path:
     (tmp_path / ".meta-config").mkdir()
     (tmp_path / ".meta-config" / "project.yaml").write_text(
-        'agent-meta-version: "2.0.0-beta.3"\n'
+        'agent-meta-version: "2.0.0-beta.4"\n'
         "ai-providers:\n- Claude\n"
         "dod-preset: rapid-prototyping\n"
         "repo_containment:\n"
