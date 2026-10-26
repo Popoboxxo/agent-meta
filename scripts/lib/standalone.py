@@ -191,7 +191,14 @@ _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 # IC-31 block snippets that standalone resolves to their real text; the
 # name -> variable mapping comes from config.AGENT_BLOCK_SNIPPETS.
-_STANDALONE_BLOCK_NAMES = frozenset({"closing-summary", "user-proxy", "worker-role"})
+_STANDALONE_BLOCK_NAMES = frozenset({
+    "closing-summary",
+    "user-proxy",
+    "worker-role",
+    "user-proxy-caller",
+    "worker-role-router",
+    "worker-role-bullet",
+})
 _STANDALONE_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = tuple(
     (name, f"{stem}_BLOCK")
     for name, stem in AGENT_BLOCK_SNIPPETS

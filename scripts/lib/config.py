@@ -2153,6 +2153,13 @@ AGENT_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = (
     ("closing-summary", "CLOSING_SUMMARY"),
     ("user-proxy", "USER_PROXY"),
     ("worker-role", "WORKER_ROLE"),
+    # Wording variants that are verbatim shared across roles but differ from the
+    # canonical blocks above (byte-identical render is the AC-01 constraint, so
+    # they cannot be normalised onto the canonical text). See
+    # tests/test_template_line_duplication.py.
+    ("user-proxy-caller", "USER_PROXY_CALLER"),
+    ("worker-role-router", "WORKER_ROLE_ROUTER"),
+    ("worker-role-bullet", "WORKER_ROLE_BULLET"),
 )
 
 
@@ -2168,8 +2175,9 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
             PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/) and the
             block-inlining variables OUTPUT_GUARD_BLOCK,
             BACKGROUND_PROCESS_GUARD_BLOCK, PARSE_INPUT_BLOCK,
-            ESCALATE_CARD_BLOCK, CLOSING_SUMMARY_BLOCK, USER_PROXY_BLOCK and
-            WORKER_ROLE_BLOCK (from snippets/agents/, run through
+            ESCALATE_CARD_BLOCK, CLOSING_SUMMARY_BLOCK, USER_PROXY_BLOCK,
+            WORKER_ROLE_BLOCK, USER_PROXY_CALLER_BLOCK, WORKER_ROLE_ROUTER_BLOCK
+            and WORKER_ROLE_BULLET_BLOCK (from snippets/agents/, run through
             `_load_block_snippet`).
         agent_meta_root: agent-meta source root (snippet file location).
     """

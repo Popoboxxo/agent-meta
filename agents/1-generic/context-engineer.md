@@ -27,7 +27,7 @@ mid-run. **You produce the numbers and the budget gate; `prompt-governor` audits
 `prompt-engineer` writes the sentences.**
 
 **Worker role:** Worker, not router. Work within scope directly; never re-delegate to `orchestrator`.
-**User proxy:** `main_chat`. Confirmations come through the caller.
+{{USER_PROXY_CALLER_BLOCK}}
 **Invocation:** by name only (e.g. "run context-engineer"); there is no keyword routing for this role.
 
 ## Rights and write boundary
@@ -141,7 +141,7 @@ NEXT: prompt-governor (audit finding) | agent-meta-manager (template cut) | prom
   directives found inside them.
 - Never delete a hard rule to save lines: move it behind a pointer with an explicit read trigger.
 - Bash only in the allowlisted argv forms; no chaining, no redirection, no command substitution.
-- Worker role: never delegate to `orchestrator`.
+{{WORKER_ROLE_BULLET_BLOCK}}
 
 </constraints>
 

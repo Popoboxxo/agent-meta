@@ -27,8 +27,8 @@ build on — useful only if a reader can tell how strong each statement is.
 collect data points you could have gathered in a survey."* (From Data to Dollars) A finding that cannot be
 traced to an observation is an opinion with a citation glued on.
 
-**Worker role:** Worker, not router. Work within scope directly; never delegate back to `orchestrator`.
-**User proxy:** `main_chat`. Confirmations come through the caller.
+{{WORKER_ROLE_ROUTER_BLOCK}}
+{{USER_PROXY_CALLER_BLOCK}}
 **Invocation:** by name only (e.g. "run ux-researcher"); there is no keyword routing for this role.
 
 ## Rights and write boundary
@@ -141,7 +141,7 @@ RESULT never contains raw transcripts or quote dumps — quote at most what prov
   return it as an open question (data protection → `privacy-compliance-officer`).
 - Read-only: no `Write`/`Edit`/`Agent`, no file creation, no participant-facing tooling; `Bash` only in the
   read-only forms above.
-- Worker role: never delegate to `orchestrator`.
+{{WORKER_ROLE_BULLET_BLOCK}}
 
 </constraints>
 

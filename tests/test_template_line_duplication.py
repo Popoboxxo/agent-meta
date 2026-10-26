@@ -5,9 +5,10 @@ Verbatim repeated lines in the source templates (``agents/1-generic``,
 ``{{..._BLOCK}}`` snippet variables (``snippets/agents/``) without changing the
 rendered output (AC-01 harness). This module keeps it that way:
 
-* ``test_boilerplate_snippets_not_inline`` -- the worker-role, closing-summary
-  and user-proxy lines (read from the snippet files, never duplicated here)
-  must not reappear inline in any source template.
+* ``test_boilerplate_snippets_not_inline`` -- the worker-role, closing-summary,
+  user-proxy and their verbatim wording-variant lines (read from the snippet
+  files, never duplicated here) must not reappear inline in any source
+  template.
 * ``test_line_duplication_ratchet`` -- counts the stripped lines of >= 40
   characters that occur in >= 5 different source files. The ceilings are the
   measured actual state after IC-31; they are lowered as duplicates disappear
@@ -44,7 +45,19 @@ MAX_DUPLICATE_LINES = 16        # distinct lines present in >= 5 files
 MAX_DUPLICATE_OCCURRENCES = 165  # sum of files over those lines
 
 # Snippets whose body must no longer occur inline in a source template.
-_DEDUPED_SNIPPETS = ("worker-role", "closing-summary", "user-proxy")
+# The first three are the canonical IC-31 blocks; the last three are wording
+# variants that are verbatim shared by the literature/doctor/optimizer roles
+# but differ from the canonical text. They cannot be normalised onto the
+# canonical blocks without changing the render (AC-01 byte-identity), so each
+# variant is its own snippet instead of being duplicated inline.
+_DEDUPED_SNIPPETS = (
+    "worker-role",
+    "closing-summary",
+    "user-proxy",
+    "user-proxy-caller",
+    "worker-role-router",
+    "worker-role-bullet",
+)
 
 
 def _source_files() -> List[Path]:

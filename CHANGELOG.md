@@ -18,6 +18,19 @@
   `tmp-sink` config keys (`system-temp-exception`, `toolchain-caches` opt-in) are documented in
   the example config.
 
+### Changed
+- **Source boilerplate de-duplicated render-neutrally (IC-31 ratchet)**: the verbatim
+  `**Worker role:** Worker, not router ...` line, the `- Worker role: never delegate ...` bullet and
+  the `**User proxy:** ... Confirmations come through the caller.` line (shared by the eight
+  literature roles plus `meta-doctor`/`meta-optimizer`) are replaced by the snippet blocks
+  `{{WORKER_ROLE_ROUTER_BLOCK}}`, `{{WORKER_ROLE_BULLET_BLOCK}}` and `{{USER_PROXY_CALLER_BLOCK}}`
+  (`snippets/agents/{worker-role-router,worker-role-bullet,user-proxy-caller}.md`; registered in
+  `consistency/placeholders.py`, resolved in `standalone.py`). The wording variants cannot be
+  normalised onto the canonical `WORKER_ROLE_BLOCK`/`USER_PROXY_BLOCK` without changing the render,
+  so each variant stays its own snippet. Rendered output is byte-identical (AC-01 harness green, no
+  rebaseline, no version bumps because the frontmatter `version` is part of the render). Ratchet:
+  19 distinct / 189 occurrences -> 16 / 165 (ceilings unchanged at 16/165).
+
 ## [2.0.0-beta.3] - 2026-10-23
 
 ### Added
