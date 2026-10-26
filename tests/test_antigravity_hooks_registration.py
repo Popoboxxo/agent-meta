@@ -28,6 +28,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -266,7 +268,7 @@ def _run_adapter(fixture_dir: Path, payload: str, target: str = "target.sh",
     return subprocess.run(  # noqa: S603
         ["bash", "antigravity-json-adapter.sh", target],
         input=payload, capture_output=True, text=True, cwd=fixture_dir, env=env,
-        timeout=60,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -274,7 +276,7 @@ def _repo_status() -> str:
     """`git status --porcelain` of this repository (must not change)."""
     result = subprocess.run(  # noqa: S603
         ["git", "-C", str(_REPO_ROOT), "status", "--porcelain"],
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, text=True, timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, result.stderr
     return result.stdout
@@ -402,7 +404,7 @@ def test_adapter_missing_argument_fails_open_with_warning(tmp_path):
     result = subprocess.run(  # noqa: S603
         ["bash", "antigravity-json-adapter.sh"],
         input=payload, capture_output=True, text=True, cwd=fixture, env=env,
-        timeout=60,
+        timeout=SCRIPT_TIMEOUT,
     )
 
     assert result.returncode == 0
