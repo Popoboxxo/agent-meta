@@ -240,6 +240,11 @@ def _regenerate_static_context(
     agent-injected trailing block (e.g. the bootstrap block) is preserved
     verbatim, exactly like the managed block. The static signature used for
     drift detection then covers header + template footer instead of header only.
+
+    The user-owned ``## Eigene Notizen`` section is preserved in the footer
+    template part as well (for the AGENTS.md family it lives there, not in the
+    header), and it is excluded from the drift signature on both sides — editing
+    only those notes neither loses content nor triggers a spurious backup.
     """
 
     if not target_path.exists():
@@ -276,16 +281,23 @@ def _regenerate_static_context(
 
     if rebuild_footer:
         existing_footer_tmpl, injected_tail = _split_injected_footer_tail(existing_footer)
+        # The AGENTS.md family carries the user-owned notes section in its footer,
+        # so the header promise applies here too: carry it over verbatim instead
+        # of letting the template rebuild drop it (#1027).
+        new_footer_tmpl, _ = _split_injected_footer_tail(new_footer)
+        new_footer_tmpl = _preserve_user_notes(new_footer_tmpl, existing_footer_tmpl)
         if injected_tail:
             # Re-attach the agent-injected tail below the fresh template footer,
             # reproducing the exact spacing the agents step uses when appending.
-            target_footer = new_footer.rstrip("\n") + "\n\n" + injected_tail
+            target_footer = new_footer_tmpl.rstrip("\n") + "\n\n" + injected_tail
         else:
-            target_footer = new_footer
+            target_footer = new_footer_tmpl
         # Signature covers header + template footer (ignoring the injected tail,
-        # which is owned by the agents step and changes independently).
-        new_sig = new_static + "\x00" + new_footer.rstrip("\n")
-        existing_sig = existing_static + "\x00" + existing_footer_tmpl.rstrip("\n")
+        # which is owned by the agents step and changes independently). The
+        # user-owned notes are stripped from both sides so editing them is not
+        # reported as static-part drift.
+        new_sig = new_static + "\x00" + _strip_user_notes(new_footer_tmpl).rstrip("\n")
+        existing_sig = existing_static + "\x00" + _strip_user_notes(existing_footer_tmpl).rstrip("\n")
     else:
         target_footer = existing_footer
         new_sig = new_static
