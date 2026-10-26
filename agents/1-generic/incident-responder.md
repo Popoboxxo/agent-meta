@@ -1,6 +1,6 @@
 ---
 name: template-incident-responder
-version: "1.5.1"
+version: "1.6.1"
 description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 reference_standards:
@@ -54,6 +54,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 5. RCA        Produce the RCA report (rca-report-v1) + prioritized hotfix list.
 6. HANDOFF    Hotfix → developer. Post-mortem / RCA → documenter.
 ```
+
+### 2.1 PRESERVE — capture evidence before stabilizing
+Before any state-destroying action (restart, rollback, scale-down, container removal, log rotation), capture volatile evidence in order of decreasing volatility: process and kernel state → network tables and open connections → memory (dump when intrusion is suspected) → local logs → the central log copy. Keep changes minimal and explainable; document every capture with path, timestamp and host, and reference the capture IDs in the RCA timeline. Restart or roll back only after the capture is complete — or with an explicitly documented exception (acute customer harm); reconstructing a timeline after a restart is evidence destruction, not stabilization.
 
 ## 3. RCA methodology
 

@@ -103,27 +103,52 @@ TOLERANCE_MAX_BYTES = 4096
 #     **pre-existing stale pin** from the Phase-1 / compact-profile work (the Gemini rules are
 #     embedded into the shared AGENTS.md, so no separate rules artifact counts into the
 #     always-loaded set). NOT caused by Task 30; the next re-pin must not inherit it silently.
+# RE-PIN (literature evidence gates, review round 2): one evidence-gate rule per role in eight role templates (+7,228 B roster, +1,258 B orchestrator)
+# Absorbed deltas of this re-pin (measured, not extrapolated):
+#   * Claude/always-loaded: 610980 -> 618208 (+7228)
+#   * Claude/harness-roster: 591201 -> 598429 (+7228)
+#   * Claude/orchestrator: 85530 -> 86788 (+1258)
+#   * Codex/always-loaded: 609316 -> 616544 (+7228)
+#   * Codex/harness-roster: 585156 -> 592384 (+7228)
+#   * Codex/orchestrator: 85145 -> 86403 (+1258)
+#   * Continue/orchestrator: 70180 -> 71438 (+1258)
+#   * Copilot/orchestrator: 70056 -> 71314 (+1258)
+#   * Gemini/orchestrator: 85552 -> 86810 (+1258)
+#   * KimiCode/always-loaded: 601837 -> 609065 (+7228)
+#   * KimiCode/harness-roster: 577663 -> 584891 (+7228)
+#   * KimiCode/orchestrator: 71943 -> 73201 (+1258)
+#   * Mammouth/always-loaded: 597890 -> 605118 (+7228)
+#   * Mammouth/harness-roster: 573719 -> 580947 (+7228)
+#   * Mammouth/orchestrator: 70481 -> 71739 (+1258)
+#   * Opencode/always-loaded: 611901 -> 619145 (+7244)
+#   * Opencode/harness-roster: 587666 -> 594910 (+7244)
+#   * Opencode/orchestrator: 85218 -> 86476 (+1258)
+#   * ZCode/always-loaded: 600076 -> 607304 (+7228)
+#   * ZCode/harness-roster: 575003 -> 582231 (+7228)
+#   * ZCode/orchestrator: 70752 -> 72010 (+1258)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25): the merge changed the
+# rendered text of the git/tester/security-auditor/database-reviewer/incident-responder/
+# performance-optimizer/se-senior-developer role files, so every aggregate that contains
+# those files shrank by 16-17 B (the replacement of the system-temp paths is shorter than
+# the old literals). Measured, not extrapolated. Complete list of non-zero deltas:
+#   * harness-roster: Claude 598429 -> 598413 (-16), Codex 592384 -> 592368 (-16),
+#     KimiCode 584891 -> 584875 (-16), Mammouth 580947 -> 580931 (-16),
+#     Opencode 594910 -> 594893 (-17), ZCode 582231 -> 582215 (-16).
+#   * always-loaded: Claude 618208 -> 618192 (-16), Codex 616544 -> 616528 (-16),
+#     KimiCode 609065 -> 609049 (-16), Mammouth 605118 -> 605102 (-16),
+#     Opencode 619145 -> 619128 (-17), ZCode 607304 -> 607288 (-16).
+#   * orchestrator: Opencode 86476 -> 86475 (-1). Every other artifact is unchanged
+#     (entry-file, rules, Continue/Copilot/Gemini and all their artifacts).
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2511, "rules": 17268, "orchestrator": 85530, "harness-roster": 591201, "always-loaded": 610980},
-    "Codex": {"entry-file": 24160, "orchestrator": 85145, "harness-roster": 585156, "always-loaded": 609316},
-    # Continue: rule files gained `alwaysApply: false` + `description` frontmatter
-    # (Task 1.31, IC-15 Nr. 10 / F-14) and `.continue/rules/project-context.md`
-    # dropped its unresolved-placeholder lines; the disk-byte metric counts the
-    # frontmatter, so `rules`/`always-loaded` grow while the runtime always-on set
-    # shrinks (the reader lazy-loads `alwaysApply: false` files).
-    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 70180, "always-loaded": 20498},
-    # Copilot: `.github/instructions/*.instructions.md` gained the required suffix
-    # plus `applyTo`/`description` frontmatter and the agent `name:` fix
-    # (Task 1.29, IC-15 Nr. 3 / F-13) — pin refreshed to the measured Ist.
-    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 70056, "always-loaded": 29393},
-    # Gemini: the `rules` artifact is dropped (its rules are embedded in the shared
-    # AGENTS.md), so `always-loaded` equals `entry-file` — the -17,142 B vs. the HEAD
-    # pin is the pre-existing stale pin documented above, not a Task-30 effect.
-    "Gemini": {"entry-file": 31841, "orchestrator": 85552, "always-loaded": 31841},
-    "KimiCode": {"entry-file": 24174, "orchestrator": 71943, "harness-roster": 577663, "always-loaded": 601837},
-    "Mammouth": {"entry-file": 24171, "orchestrator": 70481, "harness-roster": 573719, "always-loaded": 597890},
-    "Opencode": {"entry-file": 24235, "orchestrator": 85218, "harness-roster": 587666, "always-loaded": 611901},
-    "ZCode": {"entry-file": 25073, "orchestrator": 70752, "harness-roster": 575003, "always-loaded": 600076},
+    "Claude": {"always-loaded": 618192, "entry-file": 2511, "harness-roster": 598413, "orchestrator": 86788, "rules": 17268},
+    "Codex": {"always-loaded": 616528, "entry-file": 24160, "harness-roster": 592368, "orchestrator": 86403},
+    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 71438, "rules": 20140},
+    "Copilot": {"always-loaded": 29393, "entry-file": 9457, "orchestrator": 71314, "rules": 19936},
+    "Gemini": {"always-loaded": 31841, "entry-file": 31841, "orchestrator": 86810},
+    "KimiCode": {"always-loaded": 609049, "entry-file": 24174, "harness-roster": 584875, "orchestrator": 73201},
+    "Mammouth": {"always-loaded": 605102, "entry-file": 24171, "harness-roster": 580931, "orchestrator": 71739},
+    "Opencode": {"always-loaded": 619128, "entry-file": 24235, "harness-roster": 594893, "orchestrator": 86475},
+    "ZCode": {"always-loaded": 607288, "entry-file": 25073, "harness-roster": 582215, "orchestrator": 72010},
 }
 
 
@@ -261,26 +286,39 @@ def test_ac07_missing_ceiling_is_a_violation():
 # purpose because the ceilings' tolerance absorbs the delta.
 # AC-26 size TARGETS are unchanged and remain ESTIMATE data / unmet (opt-in,
 # unverified). Re-pinned from measured Ist, not extrapolated.
+# RE-PIN (literature evidence gates, review round 2): one evidence-gate rule per role in eight role templates (+7,228 B roster, +1,258 B orchestrator)
+# Absorbed deltas of this re-pin (measured, not extrapolated):
+#   * Claude/always-loaded: 556951 -> 564179 (+7228)
+#   * Claude/harness-roster: 537222 -> 544450 (+7228)
+#   * Codex/always-loaded: 534491 -> 541719 (+7228)
+#   * Codex/harness-roster: 531078 -> 538306 (+7228)
+#   * KimiCode/always-loaded: 541420 -> 548648 (+7228)
+#   * KimiCode/harness-roster: 537997 -> 545225 (+7228)
+#   * Mammouth/always-loaded: 537515 -> 544743 (+7228)
+#   * Mammouth/harness-roster: 534094 -> 541322 (+7228)
+#   * Opencode/always-loaded: 537142 -> 544386 (+7244)
+#   * Opencode/harness-roster: 533661 -> 540905 (+7244)
+#   * ZCode/always-loaded: 539659 -> 546887 (+7228)
+#   * ZCode/harness-roster: 535333 -> 542561 (+7228)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25) — measured, not
+# extrapolated. Same cause as the `full` re-pin above; non-zero deltas only:
+#   * harness-roster: Claude 544450 -> 544434 (-16), Codex 538306 -> 538290 (-16),
+#     KimiCode 545225 -> 545209 (-16), Mammouth 541322 -> 541306 (-16),
+#     Opencode 540905 -> 540888 (-17), ZCode 542561 -> 542545 (-16).
+#   * always-loaded: Claude 564179 -> 564163 (-16), Codex 541719 -> 541703 (-16),
+#     KimiCode 548648 -> 548632 (-16), Mammouth 544743 -> 544727 (-16),
+#     Opencode 544386 -> 544369 (-17), ZCode 546887 -> 546871 (-16).
+#   * orchestrator: Opencode 32471 -> 32470 (-1). Every other artifact unchanged.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2461, "rules": 17268, "orchestrator": 32809,
-               "harness-roster": 537222, "always-loaded": 556951},
-    "Codex": {"entry-file": 3413, "orchestrator": 32325,
-              "harness-roster": 531078, "always-loaded": 534491},
-    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 33249,
-                 "always-loaded": 20498},
-    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 33123,
-                "always-loaded": 29393},
-    # Gemini renders its rules embedded into the shared AGENTS.md in `compact`,
-    # so no `rules` artifact is written (unlike `full`).
-    "Gemini": {"entry-file": 10012, "orchestrator": 33997, "always-loaded": 10012},
-    "KimiCode": {"entry-file": 3423, "orchestrator": 33535,
-                 "harness-roster": 537997, "always-loaded": 541420},
-    "Mammouth": {"entry-file": 3421, "orchestrator": 32114,
-                 "harness-roster": 534094, "always-loaded": 537515},
-    "Opencode": {"entry-file": 3481, "orchestrator": 32471,
-                 "harness-roster": 533661, "always-loaded": 537142},
-    "ZCode": {"entry-file": 4326, "orchestrator": 32340,
-              "harness-roster": 535333, "always-loaded": 539659},
+    "Claude": {"always-loaded": 564163, "entry-file": 2461, "harness-roster": 544434, "orchestrator": 32809, "rules": 17268},
+    "Codex": {"always-loaded": 541703, "entry-file": 3413, "harness-roster": 538290, "orchestrator": 32325},
+    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 33249, "rules": 20140},
+    "Copilot": {"always-loaded": 29393, "entry-file": 9457, "orchestrator": 33123, "rules": 19936},
+    "Gemini": {"always-loaded": 10012, "entry-file": 10012, "orchestrator": 33997},
+    "KimiCode": {"always-loaded": 548632, "entry-file": 3423, "harness-roster": 545209, "orchestrator": 33535},
+    "Mammouth": {"always-loaded": 544727, "entry-file": 3421, "harness-roster": 541306, "orchestrator": 32114},
+    "Opencode": {"always-loaded": 544369, "entry-file": 3481, "harness-roster": 540888, "orchestrator": 32470},
+    "ZCode": {"always-loaded": 546871, "entry-file": 4326, "harness-roster": 542545, "orchestrator": 32340},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -291,7 +329,9 @@ COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
 # The AGENTS.md providers share one context file; measured in a single project
 # with all of them active (`compact`).
 _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "ZCode")
-_IST_COMPACT_MULTI_AGENTS_MD = 11374
+# Multi-provider AGENTS.md Ist-value; re-measured 2026-10-25 after the origin/main
+# merge: 11374 -> 11257 (-117 B, the tmp-sink text is shorter).
+_IST_COMPACT_MULTI_AGENTS_MD = 11257
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
 # ESTIMATES (Spec section 11): goals, not measurements. `compact` ships

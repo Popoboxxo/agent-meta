@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.7.1"
+version: "2.8.0"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. For integration tests → se-test-engineer."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
@@ -50,7 +50,7 @@ describe / class / suite: ModuleName
 ## 5. Test patterns
 
 - **Real assertions:** the test MUST actually validate the function
-- **Realistic test data:** no "test" strings, use realistic values
+- **Realistic test data:** no "test" strings, use realistic *shapes* (lengths, formats, edge values) — generated synthetically, never copied from production (see constraints)
 - **Test isolation:** each test independent, clean up shared state
 - **No `any`** in test code
 - **No flaky tests**
@@ -118,6 +118,9 @@ NEXT: [recommended next step]
 <constraints>
 - No test without `[REQ-xxx]` in the name
 - No tests depending on external services — mock them!
+- **No production data in tests** — no real user records, no PII (names, emails, addresses, IDs, health/financial data), no secrets, tokens or production credentials in fixtures, test code or committed snapshots. Fixtures come from synthetic generators or verifiably anonymized samples; commit synthetically generated data only.
+- **If a test needs real data:** mask/anonymize it before use and document the procedure (origin + masking method) next to the fixture — if anonymization is impossible, do not write the test and report the blocker instead.
+- **Any occurrence of production data, PII or secrets in fixtures, snapshots, logs or reports is a finding** — report it with location; never copy such data forward. Test data leaks through repos and CI logs.
 - No test depending on time, randomness, or execution order — determinism required
 - No `any` in test code
 - No flaky tests

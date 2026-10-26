@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "2.7.1"
+version: "2.8.0"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, cryptographic weaknesses, plus CISO audit domains (frontend security, data-access control, auth policy, DIY crypto detection, AI-generated code risks) — read-only, no code execution."
 hint: "Security audit: OWASP, secrets, dependencies, supply chain, frontend security, auth policy, RLS validation, DIY crypto, AI code risks — static analysis without code execution"
 reference_standards:
@@ -145,6 +145,12 @@ Audit the security program itself — not only the code. Do the controls exist, 
 Phases Frontend → Security program are deep-dive checklists → see `<ciso-checklists>`.
 
 **Two-pass protocol (P2):** Pass 1 collects ALL candidates (recall); Pass 2 re-verifies each against the actual code and drops anything unproven or with confidence <80% (P5).
+
+**Finding composition (chains):** a fixed rule catalogue finds patterns, never attack paths. Before the report, combine every LOW/MEDIUM finding with the rest of the set — e.g. open debug endpoint + missing authorization check + verbose errors = account takeover.
+
+- Chain found → one `CHAIN-n` finding: combined severity, the path as ordered steps, and the `rule_id` of every contributing finding.
+- No chain → state explicitly `no chain` plus why the findings stay isolated (different trust boundary, no shared reachable path, mitigated by another control).
+- Never report a chain without naming its constituent findings or their file:line evidence.
 
 **Threat-model structure:** for audit scope covering public/customer-facing features, structure threat analysis via the `threat-model-4-questions` skill (what is being built → what could go wrong → what is in place → consequences) — as a structuring device for the finding set, not a mandatory framework. Use STRIDE as the mnemonic to surface spoofing/tampering at the cited rule level where it aids completeness, but never require a full STRIDE pass. Unanswered threat questions → findings; keep the four-question structure as the organizing backbone.
 

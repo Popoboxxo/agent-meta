@@ -5168,9 +5168,20 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # (SPEC-tmp-sink-injection, AC-19) rebaselined `ac01-baseline` and
 # `slimming-golden` (sink literals + basetemp shape, documented in the two
 # harnesses' rebaseline logs); `compact-golden` is untouched.
+# Literature round 2, evidence gates (PR #1013, plan-external) rebaselined
+# `ac01-baseline` and `slimming-golden`. This does not violate AC-T4: the rule
+# freezes the trees against changes made *within* the opencode-v2 plan, and the
+# evidence gates are plan-external — the rebaseline is documented here, like the
+# 2.0.0-beta.3 release bump above. `ac01-baseline` moved only via `hashes.json`
+# (63 per-file hashes: seven of the eight enriched roles appear in the
+# provider matrix, 7 x 9 = 63). `slimming-golden` re-derived five role
+# goldens from the real sync render (`git`, `accessibility-specialist`,
+# `incident-responder`, `performance-optimizer`, `tester`). `compact-golden`
+# is unchanged. Detailed logs: `tests/test_ac01_render_identity.py` and
+# `tests/test_template_slimming_equivalence.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "69994f06ea7ea40a318b8c1a0cc08eef3dc94b718561447d060e090ad9846172",
-    "slimming-golden": "ed9668a76b84a0d09e6509fce43ca4aa60f79d7af8969e4d7c7e978ea7c32567",
+    "ac01-baseline": "f6c89a95daa5afb4965fb2c8ea9efde5b9f87efd7cec761ffb1d9f32cc3b325e",
+    "slimming-golden": "a04b3220a1dccd4062a09641cf39eaf0b10e06dd294d887699229b671b6e0576",
     "compact-golden": "3d8acdcbce82305680c7b0bb936940488142d81bc455779177715761532c4878",
 }
 

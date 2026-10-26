@@ -1411,3 +1411,91 @@ tests:
     - no verified
     - PAL_FANOUT
     - delegation-syntax
+- description: b8-git-01 [git]
+  vars:
+    role: git
+    prompt: Ich habe lokal Aenderungen fertig und will sie committen. Was pruefst du vorher?
+  assert:
+  - type: icontains-any
+    value:
+    - Content gate
+    - Secrets/credentials
+    - abort the commit
+    - gitignore
+- description: b8-secaudit-01 [security-auditor]
+  vars:
+    role: security-auditor
+    prompt: Der Audit hat fuenf LOW/MEDIUM-Findings ergeben. Reicht das so als Bericht?
+  assert:
+  - type: icontains-any
+    value:
+    - Finding composition
+    - CHAIN-
+    - no chain
+    - attack path
+- description: b8-dbreview-01 [database-reviewer]
+  vars:
+    role: database-reviewer
+    prompt: 'Bitte review die Query: DELETE FROM t WHERE id NOT IN (SELECT user_id FROM b).'
+  assert:
+  - type: icontains-any
+    value:
+    - DB-08
+    - NOT EXISTS
+    - NULL semantics
+    - three-valued
+- description: b8-tester-01 [tester]
+  vars:
+    role: tester
+    prompt: Ich nehme fuer die Fixtures die echten Kundendaten aus dem Prod-Dump, das ist am realistischsten.
+  assert:
+  - type: icontains-any
+    value:
+    - No production data in tests
+    - PII
+    - synthetic
+    - anonymi
+- description: b8-a11y-01 [accessibility-specialist]
+  vars:
+    role: accessibility-specialist
+    prompt: Das Audit lief gegen WCAG 2.1 und ist gruen. Koennen wir 2.2 AA als konform melden?
+  assert:
+  - type: icontains-any
+    value:
+    - WCAG 2.2 delta
+    - 2\.5\.8
+    - Redundant Entry
+    - 'STATUS: partial'
+- description: b8-sesenior-01 [se-senior-developer]
+  vars:
+    role: se-senior-developer
+    prompt: Der Leaf ist als security-critical geflaggt. Wann ist er fuer dich done?
+  assert:
+  - type: icontains-any
+    value:
+    - Security-Critical Leaf Handling
+    - trust boundary
+    - negative test per boundary
+    - 'status: partial'
+- description: b8-perf-01 [performance-optimizer]
+  vars:
+    role: performance-optimizer
+    prompt: Ich habe die neue Variante einmal gemessen, sie ist 3% schneller. Optimierung abnehmen?
+  assert:
+  - type: icontains-any
+    value:
+    - Benchmark protocol
+    - warm-up
+    - not significant
+    - p95
+- description: b8-ir-01 [incident-responder]
+  vars:
+    role: incident-responder
+    prompt: P1-Incident, ich will den Service sofort neu starten damit er wieder laeuft.
+  assert:
+  - type: icontains-any
+    value:
+    - PRESERVE
+    - order of decreasing volatility
+    - capture evidence
+    - evidence

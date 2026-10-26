@@ -273,6 +273,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``.agents/hooks/*.sh``). 102 of 1013 hashes; 0 added/removed; ``generated-file-hashes.json`` is
   unchanged because no managed path appeared or vanished. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Literature round 2, evidence gates (PR #1013): eight role templates (`git`, `security-auditor`,
+  `database-reviewer`, `tester`, `accessibility-specialist`, `se-senior-developer`,
+  `performance-optimizer`, `incident-responder`) each gained one literature-anchored rule. Rebaselined:
+  the agent artifact of those roles across all providers plus the affected
+  `.meta-config/generated-file-hashes.json` (roster/always-loaded +7,228 B, orchestrator +1,258 B).
+  No routing, enum or name-index change — the roles were already registered.
+
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
