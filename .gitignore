@@ -55,6 +55,8 @@ sync.log
 
 # agent-meta viz sessions (never commit runtime events)
 .meta-viz/
+# Playwright MCP browser scratch/logs
+.playwright-mcp/
 .meta-viz/events-*.jsonl
 .meta-viz/session-reports/
 docs/concepts/.local-Inputs/architecture_law.md
