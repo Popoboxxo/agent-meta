@@ -2377,6 +2377,157 @@ roles:
       - orchestrator
     short_desc: Assesses governance, risk and control processes against a named framework (COSO...
 
+  memory-architect:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Agent-memory architecture: designs the write and read paths of a memory store, decides what is consolidated, what is forgotten and how retrieval quality is measured. Read-only: produces an architecture decision plus a quality baseline, never writes memory entries. Boundary: rag-engineer owns retrieval mechanics, knowledge-curator the wiki schema, ai-observability-engineer the telemetry.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: memory-architecture-v1
+      target_roles:
+      - rag-engineer
+      - knowledge-curator
+    short_desc: 'Agent memory architecture: consolidation, retrieval quality, forgetting, write/read separation'
+  context-engineer:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Context-window economy: owns the instruction hierarchy, the token budget per context class, compaction rules and the evidence that a rule still reaches the agent after compaction. Read-only: reports budget and drift, changes go through agent-meta-manager. Boundary: prompt-governor owns prompt versions, prompt-engineer the prompt content.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: context-budget-report-v1
+      target_roles:
+      - agent-meta-manager
+    short_desc: 'Context budget: instruction hierarchy, compaction, what enters the window and what does not'
+  red-team-agent:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Adversarial testing of agent behaviour on authorised systems only: indirect prompt injection, jailbreak attempts, tool misuse and data exfiltration. Produces reproducible findings with a defence recommendation; never operates against third-party systems. Boundary: ai-security-guardian audits code, security-auditor the application, this role attacks the agent itself.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: redteam-findings-v1
+      target_roles:
+      - prompt-engineer
+      - ai-security-guardian
+    short_desc: 'Adversarial prompt red-teaming against own systems: injection, jailbreak, tool misuse'
+  secrets-manager:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Secret lifecycle governance: inventory of which secret lives where, rotation schedule, revocation path and the leak case (rotate first, then clean). Reports references only, never secret values. Boundary: devops-engineer deploys, security-auditor scans code, git owns the commit gate.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: secret-inventory-v1
+      target_roles:
+      - devops-engineer
+      - security-auditor
+    short_desc: 'Secret lifecycle: creation, storage, rotation, revocation, leak handling — references only'
+  chaos-engineer:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Controlled failure injection: states the hypothesis and the steady-state abort criterion before the experiment, keeps the blast radius minimal, requires a kill switch and proves recovery. Production only with explicit human approval. Boundary: sre-engineer defines SLOs, se-test-engineer designs integration tests, incident-responder runs live incidents.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: chaos-experiment-v1
+      target_roles:
+      - sre-engineer
+      - incident-responder
+    short_desc: 'Failure injection with hypothesis, steady-state and kill switch — never production by default'
+  reproducible-builds-engineer:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Proves build determinism: builds twice and compares byte for byte, names every non-deterministic source (timestamps, paths, network, randomness, ordering) with a countermeasure, and reconciles provenance/SBOM against the artefact. Boundary: dependency-auditor owns licence and CVE risk, release owns versioning, devops-engineer the pipeline.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: build-determinism-v1
+      target_roles:
+      - devops-engineer
+      - release
+    short_desc: 'Build determinism and provenance: double-build byte compare, SBOM, non-determinism sources'
+  ux-researcher:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'User research: interviews and observations with discipline (ask about past behaviour, not hypotheticals, never collect feature wishes), states sample, method and bias, and reports findings as hypotheses with an evidence grade. Boundary: ui-ux-designer designs, ui-reviewer audits the implementation, product-manager owns the backlog.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: ux-research-findings-v1
+      target_roles:
+      - product-manager
+      - ui-ux-designer
+    short_desc: 'User research discipline: past behaviour over opinion, sample and bias stated, findings as hypotheses'
+  privacy-compliance-officer:
+    model: balanced
+    memory: ''  # Operational review role: starts fresh each run.
+    workflow_tier: optional
+    description: 'Privacy and AI-regulation assessment: legal basis, data minimisation, retention, data-subject rights, processor agreements, plus AI-Act risk class, transparency duties and human oversight. Never gives legal advice — reports the finding and the open legal question for a human. Boundary: app-lifecycle-governor classifies data, ai-governance-engineer owns AI governance.'
+    routing:
+      addressability: name_only
+      name_only_reason: Review role with a narrow mandate; invoked explicitly by name,
+        never by routine task keywords, so it cannot absorb unrelated work.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: privacy-assessment-v1
+      target_roles:
+      - ai-governance-engineer
+      - app-lifecycle-governor
+    short_desc: 'GDPR and AI-Act obligations: legal basis, minimisation, retention, transparency, oversight'
 activation_groups:
   se:
     default: false

@@ -159,3 +159,11 @@ Minimale Szenario-Configs (z.B. `01-minimal-claude`, `13-status-table`), die
 keinen Default in `scripts/lib/config.py`. Vorbestehendes, von diesem Katalog
 unabhängiges Verhalten (bereits in `01-minimal-claude` vor jeder Erweiterung
 so), kein Scenario-Bug.
+| 79 | `79-memory-architect-role` | neue Rolle `memory-architect` (Review-Runde 2, IC-28) |
+| 80 | `80-context-engineer-role` | neue Rolle `context-engineer` (Review-Runde 2, IC-28) |
+| 81 | `81-red-team-agent-role` | neue Rolle `red-team-agent` (Review-Runde 2, IC-28) |
+| 82 | `82-secrets-manager-role` | neue Rolle `secrets-manager` (Review-Runde 2, IC-28) |
+| 83 | `83-chaos-engineer-role` | neue Rolle `chaos-engineer` (Review-Runde 2, IC-28) |
+| 84 | `84-reproducible-builds-engineer-role` | neue Rolle `reproducible-builds-engineer` (Review-Runde 2, IC-28) |
+| 85 | `85-ux-researcher-role` | neue Rolle `ux-researcher` (Review-Runde 2, IC-28) |
+| 86 | `86-privacy-compliance-officer-role` | neue Rolle `privacy-compliance-officer` (Review-Runde 2, IC-28) |

@@ -191,7 +191,14 @@ _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 # IC-31 block snippets that standalone resolves to their real text; the
 # name -> variable mapping comes from config.AGENT_BLOCK_SNIPPETS.
-_STANDALONE_BLOCK_NAMES = frozenset({"closing-summary", "user-proxy", "worker-role"})
+_STANDALONE_BLOCK_NAMES = frozenset({
+    "closing-summary",
+    "user-proxy",
+    "worker-role",
+    "user-proxy-caller",
+    "worker-role-router",
+    "worker-role-bullet",
+})
 _STANDALONE_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = tuple(
     (name, f"{stem}_BLOCK")
     for name, stem in AGENT_BLOCK_SNIPPETS
@@ -357,6 +364,18 @@ def render_all(agent_meta_root: Path, roles: tuple[str, ...] | None = None) -> d
     return {role: render_standalone_agent(role, agent_meta_root) for role in roles}
 
 
+# First-sentence boundary for index summaries: a period only ends the sentence
+# when whitespace follows and the next word starts uppercase. A plain
+# ``split(". ")`` also cuts on abbreviations ("vs. explicit"), decimals and
+# mid-thought dots, leaving a dangling fragment in the README table.
+_SENTENCE_END_RE = re.compile(r"\.\s+(?=[A-Z])")
+
+
+def _first_sentence(desc: str) -> str:
+    """Return ``desc`` up to (and including) its first real sentence end."""
+    return _SENTENCE_END_RE.split(desc, maxsplit=1)[0].rstrip(".") + "."
+
+
 def _role_summary(role: str, agent_meta_root: Path) -> str:
     """One-line description pulled from the source template's frontmatter.
 
@@ -375,7 +394,7 @@ def _role_summary(role: str, agent_meta_root: Path) -> str:
     if not desc:
         return ""
     # First sentence only — the index is a scan list, not the full description.
-    return desc.split(". ")[0].rstrip(".") + "."
+    return _first_sentence(desc)
 
 
 # German descriptions for 1-generic roles that role-defaults.yaml doesn't
@@ -396,7 +415,7 @@ def _role_summary_de(role: str, roles_cfg: dict) -> str:
     desc = roles_cfg.get(role, {}).get("description") or _ROLE_SUMMARY_DE_FALLBACKS.get(role, "")
     if not desc:
         return ""
-    return desc.split(". ")[0].rstrip(".") + "."
+    return _first_sentence(desc)
 
 
 def render_index(agent_meta_root: Path, roles: tuple[str, ...] | None = None) -> str:

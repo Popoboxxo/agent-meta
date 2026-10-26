@@ -273,12 +273,47 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``.agents/hooks/*.sh``). 102 of 1013 hashes; 0 added/removed; ``generated-file-hashes.json`` is
   unchanged because no managed path appeared or vanished. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Literature round 2, eight new review roles (PR #1015, IC-28): `memory-architect`, `context-engineer`,
+  `red-team-agent`, `secrets-manager`, `chaos-engineer`, `reproducible-builds-engineer`,
+  `ux-researcher`, `privacy-compliance-officer` add eight agent artifacts per provider, eight roster
+  rows, eight agent-table rows in the entry files (+864 B, Copilot +1,430 B) and eight orchestrator/
+  name-index rows, plus the managed-file lists and `generated-file-hashes.json`. The manifest grows
+  1012 -> 1085 hashes (the new per-provider agent artifacts and managed-file lists); 106 existing hashes
+  changed. No existing role body changed.
+
+- Literature round 2 follow-up (AC-23 / AC-49): `chaos-engineer`, `reproducible-builds-engineer` and
+  `ux-researcher` lose bare role arrows (prose handoffs instead; patch bumps `1.0.0 -> 1.0.1`). Rebaseline
+  also absorbs the post-merge tmp-sink drift (`f9e3f3e5`) that the branch merge left unrebaselined: the hook
+  script, `context-hashes.json`, `project.yaml` and the entry/agent artifacts of every provider. 220 of 1085
+  hashes changed; 0 added/removed. No role artifacts were added or removed.
+- Literature round 2 follow-up, dangling dispatch: the `se-test-engineer` row in `chaos-engineer` and the
+  `se-validator` row in `reproducible-builds-engineer` are gated on their target role (`1.0.1 -> 1.0.2`).
+  The AC-01 matrix has every role active, so only those two artifacts per provider change (2 x 9 = 18 of
+  1085 hashes; 0 added/removed).
+- Rebaseline verification after the literature-round-2 fix series A-F (2026-10-26): a full re-render of the
+  provider matrix measured **0 of 1085 hashes changed**; `--write` was a byte-identical no-op. The fixes were
+  already covered by the two rebaselines above - D absorbed A's rendered-table change (name-only rows leave
+  the entry-file/orchestrator tables) together with the post-merge tmp-sink drift, E rebaselined its own gated
+  dispatch rows; C/D were part of D's rebaseline; B (routing eval catalog) and F (standalone README export)
+  are not part of the matrix render. No hash was absorbed silently and no exception was added.
+
 - Literature round 2, evidence gates (PR #1013): eight role templates (`git`, `security-auditor`,
   `database-reviewer`, `tester`, `accessibility-specialist`, `se-senior-developer`,
   `performance-optimizer`, `incident-responder`) each gained one literature-anchored rule. Rebaselined:
   the agent artifact of those roles across all providers plus the affected
   `.meta-config/generated-file-hashes.json` (roster/always-loaded +7,228 B, orchestrator +1,258 B).
   No routing, enum or name-index change — the roles were already registered.
+
+- Merge of main (bb92039f, #1013 evidence gates) into the literature-round-2 branch (PR #1015 +
+  follow-up series A-F; 2026-10-26): the two independently rebaselined baselines were combined by
+  re-rendering the merged tree. Drift before `--write` was exactly the 63 per-provider hashes of the
+  seven matrix-active #1013 roles (`git`, `security-auditor`, `database-reviewer`, `tester`,
+  `accessibility-specialist`, `performance-optimizer`, `incident-responder`; `se-senior-developer` is
+  gated off in the matrix), i.e. 7 x 9 = 63 of 1085 hashes; 0 added/removed. #1015's eight new roles
+  and the A-F follow-ups were already in the branch baseline, so the merged manifest is the union of
+  both sources with no silently absorbed hash and no exception added. The fixture-tree digests in
+  `tests/test_opencode_v2_surface.py` were re-verified against the regenerated `ac01-baseline` and
+  `slimming-golden` trees; `compact-golden` is unchanged.
 
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q

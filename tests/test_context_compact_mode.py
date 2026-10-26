@@ -148,7 +148,7 @@ def test_agents_table_full_render_is_dense_without_blank_lines():
     builder = TemplateBuilder(REPO_ROOT / "templates" / "context")
     body = _agents_table_body()
     rendered = builder.resolve_conditionals(
-        builder.resolve_loops(body, {"active_agents": _SAMPLE_AGENTS}),
+        builder.resolve_loops(body, {"active_agents_table": _SAMPLE_AGENTS}),
         {"COMPACT_MODE": "false"},
     )
     assert rendered == expected
@@ -160,7 +160,7 @@ def test_agents_table_compact_render_is_dense_with_keywords():
     builder = TemplateBuilder(REPO_ROOT / "templates" / "context")
     body = _agents_table_body()
     rendered = builder.resolve_conditionals(
-        builder.resolve_loops(body, {"active_agents": _SAMPLE_AGENTS}),
+        builder.resolve_loops(body, {"active_agents_table": _SAMPLE_AGENTS}),
         {"COMPACT_MODE": "true"},
     )
     lines = [line for line in rendered.splitlines() if line.strip()]
@@ -297,6 +297,44 @@ def test_bootstrap_compact_skips_empty_dir(tmp_path):
     engine = BootstrapEngine()
     assert engine.generate_gemini_bootstrap_instructions(
         tmp_path, compact=True, agents_label=".gemini/agents") == ""
+
+
+def test_bootstrap_compact_fallback_when_full_form_exceeds_hard_cap(tmp_path):
+    """Over-cap full roster -> compact instruction form (same obligation, no enumeration)."""
+    from scripts.lib.io import SyncError
+
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    for index in range(20):
+        (agents_dir / f"agent-{index}.md").write_text(
+            "---\ndescription: Agent %d\n---\nbody\n" % index, encoding="utf-8")
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "AGENTS.md").write_text("# project\n", encoding="utf-8")
+
+    engine = BootstrapEngine()
+    guard_bytes: list[int] = []
+
+    def guard(_path, content):
+        size = len(content.encode("utf-8"))
+        guard_bytes.append(size)
+        if size > 1200:
+            raise SyncError("context.over-hard-cap: fake reader cap")
+
+    result = engine._bootstrap_api_based(
+        "Gemini",
+        agents_dir,
+        {"action": "inject-bootstrap-instructions", "context_file": "AGENTS.md"},
+        project,
+        hard_cap_guard=guard,
+    )
+
+    assert result["status"] == "success"
+    assert len(guard_bytes) == 2 and guard_bytes[0] > guard_bytes[1]
+    assert "define_subagent(name=" not in result["instructions"]
+    assert "registriere jeden Agenten unter seinem Dateinamen" in result["instructions"]
+    written = (project / "AGENTS.md").read_text(encoding="utf-8")
+    assert "define_subagent(name=" not in written
 
 
 # ---------------------------------------------------------------------------

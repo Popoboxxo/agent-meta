@@ -5179,9 +5179,19 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `incident-responder`, `performance-optimizer`, `tester`). `compact-golden`
 # is unchanged. Detailed logs: `tests/test_ac01_render_identity.py` and
 # `tests/test_template_slimming_equivalence.py`.
+# Merge of main (bb92039f) into the literature-round-2 branch: the name-only
+# table exclusion and #1015's new roles hit the same trees on top of the #1013
+# rebaseline; both trees were re-derived from the combined sync render and the
+# digests verified against the regenerated trees (see the AC-01 log entry of
+# 2026-10-26). `ac01-baseline` moved only via `hashes.json` (63 per-file hashes
+# absorbed #1013's evidence gates on the seven matrix-active roles);
+# `slimming-golden` moved via the five role goldens gaining the merged #1013
+# rule text (relative to the branch) and its orchestrator golden losing the two
+# name-only table rows (fix A, reason in test_orchestrator_compact_sections.py;
+# relative to main). `compact-golden` remains unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "f6c89a95daa5afb4965fb2c8ea9efde5b9f87efd7cec761ffb1d9f32cc3b325e",
-    "slimming-golden": "a04b3220a1dccd4062a09641cf39eaf0b10e06dd294d887699229b671b6e0576",
+    "ac01-baseline": "8fbb168951aef72034ff11c141e3da72c0a74ab184345cc196419bf20090ebe1",
+    "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "3d8acdcbce82305680c7b0bb936940488142d81bc455779177715761532c4878",
 }
 

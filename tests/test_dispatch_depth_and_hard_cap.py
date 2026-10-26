@@ -110,8 +110,13 @@ def test_codex_config_toml_gets_agents_max_depth(tmp_path):
 
 
 def test_multi_provider_agents_md_over_hard_cap_aborts(tmp_path):
-    """Test 2: an over-cap multi-provider AGENTS.md is never written silently."""
-    project = _make_project(tmp_path, AGENTS_MD_PROVIDERS)
+    """Test 2: an over-cap multi-provider AGENTS.md is never written silently.
+
+    The fixture forces the static part of AGENTS.md over Codex's 32 KiB cap, so
+    the cap holds for the explicit *and* the compact bootstrap form (the
+    fallback path must stay over cap too and therefore re-raise).
+    """
+    project = _make_project(tmp_path, AGENTS_MD_PROVIDERS, description="x" * 40_000)
     result = _run(project, "--init")
     combined = result.stdout + result.stderr
     assert result.returncode != 0, "sync silently accepted an over-cap AGENTS.md"

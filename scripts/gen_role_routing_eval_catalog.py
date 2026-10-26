@@ -42,6 +42,7 @@ except ImportError:
     print("PyYAML is required (pip install pyyaml).", file=sys.stderr)
     sys.exit(1)
 
+from scripts.lib.delegation_table import _derive_addressability
 from scripts.lib.roles import load_roles_config
 
 DEFAULT_OUT_DIR = _REPO_ROOT / "tests" / "routing-llm-eval" / "roles"
@@ -84,11 +85,23 @@ def _patterns(info: dict) -> tuple:
     return list(patterns.get("keywords") or []), list(patterns.get("examples") or [])
 
 
+def _addressability(info: dict) -> str:
+    """Addressability of a role, derived exactly like the routing layer.
+
+    Reuses ``delegation_table._derive_addressability`` (SPEC §3.4) instead of
+    re-implementing it: an explicit ``routing.addressability`` wins, otherwise
+    a role with routing patterns is ``keyword`` and every other role is
+    ``name_only``. Keeping one derivation guarantees a role can never be
+    keyword-routable for the router but case-less in the eval corpus.
+    """
+    return _derive_addressability(info)[0]
+
+
 def _overlap_index(roles: dict) -> dict:
     """normalized keyword -> sorted owner roles, only for tokens owned by >1 role."""
     owners: dict = defaultdict(set)
     for name, info in roles.items():
-        if (info.get("routing") or {}).get("addressability") in ("excluded", "name_only"):
+        if _addressability(info) in ("excluded", "name_only"):
             continue  # not keyword-routable: never an overlap owner
         for kw in _patterns(info)[0]:
             owners[_norm(kw)].add(name)
@@ -108,7 +121,7 @@ def generate_catalog(agent_meta_root: Path) -> dict:
         cases.append(case)
 
     for name, info in roles.items():
-        addressability = (info.get("routing") or {}).get("addressability")
+        addressability = _addressability(info)
         if addressability == "excluded":
             continue
         if addressability == "name_only":

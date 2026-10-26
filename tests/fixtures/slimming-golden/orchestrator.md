@@ -2144,7 +2144,6 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 | `git` | Commits, Branches, Tags |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
 | `incident-responder` | Live-Incident-Koordination: korreliert Logs, Metriken, führt Runbook-Schri |
-| `intern-developer` | Der übereifrige Praktikant |
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
 | `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun |
 | `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e |
@@ -2160,7 +2159,6 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
 | `performance-optimizer` | Big-O Bottleneck-Identifikation, datengetriebene Performance-Optimierung |
 | `planner` | Umsetzungsplanung |
-| `principal-developer` | Last-Resort-Eskalationsstufe |
 | `product-manager` | Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung |
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
 | `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |

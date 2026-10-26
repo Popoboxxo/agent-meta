@@ -127,7 +127,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # config._load_block_snippet_variables (resolved in every sync)
     "OUTPUT_GUARD_BLOCK", "BACKGROUND_PROCESS_GUARD_BLOCK", "PARSE_INPUT_BLOCK",
     "ESCALATE_CARD_BLOCK", "CLOSING_SUMMARY_BLOCK", "USER_PROXY_BLOCK",
-    "WORKER_ROLE_BLOCK",
+    "WORKER_ROLE_BLOCK", "USER_PROXY_CALLER_BLOCK", "WORKER_ROLE_ROUTER_BLOCK",
+    "WORKER_ROLE_BULLET_BLOCK",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging
@@ -267,7 +268,7 @@ _UNREGISTERED_BUILDER_RATCHET: frozenset[str] = frozenset({
 
 # Builder-internal keys (raw data, not template placeholders), filtered from
 # the builder output in addition to every key with a leading underscore.
-_BUILDER_INTERNAL_KEYS: frozenset[str] = frozenset({"active_agents"})
+_BUILDER_INTERNAL_KEYS: frozenset[str] = frozenset({"active_agents", "active_agents_table"})
 
 # Ratchet (shrink only): template placeholders neither builder-derived nor
 # registered. SKILL_* and MCP_GUARDRAILS_LIST are covered by _DYNAMIC_PREFIXES.

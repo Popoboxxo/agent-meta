@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .io import load_yaml_file
+from .io import SyncError, load_yaml_file
 
 
 class BootstrapEngine:
@@ -202,14 +202,17 @@ class BootstrapEngine:
         marker_id = config.get("marker_id") or provider
         marker_begin = f"<!-- agent-meta:bootstrap-begin:{marker_id} -->"
         marker_end = f"<!-- agent-meta:bootstrap-end:{marker_id} -->"
-        block = f"{marker_begin}\n{instructions}\n{marker_end}"
 
-        if marker_begin in existing:
-            pattern = re.compile(re.escape(marker_begin) + ".*?" + re.escape(marker_end), re.DOTALL)
-            # Function replacement keeps the generated block verbatim (#674).
-            new_content = pattern.sub(lambda _m: block, existing, count=1)
-        else:
-            new_content = existing.rstrip("\n") + "\n\n" + block + "\n"
+        def _compose(text: str) -> str:
+            block = f"{marker_begin}\n{text}\n{marker_end}"
+            if marker_begin in existing:
+                pattern = re.compile(
+                    re.escape(marker_begin) + ".*?" + re.escape(marker_end), re.DOTALL)
+                # Function replacement keeps the generated block verbatim (#674).
+                return pattern.sub(lambda _m: block, existing, count=1)
+            return existing.rstrip("\n") + "\n\n" + block + "\n"
+
+        new_content = _compose(instructions)
 
         if new_content == existing:
             if log:
@@ -217,7 +220,35 @@ class BootstrapEngine:
             return {"status": "skipped", "mechanism": "api-based", "reason": "bootstrap instructions unchanged"}
 
         if hard_cap_guard is not None:
-            hard_cap_guard(target_path, new_content)
+            try:
+                hard_cap_guard(target_path, new_content)
+            except SyncError as exc:
+                # Hard-cap fallback (data-driven: the reader capability decides,
+                # never a provider name). The explicit per-agent enumeration is
+                # a convenience; the registration obligation is not. When the
+                # full form pushes a shared file over a reader's cap, fall back
+                # to the compact instruction form (same obligation, pointers
+                # instead of an enumeration). Still over cap -> re-raise.
+                if (
+                    "context.over-hard-cap" not in str(exc)
+                    or compact
+                    or config.get("instructions_mode") == "static"
+                ):
+                    raise
+                compact_instructions = self.generate_gemini_bootstrap_instructions(
+                    agents_dir, compact=True,
+                    agents_label=agents_label or agents_dir.name,
+                )
+                if not compact_instructions:
+                    raise
+                new_content = _compose(compact_instructions)
+                hard_cap_guard(target_path, new_content)
+                instructions = compact_instructions
+                if log:
+                    log.note(
+                        str(target_path.relative_to(project_root)),
+                        "bootstrap: explicit roster exceeds a reader hard cap, compact form used",
+                    )
         if log:
             log.action("UPDATE", str(target_path.relative_to(project_root)), "bootstrap instructions")
         if not dry_run:

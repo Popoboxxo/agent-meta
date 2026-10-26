@@ -75,6 +75,36 @@ def _has_routing_patterns(role_info: dict) -> bool:
     return bool(patterns.get("keywords") or patterns.get("examples"))
 
 
+def _derive_addressability(role_info: dict) -> tuple[str, bool]:
+    """Return ``(addressability, derived)`` from the role's routing metadata.
+
+    Single derivation shared by the routing ``name_index`` and the entry-file
+    table filter (SPEC §3.4): an explicit ``routing.addressability`` wins;
+    otherwise a role with routing patterns is ``keyword``, every other role is
+    ``name_only`` (name dispatch only, no keyword surface). ``derived`` is True
+    when the config carried no explicit value — only the routing builder turns
+    that into a warning.
+    """
+    routing = role_info.get("routing")
+    routing = routing if isinstance(routing, dict) else {}
+    addressability = routing.get("addressability")
+    if addressability in ("keyword", "name_only", "excluded"):
+        return addressability, False
+    return ("keyword" if _has_routing_patterns(role_info) else "name_only"), True
+
+
+def exclude_name_only(agents: list[dict]) -> list[dict]:
+    """Rows for the rendered agent table: keyword-addressable roles only.
+
+    ``name_only`` roles are name-dispatchable but have no keyword surface, so a
+    table row adds bytes to capped entry files without adding a routable
+    keyword. They stay in ``target_agents``/``routing.name_index``. The filter
+    reads the ``addressability`` field derived from ``config/role-defaults.yaml``
+    — no role list is hardcoded here.
+    """
+    return [agent for agent in agents if agent.get("addressability") != "name_only"]
+
+
 def _emit_warn_sink(messages: set[str], warn_sink: list[str] | None) -> None:
     """Emit sorted, deduplicated warnings to the sink or the SyncLog fallback."""
     if not messages:
@@ -99,12 +129,20 @@ def get_active_agents_data(
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
     active_set: ActiveSet | None = None,
+    include_name_only: bool = True,
 ) -> list[dict]:
     """Return a list of dictionaries with agent data.
 
     Reads roles from config/role-defaults.yaml and resolves the shared Layer-2
     activation set (gates + whitelist intersected with generatable templates).
-    Returns: list of dicts with 'name', 'short_desc' and derived 'keywords'.
+    Returns: list of dicts with 'name', 'short_desc', derived 'keywords' and the
+    config-derived 'addressability' (keyword | name_only | excluded).
+
+    ``include_name_only=False`` drops the ``name_only`` rows. That is the
+    rendered-table view: such roles are reachable by explicit name dispatch
+    (``routing.name_index``/``target_agents``) but contribute no keyword and no
+    table row. The default stays the full catalog so the F15 contract below
+    holds for audits.
 
     Contract (issue #811 / audit check F15): the returned catalog is exactly
     ``resolve_active_roles(..., require_template=True)``. ``config["roles"]`` is
@@ -130,6 +168,9 @@ def get_active_agents_data(
         active_set=active_set,
     ):
         role_info = roles[role_name]
+        addressability, _derived = _derive_addressability(role_info)
+        if not include_name_only and addressability == "name_only":
+            continue
 
         desc = role_info.get("short_desc", role_info.get("description", ""))
         active_agents_data.append({
@@ -139,6 +180,7 @@ def get_active_agents_data(
             # agents-table.md ({{#if COMPACT_MODE}}); computed unconditionally
             # so the loop expansion never leaves a literal {{keywords}} behind.
             "keywords": derive_keywords(desc),
+            "addressability": addressability,
         })
 
     return active_agents_data
@@ -349,9 +391,8 @@ def get_routing_rules(
         role_info = roles.get(role_name) or {}
         routing = role_info.get("routing")
         routing = routing if isinstance(routing, dict) else {}
-        addressability = routing.get("addressability")
-        if addressability not in ("keyword", "name_only", "excluded"):
-            addressability = "keyword" if _has_routing_patterns(role_info) else "name_only"
+        addressability, derived = _derive_addressability(role_info)
+        if derived:
             derived_warnings.add(
                 f"missing addressability, derived: {role_name}={addressability}"
             )
