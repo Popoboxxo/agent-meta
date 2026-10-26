@@ -281,6 +281,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   1012 -> 1085 hashes (the new per-provider agent artifacts and managed-file lists); 106 existing hashes
   changed. No existing role body changed.
 
+- Literature round 2 follow-up (AC-23 / AC-49): `chaos-engineer`, `reproducible-builds-engineer` and
+  `ux-researcher` lose bare role arrows (prose handoffs instead; patch bumps `1.0.0 -> 1.0.1`), and the
+  inactive SE dispatch rows in `chaos-engineer`/`reproducible-builds-engineer` are gated on their target
+  role. Rebaseline also absorbs the post-merge tmp-sink drift (`f9e3f3e5`) that the branch merge left
+  unrebaselined: the hook script, `context-hashes.json`, `project.yaml` and the entry/agent artifacts of
+  every provider. 220 of 1085 hashes changed; 0 added/removed. No role artifacts were added or removed.
+
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

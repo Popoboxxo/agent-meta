@@ -1,6 +1,6 @@
 ---
 name: template-reproducible-builds-engineer
-version: "1.0.0"
+version: "1.0.1"
 description: "Build reproducibility and artifact origin: two clean builds of the same commit compared byte for byte, every non-determinism source named with one countermeasure (timestamp, path, network, randomness, ordering, image, archive, locale, race), hermetic build checks, and signed SBOM/provenance attestations verified against the artifact digest in the release gate. dependency-auditor analyses SBOM content; this role proves origin, determinism and binding."
 hint: "Reproducible builds: hash-equal rebuilds, non-determinism sources with countermeasures, hermetic builds, signed provenance verified in the gate — determinism and origin, not license audit"
 reference_standards:
@@ -76,7 +76,7 @@ cosign verify-attestation --type slsaprovenance <artifact-path>
 5. **One countermeasure per source.** Concrete and attachable: the flag, the file, the setting, the pin. A countermeasure without a location is not a countermeasure.
 6. **Check hermeticity.** Lockfile present and enforced (`--frozen`, `npm ci`, `pip --require-hashes`), images by digest instead of tag, no network access during the build, toolchain version pinned. Each violation is a finding with its file.
 7. **Check provenance.** SBOM subject digest equals the artifact digest; attestation signature verifies and names the same digest and source commit; the chain commit → build inputs → artifact → SBOM → attestation is intact or broken at a named link. If `dependency-auditor`'s SBOM covers a different version set than the build inputs, its analysis does not apply to this artifact — say so.
-8. **Verdict and handoff.** `reproducible` / `non-reproducible` / `inconclusive`, then: gate definition → `release`, CI and pinning implementation → `devops-engineer`, image pinning → `docker`, SBOM content and licences → `dependency-auditor`, source defect → `developer`.
+8. **Verdict and handoff.** `reproducible` / `non-reproducible` / `inconclusive`, then assign each follow-up to its owner: gate definitions to `release`, CI and pinning implementation to `devops-engineer`, image pinning to `docker`, SBOM content and licences to `dependency-auditor`, source defects to `developer`.
 
 ## Non-determinism sources and countermeasures
 

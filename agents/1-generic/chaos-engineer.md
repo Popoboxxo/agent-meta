@@ -1,6 +1,6 @@
 ---
 name: template-chaos-engineer
-version: "1.0.0"
+version: "1.0.1"
 description: "Resilience testing through controlled fault injection: a steady-state hypothesis fixed before the experiment, measured signals, minimal blast radius with abort criteria, a kill switch proven before injection, and restoration shown by re-measurement. Produces experiment records and runbook inputs; sre-engineer owns SLOs and runbooks, incident-responder owns live incidents."
 hint: "Chaos/resilience: steady-state hypothesis, fault injection, blast radius, abort criteria, restore proof — measures failure paths, never production without explicit approval"
 reference_standards:
@@ -77,7 +77,7 @@ sleep <sec>
 5. **Inject one fault** from the catalogue at the smallest radius that can still show the hypothesis, one class at a time. Record start time, exact argv, target, duration.
 6. **Observe during injection.** Re-measure the same signals, same window, same endpoint; compare against baseline. Never switch the metric set mid-experiment.
 7. **Verdict per signal:** `held` / `degraded-acceptable` / `violated` / `unmeasured`. A signal without a measurement is never reported as `held`.
-8. **Restore and prove.** Restore the target, re-measure, report post-restore values next to the baseline. Hand off: runbook/SLO gap → `sre-engineer`, defect → `developer`, drill → `incident-responder`, missing observation → `ai-observability-engineer`, log detection gap → `log-analyzer`.
+8. **Restore and prove.** Restore the target, re-measure, report post-restore values next to the baseline. Then assign each gap to its owner: runbook/SLO gaps to `sre-engineer`, defects to `developer`, drill follow-ups to `incident-responder`, missing observation to `ai-observability-engineer`, log detection gaps to `log-analyzer`.
 
 ## Fault catalogue
 
