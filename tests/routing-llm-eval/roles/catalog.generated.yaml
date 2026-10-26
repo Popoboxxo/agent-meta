@@ -4981,6 +4981,150 @@ cases:
   expected:
     target: control-framework-assessor
     tier_escalation: false
+- id: rn-memory-architect-de
+  role: memory-architect
+  category: name_only
+  lang: de
+  task: Rufe den Agenten memory-architect auf und starte direkt.
+  pair_id: rn-memory-architect
+  expected:
+    target: memory-architect
+    tier_escalation: true
+- id: rn-memory-architect-en
+  role: memory-architect
+  category: name_only
+  lang: en
+  task: Run the memory-architect agent directly.
+  pair_id: rn-memory-architect
+  expected:
+    target: memory-architect
+    tier_escalation: true
+- id: rn-context-engineer-de
+  role: context-engineer
+  category: name_only
+  lang: de
+  task: Rufe den Agenten context-engineer auf und starte direkt.
+  pair_id: rn-context-engineer
+  expected:
+    target: context-engineer
+    tier_escalation: true
+- id: rn-context-engineer-en
+  role: context-engineer
+  category: name_only
+  lang: en
+  task: Run the context-engineer agent directly.
+  pair_id: rn-context-engineer
+  expected:
+    target: context-engineer
+    tier_escalation: true
+- id: rn-red-team-agent-de
+  role: red-team-agent
+  category: name_only
+  lang: de
+  task: Rufe den Agenten red-team-agent auf und starte direkt.
+  pair_id: rn-red-team-agent
+  expected:
+    target: red-team-agent
+    tier_escalation: true
+- id: rn-red-team-agent-en
+  role: red-team-agent
+  category: name_only
+  lang: en
+  task: Run the red-team-agent agent directly.
+  pair_id: rn-red-team-agent
+  expected:
+    target: red-team-agent
+    tier_escalation: true
+- id: rn-secrets-manager-de
+  role: secrets-manager
+  category: name_only
+  lang: de
+  task: Rufe den Agenten secrets-manager auf und starte direkt.
+  pair_id: rn-secrets-manager
+  expected:
+    target: secrets-manager
+    tier_escalation: true
+- id: rn-secrets-manager-en
+  role: secrets-manager
+  category: name_only
+  lang: en
+  task: Run the secrets-manager agent directly.
+  pair_id: rn-secrets-manager
+  expected:
+    target: secrets-manager
+    tier_escalation: true
+- id: rn-chaos-engineer-de
+  role: chaos-engineer
+  category: name_only
+  lang: de
+  task: Rufe den Agenten chaos-engineer auf und starte direkt.
+  pair_id: rn-chaos-engineer
+  expected:
+    target: chaos-engineer
+    tier_escalation: true
+- id: rn-chaos-engineer-en
+  role: chaos-engineer
+  category: name_only
+  lang: en
+  task: Run the chaos-engineer agent directly.
+  pair_id: rn-chaos-engineer
+  expected:
+    target: chaos-engineer
+    tier_escalation: true
+- id: rn-reproducible-builds-engineer-de
+  role: reproducible-builds-engineer
+  category: name_only
+  lang: de
+  task: Rufe den Agenten reproducible-builds-engineer auf und starte direkt.
+  pair_id: rn-reproducible-builds-engineer
+  expected:
+    target: reproducible-builds-engineer
+    tier_escalation: true
+- id: rn-reproducible-builds-engineer-en
+  role: reproducible-builds-engineer
+  category: name_only
+  lang: en
+  task: Run the reproducible-builds-engineer agent directly.
+  pair_id: rn-reproducible-builds-engineer
+  expected:
+    target: reproducible-builds-engineer
+    tier_escalation: true
+- id: rn-ux-researcher-de
+  role: ux-researcher
+  category: name_only
+  lang: de
+  task: Rufe den Agenten ux-researcher auf und starte direkt.
+  pair_id: rn-ux-researcher
+  expected:
+    target: ux-researcher
+    tier_escalation: true
+- id: rn-ux-researcher-en
+  role: ux-researcher
+  category: name_only
+  lang: en
+  task: Run the ux-researcher agent directly.
+  pair_id: rn-ux-researcher
+  expected:
+    target: ux-researcher
+    tier_escalation: true
+- id: rn-privacy-compliance-officer-de
+  role: privacy-compliance-officer
+  category: name_only
+  lang: de
+  task: Rufe den Agenten privacy-compliance-officer auf und starte direkt.
+  pair_id: rn-privacy-compliance-officer
+  expected:
+    target: privacy-compliance-officer
+    tier_escalation: true
+- id: rn-privacy-compliance-officer-en
+  role: privacy-compliance-officer
+  category: name_only
+  lang: en
+  task: Run the privacy-compliance-officer agent directly.
+  pair_id: rn-privacy-compliance-officer
+  expected:
+    target: privacy-compliance-officer
+    tier_escalation: true
 - id: rc-a11y-accessibility-specialist-de
   role: accessibility-specialist
   category: collision
