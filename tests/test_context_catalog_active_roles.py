@@ -23,7 +23,7 @@ import re
 from pathlib import Path
 
 from scripts.lib.config import build_variables, load_config
-from scripts.lib.delegation_table import get_active_agents_data
+from scripts.lib.delegation_table import exclude_name_only, get_active_agents_data
 from scripts.lib.roles import resolve_active_roles
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -40,20 +40,29 @@ def _repo_config() -> dict:
 
 
 def test_rendered_context_catalog_equals_resolved_active_roles():
-    """The rendered catalog is exactly the Layer-2 active set (F15 invariant)."""
+    """The catalog is the Layer-2 active set; the rendered table drops name-only rows.
+
+    F15 invariant (unchanged): the catalog data is exactly
+    ``resolve_active_roles()``. The rendered table is a projection of that
+    catalog — keyword-addressable rows only, because name-only roles are reachable
+    by explicit name dispatch and have no keyword surface (see
+    ``tests/test_name_only_entry_table_exclusion.py``).
+    """
     config = _repo_config()
     variables, _ = build_variables(config, REPO_ROOT)
 
     catalog = _ROW_RE.findall(variables["AGENT_DELEGATION_TABLE"])
     expected = resolve_active_roles(REPO_ROOT, config, require_template=True)
 
-    assert catalog == expected, (
-        "context catalog drifted from resolve_active_roles(): "
-        f"only-in-catalog={sorted(set(catalog) - set(expected))}, "
-        f"missing={sorted(set(expected) - set(catalog))}"
-    )
-    # The catalog data used to build the table must agree as well.
+    # The catalog data used to build the table must agree with the resolver.
     assert [entry["name"] for entry in variables["active_agents"]] == expected
+
+    rendered_rows = [entry["name"] for entry in exclude_name_only(variables["active_agents"])]
+    assert catalog == rendered_rows, (
+        "context catalog drifted from its active-set projection: "
+        f"only-in-catalog={sorted(set(catalog) - set(rendered_rows))}, "
+        f"missing={sorted(set(rendered_rows) - set(catalog))}"
+    )
 
 
 def test_gated_whitelist_entry_is_intentionally_absent_from_catalog():

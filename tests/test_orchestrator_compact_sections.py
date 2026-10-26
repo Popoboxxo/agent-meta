@@ -32,6 +32,11 @@ documented reason):
   is the only content change next to the version pin. The all-roles AC-01
   matrix (both roles active) keeps the section, so its hash drift is the
   version bump only.
+* Name-only table exclusion (entry-file hard-cap fix): the rendered agent table
+  lists keyword-addressable roles only. In the repo whitelist the ``name_only``
+  roles ``intern-developer`` and ``principal-developer`` lose their table row
+  (they stay in the routing name_index/target_agents). Full golden rebaselined
+  by exactly those two lines; the compact render is unchanged.
 """
 from __future__ import annotations
 

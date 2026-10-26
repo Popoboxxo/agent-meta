@@ -2253,7 +2253,7 @@ def _build_managed_block(
     target_name: str | None = None,
     platform_vars: dict | None = None,
 ) -> str:
-    from .delegation_table import get_active_agents_data
+    from .delegation_table import exclude_name_only, get_active_agents_data
     from .rules import (
         collect_rule_sources,
         filter_skill_tables,
@@ -2448,8 +2448,13 @@ def _build_managed_block(
     # > project > framework default, spec §2.3/§4.5).
     local_vars.update(repo_containment_variables(config, provider))
 
+    # Entry-file agent directory. `active_agents` is the full catalog: the
+    # compact roster must stay reachable by name (incl. name_only roles).
+    # `active_agents_table` is the table projection — keyword-addressable roles
+    # only, because a name_only row adds bytes to the capped context file
+    # without adding a keyword. Name-only roles keep their routing entry.
     local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
-    
+    local_vars["active_agents_table"] = exclude_name_only(local_vars["active_agents"])
     embedded_rules: list[dict] = []
     # Non-embedded (lazy) rule counter — only populated in the embedded-rules
     # branch below (has_rules providers never embed, so there is nothing to

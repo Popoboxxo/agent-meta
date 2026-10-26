@@ -56,7 +56,11 @@ from .consistency.placeholders import _BUILTIN_VARS
 from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
-from .delegation_table import get_active_agents_data, get_intent_routing_table
+from .delegation_table import (
+    exclude_name_only,
+    get_active_agents_data,
+    get_intent_routing_table,
+)
 from .dod import (
     resolve_dod,
     resolve_dod_preset_name,
@@ -1824,8 +1828,8 @@ def _build_platform_variables(
         variables: mutated in place — receives SE_*, the SE cascade variables
             (role-defaults.yaml `se_variables` defaults), KNOWLEDGE_*,
             VALIDATOR_ENABLED, DEVELOPER_TIERS_ENABLED, EFFORT_ESTIMATOR_ENABLED,
-            WEB_PROJECT_ENABLED, `active_agents`, AGENT_DELEGATION_TABLE and
-            PROJECT_SPECIFIC_AGENTS.
+            WEB_PROJECT_ENABLED, `active_agents`, `active_agents_table`,
+            AGENT_DELEGATION_TABLE and PROJECT_SPECIFIC_AGENTS.
         unmapped: mutated in place — forwarded to `_load_se_variable_defaults()`
             as its warnings sink (SE-variable load errors, audit #402).
         config: the loaded project.yaml dict (read-only).
@@ -1891,6 +1895,12 @@ def _build_platform_variables(
     variables["active_agents"] = get_active_agents_data(
         agent_meta_root, config, variables, warn_sink=unmapped, active_set=active_set
     )
+    # The rendered table (`agents-table.md` loops `active_agents_table`) lists
+    # keyword-addressable roles only: name_only roles are name-dispatchable
+    # (they stay in the routing name_index/target_agents) but their rows only
+    # add bytes to capped context files. `active_agents` keeps the full catalog
+    # for the F15 audit contract and the compact roster.
+    variables["active_agents_table"] = exclude_name_only(variables["active_agents"])
 
     # INTENT_ROUTING_TABLE is finalized after `effective` quality-pipelines are
     # resolved below (see QUALITY_PIPELINES_ENABLED block), so pipeline
