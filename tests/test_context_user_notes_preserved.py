@@ -99,15 +99,25 @@ def agents_project(tmp_path):
     )
     target.write_text(content, encoding="utf-8")
 
-    def run_sync():
+    def run_sync(force_rebuild: bool = False):
         from lib.context import sync_context_for_provider
         from lib.log import SyncLog
+
+        sync_variables = dict(variables)
+        if force_rebuild:
+            # Alter the rendered static header so its drift signature differs
+            # from the existing file. Without this the sync takes the "static
+            # part unchanged" early return and never regenerates the footer, so
+            # the footer rebuild would not be exercised at all.
+            sync_variables["PROJECT_NAME"] = (
+                f"{variables['PROJECT_NAME']}-forced-rebuild"
+            )
 
         # Opencode renders AGENTS.md via `_sync_opencode_context`, the same
         # `_regenerate_static_context(..., rebuild_footer=True)` path a real
         # sync.py run takes for the shared AGENTS.md core.
         sync_context_for_provider(
-            REPO_ROOT, tmp_path, config, dict(variables), SyncLog(),
+            REPO_ROOT, tmp_path, config, sync_variables, SyncLog(),
             dry_run=False, provider="Opencode", provider_config=provider_config,
         )
         return target.read_text(encoding="utf-8")
@@ -155,4 +165,22 @@ def test_agents_md_footer_user_notes_are_not_reported_as_drift(agents_project, t
     assert not list(tmp_path.glob("AGENTS.md.sync-backup-*")), (
         "editing the user-owned notes section of the AGENTS.md footer must not be "
         "treated as static-part drift"
+    )
+
+
+def test_agents_md_footer_user_notes_survive_forced_footer_rebuild(agents_project):
+    """Exercise the footer rebuild instead of the steady-state early return.
+
+    Once the notes are stripped from the drift signature, an unchanged file
+    yields identical signatures and sync returns at "static part unchanged"
+    without ever touching the footer. A test that only syncs the steady state
+    therefore still passes when the footer ``_preserve_user_notes`` call is
+    deleted — it is vacuous. Changing the rendered header forces a real
+    regeneration of the footer template part, which is the path under test.
+    """
+    content = agents_project(force_rebuild=True)
+    assert content.count(AGENTS_USER_NOTES) == 1, (
+        "AGENTS.md footer user notes must be carried over exactly once by a real "
+        "footer rebuild (dropped or duplicated): "
+        f"found {content.count(AGENTS_USER_NOTES)} occurrence(s)"
     )
