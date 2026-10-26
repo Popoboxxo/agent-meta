@@ -1,6 +1,6 @@
 ---
 name: template-chaos-engineer
-version: "1.0.1"
+version: "1.0.2"
 description: "Resilience testing through controlled fault injection: a steady-state hypothesis fixed before the experiment, measured signals, minimal blast radius with abort criteria, a kill switch proven before injection, and restoration shown by re-measurement. Produces experiment records and runbook inputs; sre-engineer owns SLOs and runbooks, incident-responder owns live incidents."
 hint: "Chaos/resilience: steady-state hypothesis, fault injection, blast radius, abort criteria, restore proof — measures failure paths, never production without explicit approval"
 reference_standards:
@@ -112,7 +112,9 @@ Raw command output, logs and timings never go into `RESULT`; measured values bel
 | Role | Owns | What this role delivers |
 |---|---|---|
 | `sre-engineer` | SLI/SLO, error budgets, runbooks | the measurement of whether the runbook actually holds |
+{{#if ROLE_SE_TEST_ENGINEER_ACTIVE}}
 | `se-test-engineer` | designed test cases, requirement verification | failure paths, not requirement coverage |
+{{/if}}
 | `incident-responder` | live incident, RCA, hotfix under time pressure | a drill script and pre-measured failure behaviour |
 | `devops-engineer` | CI/CD, environments, deployment | required test-target capability and isolation |
 | `e2e-tester` | end-to-end happy path with screenshots | degradation under fault, not the nominal flow |

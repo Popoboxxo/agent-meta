@@ -282,11 +282,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   changed. No existing role body changed.
 
 - Literature round 2 follow-up (AC-23 / AC-49): `chaos-engineer`, `reproducible-builds-engineer` and
-  `ux-researcher` lose bare role arrows (prose handoffs instead; patch bumps `1.0.0 -> 1.0.1`), and the
-  inactive SE dispatch rows in `chaos-engineer`/`reproducible-builds-engineer` are gated on their target
-  role. Rebaseline also absorbs the post-merge tmp-sink drift (`f9e3f3e5`) that the branch merge left
-  unrebaselined: the hook script, `context-hashes.json`, `project.yaml` and the entry/agent artifacts of
-  every provider. 220 of 1085 hashes changed; 0 added/removed. No role artifacts were added or removed.
+  `ux-researcher` lose bare role arrows (prose handoffs instead; patch bumps `1.0.0 -> 1.0.1`). Rebaseline
+  also absorbs the post-merge tmp-sink drift (`f9e3f3e5`) that the branch merge left unrebaselined: the hook
+  script, `context-hashes.json`, `project.yaml` and the entry/agent artifacts of every provider. 220 of 1085
+  hashes changed; 0 added/removed. No role artifacts were added or removed.
+- Literature round 2 follow-up, dangling dispatch: the `se-test-engineer` row in `chaos-engineer` and the
+  `se-validator` row in `reproducible-builds-engineer` are gated on their target role (`1.0.1 -> 1.0.2`).
+  The AC-01 matrix has every role active, so only those two artifacts per provider change (2 x 9 = 18 of
+  1085 hashes; 0 added/removed).
 
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
