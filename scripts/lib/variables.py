@@ -26,6 +26,13 @@ from .substitution import substitute_placeholders
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
 
+#: The ONE source of the legacy default (D1b). ``config/project-config.schema.json``
+#: declares ``orchestrator.mode`` default ``strict``; the legacy ``enabled``/
+#: ``strict`` fallback must resolve to exactly the same mode, otherwise the
+#: rendered template (``ORCH_MODE_STRICT``) and the runtime gate diverge.
+#: ``consistency.orchestrator_strict._resolve_effective_strict`` delegates here.
+_ORCH_STRICT_DEFAULT = True
+
 # Subagent-permission policy (Feature A). Neutral, stdlib-only layer so
 # config.py/rules.py/standalone.py can share one resolution without
 # re-introducing the historic import cycle (Issue #565).
@@ -108,7 +115,12 @@ def _reindent_to_placeholder(match: "re.Match[str]", value: str) -> str:
     )
 
 
-def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None) -> str:
+def _resolve_orch_mode(
+    orch_config: dict,
+    provider_override: dict | None = None,
+    *,
+    validate: bool = True,
+) -> str:
     """Compute the effective orchestrator mode ('strict'|'advisory'|'main-chat').
 
     Precedence: provider_override['mode'] > orch_config['mode'] > legacy
@@ -116,6 +128,12 @@ def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None)
     → 'strict'). provider_override is typically
     orchestrator.provider-overrides.<Provider> from project.yaml; pass None (or a
     dict without 'mode') to fall back to the global orchestrator.mode.
+
+    This is the ONE mode resolver (D1b): ``consistency.orchestrator_strict``
+    delegates here instead of keeping a second legacy fallback. ``validate=False``
+    keeps the checker's historic fail-soft behaviour for an invalid value (it
+    returns the normalized string; callers comparing to ``"strict"`` get
+    ``False``) instead of aborting the process.
     """
     _mode = None
     if provider_override and provider_override.get("mode") is not None:
@@ -126,6 +144,8 @@ def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None)
     if _mode is not None:
         _normalized_mode = str(_mode).strip().lower()
         if _normalized_mode not in _VALID_ORCH_MODES:
+            if not validate:
+                return _normalized_mode
             print(
                 f"ERROR: Invalid orchestrator.mode value: {_mode!r}. "
                 f"Valid values are: {sorted(_VALID_ORCH_MODES)}. "
@@ -136,7 +156,7 @@ def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None)
         return _normalized_mode
 
     _orch_enabled = orch_config.get("enabled", True)
-    _orch_strict = orch_config.get("strict", True)
+    _orch_strict = orch_config.get("strict", _ORCH_STRICT_DEFAULT)
     if not _orch_enabled:
         return "main-chat"
     elif _orch_strict:

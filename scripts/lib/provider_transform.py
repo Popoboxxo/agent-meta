@@ -502,7 +502,10 @@ def _apply_agent_transform(
                 except Exception:  # noqa: BLE001 - unreadable registry degrades
                     capabilities = {}
             orch = config.get('orchestrator', {}) if isinstance(config, dict) else {}
-            deny_edit = _resolve_effective_strict(orch, provider) and (
+            # D2b: pass the framework root so the version-driven grace for the
+            # IMPLICIT strict default applies here too — the agent-level deny
+            # must never run ahead of the gate it mirrors.
+            deny_edit = _resolve_effective_strict(orch, provider, agent_meta_root) and (
                 isolation.permission_deny_required(
                     # One resolved provider entry (registry or single entry).
                     isolation._v2_provider_entry(provider_config, provider),

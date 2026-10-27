@@ -482,12 +482,50 @@ def _opencode_entry_point(
     return role
 
 
+def _has_valid_default_agent(existing: dict, desired: str | None, st: dict) -> bool:
+    """Whether the written document will carry a usable ``default_agent``.
+
+    D1a: the deny and the entry point are ONE invariant — no gate deny without
+    a valid ``default_agent`` in the written ``opencode.json``. A non-empty
+    string is valid (the user's own value included, D1c: it is respected, not
+    overwritten). When the key is absent, the merge writes ``desired`` only if
+    no managed state record exists; a record means the user deleted or changed
+    our value, so nothing is written.
+    """
+    current = existing.get(_DEFAULT_AGENT_JSON_KEY)
+    if isinstance(current, str) and current.strip():
+        return True
+    if desired is None or current is not None:
+        return False
+    state_value = st.get("value") if isinstance(st, dict) else None
+    return not (isinstance(state_value, str) and state_value)
+
+
+def _gate_invariant_warning(provider: str, desired: str | None) -> str:
+    """Loud state-error text when the deny would exist without an entry point.
+
+    D1a: a half-active gate is a programming/state error, never a silent
+    condition — the gate is suspended and the user is told how to restore the
+    invariant (delete our record / point the key at the entry point).
+    """
+    return (
+        "runtime gate (permission.edit/bash deny) SUSPENDED for provider "
+        f"'{provider}': default_agent is missing or was removed while the gate "
+        "is wanted, so no agent would be able to act — deny and entry point are "
+        "one invariant, writing the deny would lock the main chat out. Restore "
+        f"default_agent to '{desired}' (or remove the "
+        f"'{_STATE_DEFAULT_AGENT_KEY}' record from {_OPENCODE_STATE_FILE} "
+        "so the merge writes it again)."
+    )
+
+
 def _merge_default_agent(
     existing: dict,
     desired: str | None,
     st: dict,
     gate_effective: bool,
     log: SyncLog,
+    warn: bool = True,
 ) -> dict:
     """Merge the managed ``default_agent`` into *existing*; return new state.
 
@@ -496,12 +534,14 @@ def _merge_default_agent(
     explicit AND generated primary role (``_opencode_entry_point``) or
     ``None``. The user's value always wins: a differing user value is never
     overwritten, only warned about — with the gate consequence appended when
-    ``gate_effective`` (IC-6, AC-06…AC-09).
+    ``gate_effective`` (IC-6, AC-06…AC-09; D1c: edit/shell stay locked for the
+    user's agent).
 
     A state record without a non-empty ``str`` ``value`` counts as "no state".
     The warning text stays provider-agnostic and names the entry point role;
     a value the user deleted (``None``) gets its own sentence instead of the
-    literal ``'None'``.
+    literal ``'None'``. ``warn=False`` suppresses the warning when the caller
+    already emitted the ``_gate_invariant_warning`` for the same condition.
     """
     state_value = st.get("value") if isinstance(st, dict) else None
     if not (isinstance(state_value, str) and state_value):
@@ -530,11 +570,13 @@ def _merge_default_agent(
                 )
             else:
                 message += (
-                    f" — the runtime gate is active, so '{current}' is locked: "
-                    f"set default_agent to '{desired}' or disable strict for "
-                    "this provider via orchestrator.provider-overrides"
+                    f" — the runtime gate is active, so edit and shell stay "
+                    f"locked for '{current}': set default_agent to '{desired}' "
+                    "or disable strict for this provider via "
+                    "orchestrator.provider-overrides"
                 )
-        log.warning(message)
+        if warn:
+            log.warning(message)
 
     if desired is not None and not st:
         if current is None:
@@ -625,6 +667,15 @@ def _sync_opencode_runtime_gate(
 
     entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
 
+    # D2b grace: the frozen Spec-A entries function stays byte-identical
+    # (ADR-4/IC-4); the version-bounded window for the IMPLICIT strict default
+    # is applied here. An explicitly configured strict is never affected, and
+    # the entry point (step 3) still lands — only the deny waits one minor.
+    if entries:
+        _orch = config.get("orchestrator", {}) if isinstance(config, dict) else {}
+        if not _resolve_effective_strict(_orch, provider, agent_meta_root):
+            entries = {}
+
     # v2 surface (#1007/Amendment B1): Spec-A step 4 (the ``permission`` map
     # merge including its rollback branch) does NOT run here. On a v2 document
     # the tier-independent ``reconcile_opencode_surface_gate`` is the single
@@ -658,9 +709,32 @@ def _sync_opencode_runtime_gate(
         entries = {}
 
     da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
+
+    # D1a: deny and entry point are ONE invariant. Even with an explicit and
+    # generated primary role the written document can end up WITHOUT a valid
+    # ``default_agent`` — the user deleted the managed key (state record still
+    # present) or replaced it with an unusable value. Writing the deny in that
+    # state is the #1006 lockout. Treat it as a state error: suspend the gate
+    # (the rollback branch below takes back a managed deny), warn loudly, and
+    # never write a half-active gate.
+    #
+    # v2 surfaces are excluded here: their deny lives in ``permissions[]``,
+    # owned by ``reconcile_opencode_surface_gate`` (Amendment B1); suspending
+    # the v1 map's ``entries`` would not touch it, so the warning would lie.
+    invariant_suspended = False
+    if (
+        entries
+        and not is_v2_surface
+        and not _has_valid_default_agent(existing, entry, da_state)
+    ):
+        log.warning(_gate_invariant_warning(provider, entry))
+        entries = {}
+        invariant_suspended = True
+
     before_default_agent = existing.get(_DEFAULT_AGENT_JSON_KEY)
     new_da_state = _merge_default_agent(
-        existing, entry, da_state, bool(entries), log
+        existing, entry, da_state, bool(entries), log,
+        warn=not invariant_suspended,
     )
 
     permission_changed = False
@@ -896,7 +970,7 @@ def _opencode_v2_gate_permissions(
         return []
 
     orch = config.get("orchestrator", {}) if isinstance(config, dict) else {}
-    if not _resolve_effective_strict(orch, provider):
+    if not _resolve_effective_strict(orch, provider, agent_meta_root):
         return []
 
     if _opencode_entry_point(provider, provider_config, active_set) is None:

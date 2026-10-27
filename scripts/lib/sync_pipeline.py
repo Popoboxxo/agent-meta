@@ -1146,6 +1146,18 @@ def _sync_stage_per_provider(
     # level) so no claim leaks into the next run.
     opencode_claimed_files: set[str] = set()
 
+    # D2b grace (data-driven, provider-agnostic): projects that only inherit the
+    # strict default get ONE run-level warning while the default flip is inside
+    # its announced minor-release window. No provider branch: the decision and
+    # the version window live in the shared resolver.
+    from lib.consistency.orchestrator_strict import strict_default_notice
+
+    _strict_notice = strict_default_notice(
+        config.get("orchestrator", {}), agent_meta_root,
+    )
+    if _strict_notice:
+        log.warning(_strict_notice)
+
     for provider in providers:
         pc = provider_config[provider]
         if not is_provider_active(config, provider):
