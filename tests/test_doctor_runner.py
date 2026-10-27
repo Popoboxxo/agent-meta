@@ -396,6 +396,26 @@ def test_path_exists_required_suffix(tmp_path, monkeypatch):
     assert run(tmp_path, monkeypatch, ids, providers=("Claude",)).findings == ()
 
 
+def test_path_exists_glob_ignores_dotfiles(tmp_path, monkeypatch):
+    """Issue #1034: dot-prefixed manifests are not rule files."""
+    ids = real("rules-file-wrong-suffix")
+    put(tmp_path, ".github/instructions/good.instructions.md")
+    put(tmp_path, ".github/instructions/.agent-meta-managed", "good.instructions.md\n")
+    put(tmp_path, ".github/instructions/.agent-meta-managed-mcp", "mcp\n")
+    put(tmp_path, ".github/instructions/.agent-meta-managed-tools", "tools\n")
+    assert run(tmp_path, monkeypatch, ids, providers=("Copilot",)).findings == ()
+
+
+def test_directory_enumeration_ignores_dotfiles(tmp_path, monkeypatch):
+    """Issue #1034: the dir-wide enumeration skips dotfiles as well."""
+    e = entry("df1", {"kind": "regex", "pattern": "TODO", "expect": "match"},
+              target={"artifact": "rules_dir"})
+    put(tmp_path, ".claude/rules/rule.md", "TODO here\n")
+    assert [f.file for f in run(tmp_path, monkeypatch, [e]).findings] == [".claude/rules/rule.md:1"]
+    put(tmp_path, ".claude/rules/.managed", "TODO here\n")
+    assert [f.file for f in run(tmp_path, monkeypatch, [e]).findings] == [".claude/rules/rule.md:1"]
+
+
 def test_path_exists_bind_then_project_role(tmp_path, monkeypatch):
     ids = real("project-role-not-generated")
     put(tmp_path, ".claude/3-project/mybot.md")

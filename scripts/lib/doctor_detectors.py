@@ -85,11 +85,26 @@ def _rel(path: Path, root: Path) -> str:
         return str(path)
 
 
+def is_dotfile(path: Path) -> bool:
+    """True for a hidden (dot-prefixed) file name - never a detector target.
+
+    ``Path.glob``/``rglob`` yield dotfiles (unlike the ``glob`` module), so a
+    rules dir such as ``.github/instructions`` reported the managed-block
+    manifests ``.agent-meta-managed*`` as rule files (issue #1034). Both
+    enumeration helpers below filter through this predicate, so the exclusion is
+    defined once for every detector. Only the file name is checked: provider
+    artifact dirs are themselves dot-directories, and an explicit ``path`` /
+    ``path_template`` target stays unfiltered by design.
+    """
+    return path.name.startswith(".")
+
+
 def _files_in(directory: Path, suffix: Optional[str] = None) -> list:
     if not directory.is_dir():
         return []
     return [p for p in sorted(directory.rglob("*"))
-            if p.is_file() and (suffix is None or p.name.endswith(suffix))]
+            if p.is_file() and not is_dotfile(p)
+            and (suffix is None or p.name.endswith(suffix))]
 
 
 def target_files(tgt: dict, env: Env) -> list:
@@ -247,7 +262,8 @@ def _glob_matches(det: dict, env: Env, tgt: dict) -> list:
             base = env.project_root / art_dir
     skip = det.get("exclude_glob")
     return [p for p in sorted(base.glob(pattern))
-            if p.is_file() and not (skip and fnmatch.fnmatch(p.name, skip))]
+            if p.is_file() and not is_dotfile(p)
+            and not (skip and fnmatch.fnmatch(p.name, skip))]
 
 
 def detect_path_exists(det: dict, env: Env, tgt: dict) -> list:
