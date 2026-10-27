@@ -241,3 +241,47 @@ def test_settings_json_writer_writes_lf_and_skips_second_run(tmp_path, monkeypat
 
     hooks_mod._update_settings_hooks(**kwargs)
     assert calls == [], f"unchanged settings.json was rewritten: {calls}"
+
+
+def test_create_hook_writes_lf_through_write_atomic(tmp_path, monkeypatch):
+    """``--create-hook`` must use the LF-deterministic atomic writer (D8, #961).
+
+    Regression guard for the last ``Path.write_text`` caller in the write path:
+    text mode translated every ``\\n`` to ``os.linesep``, so the freshly created
+    hook landed as CRLF on Windows and failed at runtime with
+    ``$'\\r': command not found``.
+    """
+    calls = []
+    real = hooks_mod.write_atomic
+
+    def spy(path, content, mode="w"):
+        calls.append(Path(path))
+        return real(path, content, mode)
+
+    monkeypatch.setattr(hooks_mod, "write_atomic", spy)
+
+    hooks_mod.create_hook(tmp_path, "my-demo", SyncLog(), dry_run=False)
+
+    created = tmp_path / ".claude" / "hooks" / "my-demo.sh"
+    assert created.is_file()
+    assert [p.name for p in calls] == ["my-demo.sh"], calls
+    raw = created.read_bytes()
+    assert 13 not in raw, f"created hook contains a CR byte: {raw!r}"
+    assert raw.startswith(b"#!/bin/bash\n"), raw[:20]
+
+
+def test_create_hook_dry_run_writes_nothing(tmp_path, monkeypatch):
+    """``--create-hook --dry-run`` logs the action but touches no file."""
+    calls = []
+    real = hooks_mod.write_atomic
+
+    def spy(path, content, mode="w"):
+        calls.append(Path(path))
+        return real(path, content, mode)
+
+    monkeypatch.setattr(hooks_mod, "write_atomic", spy)
+
+    hooks_mod.create_hook(tmp_path, "dry-demo", SyncLog(), dry_run=True)
+
+    assert calls == []
+    assert not (tmp_path / ".claude" / "hooks" / "dry-demo.sh").exists()

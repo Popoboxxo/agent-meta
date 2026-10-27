@@ -704,5 +704,9 @@ def create_hook(
     log.action("CREATE", str(target_path.relative_to(project_root)),
                f"--create-hook {stem}")
     if not dry_run:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+        # D8 (#961): the same LF-deterministic, crash-safe write as the sync
+        # path. A text-mode ``write_text`` translates ``\n`` to ``os.linesep``,
+        # so the created hook would land as CRLF on Windows and fail at runtime
+        # with ``$'\r': command not found``. ``write_atomic`` opens with
+        # ``newline="\n"`` and creates the parent directory itself.
+        write_atomic(target_path, content)
