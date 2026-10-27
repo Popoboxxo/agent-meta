@@ -2,8 +2,40 @@
 
 ## [Unreleased]
 
+### Added
+- **Strict-first orchestrator mode from a single resolver (D1b, #1006)**: the effective mode now
+  resolves in exactly one place, `variables._resolve_orch_mode` (`_ORCH_STRICT_DEFAULT = True`, the
+  same default the schema declares). `consistency/orchestrator_strict` delegates to it instead of
+  keeping a second legacy `enabled`/`strict` fallback, so the rendered `ORCH_MODE_STRICT` and the
+  runtime gate cannot diverge. The new `validate=False` flag keeps the checker's historic fail-soft
+  behaviour for an invalid value instead of aborting the process.
+- **Runtime gate and entry point are one invariant (D1a/D1c, #1006)**: a provider `permission`
+  deny (`edit`/`bash`) is never written without a valid `default_agent` in the same
+  `opencode.json`. A deleted or unusable managed key suspends the gate (the rollback branch takes
+  a managed deny back) and emits a loud state-error warning naming how to restore the invariant,
+  instead of writing the half-active gate that locked the main chat out. A user-set
+  `default_agent` is respected and not overwritten (D1c); edit/shell stay locked for it while the
+  gate is active. v2 surfaces are excluded because their deny lives in `permissions[]`.
+- **Announced strict-default flip with a version-driven grace window (D2b, #1006)**: a project
+  that only inherits the new strict default keeps the pre-flip behaviour — the entry point still
+  lands, the deny waits — and gets one run-level warning plus the new
+  `orchestrator-strict.default-flip-grace` finding (WARNING) until `2.1.0`. An explicitly
+  configured `strict` is never affected, and the window is data (`_STRICT_DEFAULT_GRACE_UNTIL`
+  compared against `VERSION`), not a provider branch.
+
 ### Fixed
 - Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
+- **`dod-push-check` 2.1.6 (#1033)**: the protected-branch list in the push-block message is
+  de-duplicated — a configured `GIT_MAIN_BRANCH` of `main`/`master` no longer appears twice.
+- **Runtime-reader registry evidence re-anchored (#1033 follow-up)**: the `dod-push-check` evidence
+  lines in `config/runtime-config-readers.yaml` moved with the 2.1.6 edit —
+  `variables.TEST_COMMAND` `:1095` → `:1101`, `variables.TEST_TIMEOUT` `:1142` → `:1148`;
+  `variables.GIT_MAIN_BRANCH` (`:224`) is unchanged.
+- **Doctor detectors never pick up dotfiles (#1034)**: `is_dotfile` is now the single exclusion
+  applied by both `_files_in` and `_glob_matches`, so managed-block manifests such as
+  `.agent-meta-managed*` in a rules dir (e.g. `.github/instructions`) are no longer reported as
+  rule files. Only the file name is checked, so provider artifact (dot-)directories stay
+  traversable and an explicit `path`/`path_template` target stays unfiltered by design.
 
 ## [2.0.0-beta.4] - 2026-10-26
 
