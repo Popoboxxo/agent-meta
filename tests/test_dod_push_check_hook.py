@@ -1042,3 +1042,29 @@ def test_953_recurse_submodules_allowed_without_submodules_or_for_check(repo_on_
     assert check.returncode == 0, check.stderr  # check only verifies, never pushes
     no_flag = _run_hook(repo_on_feature_branch, "git push origin feat/x")
     assert no_flag.returncode == 0, no_flag.stderr
+
+
+# --- issue #1033: the block message names each protected branch once -------
+
+@pytest.mark.parametrize("main_branch,expected_list", [
+    ("main", "main, master"),        # the reported case: 'main, main, master'
+    ("master", "main, master"),
+    ("develop", "develop, main, master"),
+])
+def test_1033_block_message_lists_protected_branches_once(
+        repo_on_feature_branch, main_branch, expected_list):
+    """The protected set is main + master + the configured main branch; the
+    message must print that set de-duplicated (exit code stays 2)."""
+    payload = {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+               "cwd": repo_on_feature_branch.as_posix()}
+    env = dict(os.environ, AGENT_META_MAIN_BRANCH=main_branch)
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(repo_on_feature_branch),
+        env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert f"Protected branches: {expected_list}. " in result.stderr, result.stderr

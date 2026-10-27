@@ -24,11 +24,11 @@ readers:
     effect: "Strict-Mode/Guard"
   - key: variables.TEST_COMMAND
     reader: hooks/1-generic/dod-push-check.sh
-    evidence: ".claude/hooks/dod-push-check.sh:1095"
+    evidence: ".claude/hooks/dod-push-check.sh:1101"
     effect: "DoD-Test-Gate vor Push"
   - key: variables.TEST_TIMEOUT
     reader: hooks/1-generic/dod-push-check.sh
-    evidence: ".claude/hooks/dod-push-check.sh:1142"
+    evidence: ".claude/hooks/dod-push-check.sh:1148"
     effect: "Test-Timeout"
   - key: variables.GIT_MAIN_BRANCH
     reader: hooks/1-generic/dod-push-check.sh

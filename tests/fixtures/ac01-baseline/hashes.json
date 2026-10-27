@@ -97,7 +97,7 @@
  "Claude/.claude/commands/what-is.md": "0c122bb377b3c72cae4c2719063c0ea4e41db5a2f444562fcfc8ad3eaadc69b1",
  "Claude/.claude/hooks/.agent-meta-managed": "29e6e25d192cadf724e807b31a0813ab783657ac522d4bf0f64fc8225d211935",
  "Claude/.claude/hooks/auto-github-release.sh": "f5f5945e0ba502852a58ec1afd16d1ceaf801daa84cc424f5feebed98e2b2f20",
- "Claude/.claude/hooks/dod-push-check.sh": "3f53fa17c0b16949076ac48466c7c95d7b611bd4f4e1f57e1914bae9d7edc893",
+ "Claude/.claude/hooks/dod-push-check.sh": "f9823b65f003db3d4671270f160da666004184399ca61ff23ef19371cb3a84cd",
  "Claude/.claude/hooks/graphify-read-guard.sh": "ed9b0ffd8b4324cd06105247c170a2bc31a8cb869965fc446c3250f2a1292c5d",
  "Claude/.claude/hooks/graphify-search-guard.sh": "f04caceb7e47b50c0a2df6042f9e077dda5086cb9292736666d7173105599f9c",
  "Claude/.claude/hooks/lib/.agent-meta-managed": "9075c9f49f4185716bab19a245ef02d1dbaf8d7cae1095449ef38f02a8bde3a3",

@@ -85,7 +85,7 @@
     ".claude/agents/ui-ux-designer.md": "156f1c1ae6f7b856",
     ".claude/agents/validator.md": "bd5e2f9e77ebb9db",
     ".claude/hooks/auto-github-release.sh": "f5f5945e0ba50285",
-    ".claude/hooks/dod-push-check.sh": "3f53fa17c0b16949",
+    ".claude/hooks/dod-push-check.sh": "f9823b65f003db3d",
     ".claude/hooks/graphify-read-guard.sh": "ed9b0ffd8b4324cd",
     ".claude/hooks/graphify-search-guard.sh": "f04caceb7e47b50c",
     ".claude/hooks/lifecycle-check.sh": "64fad69126de6c91",
