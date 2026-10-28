@@ -333,6 +333,39 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   paths. No agent or rule template touched and no golden (``slimming-golden``/``compact-golden``)
   touched; ``AC01_EXCEPTIONS`` is NOT extended (no blanket pattern, no widened regex).
 
+- Issue #1033 (``dod-push-check`` 2.1.6 de-duplicated branch list, 2026-10-27): the hook template edit
+  changes the rendered hook, so exactly one hash moved and was rebaselined:
+  ``Claude/.claude/hooks/dod-push-check.sh`` (``3f53fa17…`` -> ``f9823b65…``, 1 of 1085 hashes).
+  Only Claude renders the hook - no other provider artifact, ``AGENTS.md`` or ``context-hashes.json``
+  changed, and no golden (``slimming-golden``/``compact-golden``) was touched.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Welle 2 (#949/#951/#953/#954; ``dod-push-check`` 2.1.7, ``hook_common.sh`` 1.1.0, 2026-10-27): the
+  hardened git-push flag/short-cluster walk and the shared protected-branch helper change two rendered
+  hook files. Affected: ``Claude/.claude/hooks/dod-push-check.sh`` (2.1.6 -> 2.1.7),
+  ``Claude/.claude/hooks/lib/hook_common.sh`` and ``Gemini/.agents/hooks/lib/hook_common.sh`` (-> 1.1.0).
+  Pending sync, hashes land with the sync run. Only Claude renders ``dod-push-check`` and only
+  Claude/Gemini render the hook lib - no other provider artifact, ``AGENTS.md`` or
+  ``context-hashes.json`` changes, and no golden (``slimming-golden``/``compact-golden``) is touched.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Hook hardening rebaseline after the sync write run (2026-10-28, ``fix/bug-session-2026-10-27``):
+  completes the "Welle 2" entry above and absorbs the remaining hook edits of the series
+  (``hook_common.sh`` 1.2.0, ``orchestrator-guard-impl.sh`` 1.8.0, ``repo-containment-impl.sh``
+  1.3.0, ``repo-containment.sh`` 1.1.0, ``antigravity-json-adapter.sh`` comment). A full re-render
+  of the provider matrix measured **10 of 1085 hashes changed; 0 added/removed**: the 5 Claude
+  hook renders (``dod-push-check.sh``, ``lib/hook_common.sh``, ``orchestrator-guard-impl.sh``,
+  ``repo-containment-impl.sh``, ``repo-containment.sh``) and the 5 Gemini ``.agents/hooks``
+  counterparts (``antigravity-json-adapter.sh``, ``lib/hook_common.sh``, ``orchestrator-guard-impl.sh``,
+  ``repo-containment-impl.sh``, ``repo-containment.sh``). Only Claude renders ``dod-push-check`` and
+  only Gemini renders ``antigravity-json-adapter``, hence 5+5 rather than 6+6. No agent/rule artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden (``slimming-golden``/``compact-golden``) changed.
+  The manifest was patched **per entry** (10 single-line replacements, 1077 lines untouched) — not
+  via ``--write`` — and every new digest was independently recomputed from the rendered file bytes
+  before being written. The repo's own ``.meta-config/generated-file-hashes.json`` was refreshed by
+  the sync's post-write capture stage (same 10 entries); it was verified against the on-disk deployed
+  files (375/375 entries consistent, 0 stale). ``AC01_EXCEPTIONS`` is NOT extended.
+
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

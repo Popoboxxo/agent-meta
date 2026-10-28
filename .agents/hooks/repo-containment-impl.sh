@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.2.0
+# version: 1.3.0
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -62,7 +62,12 @@
 #
 # Fail-mode (issue #630): the wrapper owns the missing-/broken-impl handling.
 # This impl itself fails CLOSED on a missing helper lib, a missing python
-# interpreter (issue #595 posture) and on an empty/malformed payload.
+# interpreter (issue #595 posture), an interpreter that exits 0 while
+# printing garbage, an empty/malformed payload, and a missing or
+# unrecognized tool_name (v1.3.0, review finding M2). The recognized-name
+# list is shared with orchestrator-guard-impl.sh (hook_known_tool_name in
+# lib/hook_common.sh): a new built-in tool must be added there, and until
+# then its calls block on purpose (fail-closed).
 #
 # Anchor rule (fail-closed root resolution, spec §Fail-closed-Design):
 # the repo root is searched from an explicit ANCHOR — the payload `cwd` when
@@ -121,18 +126,51 @@ if ! hook_have_python; then
 fi
 _PY="$(hook_python_bin)"
 
+# The shared helper functions this guard relies on must actually be there:
+# a deployed lib/hook_common.sh from before they existed (sync.py not re-run
+# after an agent-meta update) would otherwise make the calls below fail
+# obscurely. Fail closed, same as a missing lib (issue #595).
+if ! declare -F hook_json_usable >/dev/null 2>&1 \
+   || ! declare -F hook_known_tool_name >/dev/null 2>&1; then
+  echo "REPO_CONTAINMENT: $SCRIPT_DIR/lib/hook_common.sh is outdated (shared guard helpers missing)." >&2
+  echo "Failing closed — re-run sync.py to redeploy the hooks/lib/ directory." >&2
+  exit 2
+fi
+
+# Issue #954 / review finding M2: a python3 on PATH that EXITS 0 while
+# printing garbage (broken or hostile PATH shim) is indistinguishable from a
+# working interpreter by exit status alone. Before this gate it handed junk
+# back as tool_name, which matched the `*) exit 0` allow branch below -- a
+# fail-open. Verify the interpreter before trusting any field (shared helper,
+# not a second copy of the probe).
+if ! hook_json_usable; then
+  echo "REPO_CONTAINMENT: the python/python3 on PATH does not behave like a Python interpreter." >&2
+  echo "Failing closed (M2/#954) — the hook payload cannot be read reliably." >&2
+  exit 2
+fi
+
 INPUT=$(cat)
 
 TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
-# Empty/malformed payload -> fail CLOSED. This intentionally differs from
-# orchestrator-guard-impl, which exits 0 when tool_name is empty (it treats
-# that as a non-tool event). A containment guard cannot tell a benign
-# non-tool event from a truncated payload, so it takes the safe side (F4):
-# an unevaluable payload must never open the jail.
+# Empty/malformed payload -> fail CLOSED: a containment guard cannot tell a
+# benign non-tool event from a truncated payload, so an unevaluable payload
+# must never open the jail. (orchestrator-guard-impl.sh now takes the same
+# safe side, review finding M2; before that it exited 0 here.)
 if [ -z "$TOOL_NAME" ]; then
   echo "REPO_CONTAINMENT: empty or unparseable PreToolUse payload (no tool_name)." >&2
   echo "Failing closed so an unknown tool call cannot write outside the repo root." >&2
+  exit 2
+fi
+
+# M2: an unrecognized tool_name used to fall through the `*) exit 0` branch
+# below. The known-name allow-list lives in lib/hook_common.sh so both
+# security guards share one definition (see hook_known_tool_name there for
+# what is allowed and why).
+if ! hook_known_tool_name "$TOOL_NAME"; then
+  echo "REPO_CONTAINMENT: unknown tool_name '$TOOL_NAME' in the PreToolUse payload." >&2
+  echo "Failing closed (M2) — an unrecognized tool could write outside the repo root." >&2
+  echo "If it is a legitimate tool, add it to hook_known_tool_name in lib/hook_common.sh." >&2
   exit 2
 fi
 
@@ -409,7 +447,7 @@ try:
     with open(CONFIG_FILE, encoding="utf-8") as handle:
         config = yaml.safe_load(handle) or {}
 
-    raw = config.get("repo_containment")
+    raw = config.get("repo_containment")  # runtime-reader:repo_containment
     rc = raw if isinstance(raw, dict) else {}
 
     # Master switch: provider-override > project value > default True.

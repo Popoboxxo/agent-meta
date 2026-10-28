@@ -1,8 +1,8 @@
 #!/bin/bash
 # lib: hook_common
-# version: 1.0.1
+# version: 1.2.0
 # description: Shared helper functions sourced by other hook scripts (issue #601 dedup)
-# changelog: v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
+# changelog: v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
 #
 # NOT a hook itself — no `event`/`matcher` header, sync.py never registers it
 # in settings.json. Deployed verbatim to <hooks_dir>/lib/hook_common.sh
@@ -13,13 +13,16 @@
 #   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   source "$SCRIPT_DIR/lib/hook_common.sh"
 #
-# Security-boundary hooks (orchestrator-guard.sh, dod-push-check.sh) treat a
-# failed `source` (this file missing/unreadable) as fail-closed, not
-# fail-open — see the sourcing snippet at the top of each of those scripts.
+# Security-boundary hooks (orchestrator-guard-impl.sh,
+# repo-containment-impl.sh, dod-push-check.sh) treat a failed `source` (this
+# file missing/unreadable) as fail-closed, not fail-open — see the sourcing
+# snippet at the top of each of those scripts. All three additionally call
+# hook_json_usable() before trusting any field, so a python3/python that is
+# missing, exits non-zero or exits 0 while printing garbage also fails closed.
 # Non-security hooks may fail open on a missing lib, matching their prior
-# fail-open behavior on a missing python3 (issue #595 only hardens the two
-# hooks that are actual security controls, not every hook that happens to
-# use python3).
+# fail-open behavior on a missing python3 (issue #595 only hardens the hooks
+# that are actual security controls, not every hook that happens to use
+# python3).
 #
 # Every function here is stdlib-only (python3/python, common POSIX
 # utilities) — no new external dependency for consumer projects.
@@ -104,6 +107,69 @@ if cur is None or isinstance(cur, (dict, list)):
 else:
     emit(str(cur))
 " "$path" "$default" 2>/dev/null || printf '%s' "$default"
+}
+
+# hook_json_usable
+# Returns 0 only when hook_json_get round-trips a sentinel through a real
+# JSON parse. A python3/python on PATH that EXITS 0 but prints garbage (a
+# broken or hostile PATH shim) cannot be told apart from a working
+# interpreter by exit status alone: hook_json_get would hand its garbage
+# back as the field value, and a security hook that treats "no command" as
+# "allow" would then let a push through (issue #954). Security hooks call
+# this once before trusting any field and fail closed on a non-zero result
+# (orchestrator-guard-impl.sh, repo-containment-impl.sh, dod-push-check.sh).
+#
+# The sentinel travels in the PAYLOAD and the fallback default is a DISTINCT
+# value (#954 follow-up): with the sentinel as the default, an interpreter
+# that fails (exit 1, no output -> hook_json_get's `|| printf default` or its
+# missing-interpreter branch) printed the sentinel and looked usable. Now only
+# a real parse of a real payload can produce it — a failing interpreter yields
+# 'hook-json-bad', a garbage one its own output, both != sentinel.
+hook_json_usable() {
+  [ "$(hook_json_get '{"__hook_json_probe__": "hook-json-ok"}' \
+        '__hook_json_probe__' 'hook-json-bad')" = "hook-json-ok" ]
+}
+
+# hook_known_tool_name <tool_name>
+# Returns 0 when <tool_name> is a tool name the framework's hook contract
+# knows, 1 for anything else (including the empty string). Single source of
+# truth for the two fail-closed guards (orchestrator-guard-impl.sh,
+# repo-containment-impl.sh): both used to let a tool_name they did not
+# recognize fall through `case "$TOOL_NAME" in Write|Edit|Bash) ;; *) exit 0`
+# — i.e. an unknown value (a broken interpreter's junk before issue #954, a
+# non-string or misspelled field today) silently ALLOWED the call (review
+# finding M2). Both now call this helper and block on a non-zero result.
+#
+# Why a closed set: a tool name this hook was never taught about cannot be
+# classified — it may be a write-capable tool (NotebookEdit, a provider's
+# own file tool) or junk. Silence is not evidence of harmlessness, so the
+# unknown case fails closed. What is deliberately allowed:
+#   * Claude Code's built-in tool set — the `claude-code-json` contract these
+#     hooks are written against (Write/Edit/Bash are the intercepted ones;
+#     every other name is a pass-through tool in both guards),
+#   * Claude Code's MCP namespace `mcp__<server>__<tool>`: open-ended by
+#     design and never classified as a write tool by either guard, so
+#     blocking it would break every MCP call without protecting anything.
+# Raw provider-native tool names (Antigravity's `write_to_file`,
+# `run_command`, ...) are deliberately NOT listed: hooks only ever see the
+# normalized Claude names because antigravity-json-adapter.sh translates
+# them, and accepting a raw name would let it slip past the Write/Bash
+# interception as an "unknown but allowed" tool.
+# Maintenance: a new built-in tool (or provider surface) must be added here;
+# until then its calls block with a message naming this function. That is the
+# intended fail-closed direction, not an accident.
+hook_known_tool_name() {
+  case "$1" in
+    # Claude Code's open-ended MCP namespace (mcp__server__tool).
+    mcp__?*__?*) return 0 ;;
+    # Claude Code built-ins. Write/Edit/Bash are intercepted by both guards;
+    # the others pass through untouched, but must still be identifiable.
+    Bash|BashOutput|Edit|ExitPlanMode|Glob|Grep|KillBash|KillShell|LS) return 0 ;;
+    ListMcpResources|MultiEdit|NotebookEdit|NotebookRead|Read|ReadMcpResource) return 0 ;;
+    Skill|SlashCommand|Task|TaskOutput|TaskStop|TodoWrite|WebFetch|WebSearch) return 0 ;;
+    Write|AskUserQuestion) return 0 ;;
+  esac
+  return 1
 }
 
 # --- Credential redaction (issue #596) -----------------------------------
@@ -287,4 +353,81 @@ hook_resolve_graphify_bin() {
   else
     printf '%s' "graphify"
   fi
+}
+
+# --- Branch-Guard push helpers (issues #949 / #1033) ---------------------
+
+# hook_protected_branches [main_branch]
+# Prints the Branch-Guard's protected-branch set as a space-separated,
+# de-duplicated list: main + master + the configured main branch, with the
+# configured branch first when it is neither main nor master (the order the
+# block message in dod-push-check.sh has always used, #1033). Git ref names
+# cannot contain whitespace, so a space-separated list is unambiguous.
+# Single source of truth for both the classifier's PROTECTED set and the
+# block message, which used to be built separately (#949).
+hook_protected_branches() {
+  local main="${1:-main}"
+  case "$main" in
+    main|master) printf '%s' "main master" ;;
+    *) printf '%s' "$main main master" ;;
+  esac
+}
+
+# hook_push_arg_parser_py
+# Emits the Python implementation of the git-push argument walk as source
+# text. dod-push-check.sh concatenates it with its classifier and pipes
+# both to python3: its tag-only detection and its destination check used to
+# carry a ~25-line copy of this walk each (issue #949), so a fix in one
+# could miss the other. Keeping one implementation in this lib (D6) makes
+# them share the exact same positionals.
+#
+# walk_push_args(args, opts_with_value) -> (pos, opts)
+#   pos  — positionals in order, after the first '--' everything is one
+#   opts — (name, value, raw) in order; a value of None means the spelling
+#          carried no value ('='-form or a plain flag), "" means an empty
+#          one. '-o' (short) and every name in opts_with_value consume the
+#          next token when they have no attached value — that rule must not
+#          be re-implemented by a caller (it is how '-o --tags' keeps
+#          '--tags' as the option's value instead of a tag flag).
+# The walk only splits option syntax; deciding whether an option is
+# allowed/known/unknown stays with the callers (tag-only allowlist vs.
+# destination check), which is why both keep their own policy tables.
+hook_push_arg_parser_py() {
+  cat <<'PY'
+def walk_push_args(args, opts_with_value):
+    pos, opts = [], []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a == "--":
+            pos += args[i:]
+            break
+        if not a.startswith("-") or a == "-":
+            pos.append(a)
+            continue
+        if a.startswith("--"):
+            name, eq, val = a.partition("=")
+            if eq:
+                opts.append((name, val, a))
+            elif name in opts_with_value:
+                opts.append((name, args[i] if i < len(args) else "", a))
+                i += 1
+            else:
+                opts.append((name, None, a))
+            continue
+        # short cluster: one option per character; 'o' takes the rest of
+        # the cluster ('-o<val>') or the next token ('-o <val>') as value
+        rest = a[1:]
+        for k, ch in enumerate(rest):
+            if ch == "o":
+                if k + 1 < len(rest):
+                    opts.append(("-o", rest[k + 1:], a))
+                else:
+                    opts.append(("-o", args[i] if i < len(args) else "", a))
+                    i += 1
+                break
+            opts.append(("-" + ch, None, a))
+    return pos, opts
+PY
 }

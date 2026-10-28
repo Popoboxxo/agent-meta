@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.7.0
+# version: 1.8.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -26,6 +26,16 @@ set -uo pipefail
 #
 # Only mutating tools (Write, Edit, Bash) are intercepted.
 # Research tools (read, glob, grep) are never blocked.
+#
+# Payload/tool_name fail-closed (v1.8.0, review finding M2, #954 follow-up):
+# an empty payload, a payload that is not valid JSON, a missing/non-string
+# tool_name, an unrecognized tool_name and a python3/python that does not
+# behave like an interpreter all block (exit 2). Previously each of those
+# except a non-JSON payload fell into `*) exit 0` and silently ALLOWED the
+# call — a broken PATH shim printing junk as tool_name was enough to disable
+# this guard. The recognized-name list is shared with repo-containment-impl.sh
+# (hook_known_tool_name in lib/hook_common.sh), so a new built-in tool must be
+# added there; until then its calls block on purpose (fail-closed).
 #
 # Exit codes: 0 = allow, 2 = block.
 #
@@ -137,12 +147,41 @@ if ! hook_have_python; then
 fi
 _PY="$(hook_python_bin)"
 
-# Fail closed on a non-empty payload that is not valid JSON (SR-B-09): the
-# field readers below return "" for unparseable input, which would read as
-# "no tool name" and let the call through. An empty payload stays a no-op
-# (non-tool events). Invalid UTF-8 bytes are tolerated (surrogateescape), as
-# in hook_json_get -- only structurally broken JSON is rejected.
-if [ -n "$INPUT" ] && ! printf '%s' "$INPUT" | "$_PY" -c \
+# The shared helper functions this guard relies on must actually be there:
+# a deployed lib/hook_common.sh from before they existed (sync.py not re-run
+# after an agent-meta update) would otherwise make the calls below fail
+# obscurely. Fail closed, same as a missing lib (issue #595).
+if ! declare -F hook_json_usable >/dev/null 2>&1 \
+   || ! declare -F hook_known_tool_name >/dev/null 2>&1; then
+  echo "ORCHESTRATOR_GUARD: $SCRIPT_DIR/lib/hook_common.sh is outdated (shared guard helpers missing)." >&2
+  echo "Failing closed — re-run sync.py to redeploy the hooks/lib/ directory." >&2
+  exit 2
+fi
+
+# Issue #954 / review finding M2: a python3 on PATH that EXITS 0 while
+# printing garbage (broken or hostile PATH shim) is indistinguishable from a
+# working interpreter by exit status alone. Before this gate it handed junk
+# back as tool_name, which matched the `*) exit 0` allow branch below -- a
+# fail-open in BOTH security guards. Verify the interpreter before trusting
+# any field (shared helper, not a second copy of the probe).
+if ! hook_json_usable; then
+  echo "ORCHESTRATOR_GUARD: the python/python3 on PATH does not behave like a Python interpreter." >&2
+  echo "Failing closed (M2/#954) — the hook payload cannot be read reliably." >&2
+  exit 2
+fi
+
+# Fail closed on an empty or non-JSON payload (SR-B-09, M2): the field
+# readers below return "" for both, which used to read as "no tool name" and
+# let the call through. A PreToolUse payload is always JSON; anything else
+# means the guard cannot evaluate the call. Invalid UTF-8 bytes are
+# tolerated (surrogateescape), as in hook_json_get -- only structurally
+# broken JSON is rejected.
+if [ -z "$INPUT" ]; then
+  echo "ORCHESTRATOR_GUARD: empty PreToolUse payload (no JSON on stdin)." >&2
+  echo "Failing closed (M2) — an unevaluable call must not be allowed." >&2
+  exit 2
+fi
+if ! printf '%s' "$INPUT" | "$_PY" -c \
   'import sys, json; json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))' \
   2>/dev/null; then
   echo "ORCHESTRATOR_GUARD: hook payload is not valid JSON." >&2
@@ -152,9 +191,25 @@ fi
 
 TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
-# If no tool name: startup or other events — allow through
+# M2: a missing (or non-string/non-scalar, which hook_json_get reports as
+# missing) tool_name is a payload the guard cannot classify. This used to
+# allow the call "as a non-tool event"; a genuine PreToolUse payload always
+# carries one, so the safe side is to block.
 if [ -z "$TOOL_NAME" ]; then
-  exit 0
+  echo "ORCHESTRATOR_GUARD: no usable tool_name in the PreToolUse payload." >&2
+  echo "Failing closed (M2) — a call the guard cannot identify must not be allowed." >&2
+  exit 2
+fi
+
+# M2: an unrecognized tool_name used to fall through the `*) exit 0` branch
+# below. The known-name allow-list lives in lib/hook_common.sh so both
+# security guards share one definition (see hook_known_tool_name there for
+# what is allowed and why).
+if ! hook_known_tool_name "$TOOL_NAME"; then
+  echo "ORCHESTRATOR_GUARD: unknown tool_name '$TOOL_NAME' in the hook payload." >&2
+  echo "Failing closed (M2) — an unrecognized tool cannot be classified as safe." >&2
+  echo "If it is a legitimate tool, add it to hook_known_tool_name in lib/hook_common.sh." >&2
+  exit 2
 fi
 
 # agent_id (issue #683): Claude Code's PreToolUse payload carries this
@@ -952,7 +1007,7 @@ try:
     import yaml
     with open(CONFIG_FILE) as f:
         c = yaml.safe_load(f) or {}
-    orch = c.get('orchestrator', {})
+    orch = c.get('orchestrator', {})  # runtime-reader:orchestrator
     mode = resolve_mode(orch, PROVIDER)
     if mode is not None:
         mode = str(mode).strip().lower()
