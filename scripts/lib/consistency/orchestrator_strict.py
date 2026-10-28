@@ -72,17 +72,28 @@ def strict_default_grace_active(agent_meta_root: Path | None = None) -> bool:
     """True while the strict-default flip is announced but not runtime-enforced.
 
     The decision is data: ``<agent_meta_root>/VERSION`` against the window in
-    ``_STRICT_DEFAULT_GRACE_UNTIL``. Without a root the grace is off — that is
-    the config-level decision the frozen Spec-A entries function reads (ADR-4),
-    and it keeps unit-test fixtures independent of this checkout's version.
-    An unreadable/missing VERSION is not a real installation and is hard too.
+    ``_STRICT_DEFAULT_GRACE_UNTIL``.
+
+    A missing or unreadable ``VERSION`` counts as INSIDE the window (M6): the
+    public promise is that the implicit strict default is *announced* before it
+    hardens, and silently hard-flipping an installation whose version cannot be
+    read is exactly the unannounced behaviour-change that promise rules out. The
+    hard branch therefore requires a version that proves the window has passed.
+    ``OSError`` and ``UnicodeDecodeError`` (a non-UTF-8 VERSION used to abort the
+    whole sync) both count as unreadable.
+
+    ``agent_meta_root is None`` stays off: no root means there is no installation
+    to read a version from, the caller cannot announce anything either, and the
+    frozen Spec-A entries function depends on this default (ADR-4). Every real
+    call site passes the framework root (``_opencode_runtime_gate_entries``
+    included since M4).
     """
     if agent_meta_root is None:
         return False
     try:
         raw = (Path(agent_meta_root) / "VERSION").read_text(encoding="utf-8").strip()
-    except OSError:
-        return False
+    except (OSError, UnicodeDecodeError):
+        return True
     return _version_tuple(raw) < _STRICT_DEFAULT_GRACE_UNTIL
 
 

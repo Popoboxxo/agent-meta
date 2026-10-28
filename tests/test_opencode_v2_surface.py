@@ -1941,12 +1941,16 @@ def _seed_v1_strict(project: Path) -> None:
     """A v1-strict project with the Spec-A map deny plus ``runtime-gate-deny``.
 
     ``edit`` has a user entry next to the managed glob; the recorded prior is
-    ``"allow"`` for edit and ``None`` (key absent) for bash.
+    ``"allow"`` for edit and ``None`` (key absent) for bash. ``default_agent``
+    is present because the Spec-A writer wrote it together with the map and the
+    ``default-agent`` record — the D1a precondition of a healthy v1 project
+    (M1: no deny without a valid entry point).
     """
     _write_json(
         project / "opencode.json",
         {
             "theme": "dark",
+            "default_agent": "orchestrator",
             "permissions": list(_USER_PERMISSIONS),
             "permission": {
                 "edit": {"**": "deny", "docs/**": "allow"},
@@ -1969,9 +1973,16 @@ def _seed_v1_strict(project: Path) -> None:
 
 
 def _seed_v2_triples(project: Path, user: bool = True) -> None:
-    """A v2 project whose managed triples are written and recorded in state."""
+    """A v2 project whose managed triples are written and recorded in state.
+
+    It carries ``default_agent`` as well: a healthy v2 project got it from
+    ``settings-init``, and D1a (M1) allows no deny without that entry point.
+    """
     permissions = list(_USER_PERMISSIONS) if user else []
-    _write_json(project / "opencode.json", {"theme": "dark", "permissions": permissions})
+    _write_json(
+        project / "opencode.json",
+        {"theme": "dark", "default_agent": "orchestrator", "permissions": permissions},
+    )
     _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
 
 
@@ -2142,6 +2153,9 @@ def test_ac_c15_non_generated_primary_role_gets_no_triples_on_plugin_observe(
     assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
 
     # Positive control: plugin+observe is exactly where the deny must stay.
+    # The document carries the settings-init entry point — D1a (M1) forbids a
+    # deny in a document without it, so this is the production precondition.
+    _write_json(project / "opencode.json", {"default_agent": "orchestrator"})
     _reconcile(project, _gate_config(), pc, framework, active_set=_GENERATED)
 
     assert _read_json(project / "opencode.json")["permissions"] == [
@@ -2227,6 +2241,9 @@ def test_ac_c14_observe_keeps_triples_enforce_removes(tmp_path, monkeypatch):
     project = tmp_path / "project"
     framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
     plugin_config = {"Opencode": _plugin_pc()}
+    # settings-init wrote the entry point once; D1a (M1) requires it before any
+    # deny triple is allowed into the document.
+    _write_json(project / "opencode.json", {"default_agent": "orchestrator"})
 
     monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
     _reconcile(project, _gate_config(), plugin_config, framework)
@@ -2355,6 +2372,8 @@ def _matrix_permission_strict_off(project: Path, framework: Path) -> None:
 
 
 def _matrix_plugin_observe(project: Path, framework: Path) -> None:
+    project.mkdir(parents=True, exist_ok=True)
+    _write_json(project / "opencode.json", {"default_agent": "orchestrator"})
     _reconcile(project, _gate_config(), {"Opencode": _plugin_pc()}, framework)
     doc = _read_json(project / "opencode.json")
     assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY]
@@ -2431,7 +2450,7 @@ def test_reconcile_matrix_seven_rows(tmp_path, monkeypatch):
 # their exact shape (spec §3.4, IC-4 / m-6, AC-C14).
 _IC4_SOURCE_HASHES = {
     "_opencode_runtime_gate_entries": (
-        "b4a6c1420a851f096fe095ddaf5e0f0702be2eab883231f56bc828e513dd9001"
+        "6adc9fca564d4a6f9649912c6bbd6a57fdfb44765bf7fa816d362acc2089b014"
     ),
     "opencode_runtime_gate_wanted": (
         "294986792a899dedaa05a03786cb657c82081dafc1968aeb065de80aeba1deea"
@@ -3386,6 +3405,9 @@ def test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples(
     )
 
     project = tmp_path / "project"
+    # settings-init writes `default_agent` once on a v2 surface; the shipped
+    # entry is the D1a precondition for the deny triples below (M1).
+    _write_json(project / "opencode.json", {"default_agent": "orchestrator"})
     monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
     log = SyncLog()
     _reconcile(project, _gate_config(), {"Opencode": pc}, _REPO_ROOT, log=log)
@@ -3431,6 +3453,10 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
     monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
 
     # (a) The real stage seam at tier ``plugin``: Spec-A is not dispatched.
+    #     ``settings-init`` (stage 4) wrote ``default_agent`` before this stage;
+    #     D1a (M1) allows the deny triples only while that entry point exists.
+    entry_json = tmp_path / "plugin-tier" / "project"
+    _write_json(entry_json / "opencode.json", {"default_agent": "orchestrator"})
     project, _, gate_calls = _run_stage(
         tmp_path / "plugin-tier", monkeypatch, {"Opencode": pc}, ["Opencode"],
         _gate_config(), {"Opencode": "plugin"},
@@ -3440,7 +3466,7 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
         "default_agent) — the reconcile function is the only actor"
     )
     doc = _read_json(project / "opencode.json")
-    assert "default_agent" not in doc, (
+    assert doc["default_agent"] == "orchestrator", (
         "reconcile must not write default_agent at tier plugin (OQ-B12 default)"
     )
     assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
@@ -3487,16 +3513,22 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
 def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
     tmp_path, monkeypatch
 ):
-    """AC-C16(a) as scoped by Amendment B4 (QA-D-02): no reconciliation at ``plugin``.
+    """AC-C16(a), revised by D1a(iii): a deleted entry point takes the deny along.
 
-    Amendment B4 narrows AC-C16(a): the ``default_agent`` managed merge (with
-    its ``default-agent`` state and its user-value warning) runs on tier
+    Amendment B4 / OQ-B12 kept the ``default_agent`` managed merge on tier
     ``permission`` only, because Spec A's call condition is frozen at
-    ``== "permission"`` (OQ-B12: "Eigenprüfung genügt"). On the C3 v2 surface
-    (tier ``plugin``) ``settings-init`` writes ``default_agent`` once and
-    ``reconcile_opencode_surface_gate`` only CHECKS the entry point — nothing
-    reconciles afterwards. A user-deleted ``default_agent`` therefore stays
-    deleted (accepted limitation).
+    ``== "permission"``. On the C3 v2 surface (tier ``plugin``) ``settings-init``
+    writes ``default_agent`` once and ``reconcile_opencode_surface_gate`` only
+    CHECKS the entry point. Amendment B4 called the consequence an "accepted
+    limitation": a user-deleted ``default_agent`` stays deleted *while the gate
+    triples stay written*.
+
+    D1a(iii) (user decision, 2026-10-27) supersedes that reading: deny and entry
+    point are ONE invariant, so a document without a valid ``default_agent``
+    must not keep a project-wide deny — that half-active gate is the #1006
+    lockout in ``permissions[]`` form. The deletion itself is still respected
+    (D1c: no writer re-adds the value at this tier); the triples are rolled back
+    and exactly one loud warning names the state.
 
     The permission-tier half is the non-vacuity control: the same seeded
     document *does* get ``default_agent`` re-added there, because the real
@@ -3541,23 +3573,72 @@ def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
     )
     assert not _warned(log, "default_agent"), log.warnings
 
-    # (c) The accepted limitation: a user-deleted value is not re-added, and
-    #     no user-value warning appears (no merge runs at all).
-    del doc["default_agent"]
-    _write_json(project / "opencode.json", doc)
-    before = (project / "opencode.json").read_bytes()
+    # (c) D1a(iii) (user decision, 2026-10-27) SUPERSEDES Amendment B4's
+    #     "accepted limitation": deny and entry point are ONE invariant. The
+    #     #1006 lockout is exactly the half-active state — the project-wide deny
+    #     stays while no agent is pre-selected. So a user-deleted
+    #     ``default_agent`` stays deleted (D1c: the user value is respected,
+    #     nothing re-adds it on this tier) but the gate triples go with it, and
+    #     the state error is loud instead of silent.
+    healthy = _read_json(project / "opencode.json")
+    assert healthy["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
+        "precondition: the healthy plugin-tier document carries both gate triples"
+    )
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }, "precondition: the written triples are recorded, so they can be rolled back"
+    del healthy["default_agent"]
+    _write_json(project / "opencode.json", healthy)
+
     stage_log = SyncLog()
     _run_stage(
         base, monkeypatch, {"Opencode": pc}, ["Opencode"],
         _gate_config(), {"Opencode": "plugin"}, log=stage_log,
     )
 
-    assert (project / "opencode.json").read_bytes() == before, (
-        "no writer may touch (or re-add) default_agent at tier plugin"
+    # (c1) Deleted stays deleted (D1c) AND the deny leaves with the entry point.
+    after = _read_json(project / "opencode.json")
+    assert "default_agent" not in after, (
+        "the user's deletion is respected — no tier-plugin writer re-adds it (D1c)"
     )
-    markers = ("default_agent", "opencode-v2-managed", "primary-role")
-    leaked = [w for w in stage_log.warnings if any(m in w for m in markers)]
-    assert leaked == [], leaked
+    assert "permissions" not in after, (
+        "no half-active gate: without default_agent the deny triples must be "
+        "rolled back (D1a(iii)) — a project-wide deny with no entry point is "
+        "the #1006 lockout in list form"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project), (
+        "the rolled-back triples must not stay recorded, or the next run would "
+        "claim them again"
+    )
+
+    # (c2) Exactly one loud warning names the suspension — the state error is
+    #      reported, never swallowed (the old "no warning" pin was the lockout).
+    assert len(stage_log.warnings) == 1, stage_log.warnings
+    warning = stage_log.warnings[0]
+    for token in (
+        "SUSPENDED", "permissions", "default_agent", "orchestrator", "lock",
+    ):
+        assert token in warning, warning
+    assert "opencode-v2-managed" not in warning, warning
+
+    # (c4) Not a one-way switch: restoring the entry point brings the gate back.
+    restored = _read_json(project / "opencode.json")
+    restored["default_agent"] = "orchestrator"
+    _write_json(project / "opencode.json", restored)
+    restore_log = SyncLog()
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=restore_log,
+    )
+
+    recovered = _read_json(project / "opencode.json")
+    assert recovered["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
+        "the guard suspends the gate, it does not disable it permanently"
+    )
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }
+    assert not any("SUSPENDED" in w for w in restore_log.warnings), restore_log.warnings
 
     # (d) Non-vacuity control: at tier permission the managed merge runs and
     #     re-adds the deleted value (the behaviour AC-C16(a) originally meant).
@@ -5199,8 +5280,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1033 (`dod-push-check.sh` v2.1.6): `ac01-baseline` re-pinned — 1 hash
 # (`Claude/.claude/hooks/dod-push-check.sh`); `slimming-golden`/`compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issues #948-#954/#961 (hook fixes: `dod-push-check.sh` 2.1.7,
+# `lib/hook_common.sh` 1.2.0, `orchestrator-guard-impl.sh` 1.8.0,
+# `repo-containment-impl.sh` 1.3.0, `repo-containment.sh` 1.1.0, plus the
+# `antigravity-json-adapter.sh` comment): `ac01-baseline` re-pinned — 10 hashes
+# (5 Claude + 5 Gemini hook renders); `slimming-golden`/`compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "1f8328992eb4f572bdefecbfde34001ef6d441ec357642ab9c9e5bed50a346eb",
+    "ac01-baseline": "3999aca6937fe02173fe4007da6ada86c5b589b80b4d13c52750eb5268e11c7c",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }

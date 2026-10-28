@@ -410,6 +410,12 @@ def _opencode_runtime_gate_entries(
     strict`` is effectively active for it (three-tier precedence, shared with
     ``orchestrator_strict._resolve_effective_strict``); ``{}`` otherwise.
 
+    ``agent_meta_root`` is handed to that resolver (M4): the D2b
+    version-driven grace for the IMPLICIT strict default is part of the answer,
+    so a caller of this function sees exactly what the writer writes. Before
+    that it dropped the root, applied no grace and reported "wanted" while the
+    writer suppressed the deny for the whole grace window.
+
     Provider-agnostic: the tier comes from the IC-03 resolver, never a provider
     literal and never the ``isolation-mechanism`` key (F-07).
     """
@@ -433,7 +439,7 @@ def _opencode_runtime_gate_entries(
         return {}
 
     orch = config.get("orchestrator", {}) if isinstance(config, dict) else {}
-    if not _resolve_effective_strict(orch, provider):
+    if not _resolve_effective_strict(orch, provider, agent_meta_root):
         return {}
 
     return {
@@ -667,14 +673,12 @@ def _sync_opencode_runtime_gate(
 
     entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
 
-    # D2b grace: the frozen Spec-A entries function stays byte-identical
-    # (ADR-4/IC-4); the version-bounded window for the IMPLICIT strict default
-    # is applied here. An explicitly configured strict is never affected, and
-    # the entry point (step 3) still lands — only the deny waits one minor.
-    if entries:
-        _orch = config.get("orchestrator", {}) if isinstance(config, dict) else {}
-        if not _resolve_effective_strict(_orch, provider, agent_meta_root):
-            entries = {}
+    # D2b grace (M4): the version-bounded window for the IMPLICIT strict default
+    # is already part of ``entries`` — the entries function receives
+    # ``agent_meta_root`` and passes it to the shared resolver. No second gate
+    # here: one decision, so a caller of the reader and this writer cannot
+    # disagree (an explicitly configured strict is never affected, and the entry
+    # point still lands — only the deny waits one minor release).
 
     # v2 surface (#1007/Amendment B1): Spec-A step 4 (the ``permission`` map
     # merge including its rollback branch) does NOT run here. On a v2 document
@@ -718,9 +722,11 @@ def _sync_opencode_runtime_gate(
     # (the rollback branch below takes back a managed deny), warn loudly, and
     # never write a half-active gate.
     #
-    # v2 surfaces are excluded here: their deny lives in ``permissions[]``,
-    # owned by ``reconcile_opencode_surface_gate`` (Amendment B1); suspending
-    # the v1 map's ``entries`` would not touch it, so the warning would lie.
+    # v2 surfaces are excluded here: their deny lives in ``permissions[]``, not
+    # in this map. The same D1a invariant is enforced there by
+    # ``reconcile_opencode_surface_gate`` itself, which validates the written
+    # document's ``default_agent`` before it lets a triple through (M1) — so a
+    # v2 gate is never half-active and this v1-only branch cannot lie about it.
     invariant_suspended = False
     if (
         entries
@@ -922,6 +928,83 @@ def _v2_committed_file(provider_config: dict) -> str | None:
             if found is not None:
                 return found
     return None
+
+
+def _v2_committed_document(project_root: Path, provider_config: dict) -> dict | None:
+    """The owner's v2 document, ``{}`` when absent, ``None`` when unreadable.
+
+    Read-only counterpart of the writer's own read (``_sync_opencode_v2_gate_
+    permissions``): the D1a guard needs the document BEFORE the triples are
+    written, and it must not warn twice for the same parse error. ``None``
+    therefore means "cannot be judged" and makes the guard stand down — the
+    writer refuses to touch an unparseable document anyway, so no deny can
+    appear either.
+    """
+    committed = _v2_committed_file(provider_config)
+    if committed is None:
+        return None
+    path = safe_path(Path(project_root), committed)
+    if not path.exists():
+        return {}
+    parsed = read_json_lenient(path)
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _v2_entry_point_will_be_valid(
+    document: dict,
+    desired: str | None,
+    da_state: dict,
+    merge_writes: bool,
+) -> bool:
+    """D1a on the v2 surface: will the written doc carry a valid entry point?
+
+    The v2 path never merges ``default_agent`` itself: ``settings-init`` writes
+    it once (``context.apply_settings_surface_shape``) and, on the tier that
+    dispatches the Spec-A writer, its step 3 merges it BEFORE this reconciler
+    runs. So the committed document is authoritative. ``merge_writes`` covers
+    the one case where it is not yet true: that merge is part of the same run
+    but a dry run does not persist it — then ``_has_valid_default_agent``
+    answers exactly what the merge will leave behind, so a dry run and a real
+    run report the same gate decision (M4: reader and writer must agree).
+
+    A non-empty string is always valid — the user's own value included (D1c:
+    it is respected, never overwritten). An absent key, an empty string or a
+    non-string (``42``) is not a usable entry point.
+    """
+    current = document.get(_DEFAULT_AGENT_JSON_KEY)
+    if isinstance(current, str) and current.strip():
+        return True
+    return bool(merge_writes) and _has_valid_default_agent(document, desired, da_state)
+
+
+def _v2_gate_invariant_warning(
+    provider: str, desired: str | None, *, merge_rewrites: bool
+) -> str:
+    """Loud state-error text for the v2 surface (D1a, M1).
+
+    Same invariant and same consequence as the Spec-A text
+    (``_gate_invariant_warning``), only the deny form and the remedy differ: the
+    v2 deny is a ``permissions[]`` triple, and on a tier where no ``default_agent``
+    merge runs the user has to set the key themselves (a deleted value is not
+    re-added, OQ-B12/Amendment B4).
+    """
+    if merge_rewrites:
+        remedy = (
+            f"Restore default_agent to '{desired}' (or remove the "
+            f"'{_STATE_DEFAULT_AGENT_KEY}' record from {_OPENCODE_STATE_FILE} "
+            "so the merge writes it again)."
+        )
+    else:
+        remedy = (
+            f"Set default_agent to '{desired}' (or disable strict for this "
+            "provider via orchestrator.provider-overrides)."
+        )
+    return (
+        "runtime gate (permissions edit/shell deny) SUSPENDED for provider "
+        f"'{provider}': default_agent is missing or was removed while the gate "
+        "is wanted, so no agent would be able to act — deny and entry point are "
+        "one invariant, writing the deny would lock the main chat out. " + remedy
+    )
 
 
 def _opencode_v2_gate_permissions(
@@ -1311,6 +1394,13 @@ def reconcile_opencode_surface_gate(
        one.
     7. v2, nothing in state, strict off: no-op.
 
+    D1a is enforced here for the list form too (M1): the triples are written
+    ONLY when the committed document carries a usable ``default_agent``.
+    Otherwise the gate is suspended — ``entries`` are dropped, a recorded triple
+    is rolled back by the writer, and a loud warning states the remedy. Deny and
+    working entry point are one invariant; a half-active gate (deny, no agent
+    pre-selected) is the #1006 lockout, so it is never written.
+
     ``plugin_mode`` comes from ``runtime_gate._baked_plugin_mode`` and
     ``capabilities`` from ``providers.load_provider_capabilities``. Both imports
     stay function-local: ``isolation`` ↔ ``opencode_v2_config`` would be an
@@ -1331,8 +1421,22 @@ def reconcile_opencode_surface_gate(
 
     is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
 
-    # Row 1: the old v1 mapping must go before the v2 list is written.
+    # Entry point and tier are resolved once: the D1a guard below and row 6 both
+    # need them, and both must use the same active set as the builder and the
+    # Spec-A writer (QA-C-01). The tier is pure data (IC-03 resolver), never a
+    # provider literal.
+    entry = (
+        _opencode_entry_point(provider, provider_config, active_set)
+        if is_v2_surface
+        else None
+    )
+    tier = None
     if is_v2_surface:
+        tier = providers.provider_runtime_gate_tier(
+            _v2_provider_entry(provider_config, provider),
+            _capabilities_for(capabilities, provider),
+        )
+        # Row 1: the old v1 mapping must go before the v2 list is written.
         _rollback_opencode_v1_gate_map(project_root, provider_config, log, dry_run)
 
     entries = _opencode_v2_gate_permissions(
@@ -1340,24 +1444,51 @@ def reconcile_opencode_surface_gate(
         active_set=active_set,
     )
 
+    # D1a on the v2 surface (M1): deny and entry point are ONE invariant — no
+    # ``permissions[]`` deny in a document without a valid ``default_agent``.
+    # Enforced HERE, before the writer runs, because this function is the only
+    # actor for the triples: without it a v2 sync writes the project-wide deny
+    # while no agent is pre-selected (#1006 lockout in the list form). The guard
+    # is deliberately outside the tier branch — on every tier the written
+    # document, not the tier, decides whether a deny is safe.
+    #
+    # A violation is a state error, never a silent half-active gate: the triples
+    # are dropped (the writer's rollback branch then takes back a recorded one)
+    # and a loud warning names the remedy — full gate, or no deny at all.
+    if is_v2_surface and entries:
+        document = _v2_committed_document(project_root, provider_config)
+        if document is not None:
+            # The Spec-A writer shares the tier-``permission`` dispatch
+            # condition (IC-7), and its merge reads this namespace; passing the
+            # same record keeps the dry-run and the real run decision identical.
+            da_state = _read_state(
+                safe_path(Path(project_root), _OPENCODE_STATE_FILE),
+                _STATE_DEFAULT_AGENT_KEY,
+            )
+            merge_writes = tier == "permission"
+            if not _v2_entry_point_will_be_valid(
+                document, entry, da_state, merge_writes
+            ):
+                log.warning(
+                    _v2_gate_invariant_warning(
+                        provider, entry, merge_rewrites=merge_writes
+                    )
+                )
+                entries = []
+
     # Row 6 (AC-C15): on the ``permission`` tier Spec A's coupling warning is
     # the single one; on every other tier Spec A never runs, so the consequence
     # of a missing entry point would otherwise go untold. The predicate uses the
     # same active set as the builder and the Spec-A writer (QA-C-01).
     if is_v2_surface and not entries:
-        if _opencode_entry_point(provider, provider_config, active_set) is None:
-            pc = _v2_provider_entry(provider_config, provider)
-            tier = providers.provider_runtime_gate_tier(
-                pc, _capabilities_for(capabilities, provider)
+        if entry is None and tier != "permission":
+            log.warning(
+                "opencode-v2 gate (permissions deny) NOT written for "
+                f"provider '{provider}': no explicit and generated "
+                "primary-role — the gate would lock every agent; declare "
+                "primary-role in config/ai-providers.yaml and keep that "
+                "role in the active set"
             )
-            if tier != "permission":
-                log.warning(
-                    "opencode-v2 gate (permissions deny) NOT written for "
-                    f"provider '{provider}': no explicit and generated "
-                    "primary-role — the gate would lock every agent; declare "
-                    "primary-role in config/ai-providers.yaml and keep that "
-                    "role in the active set"
-                )
 
     _sync_opencode_v2_gate_permissions(
         project_root, provider_config, entries, log, dry_run
