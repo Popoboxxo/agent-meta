@@ -669,3 +669,140 @@ def test_sink_path_backslash_is_canonicalized(tmp_path):
         '    path: "scratch\\\\out"\n',
     )
     assert f"under {root}/scratch/out" in _outside_block_stderr(root)
+
+
+# --- SR-B-17: wrapper maps impl exit status to {0, 2} -----------------------
+# Same gap as SR-B-08 on orchestrator-guard.sh: the harness only blocks on
+# exit 2, so a crashed impl (rc 1 / 137 / 141) passed straight through and
+# the tool call proceeded. Only {0, 2} may be propagated.
+
+def _wrapper_with_stub_impl(tmp_path, impl_body: str) -> Path:
+    hooks_dir = tmp_path / "hooks"
+    hooks_dir.mkdir()
+    wrapper = hooks_dir / "repo-containment.sh"
+    wrapper.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "repo-containment-impl.sh").write_text(
+        "#!/bin/bash\ncat >/dev/null\n" + impl_body + "\n", encoding="utf-8",
+    )
+    return wrapper
+
+
+@pytest.mark.parametrize("impl_body,crash_rc", [
+    ("set -u\necho \"$UNBOUND_VAR_SR_B_17\"", 1),
+    ("kill -KILL $$", 137),
+    ("kill -PIPE $$", 141),
+    ("exit 3", 3),
+])
+def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, impl_body)
+    result = subprocess.run(
+        [_BASH, str(wrapper)],
+        input=json.dumps(_bash_payload("echo hi", tmp_path)),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert f"impl crashed rc={crash_rc}" in result.stderr
+    assert "failing closed" in result.stderr
+
+
+@pytest.mark.parametrize("impl_rc", [0, 2])
+def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, f"exit {impl_rc}")
+    result = subprocess.run(
+        [_BASH, str(wrapper)],
+        input=json.dumps(_bash_payload("echo hi", tmp_path)),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
+    assert "impl crashed" not in result.stderr
+
+
+# --- review finding M2: payload/tool_name fail-closed ----------------------
+
+def _garbage_python_env(tmp_path) -> dict:
+    """Environment whose `python3` EXITS 0 printing junk (the M2 trigger);
+    the rest of PATH stays intact so the hook's shell utilities still work."""
+    shim_dir = tmp_path / "garbage-python"
+    shim_dir.mkdir()
+    shim = shim_dir / "python3"
+    shim.write_text("#!/bin/sh\necho garbage\n", encoding="utf-8")
+    shim.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def test_garbage_python_interpreter_fails_closed(tmp_path):
+    """M2: junk from a broken python3 shim used to become tool_name and hit
+    `*) exit 0` -- an outside write was allowed. hook_json_usable() blocks."""
+    root = _project(tmp_path)
+    outside = root.parent / "outside.py"
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(outside, root)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT),
+        env=_garbage_python_env(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "does not behave like a Python interpreter" in result.stderr
+
+
+@pytest.mark.parametrize("tool", ["Frobnicate", "bash", "run_command"])
+def test_unknown_tool_name_fails_closed(tmp_path, tool):
+    """M2: an unrecognized tool_name used to hit `*) exit 0` (allow)."""
+    root = _project(tmp_path)
+    result = _run_hook({"tool_name": tool, "tool_input": {}, "cwd": str(root)})
+    assert result.returncode == 2, result.stderr
+    assert f"unknown tool_name '{tool}'" in result.stderr
+
+
+@pytest.mark.parametrize("payload", [
+    {"tool_input": {}},                       # no tool_name at all
+    {"tool_name": None, "tool_input": {}},    # null
+    {"tool_name": ["Write"], "tool_input": {}},   # array
+    {"tool_name": {"name": "Write"}, "tool_input": {}},  # object
+])
+def test_missing_or_non_scalar_tool_name_fails_closed(payload):
+    result = _run_hook(payload)
+    assert result.returncode == 2, result.stderr
+    assert "empty or unparseable PreToolUse payload" in result.stderr
+
+
+@pytest.mark.parametrize("tool", [
+    "Read", "Glob", "Grep", "WebFetch", "TodoWrite", "Task",
+    "mcp__playwright__browser_navigate",
+])
+def test_known_non_mutating_tools_stay_allowed(tmp_path, tool):
+    """M2 must not over-block: known non-writing tools keep their pass-through
+    even when the target path would be blocked for Write/Edit."""
+    root = _project(tmp_path)
+    result = _run_hook({"tool_name": tool, "tool_input": {"file_path": "/etc/passwd"},
+                        "cwd": str(root)})
+    assert result.returncode == 0, result.stderr
+
+
+def test_outdated_helper_lib_fails_closed(tmp_path):
+    """A deployed lib/hook_common.sh without hook_known_tool_name must block
+    with a clear message instead of failing obscurely."""
+    root = _project(tmp_path)
+    hooks_dir = tmp_path / "hooks"
+    (hooks_dir / "lib").mkdir(parents=True)
+    (hooks_dir / "repo-containment.sh").write_text(
+        _HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "repo-containment-impl.sh").write_text(
+        _IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "lib" / "hook_common.sh").write_text(
+        "#!/bin/bash\n"
+        "hook_have_python() { command -v python3 >/dev/null 2>&1; }\n"
+        "hook_python_bin() { printf '%s' python3; }\n"
+        "hook_json_get() { printf '%s' \"${3:-}\"; }\n"
+        "hook_json_usable() { return 0; }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [_BASH, str(hooks_dir / "repo-containment.sh")],
+        input=json.dumps(_write_payload(root / "ok.py", root)),
+        capture_output=True, text=True, cwd=str(root),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "outdated" in result.stderr

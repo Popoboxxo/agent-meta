@@ -13,6 +13,7 @@ Run: python -m pytest tests/test_hook_common_lib.py -v
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -119,6 +120,55 @@ def test_hook_json_get_invalid_utf8_input_is_not_dropped(locale):
     assert r.stdout.startswith(b"git push "), (locale, r.stdout, r.stderr)
 
 
+# --- hook_json_usable (issue #954) ---------------------------------------
+
+def _python_shim(tmp_path: Path, body: str) -> str:
+    """A PATH whose first python3 is `body` (the shim dir only, so a second
+    real interpreter cannot rescue the probe)."""
+    d = tmp_path / "shim"
+    d.mkdir(exist_ok=True)
+    f = d / "python3"
+    f.write_text(body, encoding="utf-8")
+    f.chmod(0o755)
+    return str(d)
+
+
+def test_hook_json_usable_true_with_a_real_interpreter():
+    r = _call("hook_json_usable && echo usable || echo unusable")
+    assert r.stdout.strip() == "usable", r.stderr
+
+
+def test_hook_json_usable_rejects_an_interpreter_that_exits_non_zero(tmp_path):
+    """M3/#954: the probe default used to be the sentinel itself, so an
+    interpreter that exits 1 without output fell back to the default and
+    looked usable. The sentinel must come from the payload, never a fallback."""
+    path = _python_shim(tmp_path, "#!/bin/sh\nexit 1\n")
+    r = _call("hook_json_usable && echo usable || echo unusable", {"PATH": path})
+    assert r.stdout.strip() == "unusable", (r.stdout, r.stderr)
+
+
+def test_hook_json_usable_rejects_an_interpreter_that_prints_garbage(tmp_path):
+    path = _python_shim(tmp_path, "#!/bin/sh\necho garbage\n")
+    r = _call("hook_json_usable && echo usable || echo unusable", {"PATH": path})
+    assert r.stdout.strip() == "unusable", (r.stdout, r.stderr)
+
+
+def test_hook_json_usable_rejects_a_missing_interpreter(tmp_path):
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    r = _call("hook_json_usable && echo usable || echo unusable", {"PATH": str(empty)})
+    assert r.stdout.strip() == "unusable", (r.stdout, r.stderr)
+
+
+def test_hook_json_usable_probe_default_is_distinct_from_the_sentinel():
+    """The fallback default must not be the sentinel value the comparison
+    looks for (that equality was the M3 bug)."""
+    lib = _LIB_PATH.read_text(encoding="utf-8")
+    assert "'hook-json-bad'" in lib
+    r = _call("hook_json_get '{}' '__hook_json_probe__' 'hook-json-bad'")
+    assert r.stdout.strip() == "hook-json-bad"
+
+
 # --- hook_redact_secrets (issue #596) -------------------------------------
 
 @pytest.mark.parametrize("raw,must_not_contain", [
@@ -196,3 +246,97 @@ def test_graphify_bin_env_override_accepted_when_valid(tmp_path):
     good.chmod(0o700)
     r = _call("hook_resolve_graphify_bin", env={"GRAPHIFY_BIN": str(good), "PATH": "/usr/bin:/bin"})
     assert r.stdout.strip() == str(good)
+
+
+# --- issue #949: shared push-guard helpers --------------------------------
+
+def test_hook_protected_branches_dedupes_main_and_master():
+    """One definition for the classifier's set and the block message (#949):
+    main/master must never appear twice (#1033) and the configured main
+    branch stays first when it is a different branch."""
+    assert _call("hook_protected_branches main").stdout.strip() == "main master"
+    assert _call("hook_protected_branches master").stdout.strip() == "main master"
+    assert _call("hook_protected_branches develop").stdout.strip() == "develop main master"
+    assert _call("hook_protected_branches").stdout.strip() == "main master"
+    assert _call('hook_protected_branches ""').stdout.strip() == "main master"
+
+
+def _walk(args, opts_with_value=""):
+    """Run the emitted walk_push_args() (issue #949) on a JSON arg list and
+    return (pos, opts) as JSON-decoded Python objects."""
+    import json as _json
+
+    script = (
+        'hook_push_arg_parser_py > /dev/null\n'  # must exist and emit source
+        "{ hook_push_arg_parser_py; cat <<'PY'\n"
+        "import json, sys\n"
+        "print(json.dumps(walk_push_args(json.loads(sys.argv[1]), set(sys.argv[2].split(',')))))\n"
+        "PY\n"
+        "} | python3 - " + f"'{_json.dumps(args)}' '{opts_with_value}'\n"
+    )
+    r = _call(script)
+    assert r.returncode == 0, r.stderr
+    return tuple(_json.loads(r.stdout))
+
+
+def test_push_arg_parser_emits_python_source():
+    r = _call("hook_push_arg_parser_py | python3 -c 'import sys; compile(sys.stdin.read(), \"p\", \"exec\")'")
+    assert r.returncode == 0, r.stderr
+
+
+def test_push_arg_parser_positionals_after_double_dash():
+    pos, opts = _walk(["-f", "origin", "--", "main", "-oZ"])
+    assert pos == ["origin", "main", "-oZ"]
+    assert opts == [["-f", None, "-f"]]
+
+
+def test_push_arg_parser_long_value_forms():
+    pos, opts = _walk(["--push-option=x", "--push-option", "y", "origin"],
+                      "--push-option")
+    assert pos == ["origin"]
+    assert opts == [["--push-option", "x", "--push-option=x"],
+                    ["--push-option", "y", "--push-option"]]
+
+
+def test_push_arg_parser_short_clusters_and_o_value():
+    pos, opts = _walk(["-fv", "-o", "--tags", "origin", "-fo", "y"], "--push-option")
+    assert pos == ["origin"]
+    assert opts == [["-f", None, "-fv"], ["-v", None, "-fv"],
+                    ["-o", "--tags", "-o"], ["-f", None, "-fo"], ["-o", "y", "-fo"]]
+
+
+# --- hook_known_tool_name (review finding M2, #954 follow-up) -------------
+
+def _known(name: str) -> str:
+    return _call(
+        f"hook_known_tool_name {shlex.quote(name)} && echo known || echo unknown"
+    ).stdout.strip()
+
+
+@pytest.mark.parametrize("name", [
+    "Bash", "Write", "Edit", "Read", "Glob", "Grep", "TodoWrite", "Task",
+    "WebFetch", "WebSearch", "NotebookEdit", "MultiEdit", "Skill",
+    "mcp__playwright__browser_navigate", "mcp__reqogniloom__workspace_get",
+])
+def test_hook_known_tool_name_accepts_known_tools(name):
+    """The shared allow-list both security guards consult (M2): every name
+    either guard can receive from the claude-code-json contract, plus the
+    open-ended MCP namespace, must stay allowed."""
+    assert _known(name) == "known"
+
+
+@pytest.mark.parametrize("name", [
+    "",            # missing tool_name (or unparseable payload)
+    "garbage",     # what a broken python3 shim used to return as tool_name
+    "bash",        # raw provider-native spelling, not the hook contract
+    "write",
+    "run_command",     # Antigravity native name: the adapter normalizes it
+    "write_to_file",
+    "123",         # JSON number -> "123"
+    "True",        # JSON true
+    "mcp__",       # namespace without server/tool
+])
+def test_hook_known_tool_name_rejects_unknown_or_non_canonical(name):
+    """Anything not on the list fails closed: unknown means unclassifiable,
+    so both guards block it instead of matching their `*) exit 0` branch."""
+    assert _known(name) == "unknown"

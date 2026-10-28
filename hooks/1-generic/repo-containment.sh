@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: repo-containment
-# version: 1.0.0
+# version: 1.1.0
 # event: PreToolUse
 # matcher: ""
 # description: Confine Write/Edit/Bash file writes to repo root (+ optional .tmp sink).
@@ -44,8 +44,26 @@ if [ ! -f "$IMPL" ]; then
 fi
 
 if bash -n "$IMPL" 2>/dev/null; then
+  # Exit-status mapping (SR-B-08 / SR-B-17): the harness blocks ONLY on
+  # exit 2; every other non-zero status is a non-blocking error and the tool
+  # call proceeds. A runtime crash of impl (set -u unbound variable -> 1,
+  # signal -> 128+n, SIGPIPE -> 141) must therefore not be passed through
+  # as-is -- that would fail OPEN (the documented SR-B-17 gap: this wrapper
+  # used to `exit $?` blindly). Only a genuine 0 (allow) or 2 (block) is
+  # propagated; anything else fails CLOSED. PIPESTATUS[1] is impl's own
+  # status, so a SIGPIPE on printf (pipefail would surface it as the
+  # pipeline status) cannot mask it.
   printf '%s' "$INPUT" | bash "$IMPL"
-  exit $?
+  _STATUSES=("${PIPESTATUS[@]}")
+  _RC="${_STATUSES[1]:-unknown}"
+  case "$_RC" in
+    0) exit 0 ;;
+    2) exit 2 ;;
+    *)
+      echo "repo-containment: impl crashed rc=$_RC, failing closed (SR-B-17)." >&2
+      exit 2
+      ;;
+  esac
 fi
 
 # --- impl script is syntactically broken: narrow self-repair carve-out ---

@@ -193,7 +193,7 @@ def main() -> None:
         print(f"lifecycle-check: could not load config: {e}", file=sys.stderr)
         sys.exit(0)
 
-    triggers = config.get("lifecycle-triggers", {})
+    triggers = config.get("lifecycle-triggers", {})  # runtime-reader:lifecycle-triggers
     tasks = triggers.get(event, [])
 
     # Fall back to a built-in default task when the event is not explicitly

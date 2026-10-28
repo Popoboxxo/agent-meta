@@ -137,9 +137,10 @@ def test_hook_protects_every_python_protected_prefix(tmp_path):
 
 
 def test_hook_version_bumped_and_old_version_is_drift(tmp_path):
-    # Task 8 (fail-closed anchor rule) changed the impl logic, so the impl's
-    # self-documented rule requires a version bump: 1.1.0 -> 1.2.0.
-    assert re.search(r"^# version: 1\.2\.0$", HOOK_IMPL.read_text(encoding="utf-8"), re.M)
+    # The impl's self-documented rule requires a version bump whenever its
+    # logic changes: 1.1.0 -> 1.2.0 (Task 8, fail-closed anchor rule),
+    # 1.2.0 -> 1.3.0 (review finding M2, tool_name/payload fail-closed).
+    assert re.search(r"^# version: 1\.3\.0$", HOOK_IMPL.read_text(encoding="utf-8"), re.M)
     meta = tmp_path / "meta"
     (meta / "hooks" / "1-generic").mkdir(parents=True)
     name = HOOK_IMPL.name
@@ -149,7 +150,7 @@ def test_hook_version_bumped_and_old_version_is_drift(tmp_path):
     project = tmp_path / "project"
     hooks = project / ".claude" / "hooks"
     hooks.mkdir(parents=True)
-    old = HOOK_IMPL.read_text(encoding="utf-8").replace("# version: 1.2.0", "# version: 1.0.0", 1)
+    old = HOOK_IMPL.read_text(encoding="utf-8").replace("# version: 1.3.0", "# version: 1.0.0", 1)
     (hooks / name).write_text(old, encoding="utf-8")
     (hooks / ".agent-meta-managed").write_text(name + "\n", encoding="utf-8")
     findings = check_stale_deployed_hooks(

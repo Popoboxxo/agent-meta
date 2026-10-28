@@ -1547,9 +1547,119 @@ def test_unparseable_payload_fails_closed(raw):
     assert "not valid JSON" in result.stderr
 
 
-def test_empty_payload_is_still_a_noop():
+def test_empty_payload_fails_closed():
+    """Review finding M2: an empty payload is not a documented PreToolUse
+    event -- it used to exit 0 here ("no tool name -> allow"). The guard
+    cannot evaluate a call whose payload never arrived, so it fails closed
+    like repo-containment-impl.sh always did.
+
+    CONFLICT NOTE: this replaces the former test_empty_payload_is_still_a_noop
+    (asserted returncode 0), which pinned exactly the fail-open M2 names.
+    """
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input="", capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT), env=_clean_env(),
     )
-    assert result.returncode == 0
+    assert result.returncode == 2, result.stderr
+    assert "empty PreToolUse payload" in result.stderr
+
+
+# --- review finding M2: payload/tool_name fail-closed ----------------------
+
+def _garbage_python_env(tmp_path) -> dict:
+    """Environment whose `python3` is a shim that EXITS 0 printing junk --
+    the M2 fail-open trigger. The rest of PATH stays intact so bash/cat/
+    dirname/... still work inside the hook."""
+    shim_dir = tmp_path / "garbage-python"
+    shim_dir.mkdir()
+    shim = shim_dir / "python3"
+    shim.write_text("#!/bin/sh\necho garbage\n", encoding="utf-8")
+    shim.chmod(0o755)
+    env = _clean_env()
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def _tool_payload(tool, **extra) -> dict:
+    payload = {"tool_name": tool, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}
+    payload.update(extra)
+    return payload
+
+
+def test_garbage_python_interpreter_fails_closed(tmp_path):
+    """M2: `python3` on PATH that exits 0 printing junk made tool_name
+    'garbage', which matched `*) exit 0` -- the destructive git push below
+    went through. The shared hook_json_usable() gate must block it instead."""
+    env = _garbage_python_env(tmp_path)
+    payload = _bash_payload("git push --force origin main")
+    payload["cwd"] = _PROJECT_ROOT.as_posix()
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT), env=env,
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "does not behave like a Python interpreter" in result.stderr
+
+
+@pytest.mark.parametrize("tool", ["Frobnicate", "bash", "run_command"])
+def test_unknown_tool_name_fails_closed(tool):
+    """M2: an unrecognized tool_name used to hit `*) exit 0` (allow)."""
+    result = _run_hook(_tool_payload(tool))
+    assert result.returncode == 2, result.stderr
+    assert f"unknown tool_name '{tool}'" in result.stderr
+
+
+@pytest.mark.parametrize("payload", [
+    {"tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},                    # missing
+    {"tool_name": None, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}, # null
+    {"tool_name": ["Bash"], "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},  # array
+    {"tool_name": {"name": "Bash"}, "tool_input": {},
+     "cwd": _PROJECT_ROOT.as_posix()},                                      # object
+])
+def test_missing_or_non_scalar_tool_name_fails_closed(payload):
+    """hook_json_get reports null/object/array as "missing"; all of them, and
+    an absent key, are unclassifiable payloads and must block (M2)."""
+    result = _run_hook(payload)
+    assert result.returncode == 2, result.stderr
+    assert "no usable tool_name" in result.stderr
+
+
+@pytest.mark.parametrize("tool", [
+    "Read", "Glob", "Grep", "WebFetch", "WebSearch", "TodoWrite", "Task",
+    "Skill", "mcp__playwright__browser_navigate",
+])
+def test_known_non_mutating_tools_stay_allowed(tool):
+    """M2 must not over-block: every known non-mutating tool keeps passing
+    through untouched (this project's config has orchestrator.strict: true,
+    so the pass-through is proven under strict mode too)."""
+    result = _run_hook(_tool_payload(tool))
+    assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_outdated_helper_lib_fails_closed(tmp_path):
+    """A deployed lib/hook_common.sh from before hook_known_tool_name existed
+    (sync.py not re-run) must block with a clear message instead of failing
+    obscurely on the missing function."""
+    hooks_dir = tmp_path / "hooks"
+    (hooks_dir / "lib").mkdir(parents=True)
+    (hooks_dir / "orchestrator-guard.sh").write_text(
+        _HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "orchestrator-guard-impl.sh").write_text(
+        _IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # Pre-M2 lib surface: no hook_known_tool_name.
+    (hooks_dir / "lib" / "hook_common.sh").write_text(
+        "#!/bin/bash\n"
+        "hook_have_python() { command -v python3 >/dev/null 2>&1; }\n"
+        "hook_python_bin() { printf '%s' python3; }\n"
+        "hook_json_get() { printf '%s' \"${3:-}\"; }\n"
+        "hook_json_usable() { return 0; }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [_BASH, str(hooks_dir / "orchestrator-guard.sh")],
+        input=json.dumps(_bash_payload("git status")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "outdated" in result.stderr
+    assert "hook_common.sh" in result.stderr
