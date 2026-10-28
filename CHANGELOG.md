@@ -36,6 +36,49 @@
   `.agent-meta-managed*` in a rules dir (e.g. `.github/instructions`) are no longer reported as
   rule files. Only the file name is checked, so provider artifact (dot-)directories stay
   traversable and an explicit `path`/`path_template` target stays unfiltered by design.
+- **Created hooks are LF-deterministic (#961)**: `--create-hook` now writes through
+  `write_atomic` instead of `write_text`, which translated `\n` to `os.linesep` and landed
+  created hooks as CRLF on Windows, failing at runtime with `$'\r': command not found`.
+  `write_atomic` opens with `newline="\n"` and creates the parent directory itself, so a
+  created hook is byte-identical to the sync path; two tests in
+  `tests/test_newline_normalization.py` pin the LF write and the dry-run no-op.
+- **`dod-push-check` 2.1.7 (#949, #953, #954)**: the git-push flag/short-cluster walk and the
+  protected-branch set are built once in `lib/hook_common.sh` (`hook_push_arg_parser_py`,
+  `hook_protected_branches`) instead of twice — tag-only check vs. destination check and classifier
+  vs. block message now share the identical positionals and can no longer drift apart (#949). The
+  shared walk consumes `--recurse-submodules`' separately passed value, closing the bypass where the
+  space form (`git push --recurse-submodules on-demand origin …`) reached the submodule check with
+  `on-demand` read as the remote and was allowed while the `=` form was blocked (#953). The
+  security-critical reads fail closed: an unreadable `git config` blocks on **every** path, the
+  tag-only shortcut included — it used to inspect the config verdict *before* the config was read,
+  so `git push --tags origin` exited 0 while the same command with a readable
+  `remote.origin.push=refs/tags/v1.0.0:refs/heads/main` was blocked — and a `python3` on `PATH` that
+  exits non-zero or prints garbage is rejected instead of trusted (#954).
+- **`hook_common.sh` 1.1.0 (#949, #954)**: adds `hook_protected_branches` (one de-duplicated
+  protected-branch list, used by both the classifier's set and the block message) and
+  `hook_push_arg_parser_py` (the single git-push argument walk). `hook_json_usable` now carries its
+  probe sentinel in the payload and falls back to a **distinct** value, so an interpreter that exits
+  non-zero without output — or is missing — reads as unusable; the old probe compared the result
+  against its own fallback default, so a broken shim looked usable and the block came from the
+  payload check with a misleading message instead of the interpreter check.
+- **`dod-push-check` regression tests (#949, #951, #953, #954)**: one flag walk / one
+  protected-list builder are asserted, plus the fail-closed path for an outdated deployed lib
+  (#949); the hook tests are hermetic against a caller's `AGENT_META_*` environment, and
+  `GIT_MAIN_BRANCH` from `.meta-config/project.yaml`, `-C <other>` as a foreign repository and a
+  tag/branch name collision are covered (#951); the `--recurse-submodules` space form is pinned
+  against a real submodule (#953); the `git config`, `for-each-ref` and interpreter fail-closed
+  paths are pinned, including the tag-only variant that used to read the config verdict before the
+  read (#954).
+- **#948, #950, #952 re-checked — already fixed in 2.1.3–2.1.5**: the bug session re-reproduced the
+  unquoted word-start `#` comment, the `xargs … git push` / `{}` placeholder and the
+  `cd`-into-another-repository reports against the 2.1.5 classifier; all three were closed there.
+  No code change — the existing regression tests keep them closed.
+- **Strict-default grace holds on every read path (#1006 D2b)**: the runtime-gate readers
+  (`isolation._opencode_runtime_gate_entries`, `opencode_runtime_gate_wanted`) now hand the
+  framework root to the shared three-tier resolver, so they apply the same version-driven grace as
+  the writer instead of reporting "gate wanted" while the deny was suppressed. A missing or
+  non-UTF-8 `VERSION` counts as *inside* the window — announced, never silently hardened — so only
+  a readable version that proves the window has passed flips the implicit strict default.
 
 ## [2.0.0-beta.4] - 2026-10-26
 
