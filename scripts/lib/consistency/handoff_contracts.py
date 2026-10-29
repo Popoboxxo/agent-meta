@@ -10,6 +10,14 @@ Validates the A2A handoff wiring declared under each role's ``handoff`` block:
 
 Roles without a ``handoff`` block are skipped. ``task-spec-v1`` is produced
 by the orchestrator at runtime and is exempt from the producer check.
+
+Advisory handoffs (issue #1031): a read-only review role can declare
+``handoff.advisory: true`` in role-defaults.yaml. That is a DATA marker, not a
+role list in code: it states that the role's output contract is a report the
+orchestrator (or a human) reads, not an artifact any peer ingests as its
+``input_contract``. Only an exact ``True`` skips the ``output-not-consumed``
+warning — every other producer still needs a consuming ``target_role``, and the
+``target_roles`` existence check keeps applying.
 """
 from __future__ import annotations
 
@@ -95,8 +103,12 @@ def check_handoff_contracts(agent_meta_root: Path) -> list[Finding]:
                     f"fix the target_roles entry of '{name}'.",
                 ))
 
-        # 2b) output -> input matching among declared target_roles
-        if output_contract and targets:
+        # 2b) output -> input matching among declared target_roles.
+        # ``handoff.advisory: true`` (data, role-defaults.yaml) marks a report
+        # whose consumers are the orchestrator/human, so no peer declares it as
+        # an input_contract (issue #1031). Checked per handoff, never via a role
+        # allowlist; any non-True value leaves the gate sharp.
+        if output_contract and targets and h.get("advisory") is not True:
             consumed = any(
                 output_contract in ((_handoff(roles.get(t)) or {}).get("input_contracts") or [])
                 for t in targets
@@ -109,7 +121,8 @@ def check_handoff_contracts(agent_meta_root: Path) -> list[Finding]:
                     f"output_contract '{output_contract}' of '{name}' is not "
                     f"consumed by any target_role (possible silent handoff failure).",
                     f"Add '{output_contract}' to the input_contracts of one of: "
-                    f"{', '.join(targets)}.",
+                    f"{', '.join(targets)} — or set 'advisory: true' on this "
+                    f"handoff if the output is a report no role ingests.",
                 ))
 
         # 2c) input_contracts without producer

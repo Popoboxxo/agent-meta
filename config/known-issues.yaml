@@ -35,7 +35,10 @@
 #         # or  <capability-key>: {<capability-value>: <state>}
 #       evidence: {kind: runtime|source|docs|third-party, ref: <url|path:line>, date: YYYY-MM-DD}
 #       fix-hint: <one sentence; never applied automatically>
-#       fix-owner: agent-meta-manager|framework-issue|project-config
+#       fix-owner: agent-meta-manager|framework-issue|project-config|agent-meta
+#         agent-meta = the framework (template/sync output) must change; a
+#         consumer edit to the artifact is overwritten on the next sync, so the
+#         project cannot fix the finding itself (issue #1035).
 #       introduced-in: <agent-meta version|null>
 #       fixed-in: <agent-meta version|null>   # runner skips when VERSION >= fixed-in
 #
@@ -138,7 +141,7 @@ issues:
       context_soft_cap_chars: {4000: DOCUMENTED, 12000: UNVERIFIED}
     evidence: {kind: third-party, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.7", date: '2026-10-11'}
     fix-hint: Split the instruction file into smaller files below the limit.
-    fix-owner: project-config
+    fix-owner: agent-meta
     introduced-in: 2.0.0-beta.1
     fixed-in: null
 

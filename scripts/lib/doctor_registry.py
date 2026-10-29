@@ -21,7 +21,14 @@ _VERIFIED = {
     "UNVERIFIED",
 }
 _EVIDENCE_KINDS = {"runtime", "source", "docs", "third-party"}
-_FIX_OWNERS = {"agent-meta-manager", "framework-issue", "project-config"}
+# Fix owners: who can actually act on a finding.
+#   agent-meta-manager — a role in the consumer project (sync/config/artifacts)
+#   project-config     — the consumer's own config/content
+#   framework-issue    — needs an upstream decision/issue before it can be fixed
+#   agent-meta         — the agent-meta framework itself must change (template or
+#                        sync output); a consumer edit is overwritten on the next
+#                        sync, so there is nothing the project can do (issue #1035)
+_FIX_OWNERS = {"agent-meta-manager", "framework-issue", "project-config", "agent-meta"}
 _PRED_OPS = {"present", "absent", "eq", "ne", "truthy", "falsy", "in", "gt", "lt"}
 _OPS_WITH_VALUE = {"eq", "ne", "in", "gt", "lt"}
 _ARTIFACTS = {

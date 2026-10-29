@@ -173,6 +173,10 @@ def test_seed_formalisations(registry):
     assert soft["verified-state"] == "UNVERIFIED"
     assert soft["verified-state-by-capability"] == {
         "context_soft_cap_chars": {4000: "DOCUMENTED", 12000: "UNVERIFIED"}}
+    # Issue #1035: the file is written by sync.py and a consumer edit is
+    # overwritten on the next run, so the owner is the framework itself.
+    assert soft["fix-owner"] == "agent-meta"
+    assert soft["target"] == {"artifact": "rules_dir"}
 
     surf = seeds["surface-unverified"]
     assert surf["detector"]["key"] == "surface_verified_state.*"
@@ -283,6 +287,27 @@ def test_variable_unreferenced_message_binds_length(registry):
 def test_evidence_dates_not_in_future(registry):
     for e in registry["issues"]:
         assert date.fromisoformat(str(e["evidence"]["date"])) <= date.today()
+
+
+# ------------------------------------------------- fix-owner (issue #1035)
+
+def test_agent_meta_is_an_accepted_fix_owner(registry):
+    """A framework-owned finding validates without a registry-invalid finding."""
+    entry = _sample(registry)
+    entry["fix-owner"] = "agent-meta"
+    assert validate_entry(entry, _load_context()) == []
+
+
+def test_generated_artifacts_are_owned_by_the_framework(registry):
+    """Fully sync-written artifacts cannot be fixed by the consumer project."""
+    generated = {"rules_dir", "agents_dir", "skills_dir"}
+    owners = {
+        e["id"]: e["fix-owner"] for e in registry["issues"]
+        if e["target"]["artifact"] in generated
+    }
+    assert owners, "fixture assumption: the registry targets generated dirs"
+    assert "project-config" not in set(owners.values()), owners
+    assert owners["instruction-soft-cap-chars"] == "agent-meta"
 
 
 # ------------------------------------------------------ validator self-checks

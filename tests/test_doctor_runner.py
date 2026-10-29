@@ -342,6 +342,18 @@ def test_file_size_lines(tmp_path, monkeypatch):
     assert finding.verified_state == "DOCUMENTED"
 
 
+def test_instruction_soft_cap_is_owned_by_the_framework(tmp_path, monkeypatch):
+    """Issue #1035: the instruction file is written by sync.py, so a consumer
+    edit is overwritten on the next sync and the registry owner must be the
+    framework itself, not the project config."""
+    ids = real("instruction-soft-cap-chars")
+    put(tmp_path, ".github/instructions/a2a-delegation-gates.instructions.md", "x" * 6972)
+    (finding,) = run(tmp_path, monkeypatch, ids, providers=("Copilot",)).findings
+    assert finding.issue_id == "instruction-soft-cap-chars"
+    assert finding.severity is Severity.WARNING
+    assert finding.fix_owner == "agent-meta"
+
+
 # ---------------------------------------------------------------- kind: regex
 
 def test_regex_agent_name_suffix(tmp_path, monkeypatch):

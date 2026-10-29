@@ -1,3 +1,9 @@
+# `handoff.advisory: true` marks a review role whose output contract is a
+# report for the orchestrator/human, not an artifact any peer ingests as an
+# `input_contract`. scripts/lib/consistency/handoff_contracts.py skips
+# `handoff.output-not-consumed` only for a handoff carrying this data flag
+# (never for a role allowlist in code, issue #1031); every other producer must
+# still be consumed by one of its declared `target_roles`.
 roles:
   orchestrator:
     model: balanced
@@ -2395,6 +2401,7 @@ roles:
       target_roles:
       - rag-engineer
       - knowledge-curator
+      advisory: true
     short_desc: 'Agent memory architecture: consolidation, retrieval quality, forgetting, write/read separation'
   context-engineer:
     model: balanced
@@ -2413,6 +2420,7 @@ roles:
       output_contract: context-budget-report-v1
       target_roles:
       - agent-meta-manager
+      advisory: true
     short_desc: 'Context budget: instruction hierarchy, compaction, what enters the window and what does not'
   red-team-agent:
     model: balanced
@@ -2432,6 +2440,7 @@ roles:
       target_roles:
       - prompt-engineer
       - ai-security-guardian
+      advisory: true
     short_desc: 'Adversarial prompt red-teaming against own systems: injection, jailbreak, tool misuse'
   secrets-manager:
     model: balanced
@@ -2451,6 +2460,7 @@ roles:
       target_roles:
       - devops-engineer
       - security-auditor
+      advisory: true
     short_desc: 'Secret lifecycle: creation, storage, rotation, revocation, leak handling — references only'
   chaos-engineer:
     model: balanced
@@ -2470,6 +2480,7 @@ roles:
       target_roles:
       - sre-engineer
       - incident-responder
+      advisory: true
     short_desc: 'Failure injection with hypothesis, steady-state and kill switch — never production by default'
   reproducible-builds-engineer:
     model: balanced
@@ -2489,6 +2500,7 @@ roles:
       target_roles:
       - devops-engineer
       - release
+      advisory: true
     short_desc: 'Build determinism and provenance: double-build byte compare, SBOM, non-determinism sources'
   ux-researcher:
     model: balanced
@@ -2508,6 +2520,7 @@ roles:
       target_roles:
       - product-manager
       - ui-ux-designer
+      advisory: true
     short_desc: 'User research discipline: past behaviour over opinion, sample and bias stated, findings as hypotheses'
   privacy-compliance-officer:
     model: balanced
@@ -2527,6 +2540,7 @@ roles:
       target_roles:
       - ai-governance-engineer
       - app-lifecycle-governor
+      advisory: true
     short_desc: 'GDPR and AI-Act obligations: legal basis, minimisation, retention, transparency, oversight'
 activation_groups:
   se:
