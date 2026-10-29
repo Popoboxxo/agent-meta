@@ -206,6 +206,10 @@
         "short": {
           "type": "string",
           "description": "Short project name for display (e.g. 'my-plugin')."
+        },
+        "description": {
+          "type": "string",
+          "description": "One-line project description. Seeds PROJECT_DESCRIPTION (and, via fallback, PROJECT_GOAL/PROJECT_CONTEXT) unless those are set explicitly under variables: (issue #1037)."
         }
       },
       "required": [

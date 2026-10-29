@@ -59,6 +59,9 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "BUILD_OUTPUT", "ARTIFACT_ZIP_CMD", "ARTIFACT_TAR_CMD", "GH_ASSETS",
     "REQUIRED_BINARIES_SECTION", "BINARY_INSTALL_STEPS", "REQUIRED_BINARY_NAMES",
     "BUILD_SYSTEM_NOTES", "VERSION_DIST_BEHAVIOUR",
+    # TECH_STACK: sharkord-platform project variable (release-notes tech stack),
+    # derived from PROJECT_LANGUAGES by build_variables when unset (issue #983)
+    "TECH_STACK",
     # Misc
     "SYSTEM_DEPENDENCIES", "SYSTEM_URLS",
     # Orchestrator (injected by build_variables)
@@ -272,11 +275,11 @@ _BUILDER_INTERNAL_KEYS: frozenset[str] = frozenset({"active_agents", "active_age
 
 # Ratchet (shrink only): template placeholders neither builder-derived nor
 # registered. SKILL_* and MCP_GUARDRAILS_LIST are covered by _DYNAMIC_PREFIXES.
-# TECH_STACK / AGENT_RULES / EXTERNAL_DOCS_LANGUAGE: no filler found - possible
-# defect or reference example (follow-up issue).
-_UNKNOWN_TEMPLATE_RATCHET: frozenset[str] = frozenset({
-    "TECH_STACK", "AGENT_RULES", "EXTERNAL_DOCS_LANGUAGE",
-})
+# Emptied by issue #983: TECH_STACK is a builder-derived project variable (see
+# _BUILTIN_VARS), AGENT_RULES / EXTERNAL_DOCS_LANGUAGE were reference examples
+# in the non-deployable agents/1-generic/_reference-agent.md and are escaped
+# there ({{%VAR%}} renders literally). Nothing may be added back.
+_UNKNOWN_TEMPLATE_RATCHET: frozenset[str] = frozenset()
 
 
 def derive_builder_vars(agent_meta_root: Path) -> set[str]:

@@ -45,6 +45,8 @@ project:
   name: mein-projekt               # Vollständiger Projektname (z.B. sharkord-mein-plugin)
   prefix: mp                       # Kürzel, max 5 Zeichen (z.B. mp für mein-plugin)
   short: mein-plugin               # Kurzname ohne Plattform-Prefix
+  # description: Kurzbeschreibung des Projekts.   # Optional (Issue #1037):
+  # speist {{PROJECT_DESCRIPTION}} und via Fallback {{PROJECT_GOAL}}/{{PROJECT_CONTEXT}}.
 
 # Kommunikationsstil: "full" (Default), "short", "childish", "caveman", "asozial", "submissive"
 # speech-mode: full

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 
 from .io import SyncError
 from .log import SyncLog
@@ -68,6 +69,111 @@ _BOOLEAN_SUBAGENT_PERMISSION_FLAGS: frozenset[str] = frozenset({
 # inner whitespace. Group 1 captures the name (contract of the shared
 # substitution core, issue #476).
 _VAR_PATTERN = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
+
+#: D3(a) grace window — pure data, version-driven, provider-agnostic.
+#:
+#: A placeholder that is *referenced* in a template but *not defined* (no
+#: variable builder, no project `variables:` entry) must fail the sync instead
+#: of shipping a literal token (agents) or dropping the line (context files,
+#: `context.omit_unresolved_placeholder_lines`). Making that an immediate hard
+#: error would break every existing project that carries such a token today, so
+#: it is announced for one minor release: until this version the render only
+#: warns *and names the future error verbatim*; from this version on it raises
+#: `SyncError` (issue #983 / D3(a)). The release that makes it hard only moves
+#: this tuple — there is no provider- or role-specific branch anywhere.
+_UNRESOLVED_PLACEHOLDER_GRACE_UNTIL: tuple[int, int, int] = (2, 1, 0)
+
+
+def framework_root() -> Path:
+    """The agent-meta checkout root that contains this module (stdlib only).
+
+    ``scripts/lib/variables.py`` → ``parents[2]`` is the checkout root, which is
+    the repository root when self-hosting and the ``.agent-meta/`` submodule
+    checkout when embedded. Used to read ``VERSION`` for grace windows.
+    """
+    return Path(__file__).resolve().parents[2]
+
+
+def _version_tuple(raw: str) -> tuple[int, int, int]:
+    """Lenient ``MAJOR.MINOR.PATCH`` parse; unparsable parts count as ``0``."""
+    parts: list[int] = []
+    for chunk in str(raw).strip().lstrip("vV").split(".")[:3]:
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return (parts[0], parts[1], parts[2])
+
+
+def grace_window_active(agent_meta_root: Path | None,
+                        until: tuple[int, int, int]) -> bool:
+    """True while *until* lies in the future (the announced grace still runs).
+
+    The decision is data: ``<agent_meta_root>/VERSION`` against *until*. A
+    missing or unreadable ``VERSION`` counts as INSIDE the window — silently
+    hardening an installation whose version cannot be read is exactly the
+    unannounced behaviour change a grace window rules out. ``agent_meta_root is
+    None`` is ``False`` (no installation, no version, nothing to announce).
+    """
+    if agent_meta_root is None:
+        return False
+    try:
+        raw = (Path(agent_meta_root) / "VERSION").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return True
+    return _version_tuple(raw) < tuple(until)
+
+
+def unresolved_placeholder_grace_active(
+    agent_meta_root: Path | None = None,
+) -> bool:
+    """True while an undefined placeholder warns instead of aborting (D3(a))."""
+    root = framework_root() if agent_meta_root is None else Path(agent_meta_root)
+    return grace_window_active(root, _UNRESOLVED_PLACEHOLDER_GRACE_UNTIL)
+
+
+def unknown_placeholder_error_text(key: str, source_label: str) -> str:
+    """The ONE error text for an undefined placeholder (announced in the WARN)."""
+    return (f"Unknown placeholder {{{{{key}}}}} in {source_label} — "
+            f"not found in config variables.")
+
+
+def unresolved_placeholder_notice(key: str, source_label: str) -> str:
+    """The D3(a) grace WARN: states the behaviour AND the future error verbatim."""
+    until = ".".join(str(part) for part in _UNRESOLVED_PLACEHOLDER_GRACE_UNTIL)
+    error_text = unknown_placeholder_error_text(key, source_label)
+    return (
+        f"Variable {key} not in config — placeholder remains in: {source_label}. "
+        f"D3(a) grace: until {until} this only warns; from {until} it aborts the "
+        f"sync with SyncError: \"{error_text}\" "
+        f"Add '{key}' under variables: in .meta-config/project.yaml, or fix the "
+        f"spelling."
+    )
+
+
+def _placeholder_keep(matched: str, key: str, source_label: str,
+                      strict: bool, log: SyncLog | None) -> str:
+    """PAL_* pass-through, then hard error / grace WARN / literal keep.
+
+    Shared by both substitution engines (``substitute()`` here and
+    ``context_templates.builder.TemplateBuilder.resolve_variables``) so the
+    grace decision and the error text cannot drift apart.
+
+    ``substitute()`` only reaches this helper for tokens that survive the
+    conditional strip (it probes the stripped text without rewriting its
+    output), so a token inside an inactive ``{{#if}}``/``{{#unless}}`` block is
+    never evaluated: it cannot warn and cannot abort once the grace window
+    closes. The builder engine resolves conditionals before variables for the
+    same reason.
+    """
+    if key.startswith("PAL_"):
+        return matched
+    if strict or not unresolved_placeholder_grace_active():
+        raise SyncError(unknown_placeholder_error_text(key, source_label))
+    if log is not None:
+        log.warn(unresolved_placeholder_notice(key, source_label))
+    return matched
+
 
 _LINE_LEADING_WS_RE = re.compile(r"^[ \t]*\Z")
 
@@ -461,7 +567,22 @@ def substitute(
             instead of warning and leaving it unsubstituted. Escaped
             placeholders ({{%VAR%}}) and PAL_* placeholders are never
             considered "unknown" — they are exempt in both modes.
-            Default False preserves the historic warn-and-continue behavior.
+            Default False keeps the announce-then-harden behaviour: while the
+            D3(a) grace window runs (``_UNRESOLVED_PLACEHOLDER_GRACE_UNTIL``)
+            an undefined placeholder warns and names the future error verbatim;
+            once the window has passed the call raises that same SyncError
+            (issue #983).
+
+    D3(a) live-output guarantee: a placeholder is only evaluated against the
+    text that survives conditional stripping. The liveness probe runs the same
+    ``strip_inactive_conditional_blocks`` engine on the input and never
+    changes the returned text — order-sensitive callers (``agent_sync`` runs
+    the PAL deck engine between substitute and strip, issue #277) keep their
+    historic substitute-then-strip behaviour byte-for-byte. A token that
+    cannot reach the output (e.g. ``{{PIPELINE_DETAILS_DIR}}`` in the
+    ``ORCH_MODE_MAIN_CHAT`` branch of ``use-orchestrator.md`` for a strict-mode
+    project) therefore never warns and never aborts, while a token in live
+    output still does.
     """
     # First pass: protect escaped literals {{%VAR%}} with unique sentinel
     _SENTINEL = "\x00ESC\x00"
@@ -472,6 +593,23 @@ def substitute(
         return f"{_SENTINEL}{len(escaped) - 1}{_SENTINEL}"
 
     text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", stash_escape, text)
+
+    # Liveness probe for the D3(a) decision (issue #983 follow-up): a token
+    # that sits only in an inactive {{#if}}/{{#unless}} block is dropped by the
+    # caller's conditional strip and never reaches the output, so it must not
+    # warn now / abort once `_UNRESOLVED_PLACEHOLDER_GRACE_UNTIL` passes. The
+    # probe is computed lazily (only when an unresolved token triggers `keep`)
+    # and never rewrites `text`: order-sensitive callers (agent_sync runs the
+    # PAL engine between substitute and strip, issue #277) stay byte-identical.
+    _live_text_cache: list[str] = []
+
+    def _survives_conditional_strip(matched: str) -> bool:
+        if "{{#if" not in text and "{{#unless" not in text:
+            return True
+        if not _live_text_cache:
+            _live_text_cache.append(
+                strip_inactive_conditional_blocks(text, variables))
+        return matched in _live_text_cache[0]
 
     # Second pass: substitute real {{VAR}} placeholders via the shared
     # escape-safe core (issue #476). PAL_* placeholders are handled by the
@@ -487,14 +625,9 @@ def substitute(
     def keep(matched: str, key: str) -> str:
         if key.startswith("PAL_"):
             return matched
-        if strict:
-            raise SyncError(
-                f"Unknown placeholder {{{{{key}}}}} in {source_label} — "
-                f"not found in config variables (strict mode)."
-            )
-        if log:
-            log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
-        return matched
+        if not _survives_conditional_strip(matched):
+            return matched
+        return _placeholder_keep(matched, key, source_label, strict, log)
 
     text = substitute_placeholders(
         text, _VAR_PATTERN, lookup, keep, _reindent_to_placeholder
@@ -507,4 +640,157 @@ def substitute(
     return text
 
 
+# --- AGENT_META_REPO derivation (issue #1037) ------------------------------
+# AGENT_META_REPO (owner/repo of the agent-meta upstream) is used by the
+# meta-feedback/agent-meta-scout/documenter templates. It used to be reachable
+# only through an explicit project.yaml `variables:` entry (the --setup wizard
+# writes one), so a hand-written project shipped the literal token (27x per
+# 9-provider sync). The slug is derivable — no guesswork, no hardcoded fork
+# default: the embedded submodule URL or the checkout's own git remote.
 
+_SLUG_PART_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_GITMODULE_SECTION_RE = re.compile(r'^\[submodule\s+"([^"]+)"\]$')
+_GIT_REMOTE_SECTION_RE = re.compile(r'^\[remote\s+"([^"]+)"\]$')
+_GITDIR_POINTER_RE = re.compile(r"^gitdir:\s*(.+)$")
+
+
+def parse_repo_slug(url: str) -> str:
+    """``owner/repo`` from a git URL; ``""`` when no slug can be parsed.
+
+    Handles ``https://host/owner/repo(.git)``, ``ssh://git@host[:port]/owner/
+    repo``, the scp-like ``git@host:owner/repo`` and a bare ``owner/repo``.
+    """
+    raw = str(url or "").strip().rstrip("/")
+    if not raw:
+        return ""
+    if raw.endswith(".git"):
+        raw = raw[:-4]
+    # scp-like 'git@host:owner/repo' — everything after the FIRST colon is the
+    # path. Only when there is no scheme, otherwise the colon belongs to it.
+    if "://" not in raw and ":" in raw:
+        raw = raw.split(":", 1)[1]
+    parts = [part for part in raw.split("/") if part]
+    if len(parts) < 2:
+        return ""
+    owner, repo = parts[-2], parts[-1]
+    if not (_SLUG_PART_RE.fullmatch(owner) and _SLUG_PART_RE.fullmatch(repo)):
+        return ""
+    return f"{owner}/{repo}"
+
+
+def _ini_sections(text: str) -> dict[str, dict[str, str]]:
+    """Minimal INI reader for ``.git/config`` (stdlib only).
+
+    Section names keep their quoting as written (``remote "origin"``) so the
+    caller can match the sub-section verbatim; keys are lower-cased.
+    """
+    sections: dict[str, dict[str, str]] = {}
+    current: dict[str, str] | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", ";")):
+            continue
+        if stripped.startswith("[") and stripped.endswith("]"):
+            current = sections.setdefault(stripped[1:-1].strip(), {})
+            continue
+        if current is not None and "=" in stripped:
+            key, _, value = stripped.partition("=")
+            current[key.strip().lower()] = value.strip()
+    return sections
+
+
+def _parse_gitmodules(text: str) -> list[tuple[str, str]]:
+    """``(path, url)`` pairs of a ``.gitmodules`` body."""
+    pairs: list[tuple[str, str]] = []
+    current: dict[str, str] | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _GITMODULE_SECTION_RE.match(stripped):
+            if current is not None:
+                pairs.append((current.get("path", ""), current.get("url", "")))
+            current = {}
+            continue
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if current is not None:
+                pairs.append((current.get("path", ""), current.get("url", "")))
+            current = None
+            continue
+        if current is not None and "=" in stripped:
+            key, _, value = stripped.partition("=")
+            current[key.strip().lower()] = value.strip()
+    if current is not None:
+        pairs.append((current.get("path", ""), current.get("url", "")))
+    return [(path, url) for path, url in pairs if path or url]
+
+
+def _git_remote_url(checkout_root: Path, remote: str = "origin") -> str:
+    """URL of *remote* from the checkout's git config, or ``""``.
+
+    A submodule checkout has a ``.git`` *file* holding a ``gitdir:`` pointer
+    into the superproject's ``.git/modules/<name>``; the config that carries
+    the submodule's own remote lives there. Unreadable/missing → ``""``.
+    """
+    marker = Path(checkout_root) / ".git"
+    git_dir: Path | None = None
+    try:
+        if marker.is_dir():
+            git_dir = marker
+        elif marker.is_file():
+            match = _GITDIR_POINTER_RE.match(
+                marker.read_text(encoding="utf-8").strip())
+            if match:
+                pointer = match.group(1).strip()
+                git_dir = (Path(checkout_root) / pointer).resolve()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    if git_dir is None:
+        return ""
+    try:
+        config_text = (git_dir / "config").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    for section, values in _ini_sections(config_text).items():
+        match = _GIT_REMOTE_SECTION_RE.match(f"[{section}]")
+        if match and match.group(1) == remote:
+            return values.get("url", "")
+    return ""
+
+
+def derive_agent_meta_repo(
+    agent_meta_root: Path,
+    project_root: Path | None = None,
+    rel_path: str = "",
+) -> str:
+    """Derive the ``owner/repo`` slug of the agent-meta upstream, or ``""``.
+
+    Sources, in order:
+
+    1. ``<project_root>/.gitmodules`` — the submodule whose ``path`` matches
+       the embedded checkout (*rel_path*, e.g. ``.agent-meta``), otherwise the
+       single submodule whose URL names agent-meta.
+    2. the agent-meta checkout's own git remote ``origin`` (self-hosting:
+       ``<root>/.git/config``; embedded: the ``gitdir:`` pointer target).
+
+    Returns ``""`` when neither source yields a slug: the caller reports the
+    miss instead of emitting a guessed/forked repository. An explicit
+    ``variables.AGENT_META_REPO`` entry always wins upstream of this helper.
+    """
+    want_path = (rel_path or "").strip().strip("/")
+    gitmodules = (Path(project_root) / ".gitmodules") if project_root else None
+    if gitmodules is not None and gitmodules.is_file():
+        try:
+            pairs = _parse_gitmodules(gitmodules.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            pairs = []
+        if want_path:
+            for path, url in pairs:
+                if path.strip().strip("/") == want_path:
+                    slug = parse_repo_slug(url)
+                    if slug:
+                        return slug
+        named = [parse_repo_slug(url) for _path, url in pairs
+                 if "agent-meta" in str(url)]
+        named = [slug for slug in named if slug]
+        if len(named) == 1:
+            return named[0]
+    return parse_repo_slug(_git_remote_url(Path(agent_meta_root)))

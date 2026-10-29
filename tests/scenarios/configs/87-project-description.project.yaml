@@ -1,0 +1,33 @@
+agent-meta-version: "2.0.0-beta.4"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+- meta-feedback
+project:
+  name: scenario-project-description
+  prefix: s87
+  short: project-description
+  description: Description seeded from the project block (issue #1037).
+variables:
+  # Deliberately NO PROJECT_DESCRIPTION entry: it must be seeded from
+  # project.description. AGENT_META_REPO is omitted too — it must be derived
+  # from the checkout (issue #1037), not shipped as a literal token.
+  PROJECT_GOAL: Verify project.description seeds PROJECT_DESCRIPTION and AGENT_META_REPO resolves without a variables entry.
+  PROJECT_LANGUAGES: Python
+  DOCS_LANGUAGE: Englisch
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-project-description
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

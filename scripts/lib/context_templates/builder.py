@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from ..frontmatter import strip_frontmatter
 from ..substitution import constant_lookup, substitute_placeholders
+from ..variables import _placeholder_keep
 
 if TYPE_CHECKING:
     from ..log import SyncLog
@@ -217,10 +218,14 @@ class TemplateBuilder:
             stripped = name.strip()
             if stripped.startswith("PAL_"):
                 return matched
-            if self._log is not None:
-                self._log.warn(f"Variable {stripped} not in config — placeholder remains")
-            # Unresolved names keep their placeholder form, rebuilt from the
-            # stripped name (whitespace variants collapse to {{NAME}}).
+            # Undefined placeholders follow the SAME D3(a) policy as
+            # variables.substitute() (shared helper): grace WARN while the
+            # version window runs, hard SyncError afterwards. The placeholder
+            # form is rebuilt from the stripped name so whitespace variants
+            # collapse to {{NAME}} when kept.
+            _placeholder_keep(
+                f"{{{{{stripped}}}}}", stripped,
+                f"{self.templates_dir} (context template)", False, self._log)
             return f"{{{{{stripped}}}}}"
 
         template_str = substitute_placeholders(template_str, _PLACEHOLDER_RE, lookup, keep)

@@ -167,3 +167,4 @@ so), kein Scenario-Bug.
 | 84 | `84-reproducible-builds-engineer-role` | neue Rolle `reproducible-builds-engineer` (Review-Runde 2, IC-28) |
 | 85 | `85-ux-researcher-role` | neue Rolle `ux-researcher` (Review-Runde 2, IC-28) |
 | 86 | `86-privacy-compliance-officer-role` | neue Rolle `privacy-compliance-officer` (Review-Runde 2, IC-28) |
+| 87 | `87-project-description` | `project.description` seedet `PROJECT_DESCRIPTION` (Issue #1037): Beschreibung landet in CLAUDE.md/AGENTS.md, kein literales Token; `AGENT_META_REPO` wird ohne `variables:`-Eintrag aus dem Checkout abgeleitet |

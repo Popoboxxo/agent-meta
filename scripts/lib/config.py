@@ -28,6 +28,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     _resolve_orch_mode,
     _subagent_permission_flags,
     _VALID_SUBAGENT_PERMISSION_MODES,
+    derive_agent_meta_repo,
     normalize_subagent_permission_mode,
     repo_containment_variables,
     strip_inactive_conditional_blocks,  # noqa: F401
@@ -1348,6 +1349,17 @@ def _build_core_variables(
     variables["PREFIX"]       = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
     variables["PROJECT_NAME"]  = project.get("name", "")
+    # PROJECT_DESCRIPTION (issue #1037): `project.description` is the project's
+    # own one-liner and the documented source of {{PROJECT_DESCRIPTION}}; it
+    # used to be reachable only through an explicit variables: entry, so a
+    # project that set just `project: {name, description}` shipped the literal
+    # token into CLAUDE.md/AGENTS.md. An explicit variables.PROJECT_DESCRIPTION
+    # (loaded below) still wins. Deliberately NOT an empty-string fallback: with
+    # neither source set the placeholder stays undefined so the D3(a) grace WARN
+    # reports it instead of rendering a silently blank field.
+    _project_description = project.get("description")
+    if _project_description:
+        variables["PROJECT_DESCRIPTION"] = str(_project_description)
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"]    = _resolve_agent_meta_date(agent_meta_root)
     if project_root is not None:
@@ -1400,6 +1412,26 @@ def _build_core_variables(
     variables.setdefault("GIT_PLATFORM", _git_cfg.get("platform", "GitHub"))
     variables.setdefault("GIT_REMOTE_URL", _git_cfg.get("remote-url", ""))
     variables.setdefault("GIT_MAIN_BRANCH", _git_cfg.get("main-branch", "main"))
+    # AGENT_META_REPO (issue #1037): the upstream owner/repo is derivable from
+    # the embedded submodule URL (.gitmodules) or from the agent-meta checkout's
+    # own git remote, so a project that never ran `--setup` resolves
+    # {{AGENT_META_REPO}} instead of shipping the literal token (27x in a
+    # 9-provider sync). An explicit variables.AGENT_META_REPO entry (loaded
+    # above) always wins. D2: a missing key is a WARN — when neither source
+    # yields a slug the key stays unset and the miss is reported here; there is
+    # deliberately no "assume upstream" default, which would be wrong for forks.
+    if not variables.get("AGENT_META_REPO"):
+        _derived_repo = derive_agent_meta_repo(
+            agent_meta_root, project_root,
+            variables.get("AGENT_META_REL_PATH", ""))
+        if _derived_repo:
+            variables["AGENT_META_REPO"] = _derived_repo
+        else:
+            unmapped.append(
+                "variables.agent-meta-repo-unresolved: AGENT_META_REPO could not "
+                "be derived from .gitmodules or the agent-meta git remote — set "
+                "it under variables: in .meta-config/project.yaml"
+            )
     # Optional, project-specific string variables (#425): unlike ARCHITECTURE/
     # DEV_COMMANDS below, an empty-string fallback is wrong here because the
     # referencing templates interpolate the value inline (e.g.
@@ -1479,6 +1511,15 @@ def _build_core_variables(
         variables["PROJECT_CONTEXT"] = variables.get("PROJECT_DESCRIPTION", "")
     variables.setdefault("ARCHITECTURE", "")
     variables.setdefault("DEV_COMMANDS", "")
+    # TECH_STACK (issue #983): project variable of the sharkord platform layer
+    # (the "Tech Stack" block of the generated release notes, documented in
+    # agents/2-platform/sharkord-release.md). It had no filler, so the token
+    # shipped literally; the declared language set is the closest existing value
+    # and serves as the derived fallback. An explicit variables.TECH_STACK wins;
+    # with no PROJECT_LANGUAGES either the key stays undefined so the D3(a)
+    # grace WARN reports it rather than substituting a blank "Tech stack:" line.
+    if variables.get("PROJECT_LANGUAGES"):
+        variables.setdefault("TECH_STACK", variables["PROJECT_LANGUAGES"])
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
     # COMPACT_MODE / CONTEXT_PROFILE (issue #540 + IC-02): derived from the
