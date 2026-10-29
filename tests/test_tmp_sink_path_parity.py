@@ -139,8 +139,14 @@ def test_hook_protects_every_python_protected_prefix(tmp_path):
 def test_hook_version_bumped_and_old_version_is_drift(tmp_path):
     # The impl's self-documented rule requires a version bump whenever its
     # logic changes: 1.1.0 -> 1.2.0 (Task 8, fail-closed anchor rule),
-    # 1.2.0 -> 1.3.0 (review finding M2, tool_name/payload fail-closed).
-    assert re.search(r"^# version: 1\.3\.0$", HOOK_IMPL.read_text(encoding="utf-8"), re.M)
+    # 1.2.0 -> 1.3.0 (review finding M2, tool_name/payload fail-closed),
+    # 1.3.0 -> 1.4.0 (#944: heredoc scanning, detector fail-closed, fixed jail
+    # root, in-place/destination flags, PyYAML warning),
+    # 1.4.0 -> 1.4.1 (review finding F5: an unresolvable fixed jail root
+    # fails closed instead of degrading to the payload anchor),
+    # 1.4.1 -> 1.5.0 (shared command-word resolver: wrapper `--`, case arms,
+    # function bodies, grouping and if/for bodies no longer hide a write).
+    assert re.search(r"^# version: 1\.5\.0$", HOOK_IMPL.read_text(encoding="utf-8"), re.M)
     meta = tmp_path / "meta"
     (meta / "hooks" / "1-generic").mkdir(parents=True)
     name = HOOK_IMPL.name
@@ -150,7 +156,7 @@ def test_hook_version_bumped_and_old_version_is_drift(tmp_path):
     project = tmp_path / "project"
     hooks = project / ".claude" / "hooks"
     hooks.mkdir(parents=True)
-    old = HOOK_IMPL.read_text(encoding="utf-8").replace("# version: 1.3.0", "# version: 1.0.0", 1)
+    old = HOOK_IMPL.read_text(encoding="utf-8").replace("# version: 1.5.0", "# version: 1.0.0", 1)
     (hooks / name).write_text(old, encoding="utf-8")
     (hooks / ".agent-meta-managed").write_text(name + "\n", encoding="utf-8")
     findings = check_stale_deployed_hooks(

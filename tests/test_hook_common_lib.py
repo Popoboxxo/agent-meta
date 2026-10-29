@@ -340,3 +340,341 @@ def test_hook_known_tool_name_rejects_unknown_or_non_canonical(name):
     """Anything not on the list fails closed: unknown means unclassifiable,
     so both guards block it instead of matching their `*) exit 0` branch."""
     assert _known(name) == "unknown"
+
+
+# --- hook_is_meta_submodule_dir (issue #943 (l)) --------------------------
+
+@pytest.mark.parametrize("path", [
+    "/home/u/project/.agent-meta",
+    "/home/u/project/.agent-meta/",
+    "/home/u/project/external/agent-meta",
+    "/home/u/project/external/agent-meta/",
+])
+def test_hook_is_meta_submodule_dir_accepts_nested_meta_checkouts(path):
+    """A nested agent-meta checkout carries its own .meta-config/ and must not
+    win the project-root walk-up over the enclosing project."""
+    assert _call(f"hook_is_meta_submodule_dir {shlex.quote(path)} && echo yes || echo no"
+                 ).stdout.strip() == "yes"
+
+
+@pytest.mark.parametrize("path", [
+    "", "/home/u/project", "/home/u/project/external/other",
+    "/home/u/agent-meta", "/home/u/project/.agent-meta-copy",
+])
+def test_hook_is_meta_submodule_dir_rejects_everything_else(path):
+    assert _call(f"hook_is_meta_submodule_dir {shlex.quote(path)} && echo yes || echo no"
+                 ).stdout.strip() == "no"
+
+
+# --- hook_shell_scan_py (issues #943 (a)/(c)/(j), #944 SR-B-16) -----------
+
+def _shell_scan_source() -> str:
+    r = _call("hook_shell_scan_py")
+    assert r.returncode == 0, r.stderr
+    assert "def split_shell_statements" in r.stdout
+    return r.stdout
+
+
+def _scan(code: str) -> subprocess.CompletedProcess:
+    """Run `code` with the emitted scanner definitions in scope."""
+    return subprocess.run(
+        [sys.executable, "-c", _shell_scan_source() + "\n" + code],
+        capture_output=True, text=True,
+    )
+
+
+def test_shell_scan_py_emits_compilable_source():
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
+        input=_shell_scan_source(), capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("command,expected", [
+    # An operator inside quotes is text, not a statement separator (#943 (j)).
+    ('echo "a; git push --force b"', [('echo "a; git push --force b"', [])]),
+    # A heredoc body is prose and is attached to the opening statement
+    # (#944 SR-B-16); a real command after the terminator still appears.
+    ("cat <<'EOF'\nfoo; git push --force\nEOF",
+     [("cat <<'EOF'", ["foo; git push --force"])]),
+    ("cat <<'EOF'\nfoo\nEOF\ngit push --force",
+     [("cat <<'EOF'", ["foo"]), ("git push --force", [])]),
+    # Backslash-newline joins the physical lines (#943 (c)).
+    ("git push \\\n--force origin main", [("git push --force origin main", [])]),
+    # A comment is not code (the sentinel line disappears; the next line stays).
+    ("#agent-meta:agent=git\ngit commit -m x", [("git commit -m x", [])]),
+    # Parentheses stay part of the statement; tokens_of splits them later.
+    ("(git push --force)", [("(git push --force)", [])]),
+    # Operators inside a command substitution do not split the outer command.
+    ('echo "$(git push --force)"', [('echo "$(git push --force)"', [])]),
+])
+def test_split_shell_statements_semantics(command, expected):
+    r = _scan(
+        "import json, sys\n"
+        f"print(json.dumps(split_shell_statements({command!r})))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    assert [tuple(x) for x in eval(r.stdout)] == expected  # noqa: S307 - test data
+
+
+def test_fork_bomb_detection_is_linear_on_a_300kb_identifier():
+    """Issue #943 (a): the old regex was quadratic on long identifier chains
+    (20 KB ~ 5 s), so the hook timeout silently disabled the gate. The shared
+    scanner must classify 300 KB well under the 100 ms acceptance bound."""
+    r = _scan(
+        "import time\n"
+        "command = 'echo ' + 'a' * 300000\n"
+        "start = time.perf_counter()\n"
+        "result = is_fork_bomb(command)\n"
+        "elapsed_ms = (time.perf_counter() - start) * 1000\n"
+        "print(int(result), elapsed_ms)\n"
+    )
+    assert r.returncode == 0, r.stderr
+    result, elapsed_ms = r.stdout.split()
+    assert result == "0"
+    assert float(elapsed_ms) < 100.0, f"fork-bomb scan took {elapsed_ms} ms"
+
+
+@pytest.mark.parametrize("command", [
+    ":(){ :|:& };:",
+    "bomb(){ bomb|bomb& };bomb",
+    "bomb ( ) { bomb | bomb & }",
+])
+def test_fork_bomb_detector_matches_real_bombs(command):
+    r = _scan(f"print(int(is_fork_bomb({command!r})))")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "1"
+
+
+def test_fork_bomb_detector_ignores_a_quoted_string_argument():
+    r = _scan("print(int(is_fork_bomb(strip_quoted('echo \\\":(){ :|:& };:\\\"'))))")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "0"
+
+
+def test_split_shell_statements_and_clean_drops_bodies_keeps_terminator():
+    """The cleaned stream keeps operators (so a fork bomb stays one line) but
+    drops heredoc bodies (#943 (j), #944 SR-B-16)."""
+    r = _scan(
+        "import json\n"
+        "stmts, cleaned = split_shell_statements_and_clean("
+        "\"cat <<'EOF'\\n:(){ :|:& };:\\nEOF\\ngit push --force\")\n"
+        "print(json.dumps([stmts, cleaned]))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    statements, cleaned = eval(r.stdout)  # noqa: S307 - test data
+    assert [tuple(x) for x in statements] == [
+        ("cat <<'EOF'", [":(){ :|:& };:"]),
+        ("git push --force", []),
+    ]
+    assert "git push --force" in cleaned
+    assert ":(){ :|:& }:" not in cleaned
+
+
+def test_heredoc_with_escaped_delimiter_is_skipped():
+    r = _scan(
+        "import json\n"
+        "print(json.dumps(split_shell_statements('cat <<\\\\EOF\\n> /etc/x\\nEOF\\nls')))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    assert eval(r.stdout) == [["cat <<\\EOF", ["> /etc/x"]], ["ls", []]]  # noqa: S307
+
+
+# --- review findings F1/F2/F4: splitter fidelity -------------------------
+
+
+def test_ansi_c_quoting_does_not_desync_the_splitter():
+    """F1: inside $'...' a backslash escapes the next character, so the \\'
+    does NOT close the string. The old scanner treated $'it\\'s' as a plain
+    quoted span, never closed it, and swallowed every later statement (a
+    force push became invisible)."""
+    r = _scan(
+        "import json\n"
+        "print(json.dumps(split_shell_statements("
+        "\"echo $'it\\\\'s'; git push --force origin main\")))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    assert eval(r.stdout) == [  # noqa: S307 - test data
+        ["echo $'it\\'s'", []],
+        ["git push --force origin main", []],
+    ]
+
+
+def test_locale_quoting_keeps_the_split_boundary():
+    """F1: $"..." (locale translation) quotes like "...", so an operator
+    inside it is text while the following statement is still split off."""
+    r = _scan(
+        "import json\n"
+        "print(json.dumps(split_shell_statements("
+        "'echo $\"a; b\"; git push --force')))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    assert eval(r.stdout) == [  # noqa: S307 - test data
+        ['echo $"a; b"', []],
+        ["git push --force", []],
+    ]
+
+
+def test_dynamic_heredoc_delimiter_does_not_swallow_the_body():
+    """F2: a delimiter word carrying '$' or a backtick is not tracked, so the
+    body stays in the statement stream instead of hiding everything after it
+    (fail closed; see the deliberate divergence documented in the scanner)."""
+    commands = [
+        "cat <<$X\nX\ngit push --force origin main",
+        "cat <<${X}\nX\ngit push --force origin main",
+        "cat <<`X`\nX\ngit push --force origin main",
+        'cat <<"$X"\nX\ngit push --force origin main',
+    ]
+    for command in commands:
+        r = _scan(
+            "import json\n"
+            f"print(json.dumps(split_shell_statements({command!r})))\n"
+        )
+        assert r.returncode == 0, r.stderr
+        statements = [tuple(x) for x in eval(r.stdout)]  # noqa: S307 - test data
+        assert statements[-1] == ("git push --force origin main", []), command
+        # The opening statement has no attached (suppressed) body.
+        assert statements[0][1] == [], command
+
+
+def test_trailing_comment_is_cut_from_cleaned_code_too():
+    """F4: the statement stream already dropped comments; the cleaned code
+    handed to the fork-bomb scan kept a trailing one, so a bomb-shaped
+    COMMENT was classified as destructive code."""
+    r = _scan(
+        "import json\n"
+        "stmts, cleaned = split_shell_statements_and_clean("
+        "'git status # :(){ :|:& };:')\n"
+        "print(json.dumps([stmts, cleaned, int(is_fork_bomb(strip_quoted(cleaned)))]))\n"
+    )
+    assert r.returncode == 0, r.stderr
+    statements, cleaned, bomb = eval(r.stdout)  # noqa: S307 - test data
+    assert [tuple(x) for x in statements] == [("git status", [])]
+    assert cleaned.strip() == "git status"
+    assert bomb == 0
+
+
+# --- hook_shell_resolver_py (containment/guard parity, v1.4.0) ------------
+
+def _resolver_source() -> str:
+    r = _call("hook_shell_scan_py; hook_shell_resolver_py")
+    assert r.returncode == 0, r.stderr
+    assert "def command_start" in r.stdout
+    return r.stdout
+
+
+def _resolve(command: str) -> list[tuple[str, list[str]]]:
+    """Run the shared splitter + resolver over *command* and return one
+    (command word, args) pair per statement that has a command word.
+
+    The tokenizer lives with the caller by design, so this mirrors what both
+    hooks do: punctuation-aware shlex, then command_start().
+    """
+    code = (
+        "import json, os, re, shlex, sys\n"
+        "def tokens_of(stmt):\n"
+        "    lex = shlex.shlex(stmt, posix=True, punctuation_chars='()')\n"
+        "    lex.whitespace_split = True\n"
+        "    lex.commenters = ''\n"
+        "    return list(lex)\n"
+        "out = []\n"
+        f"for stmt, _b in split_shell_statements({command!r}):\n"
+        "    toks = tokens_of(stmt)\n"
+        "    if not toks:\n"
+        "        continue\n"
+        "    i = command_start(toks)\n"
+        "    if i >= len(toks):\n"
+        "        continue\n"
+        "    out.append((os.path.basename(toks[i]), toks[i + 1:]))\n"
+        "print(json.dumps(out))\n"
+    )
+    r = subprocess.run(
+        [sys.executable, "-c", _resolver_source() + "\n" + code],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    return [(word, args) for word, args in eval(r.stdout)]  # noqa: S307 - test data
+
+
+def test_shell_resolver_py_emits_compilable_source():
+    source = _resolver_source()
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
+        input=source, capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("command,expected", [
+    # Wrapper grammar: positional prefix, then the wrapped command.
+    ("timeout 5 git push", [("git", ["push"])]),
+    ("flock -w 5 /tmp/l git push", [("git", ["push"])]),
+    ("chroot /x git push", [("git", ["push"])]),
+    ("env X=1 git push", [("git", ["push"])]),
+    ("sudo -u me git push", [("git", ["push"])]),
+    ("setsid --wait git push", [("git", ["push"])]),
+    # A '--' at command position is transparent, before or after the
+    # wrapper's own options/positional prefix.
+    ("timeout 5 -- git push", [("git", ["push"])]),
+    ("timeout --signal=KILL 5 -- git push", [("git", ["push"])]),
+    ("flock -w 5 /tmp/l -- git push", [("git", ["push"])]),
+    ("chroot /x -- git push", [("git", ["push"])]),
+    ("env -u HOME -- git push", [("git", ["push"])]),
+    # case arm, one-line and split across statements.
+    ("case x in x) git push ;; esac", [("git", ["push"])]),
+    ("case x\nin x) git push\nesac", [("git", ["push"])]),
+    # Function bodies, groups, subshells, if/for/while bodies. The splitter
+    # cuts the surrounding syntax into its own statements, so the pair is
+    # asserted as present rather than as the only result.
+    ("f() { git push; }", [("git", ["push"])]),
+    ("function f { git push; }", [("git", ["push"])]),
+    ("{ git push; }", [("git", ["push"])]),
+    ("if true; then git push; fi", [("git", ["push"])]),
+    ("for f in a; do git push; done", [("git", ["push"])]),
+    ("while true; do git push; break; done", [("git", ["push"])]),
+    # A command word that is merely an ARGUMENT stays an argument.
+    ("echo git push", [("echo", ["git", "push"])]),
+    ("man git pull", [("man", ["git", "pull"])]),
+])
+def test_command_start_resolves_the_real_command_word(command, expected):
+    """One shared walk for both guards: wrappers (with positional arity),
+    transparent '--', case arms, function bodies, grouping and if/for/while
+    bodies. The containment detector used a wrapper-name-only loop and missed
+    every compound shape (rc 0 on an outside write)."""
+    resolved = _resolve(command)
+    for pair in expected:
+        assert pair in resolved, resolved
+
+
+@pytest.mark.parametrize("command", ["X=1", "A=1 B=2"])
+def test_command_start_skips_pure_assignment_statements(command):
+    """A statement with no command word returns len(tokens), so the caller
+    skips it instead of treating the assignment as a command."""
+    code = (
+        "import os, re, shlex\n"
+        "def tokens_of(stmt):\n"
+        "    lex = shlex.shlex(stmt, posix=True, punctuation_chars='()')\n"
+        "    lex.whitespace_split = True\n"
+        "    lex.commenters = ''\n"
+        "    return list(lex)\n"
+        f"stmt = split_shell_statements({command!r})[0][0]\n"
+        "toks = tokens_of(stmt)\n"
+        "print(json.dumps(command_start(toks) == len(toks)))\n"
+    )
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "import json\n" + _resolver_source() + "\n" + code],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "true"
+
+
+def test_subshell_closing_paren_stays_in_args_but_not_as_command():
+    """( git push ) -> the command is git; the trailing ')' is an argument
+    token. A containment detector must therefore read the command word, not
+    args[0]."""
+    assert _resolve("( git push )")[0] == ("git", ["push", ")"])

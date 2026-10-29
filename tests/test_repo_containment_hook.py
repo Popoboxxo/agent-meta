@@ -56,7 +56,7 @@ def _write_config(root: Path, block: str) -> Path:
 def _project(tmp_path: Path, block: str | None = None) -> Path:
     """Create a project root with (optionally) a repo_containment block."""
     root = tmp_path / "project"
-    root.mkdir()
+    root.mkdir(parents=True)
     _write_config(
         root,
         block
@@ -70,6 +70,25 @@ def _project(tmp_path: Path, block: str | None = None) -> Path:
         ),
     )
     return root
+
+
+def _config_at(path: Path, block: str | None = None) -> Path:
+    """Create ``.meta-config/project.yaml`` directly in *path* (which becomes
+    the project root itself, unlike ``_project`` which appends ``project/``)."""
+    (path / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (path / ".meta-config" / "project.yaml").write_text(
+        block
+        if block is not None
+        else (
+            'repo_containment:\n'
+            '  enabled: true\n'
+            '  tmp-sink:\n'
+            '    enabled: true\n'
+            '    path: ".tmp"\n'
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _run_hook(
@@ -89,6 +108,7 @@ def _run_hook(
         capture_output=True,
         text=True,
         cwd=str(process_cwd if process_cwd is not None else _REPO_ROOT),
+        env=_clean_env(),
     )
 
 
@@ -601,6 +621,7 @@ def _run_isolated(hook: Path, payload: dict, cwd: Path) -> subprocess.CompletedP
         capture_output=True,
         text=True,
         cwd=str(cwd),
+        env=_clean_env(),
     )
 
 
@@ -698,7 +719,7 @@ def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
     result = subprocess.run(
         [_BASH, str(wrapper)],
         input=json.dumps(_bash_payload("echo hi", tmp_path)),
-        capture_output=True, text=True, cwd=str(tmp_path),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert f"impl crashed rc={crash_rc}" in result.stderr
@@ -711,7 +732,7 @@ def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
     result = subprocess.run(
         [_BASH, str(wrapper)],
         input=json.dumps(_bash_payload("echo hi", tmp_path)),
-        capture_output=True, text=True, cwd=str(tmp_path),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
     )
     assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
     assert "impl crashed" not in result.stderr
@@ -727,7 +748,7 @@ def _garbage_python_env(tmp_path) -> dict:
     shim = shim_dir / "python3"
     shim.write_text("#!/bin/sh\necho garbage\n", encoding="utf-8")
     shim.chmod(0o755)
-    env = dict(os.environ)
+    env = _clean_env()
     env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
     return env
 
@@ -802,7 +823,398 @@ def test_outdated_helper_lib_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(hooks_dir / "repo-containment.sh")],
         input=json.dumps(_write_payload(root / "ok.py", root)),
-        capture_output=True, text=True, cwd=str(root),
+        capture_output=True, text=True, cwd=str(root), env=_clean_env(),
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "outdated" in result.stderr
+
+
+# --- issue #944: repo-containment hardening (W2-B3) -----------------------
+# SR-B-16 heredoc false positives, SR-B-17 wrapper exit mapping (already
+# covered above), the detector's fail-open `|| true`, SR-B-18 fixed jail root,
+# SR-B-19 missed in-place/destination spellings, SR-B-20 silent PyYAML opt-out.
+
+
+def _clean_env() -> dict:
+    """Never inherit $CLAUDE_PROJECT_DIR: the fixed jail root (SR-B-18) prefers
+    it, so a value from the surrounding Claude session would retarget the
+    tests. Tests that need it set it explicitly."""
+    env = dict(os.environ)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    return env
+
+
+@pytest.mark.parametrize("command", [
+    "cat >> notes.md <<'EOF'\ntext with `2>/dev/null` and > /etc/x\nEOF",
+    "cat > notes.md <<EOF\nblockquote: > /etc/passwd\nEOF",
+    "python - <<'PY'\nprint('> /etc/x')\nPY",
+])
+def test_heredoc_body_is_not_scanned_as_commands(tmp_path, command):
+    """SR-B-16: prose/markdown inside a heredoc produced false-positive
+    blocks. The body is skipped; the write to notes.md itself is inside the
+    root (and not part of WRITE_ALL), so the command is allowed."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr
+
+
+def test_command_after_heredoc_terminator_is_still_scanned(tmp_path):
+    """SR-B-16: skipping the body must not skip the rest of the command."""
+    root = _project(tmp_path)
+    result = _run_hook(
+        _bash_payload("cat <<'EOF'\nprose\nEOF\ntouch /etc/after-heredoc", root)
+    )
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+# --- v1.5.0: wrapper / `--` / case blind spot (guard v1.9.2 parity) -------
+
+
+@pytest.mark.parametrize("template", [
+    # Wrapper with a positional prefix, `--` directly before the command.
+    "timeout 5 -- touch {target}",
+    "flock -w 5 {lock} -- touch {target}",
+    "chroot /x -- touch {target}",
+    # Wrapper options on either side of the marker.
+    "timeout --signal=KILL 5 -- touch {target}",
+    "env -u HOME -- touch {target}",
+    # `case … in` arm, one-line and split across statements.
+    "case x in x) touch {target} ;; esac",
+    "case x\nin x) touch {target}\nesac",
+    "case x in\n  x) touch {target}\n  ;;\nesac",
+    # Inline function body, subshell, group, if, for, while.
+    "f() {{ touch {target}; }}",
+    "function f {{ touch {target}; }}",
+    "( touch {target} )",
+    "{{ touch {target}; }}",
+    "if true; then touch {target}; fi",
+    "for f in a; do touch {target}; done",
+    "while true; do touch {target}; break; done",
+])
+def test_wrapper_and_compound_shapes_outside_root_are_blocked(tmp_path, template):
+    """The containment detector used its own wrapper-name-only skip loop and
+    knew neither `--` transparency nor `case`/function/grouping, so every one
+    of these resolved to NO command and was allowed (rc 0). The shared
+    resolver (hook_shell_resolver_py) fixes all of them; the orchestrator
+    guard got the same shapes in v1.9.2."""
+    root = _project(tmp_path)
+    target = root.parent / "outside-target.txt"
+    command = template.format(target=target, lock=root.parent / "outside.lock")
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "timeout 5 -- touch {target}",
+    "flock -w 5 {lock} -- touch {target}",
+    "chroot /x -- touch {target}",
+    "case x in x) touch {target} ;; esac",
+    "case x\nin x) touch {target}\nesac",
+    "f() {{ touch {target}; }}",
+    "( touch {target} )",
+    "if true; then touch {target}; fi",
+    "for f in a; do touch {target}; done",
+    "touch .tmp/{name}",
+    "sed -i s/a/b/ {target}",
+    "cp {source} -t .",
+    "timeout 5 -- sed -i s/a/b/ {target}",
+])
+def test_wrapper_and_compound_shapes_inside_root_stay_allowed(tmp_path, template):
+    """Counter-check for the same shapes: writes inside the root (and into
+    the `.tmp/` sink) remain allowed, so the resolver must not over-block."""
+    root = _project(tmp_path)
+    (root / "inroot.txt").write_text("x", encoding="utf-8")
+    (root / "source.txt").write_text("x", encoding="utf-8")
+    command = template.format(
+        target=root / "inroot.txt",
+        name="scratch.txt",
+        lock=root / "lock",
+        source=root / "source.txt",
+    )
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr
+
+
+def test_detector_crash_fails_closed(tmp_path):
+    """Verifier note: the detector ended in `|| true`, so a Python crash
+    ALLOWED the command. A crash must block."""
+    root = _project(tmp_path)
+    shim_dir = tmp_path / "detector-shim"
+    shim_dir.mkdir()
+    real = shutil.which("python3") or "python3"
+    shim = shim_dir / "python3"
+    shim.write_text(
+        "#!/bin/sh\n"
+        'case "${2:-}" in\n'
+        '  *WRITE_ALL*) exit 1 ;;\n'
+        "esac\n"
+        'exec "' + real + '" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    env = _clean_env()
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_bash_payload("echo hi", root)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert "detector exited rc=1" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "perl -pi -e 's/a/b/' /etc/target",
+    "sed -Ei 's/a/b/' /etc/target",
+    "sed -ni 's/a/b/p' /etc/target",
+    "sed -i 's/a/b/' /etc/target",
+    "ruby -pi -e 'x' /etc/target",
+    "cp -t /etc source",
+    "cp --target-directory=/etc source",
+    "cp -t/etc source",
+    "cp source /etc/target -v",
+    "cp source /etc/target --verbose",
+])
+def test_inplace_and_destination_spellings_are_detected(tmp_path, command):
+    """SR-B-19: perl/sed in-place clusters, `cp -t DIR` and trailing flags
+    were not recognised as writes."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "perl -pi -e 's/a/b/' notes.md",
+    "sed -Ei 's/a/b/' notes.md",
+    "sed -ni 's/a/b/p' notes.md",
+    "cp -t . source",
+    "cp source notes.md -v",
+    "perl -e 'print 1' notes.md",  # -e only: no in-place edit
+    "sed -n 's/a/b/p' notes.md",   # -n only: no in-place edit
+])
+def test_inplace_detection_does_not_over_block_inside_the_root(tmp_path, command):
+    """SR-B-19 counter-check: the same spellings writing INSIDE the root stay
+    allowed (and -e/-n without -i are not in-place edits)."""
+    root = _project(tmp_path)
+    for name in ("notes.md", "source"):
+        (root / name).write_text("x", encoding="utf-8")
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr
+
+
+def _deployed_hook(project: Path, provider_dir: str = ".claude") -> Path:
+    """Deploy wrapper+impl+lib into <project>/<provider_dir>/hooks/ (SR-B-18
+    anchor). The layout is provider-neutral (Claude, Gemini, ...)."""
+    hooks = project / provider_dir / "hooks"
+    (hooks / "lib").mkdir(parents=True)
+    (hooks / "repo-containment.sh").write_text(
+        _HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks / "repo-containment-impl.sh").write_text(
+        _IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks / "lib" / "hook_common.sh").write_text(
+        (_REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh").read_text(
+            encoding="utf-8"),
+        encoding="utf-8",
+    )
+    return hooks / "repo-containment.sh"
+
+
+def test_payload_cwd_cannot_redefine_the_deployed_jail_root(tmp_path):
+    """SR-B-18: with the hook deployed under project A, a payload cwd in a
+    different project B must not make B the jail root. A write inside B is
+    therefore outside A and blocked."""
+    project_a = _config_at(tmp_path / "a")
+    project_b = _config_at(tmp_path / "b")
+    hook = _deployed_hook(project_a)
+    result = subprocess.run(
+        [_BASH, str(hook)],
+        input=json.dumps(_write_payload(project_b / "x.py", project_b)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 2, result.stderr
+    assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
+
+
+def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
+    """SR-B-18: even when run from the source tree, $CLAUDE_PROJECT_DIR wins
+    over the payload cwd."""
+    project_a = _config_at(tmp_path / "a")
+    project_b = _config_at(tmp_path / "b")
+    env = _clean_env()
+    env["CLAUDE_PROJECT_DIR"] = str(project_a)
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(project_b / "x.py", project_b)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
+
+
+@pytest.mark.parametrize("provider_dir", [".claude", ".agents", ".gemini"])
+def test_fixed_anchor_is_provider_neutral(tmp_path, provider_dir):
+    """SR-B-18: the deployment-layout anchor does not depend on the Claude
+    directory name."""
+    project = _config_at(tmp_path / "a")
+    other = _config_at(tmp_path / "b")
+    hook = _deployed_hook(project, provider_dir)
+    result = subprocess.run(
+        [_BASH, str(hook)],
+        input=json.dumps(_write_payload(other / "x.py", other)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 2, result.stderr
+    assert f"repo root: {os.path.realpath(project)}" in result.stderr
+
+
+def test_write_inside_the_fixed_anchor_is_allowed(tmp_path):
+    """SR-B-18 counter-check: the fixed anchor must not block legitimate
+    writes inside itself."""
+    project = _config_at(tmp_path / "a")
+    hook = _deployed_hook(project)
+    result = subprocess.run(
+        [_BASH, str(hook)],
+        input=json.dumps(_write_payload(project / "pkg" / "x.py", project)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+# --- review findings F1/F2/F5: the shared splitter and the fixed root ----
+
+
+def test_f1_ansi_c_quoting_does_not_hide_an_outside_copy(tmp_path):
+    """F1: the ANSI-C quote desync swallowed the rest of the command, so an
+    outside-root copy after `echo $'it\\'s'` was invisible to this guard too
+    (both guards share hook_shell_scan_py)."""
+    root = _project(tmp_path)
+    outside = root.parent / "outside.txt"
+    result = _run_hook(
+        _bash_payload(f"echo $'it\\'s'; cp notes.md {outside}", root)
+    )
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "cat <<$X\nX\ntouch {target}",
+    'cat <<"$X"\nX\ntouch {target}',
+])
+def test_f2_dynamic_heredoc_delimiter_does_not_hide_a_write(tmp_path, command):
+    """F2: an unresolvable heredoc delimiter no longer suppresses the body,
+    so a write target after it is still seen (fail closed)."""
+    root = _project(tmp_path)
+    target = root.parent / "outside-heredoc.txt"
+    result = _run_hook(_bash_payload(command.format(target=target), root))
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+def _realpath_failing_env(tmp_path, path_to_fail: Path) -> dict:
+    """PATH whose python3 delegates to the real interpreter EXCEPT when it is
+    asked to realpath *path_to_fail* (then it exits 1, like a broken
+    interpreter would)."""
+    shim_dir = tmp_path / "realpath-shim"
+    shim_dir.mkdir()
+    real = shutil.which("python3") or "python3"
+    shim = shim_dir / "python3"
+    shim.write_text(
+        "#!/bin/sh\n"
+        'case "$*" in\n'
+        f'  *os.path.realpath*"{path_to_fail}"*) exit 1 ;;\n'
+        "esac\n"
+        f'exec "{real}" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    env = _clean_env()
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def test_f5_unresolvable_fixed_root_fails_closed(tmp_path):
+    """F5: a SELECTED fixed root whose realpath fails must not silently
+    downgrade to the payload anchor. Before the fix FIXED_ROOT became "" and
+    project_b's cwd was adopted, so a write inside B was allowed (rc 0)."""
+    project_a = _config_at(tmp_path / "a")
+    project_b = _config_at(tmp_path / "b")
+    env = _realpath_failing_env(tmp_path, project_a)
+    env["CLAUDE_PROJECT_DIR"] = str(project_a)
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(project_b / "x.py", project_b)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert "could not be resolved" in result.stderr
+    assert "F5" in result.stderr
+
+
+def test_f5_absent_fixed_root_still_uses_the_payload_anchor(tmp_path):
+    """F5 counter-check: 'no fixed root applies' (rc 1, e.g. the source-tree
+    run) is NOT a failure -- the documented payload-anchor fallback stays."""
+    root = _project(tmp_path)
+    result = _run_hook(_write_payload(root / "notes.md", root))
+    assert result.returncode == 0, result.stderr
+
+
+def test_submodule_meta_config_is_skipped_in_the_walk_up(tmp_path):
+    """#943 (l): a nested .agent-meta checkout is not the jail root when an
+    enclosing project exists (write inside the OUTER root is allowed)."""
+    outer = _config_at(tmp_path / "outer")
+    sub = _config_at(outer / ".agent-meta")
+    deep = sub / "src"
+    deep.mkdir(parents=True)
+    result = _run_hook(_write_payload(outer / "notes.md", deep))
+    assert result.returncode == 0, result.stderr
+
+
+def test_submodule_meta_config_is_the_fallback_when_nothing_encloses_it(tmp_path):
+    """#943 (l): a session opened only inside the submodule still resolves."""
+    base = Path(tempfile.mkdtemp(dir=tempfile.gettempdir(), prefix="am-submod-"))
+    try:
+        sub = _config_at(base / ".agent-meta")
+        result = _run_hook(_write_payload(sub / "notes.md", sub))
+        assert result.returncode == 0, result.stderr
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+
+def _hide_pyyaml(tmp_path) -> dict:
+    shadow = tmp_path / "no-yaml"
+    shadow.mkdir()
+    (shadow / "yaml.py").write_text(
+        "raise ImportError('PyYAML hidden by test')\n", encoding="utf-8")
+    env = _clean_env()
+    env["PYTHONPATH"] = str(shadow)
+    return env
+
+
+def test_missing_pyyaml_with_enabled_false_is_reported_not_silent(tmp_path):
+    """SR-B-20: without PyYAML the guard cannot honour the opt-out. It must
+    stay fail-closed AND say so on stderr instead of ignoring it silently."""
+    root = _project(tmp_path, "repo_containment:\n  enabled: false\n")
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(root.parent / "outside.py", root)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_hide_pyyaml(tmp_path),
+    )
+    assert result.returncode == 2, result.stderr
+    assert "PyYAML" in result.stderr
+    assert "enabled: false is NOT honoured" in result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+def test_missing_pyyaml_with_enabled_true_stays_fail_closed(tmp_path):
+    """SR-B-20 control: the safe-side default is unchanged."""
+    root = _project(tmp_path)  # enabled: true
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(root.parent / "outside.py", root)),
+        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_hide_pyyaml(tmp_path),
+    )
+    assert result.returncode == 2, result.stderr
+    assert "PyYAML" in result.stderr
