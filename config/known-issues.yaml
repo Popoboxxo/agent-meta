@@ -33,9 +33,15 @@
 #         derive: surface_verified_state.<surface>
 #         # or  <capability-key>: <state>
 #         # or  <capability-key>: {<capability-value>: <state>}
+#         #     (grammar still supported; no entry uses this form since the
+#         #      #1035 retirement below)
 #       evidence: {kind: runtime|source|docs|third-party, ref: <url|path:line>, date: YYYY-MM-DD}
 #       fix-hint: <one sentence; never applied automatically>
-#       fix-owner: agent-meta-manager|framework-issue|project-config
+#       fix-owner: agent-meta-manager|framework-issue|project-config|agent-meta
+#         agent-meta = the framework (template/sync output) must change; a
+#         consumer edit to the artifact is overwritten on the next sync, so the
+#         project cannot fix the finding itself. Introduced in issue #1035; its
+#         first user, instruction-soft-cap-chars, was retired (see below).
 #       introduced-in: <agent-meta version|null>
 #       fixed-in: <agent-meta version|null>   # runner skips when VERSION >= fixed-in
 #
@@ -126,21 +132,19 @@ issues:
     introduced-in: 2.0.0-beta.1
     fixed-in: null
 
-  - id: instruction-soft-cap-chars
-    title: Instruction file exceeds the provider character limit
-    applies_to:
-      - {capability: context_soft_cap_chars, op: present}
-    target: {artifact: rules_dir}
-    detector: {kind: file-size, unit: chars, op: ">", limit_key: context_soft_cap_chars}
-    severity: WARNING
-    verified-state: UNVERIFIED
-    verified-state-by-capability:
-      context_soft_cap_chars: {4000: DOCUMENTED, 12000: UNVERIFIED}
-    evidence: {kind: third-party, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.7", date: '2026-10-11'}
-    fix-hint: Split the instruction file into smaller files below the limit.
-    fix-owner: project-config
-    introduced-in: 2.0.0-beta.1
-    fixed-in: null
+  # Retired 2026-10-29 (issue #1035) -- `instruction-soft-cap-chars` used to warn
+  # when a `rules_dir` artifact exceeded `context_soft_cap_chars` (Copilot 4000
+  # chars). That number is a code-review visibility heuristic taken from an
+  # unverified audit quote (docs/analysis/2026-10-11-context-budget-provider-study.md:311,
+  # verified-state DOCUMENTED), NOT a provider limit on reading the file: the
+  # enforced gate content of rules/1-generic/a2a-delegation-gates.md ends at
+  # roughly 3700 chars, so a truncation would only cut documentation prose. The
+  # finding was also unactionable for the consumer (fix-owner `agent-meta`: a
+  # consumer edit is overwritten on the next sync) and the framework-side split
+  # demonstrably buys nothing. Retired, not fixed: an unactionable warning trains
+  # people to ignore warnings. Do not re-add without a verified provider limit.
+  # Regression tests: test_instruction_soft_cap_is_retired (runner) and
+  # test_instruction_soft_cap_seed_is_retired (registry).
 
   - id: context-soft-cap-lines
     title: Context file exceeds the provider recommended line count

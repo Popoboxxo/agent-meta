@@ -1,3 +1,4 @@
+# credential-key:admin-ui.token
 """Owner-only file permissions for secret-bearing project config (issue #864).
 
 ``.meta-config/project.yaml`` can hold a plaintext admin token

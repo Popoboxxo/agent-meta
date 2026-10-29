@@ -11,40 +11,48 @@
 # artifact `.meta-config/auto-commit-allowlist.json` is a generated artifact.
 #
 # `reader`  = repo-relative source path under `agent_meta_root`.
-# `evidence`= generated-runtime path + line (audit anchor, mapped to `reader`).
+# `evidence`= `<path>#<anchor>` -- a symbolic anchor, never a line number:
+#             `<path>` is the generated-runtime path (readers) or the source
+#             path (credentials); `<anchor>` is the marker id that must appear
+#             exactly once as a comment on the line of `reader` that reads the
+#             key (`# runtime-reader:<key>`) resp. that defines the credential
+#             path (`# credential-key:<key>`). Markers carry no code, so they
+#             never drift when surrounding lines move. A missing, duplicated,
+#             mis-filed or key-mismatched marker is an error
+#             (`tests/test_runtime_config_readers.py`).
 registry-version: 1
 readers:
   - key: repo_containment
     reader: hooks/1-generic/repo-containment-impl.sh
-    evidence: ".claude/hooks/repo-containment-impl.sh:412"
+    evidence: ".claude/hooks/repo-containment-impl.sh#runtime-reader:repo_containment"
     effect: "Schreib-Containment der Agenten"
   - key: orchestrator
     reader: hooks/1-generic/orchestrator-guard-impl.sh
-    evidence: ".claude/hooks/orchestrator-guard-impl.sh:881"
+    evidence: ".claude/hooks/orchestrator-guard-impl.sh#runtime-reader:orchestrator"
     effect: "Strict-Mode/Guard"
   - key: variables.TEST_COMMAND
     reader: hooks/1-generic/dod-push-check.sh
-    evidence: ".claude/hooks/dod-push-check.sh:1095"
+    evidence: ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"
     effect: "DoD-Test-Gate vor Push"
   - key: variables.TEST_TIMEOUT
     reader: hooks/1-generic/dod-push-check.sh
-    evidence: ".claude/hooks/dod-push-check.sh:1142"
+    evidence: ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_TIMEOUT"
     effect: "Test-Timeout"
   - key: variables.GIT_MAIN_BRANCH
     reader: hooks/1-generic/dod-push-check.sh
-    evidence: ".claude/hooks/dod-push-check.sh:224"
+    evidence: ".claude/hooks/dod-push-check.sh#runtime-reader:variables.GIT_MAIN_BRANCH"
     effect: "Hauptzweig-Erkennung"
   - key: admin-ui
     reader: scripts/admin-server.py
-    evidence: "scripts/admin-server.py:542"
+    evidence: "scripts/admin-server.py#runtime-reader:admin-ui"
     effect: "Bind-Host, Token/Token-Datei, Allowed-Hosts, Port der Admin-UI"
   - key: viz
     reader: scripts/admin-server.py
-    evidence: "scripts/admin-server.py:499"
+    evidence: "scripts/admin-server.py#runtime-reader:viz"
     effect: "Viz-/MCP-Server-Ports, Event-Log, Retention"
   - key: lifecycle-triggers
     reader: scripts/lifecycle_check.py
-    evidence: "scripts/lifecycle_check.py:196"
+    evidence: "scripts/lifecycle_check.py#runtime-reader:lifecycle-triggers"
     effect: "Pending-Tasks bei Lifecycle-Events"
 # Credential mark (IC-35 Rev. 3.1) - data source for IC-24.
 # A path is a credential iff one of its SEGMENTS matches `name_patterns`
@@ -57,6 +65,6 @@ credentials:
   name_patterns:
     - '(^|[-_])(token|secret|password|passwd|api[-_]?key|credentials?|private[-_]?key)$'
   keys:
-    - {key: admin-ui.token, evidence: "scripts/lib/permissions.py:3-4"}
-    - {key: admin-ui.token-file, evidence: "scripts/admin-server.py:496"}
+    - {key: admin-ui.token, evidence: "scripts/lib/permissions.py#credential-key:admin-ui.token"}
+    - {key: admin-ui.token-file, evidence: "scripts/admin-server.py#credential-key:admin-ui.token-file"}
   value_scan: secrets

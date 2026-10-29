@@ -131,7 +131,7 @@ agent-meta/
 | Script-Aufruf | Immer aus agent-meta: `py .agent-meta/scripts/sync.py` |
 | CLAUDE.md Erstellung | Automatisch wenn `"Claude"` in `ai-providers` und Datei fehlt |
 | CLAUDE.md managed block | Automatisch bei jedem sync aktualisiert (nur wenn `"Claude"` in `ai-providers`) |
-| Fehlende Variablen | **Warning + weitermachen** — Platzhalter bleibt sichtbar |
+| Fehlende Variablen | **Grace-Warnung bis 2.1.0** — Platzhalter bleibt sichtbar; ab 2.1.0 bricht der Sync mit `SyncError` ab (`63b12bde`) |
 | Agenten-Dateinamen | **Generisch** — kein Projekt-Prefix: `developer.md`, `tester.md` |
 
 ---
@@ -286,9 +286,11 @@ Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ers
 | `{{PREFIX}}` | Aus `project.prefix` |
 | `{{PROMPT_INJECTION_DEFENSE_BLOCK}}` | Kanonischer Prompt-Injection-Defense-Hinweis aus `snippets/security/prompt-injection-defense.md`, injiziert in Rollen die externe/Drittanbieter-Inhalte lesen |
 
-Unbekannte Variablen (kein Wert in Config):
-- Platzhalter bleibt unverändert sichtbar
-- Eintrag im Logfile unter `WARNINGS`
+Unbekannte Variablen (kein Wert in Config) — Grace-Fenster bis `2.1.0` (`63b12bde`):
+- bis `2.1.0`: Platzhalter bleibt unverändert sichtbar, Eintrag im Logfile unter `WARNINGS`; die Warnung nennt den künftigen Fehler wörtlich
+- ab `2.1.0`: der Sync bricht ab: `SyncError: Unknown placeholder {{KEY}} in <datei> — not found in config variables.`
+- ausgewertet wird nur, was den Conditional-Strip überlebt: ein Token in einem inaktiven `{{#if}}`/`{{#unless}}`-Zweig warnt nicht und bricht nicht ab (Conditionals werden vor den Variablen aufgelöst)
+- `PAL_*` wird unverändert durchgereicht (kein Warnen, kein Abbruch)
 
 Escape-Syntax: `{{%VAR%}}` → rendert als `{{VAR}}` ohne Substitution (für Dokumentation).
 

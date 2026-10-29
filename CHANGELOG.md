@@ -2,8 +2,181 @@
 
 ## [Unreleased]
 
+### Added
+- **Strict-first orchestrator mode from a single resolver (D1b, #1006)**: the effective mode now
+  resolves in exactly one place, `variables._resolve_orch_mode` (`_ORCH_STRICT_DEFAULT = True`, the
+  same default the schema declares). `consistency/orchestrator_strict` delegates to it instead of
+  keeping a second legacy `enabled`/`strict` fallback, so the rendered `ORCH_MODE_STRICT` and the
+  runtime gate cannot diverge. The new `validate=False` flag keeps the checker's historic fail-soft
+  behaviour for an invalid value instead of aborting the process.
+- **Runtime gate and entry point are one invariant (D1a/D1c, #1006)**: a provider `permission`
+  deny (`edit`/`bash`) is never written without a valid `default_agent` in the same
+  `opencode.json`. A deleted or unusable managed key suspends the gate (the rollback branch takes
+  a managed deny back) and emits a loud state-error warning naming how to restore the invariant,
+  instead of writing the half-active gate that locked the main chat out. A user-set
+  `default_agent` is respected and not overwritten (D1c); edit/shell stay locked for it while the
+  gate is active. The v2 surface obeys the same invariant even though its deny is a `permissions[]`
+  triple: a triple is never written without a valid `default_agent`, an already recorded one is
+  rolled back, and exactly one loud warning names the remedy (D1a(iii)).
+- **Announced strict-default flip with a version-driven grace window (D2b, #1006)**: a project
+  that only inherits the new strict default keeps the pre-flip behaviour — the entry point still
+  lands, the deny waits — and gets one run-level warning plus the new
+  `orchestrator-strict.default-flip-grace` finding (WARNING) until `2.1.0`. An explicitly
+  configured `strict` is never affected, and the window is data (`_STRICT_DEFAULT_GRACE_UNTIL`
+  compared against `VERSION`), not a provider branch.
+- **Derived defaults for three previously literal placeholders (#1037, #983)**: `PROJECT_DESCRIPTION`
+  is now seeded from the new `project.description` schema field, `AGENT_META_REPO` from the embedded
+  `.gitmodules` URL or the agent-meta checkout's own git remote, and `TECH_STACK` from
+  `PROJECT_LANGUAGES`. An explicit `variables:` entry always wins, and with no source at all the key
+  stays undefined on purpose — there is no blank-string fallback, so the unresolved-placeholder notice
+  reports it. A project that only sets `project: {name, description}` no longer ships
+  `{{PROJECT_DESCRIPTION}}` into `CLAUDE.md`/`AGENTS.md`, and `{{AGENT_META_REPO}}` (27× across a
+  9-provider sync) no longer leaks into the `meta-feedback`/`agent-meta-scout`/`documenter` output.
+- **`handoff.advisory: true` as a data marker (#1031)**: the eight literature-anchored review roles
+  (`memory-architect`, `context-engineer`, `red-team-agent`, `secrets-manager`, `chaos-engineer`,
+  `reproducible-builds-engineer`, `ux-researcher`, `privacy-compliance-officer`) declare it in
+  `config/role-defaults.yaml`, and `consistency/handoff_contracts` skips `output-not-consumed` only for
+  a handoff carrying that flag instead of an allowlist of role names in code. Only an exact `True`
+  counts — any other value leaves the check sharp — and the `target_roles` existence check still
+  applies to every producer.
+
 ### Fixed
 - Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
+- **`dod-push-check` 2.1.6 (#1033)**: the protected-branch list in the push-block message is
+  de-duplicated — a configured `GIT_MAIN_BRANCH` of `main`/`master` no longer appears twice.
+- **Runtime-reader registry evidence re-anchored (#1033 follow-up)**: the `dod-push-check` evidence
+  lines in `config/runtime-config-readers.yaml` moved with the 2.1.6 edit —
+  `variables.TEST_COMMAND` `:1095` → `:1101`, `variables.TEST_TIMEOUT` `:1142` → `:1148`;
+  `variables.GIT_MAIN_BRANCH` (`:224`) is unchanged.
+- **Doctor detectors never pick up dotfiles (#1034)**: `is_dotfile` is now the single exclusion
+  applied by both `_files_in` and `_glob_matches`, so managed-block manifests such as
+  `.agent-meta-managed*` in a rules dir (e.g. `.github/instructions`) are no longer reported as
+  rule files. Only the file name is checked, so provider artifact (dot-)directories stay
+  traversable and an explicit `path`/`path_template` target stays unfiltered by design.
+- **Created hooks are LF-deterministic (#961)**: `--create-hook` now writes through
+  `write_atomic` instead of `write_text`, which translated `\n` to `os.linesep` and landed
+  created hooks as CRLF on Windows, failing at runtime with `$'\r': command not found`.
+  `write_atomic` opens with `newline="\n"` and creates the parent directory itself, so a
+  created hook is byte-identical to the sync path; two tests in
+  `tests/test_newline_normalization.py` pin the LF write and the dry-run no-op.
+- **`dod-push-check` 2.1.7 (#949, #953, #954)**: the git-push flag/short-cluster walk and the
+  protected-branch set are built once in `lib/hook_common.sh` (`hook_push_arg_parser_py`,
+  `hook_protected_branches`) instead of twice — tag-only check vs. destination check and classifier
+  vs. block message now share the identical positionals and can no longer drift apart (#949). The
+  shared walk consumes `--recurse-submodules`' separately passed value, closing the bypass where the
+  space form (`git push --recurse-submodules on-demand origin …`) reached the submodule check with
+  `on-demand` read as the remote and was allowed while the `=` form was blocked (#953). The
+  security-critical reads fail closed: an unreadable `git config` blocks on **every** path, the
+  tag-only shortcut included — it used to inspect the config verdict *before* the config was read,
+  so `git push --tags origin` exited 0 while the same command with a readable
+  `remote.origin.push=refs/tags/v1.0.0:refs/heads/main` was blocked — and a `python3` on `PATH` that
+  exits non-zero or prints garbage is rejected instead of trusted (#954).
+- **`hook_common.sh` 1.1.0 (#949, #954)**: adds `hook_protected_branches` (one de-duplicated
+  protected-branch list, used by both the classifier's set and the block message) and
+  `hook_push_arg_parser_py` (the single git-push argument walk). `hook_json_usable` now carries its
+  probe sentinel in the payload and falls back to a **distinct** value, so an interpreter that exits
+  non-zero without output — or is missing — reads as unusable; the old probe compared the result
+  against its own fallback default, so a broken shim looked usable and the block came from the
+  payload check with a misleading message instead of the interpreter check.
+- **`hook_common.sh` 1.4.0 (#943, #944)**: adds `hook_shell_scan_py` — one
+  quote/heredoc/ANSI-C-aware statement splitter plus the **linear-time fork-bomb detector** shared by
+  both fail-closed guards — and `hook_shell_resolver_py`, the single command-word resolver (wrapper
+  grammar with positional arity, a transparent `--`, one-line and split `case … in` arms, function
+  bodies, subshells/groups and leading keywords) that replaces the per-hook copy. The splitter keeps
+  its quote state in sync for ANSI-C (`$'...'`) and locale (`$"..."`) quoting (F1), over-scans a
+  heredoc whose delimiter it cannot resolve instead of letting it hide the rest of the command (F2),
+  and cuts a trailing `#` comment from the cleaned code as well as from the statement stream (F4).
+  `hook_is_meta_submodule_dir` makes the project-root walk-up skip a nested `.agent-meta` (or
+  `external/agent-meta`) checkout's own `.meta-config/` in favour of the enclosing project, keeping it
+  as the fallback when nothing encloses it (#943 (l)).
+- **`orchestrator-guard-impl.sh` 1.9.2 (#943, #944)**: the git classification runs on the shared
+  splitter/resolver instead of raw regexes, so quoted or heredoc text is no longer cut into false
+  statements, `case … in …) git push --force;; esac` arms and inline function bodies
+  (`f(){ git push --force; }; f`) are classified, a lone `--` is transparent after a wrapper's own
+  options and positional prefix as well as directly before the command word (`timeout 5 -- git push
+  --force` no longer stops at the marker, F-NEW-1), and known wrappers (sudo/env/timeout/flock/
+  setsid/watch/strace/chroot/busybox/…) are unwrapped explicitly with their positional arity. A scan
+  failure — interpreter crash or malformed classifier output — now fails **closed** with exit 2
+  instead of the previous `|| echo "none narrow none"` allow-on-death fallback (#943 (k)). The
+  residual gaps stay deliberate and documented in the header (convention boundary, #592): command
+  substitution/backticks, `eval`, `bash -c`/`sh -c`, `env -S`, `xargs … sh -c`, alias or variable
+  indirection (`g=git; $g push`), unknown wrappers (firejail/unshare/nsenter, …), and destructive
+  commands fed through stdin other than the inspected `git update-ref --stdin` delete lines.
+- **`repo-containment-impl.sh` 1.5.0 (#943, #944)**: the write-target detector takes its command word
+  from the shared `hook_shell_resolver_py` — the same walk orchestrator-guard uses — so
+  `timeout 5 -- touch /outside`, `flock -w 5 /x -- …`, `chroot /x -- …`, `case` arms, function
+  bodies, `( … )` groups and `if`/`for`/`while` bodies resolve to a target instead of being allowed.
+  Statements split on the shared quote/heredoc-aware splitter, and in-place (`perl -pi`,
+  `sed -Ei`/`-ni` clusters) and destination (`cp -t DIR`, trailing flags no longer mistaken for the
+  destination) spellings are recognised (#944 SR-B-19). A crashing detector now fails **closed** (it
+  used to end in `|| true`, silently allowing), and the jail root prefers an anchor that does not come
+  from the payload — `$CLAUDE_PROJECT_DIR` carrying `.meta-config/`, then the deployment layout's
+  `<root>/.claude/hooks/` — instead of promoting an out-of-project or forged payload `cwd` to root
+  (#944 SR-B-18); a nested `.agent-meta` submodule's `.meta-config/` is skipped in favour of the
+  enclosing project.
+- **Deployed hook set and render hashes re-baselined (#943, #944)**: the three hardened hooks were
+  redeployed to `.agents/hooks/` — `hook_common` 1.4.0, `orchestrator-guard-impl` 1.9.2,
+  `repo-containment-impl` 1.5.0 — with the six `generated-file-hashes.json` / AC-T4 baseline entries
+  patched individually, and the AC-T4 digest recomputed from the fixture bytes and re-pinned in
+  `tests/test_opencode_v2_surface.py`.
+- **`dod-push-check` regression tests (#949, #951, #953, #954)**: one flag walk / one
+  protected-list builder are asserted, plus the fail-closed path for an outdated deployed lib
+  (#949); the hook tests are hermetic against a caller's `AGENT_META_*` environment, and
+  `GIT_MAIN_BRANCH` from `.meta-config/project.yaml`, `-C <other>` as a foreign repository and a
+  tag/branch name collision are covered (#951); the `--recurse-submodules` space form is pinned
+  against a real submodule (#953); the `git config`, `for-each-ref` and interpreter fail-closed
+  paths are pinned, including the tag-only variant that used to read the config verdict before the
+  read (#954).
+- **#948, #950, #952 re-checked — already fixed in 2.1.3–2.1.5**: the bug session re-reproduced the
+  unquoted word-start `#` comment, the `xargs … git push` / `{}` placeholder and the
+  `cd`-into-another-repository reports against the 2.1.5 classifier; all three were closed there.
+  No code change — the existing regression tests keep them closed.
+- **Strict-default grace holds on every read path (#1006 D2b)**: the runtime-gate readers
+  (`isolation._opencode_runtime_gate_entries`, `opencode_runtime_gate_wanted`) now hand the
+  framework root to the shared three-tier resolver, so they apply the same version-driven grace as
+  the writer instead of reporting "gate wanted" while the deny was suppressed. A missing or
+  non-UTF-8 `VERSION` counts as *inside* the window — announced, never silently hardened — so only
+  a readable version that proves the window has passed flips the implicit strict default.
+- **Runtime gate is rolled back before a provider is removed (#1020)**: `remove_provider_dir` — the
+  legacy-cleanup and provider-deactivation path — now calls
+  `isolation.rollback_opencode_runtime_gate` *before* the provider root disappears, because that
+  directory carries the state file recording the managed keys. It takes back the v1
+  `permission.edit/bash["**"]` deny (recorded prior restored), the v2 `permissions[]` deny triples,
+  and `default_agent` (recorded prior restored); the provider-removal paths additionally take back
+  the recorded provider-isolation globs. The helper is tier- and strict-independent — keyed on
+  `gate_state_present` rather than the resolved tier — and ownership-guarded via
+  `owns_gate_surface` (the resolved `settings_file`/`mcp-config.committed-file` data, never a
+  provider-name literal), so deactivating e.g. Claude can never take back Opencode's gate. A state
+  file left with nothing but the provenance marker is pruned.
+- **One `repo-containment.no-hook-support` finding per project (#1036)**: the per-provider warnings
+  are aggregated into a single project-wide WARNING that names every affected provider and its
+  reason — a default project with seven hook-less providers emits one finding instead of seven.
+  Detection, severity and the finding id are unchanged. In the same pass,
+  `check_orchestrator_strict_hook_support` no longer returns early for a config without an
+  `orchestrator` block: `{}` is the valid implicit-strict default, so the hard default is announced
+  per provider once the D2b grace window has passed; only a malformed (non-mapping) block is skipped.
+- **Undefined placeholders warn until 2.1.0 and abort afterwards (#983)**: an unresolved placeholder
+  now warns and names the future `SyncError` verbatim while `_UNRESOLVED_PLACEHOLDER_GRACE_UNTIL`
+  (2.1.0) lies in the future, and raises exactly that error once it has passed. Both substitution
+  engines share one helper, so the notice and the error text cannot drift apart, and a missing or
+  non-UTF-8 `VERSION` counts as inside the window. The decision applies only to tokens that survive
+  conditional-block stripping: a token in an inactive `{{#if}}`/`{{#unless}}` branch (e.g.
+  `{{PIPELINE_DETAILS_DIR}}` in the inactive `ORCH_MODE_MAIN_CHAT` branch) neither warns nor aborts,
+  which is what keeps agent-meta's own sync from aborting at the flip.
+- **Reference template documents placeholders instead of shipping them (#983)**: `TECH_STACK`,
+  `AGENT_RULES` and `EXTERNAL_DOCS_LANGUAGE` are escaped (`{{%VAR%}}`, rendering literally) in the
+  non-deployable `agents/1-generic/_reference-agent.md`, and `TECH_STACK` became a derived builder
+  variable — the `_UNKNOWN_TEMPLATE_RATCHET` set in `consistency/placeholders` is now empty.
+- **`instruction-soft-cap-chars` retired, not fixed (#1035)**: the entry is removed from
+  `config/known-issues.yaml`, leaving a rationale comment in its place. `context_soft_cap_chars` is a
+  code-review visibility heuristic from an unverified audit quote, not a provider limit — the enforced
+  gate content ends inside that window — and a consumer edit is overwritten on the next sync, so the
+  warning was unactionable.
+- **`ac01-baseline` AC-T4 digest re-pinned (#983, #1037)**: the 36-entry rebaseline (the nine copied
+  `.meta-config/project.yaml` fixtures plus `agent-meta-scout`/`documenter`/`meta-feedback` × 9
+  providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in
+  `tests/test_opencode_v2_surface.py` was recomputed from the fixture bytes before re-pinning.
+  `AC01_EXCEPTIONS` is not extended and `slimming-golden`/`compact-golden` are unchanged.
 
 ## [2.0.0-beta.4] - 2026-10-26
 

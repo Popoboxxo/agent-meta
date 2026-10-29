@@ -125,6 +125,9 @@ project:
   name: mein-projekt               # Vollständiger Projektname / Full project name
   prefix: mp                       # Kurz-Präfix (max 5 Zeichen) / Short prefix for extension files
   short: mein-projekt               # Anzeigename / Display name without platform prefix
+  # description: Kurzbeschreibung.  # Optional: speist {{PROJECT_DESCRIPTION}} (und via
+  # Fallback {{PROJECT_GOAL}}/{{PROJECT_CONTEXT}}) — Issue #1037 / Optional: seeds
+  # {{PROJECT_DESCRIPTION}}
 
 # ------------------------------------------------------------------------------
 # 6. Interaktionsverhalten & Parallelität / Interaction & Execution Settings

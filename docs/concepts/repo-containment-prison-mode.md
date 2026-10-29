@@ -309,10 +309,13 @@ keine schlafende Fehlkonfiguration freilegt.
 `orchestrator_strict.py`:
 
 - **`check_repo_containment_support(project_root, config, provider_config)`** — WARNING-only.
-  Meldet, wenn Containment für einen aktiven Provider effektiv aktiv ist, dieser aber keinen
-  gespiegelten Hook hat (`provider_hooks_supported == false`): Dort ist Containment ein stiller
-  No-Op als Runtime-Gate und wirkt nur als Prompt-Konvention. Registrierung in
-  `_handle_validate` ([`../../scripts/lib/cli_commands.py`](../../scripts/lib/cli_commands.py)) neben
+  Meldet projektweit in **einem** Finding alle aktiven Provider, für die Containment effektiv
+  aktiv ist, die aber keinen gespiegelten Hook haben (`provider_hooks_supported == false`): Dort
+  ist Containment ein stiller No-Op als Runtime-Gate und wirkt nur als Prompt-Konvention.
+  Erkennung, Severity und Finding-ID bleiben unverändert; nur die Aggregation ist
+  zusammengefasst (Issue #1036, gleiches Ein-Notice-Muster wie `orchestrator-strict`).
+  Registrierung in `_handle_validate`
+  ([`../../scripts/lib/cli_commands.py`](../../scripts/lib/cli_commands.py)) neben
   `check_orchestrator_strict_hook_support`.
 - **`check_repo_containment_templates(agent_meta_root)`** — ERROR-only Framework-Drift. Prüft,
   dass Hook und Prompt-Template die erwarteten Marker/Variablen tragen. Ein **markerbasierter

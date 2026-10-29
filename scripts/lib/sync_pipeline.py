@@ -86,7 +86,10 @@ from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, safe_path, write_atomic
 from lib.isolation import (
     _sync_opencode_runtime_gate,
+    gate_state_present,
+    owns_gate_surface,
     reconcile_opencode_surface_gate,
+    rollback_opencode_runtime_gate,
     sync_provider_isolation,
 )
 from lib.knowledge import sync_knowledge_engine
@@ -96,6 +99,7 @@ from lib.mcp import generate_mcp_artifacts, sync_secrets_template
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
     sync_opencode_v2_managed_keys,
+    v2_active,
 )
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
@@ -865,6 +869,18 @@ def _sync_stage_legacy_cleanup(
         if prov not in providers or not is_provider_active(config, prov):
             pc = provider_config.get(prov, {})
 
+            # #1020 (b): the per-provider stage never runs for a removed /
+            # deactivated provider, so its managed gate record would survive
+            # while the state file (inside the provider directory) is deleted —
+            # an unowned deny in the shared document. Roll the managed keys
+            # back BEFORE the provider directory is pruned. Ownership-guarded
+            # and state-guarded: a foreign provider and a provider without gate
+            # state are no-ops.
+            rollback_opencode_runtime_gate(
+                project_root, prov, provider_config, log, args.dry_run,
+                config=config, include_isolation_deny=True,
+            )
+
             # Default paths if missing from config
             a_dir = pc.get("agents_dir", f".{prov.lower()}/agents")
             c_file = resolve_context_filename(pc.get("context_file", f"{prov.upper()}.md"), prov, pc)
@@ -1146,6 +1162,18 @@ def _sync_stage_per_provider(
     # level) so no claim leaks into the next run.
     opencode_claimed_files: set[str] = set()
 
+    # D2b grace (data-driven, provider-agnostic): projects that only inherit the
+    # strict default get ONE run-level warning while the default flip is inside
+    # its announced minor-release window. No provider branch: the decision and
+    # the version window live in the shared resolver.
+    from lib.consistency.orchestrator_strict import strict_default_notice
+
+    _strict_notice = strict_default_notice(
+        config.get("orchestrator", {}), agent_meta_root,
+    )
+    if _strict_notice:
+        log.warning(_strict_notice)
+
     for provider in providers:
         pc = provider_config[provider]
         if not is_provider_active(config, provider):
@@ -1326,6 +1354,21 @@ def _sync_stage_per_provider(
                 project_root, config, provider, provider_config,
                 agent_meta_root, log, args.dry_run,
                 active_set=active_set,
+            )
+        elif (
+            owns_gate_surface(provider_config, provider)
+            and not v2_active(provider_config, provider)
+            and gate_state_present(project_root)
+        ):
+            # #1020 (a): the ROLLBACK used to be coupled to the ``permission``
+            # tier, so a tier change away from it skipped the writer and left
+            # the recorded deny + ``default_agent`` behind. A v1 document with a
+            # pending gate record is rolled back here; v2 documents keep their
+            # tier-independent ``reconcile_opencode_surface_gate`` path (below)
+            # and are excluded so their entry point is never taken back.
+            rollback_opencode_runtime_gate(
+                project_root, provider, provider_config, log, args.dry_run,
+                config=config,
             )
         # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: tier-INDEPENDENT surface
         # reconcile. The single actor for the v2 ``permissions[]`` triples and

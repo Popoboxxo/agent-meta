@@ -15,6 +15,7 @@ Severity is derived from the resolved runtime-gate tier
 Run: python -m pytest tests/test_orchestrator_strict_visibility.py -v
 """
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -206,3 +207,84 @@ def test_mammouth_still_warns_without_hook_protocol():
               "orchestrator": {"mode": "strict"}}
     findings = _check(config)
     assert any(f.severity == Severity.WARNING and "Mammouth" in f.message for f in findings)
+
+
+# ---------------------------------------------------------------------------
+# Issue #1036: the DEFAULT config must not emit per-provider strict noise
+# ---------------------------------------------------------------------------
+
+def _framework_root_at_version(tmp_path: Path, version: str) -> Path:
+    """Framework root with the real capability registry and a pinned VERSION."""
+    root = tmp_path / f"fw-{version}"
+    (root / "config").mkdir(parents=True)
+    shutil.copy(
+        _REPO_ROOT / "config" / "provider-capabilities.yaml",
+        root / "config" / "provider-capabilities.yaml",
+    )
+    (root / "VERSION").write_text(version + "\n", encoding="utf-8")
+    return root
+
+
+def test_default_config_emits_one_project_wide_notice_not_per_provider_noise(tmp_path):
+    """#1036: a plain default config validates with ONE strict notice.
+
+    D1b (implicit strict default) + D2b (one-minor grace window, announced but
+    not yet runtime-enforced) mean the validator reports the project-wide
+    ``default-flip-grace`` warning and NO per-provider
+    ``no-hook-support`` finding. That is the "emit it once instead of
+    per-provider noise" resolution of the issue.
+    """
+    framework = _framework_root_at_version(tmp_path, "2.0.0-beta.4")
+    config = {"ai-providers": list(_provider_config())}
+
+    findings = check_orchestrator_strict_hook_support(
+        _REPO_ROOT, config, _provider_config(), framework
+    )
+
+    assert [f.check for f in findings] == ["orchestrator-strict.default-flip-grace"], (
+        [f.message for f in findings]
+    )
+    assert findings[0].severity == Severity.WARNING
+    assert "2.1.0" in findings[0].message
+
+
+def test_default_config_announces_the_hard_default_after_the_grace_window(tmp_path):
+    """#1036 follow-up: once D2b closes, the hard default IS announced.
+
+    A config without an ``orchestrator`` block is valid and resolves to the
+    implicit strict default. The old ``if not orch: return`` exited before the
+    provider loop, so after 2.1.0 the default had no announcement at all: the
+    grace notice stops and nothing replaces it. Now the tier findings surface
+    for every active provider that cannot enforce strict at runtime.
+    """
+    framework = _framework_root_at_version(tmp_path, "2.1.0")
+    config = {"ai-providers": list(_provider_config())}
+
+    findings = check_orchestrator_strict_hook_support(
+        _REPO_ROOT, config, _provider_config(), framework
+    )
+
+    checks = [f.check for f in findings]
+    assert "orchestrator-strict.default-flip-grace" not in checks
+    assert checks == ["orchestrator-strict.no-hook-support"] * 7, [
+        (f.severity.value, f.message) for f in findings
+    ]
+
+    by_severity = {}
+    for finding in findings:
+        by_severity.setdefault(finding.severity, []).append(finding.message)
+    # Hook/plugin-tier providers (Claude, Gemini) stay silent.
+    assert not any("Claude" in m or "Gemini" in m
+                   for messages in by_severity.values() for m in messages)
+    # Permission tier -> INFO; advisory tiers -> WARNING (require-runtime-gate
+    # is not set in a default config, so nothing escalates to ERROR).
+    assert len(by_severity[Severity.INFO]) == 1
+    assert "Opencode" in by_severity[Severity.INFO][0]
+    assert len(by_severity[Severity.WARNING]) == 6
+    assert Severity.ERROR not in by_severity
+
+
+def test_default_config_without_orchestrator_block_still_handles_malformed_shape():
+    """A malformed block (non-dict) is still skipped, never raised through."""
+    config = {"ai-providers": ["Claude", "Opencode"], "orchestrator": "strict"}
+    assert _check(config) == []

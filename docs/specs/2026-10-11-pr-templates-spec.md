@@ -105,6 +105,8 @@ Zwei Phasen, strikt getrennt:
 - **PR-Zeit** (`<!-- fill: … -->`): Hinweis-Kommentare für den PR-Autor bzw. den `git`-Agenten, bleiben
   unverändert im Template und werden beim Erstellen des PR ausgefüllt.
 
+> **Superseded (2026-10-27, M7, `63b12bde`).** "A non-resolvable placeholder stays and warns" is the grace behaviour up to `2.1.0` only; from `2.1.0` the sync aborts with `SyncError` (`variables._placeholder_keep`). Only tokens that survive the conditional strip are evaluated — a token in an inactive `{{#if}}`/`{{#unless}}` branch neither warns nor aborts. The same applies to the `{{PR_VARS.<key>}}` sentence in IC-04: a missing key warns during the grace window and aborts afterwards.
+
 ### 3.3 Konfiguration (`project.yaml`)
 
 ```yaml

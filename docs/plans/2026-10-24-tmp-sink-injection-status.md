@@ -939,7 +939,9 @@ Zusätzliche Handproben (nicht Teil der drei geforderten Transkripte):
    ist Buchhaltung des Sync-Tools, keine manuelle Bearbeitung generierter Dateien.
    `config/runtime-config-readers.yaml` zeigt jetzt auf `repo-containment-impl.sh:313`
    (`CONFIG_FILE=`), weil die alte Evidence-Zeile `:267` durch den Umbau auf
-   `no_anchor_block()` zeigte (Test `test_runtime_config_readers.py`).
+   `no_anchor_block()` zeigte (Test `test_runtime_config_readers.py`). *(Superseded 2026-10-27, D5,
+   `24233481`: the registry no longer uses line numbers at all — `evidence` is
+   `<path>#runtime-reader:<key>` / `#credential-key:<key>`; see IC-35 in the context-profiles spec.)*
 5. **Docstring-Anpassung `test_missing_config_defaults_to_containment_on`:** Assertion und
    Name bleiben unverändert (Exit 2 gilt weiterhin), der Docstring hält fest, dass der
    Exit 2 seit Task 8 aus `repo-containment.no-root` folgt und Task 9 den Test bewusst

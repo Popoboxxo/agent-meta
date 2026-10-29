@@ -9,9 +9,10 @@ The registry ``config/runtime-config-readers.yaml`` documents which
 (outside the sync render path) and which paths are credentials. This test file
 covers:
 
-(a) every ``evidence`` path exists and its referenced line mentions
-    ``project.yaml`` or the key (the generated runtime path is mapped to the
-    repo source via the ``reader`` field);
+(a) every ``evidence`` anchor is symbolic (``<path>#<prefix>:<key>``) and
+    appears exactly once in the reader source on the line that actually reads
+    the key -- a line-number anchor, a missing/duplicate marker, a marker in
+    another file or a marker for another key is an error (Review M7);
 (b) the completeness ratchet over ``hooks/**/*.sh`` **and** top-level
     ``scripts/*.py`` with a reasoned exception list that may only shrink;
 (c) the credential patterns against a positive/negative list;
@@ -82,7 +83,20 @@ def _registered_reader_files():
     return {str(entry["reader"]) for entry in _registry()["readers"]}
 
 
-_EVIDENCE_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+)(?:-(?P<end>\d+))?$")
+# Symbolic anchor: ``<path>#<prefix>:<key>``, e.g.
+# ``.claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND``.
+# A line-number anchor (``<path>:<line>``) is rejected outright: it drifts with
+# every edit and stays green when the referenced line merely *mentions* the key
+# somewhere else (Review M7, ``:1119`` pointed at an unrelated ``echo`` line).
+_ANCHOR_RE = re.compile(r"^(?P<path>[^#\s]+)#(?P<anchor>[a-z][a-z0-9-]*:[^\s#]+)$")
+_LEGACY_LINE_ANCHOR_RE = re.compile(r"^(?P<path>[^#\s]+):(?P<line>\d+)(?:-(?P<end>\d+))?$")
+
+READER_PREFIX = "runtime-reader"
+CREDENTIAL_PREFIX = "credential-key"
+# The marker must sit on a real config read, not on prose that happens to name
+# the key (``echo "Set variables.TEST_COMMAND ..."``). Shell + Python idioms.
+_READ_CALL_RE = re.compile(
+    r"\bread_config_var\b|\.get\s*\(|\.get\[|\bsafe_load\s*\(|\bload_config\s*\(")
 
 # `yaml.safe_load`/`load_config`/`load_yaml_file` on a `project.yaml` reference.
 _LOAD_MARKERS = ("load_config(", "_load_config(", "load_yaml_file(", "yaml.safe_load(")
@@ -144,45 +158,279 @@ def _ratchet_violations(hits, registered, exceptions):
     return sorted(str(h) for h in hits if h not in registered and h not in exceptions)
 
 
-# --------------------------------------------------------- (a) evidence lines
+# ------------------------------------------------------ (a) symbolic anchors
 
-def test_a_registry_evidence_lines_exist_and_mention_the_key():
-    for entry in _registry()["readers"]:
-        key = str(entry["key"])
-        source = _ROOT / str(entry["reader"])
-        assert source.is_file(), f"{key}: reader source {entry['reader']} is missing"
+def _marker_re(anchor):
+    """Regex for the comment marker of *anchor* (the whole id, never a prefix)."""
+    return re.compile(r"#\s*" + re.escape(anchor) + r"(?![A-Za-z0-9_.-])")
 
-        match = _EVIDENCE_RE.match(str(entry["evidence"]))
-        assert match, f"{key}: unparseable evidence {entry['evidence']!r}"
-        evidence_rel = Path(match["path"])
-        line_no = int(match["line"])
 
-        # The evidence points at the generated runtime copy of the reader.
-        assert evidence_rel.name == source.name, (
-            f"{key}: evidence {evidence_rel} is not a copy of {source.name}")
-        generated = _ROOT / evidence_rel
-        if generated.is_file():  # `.claude/` is gitignored: best-effort line check
-            gen_lines = generated.read_text(encoding="utf-8", errors="replace").splitlines()
-            assert line_no <= len(gen_lines), (
-                f"{key}: evidence line {line_no} exceeds generated file ({len(gen_lines)} lines)")
+def _anchor_errors_for_entry(root, where, key, evidence, prefix, source_rel,
+                             require_read):
+    """All anchor errors of one registry entry (empty list = healthy).
 
-        lines = source.read_text(encoding="utf-8").splitlines()
-        assert 1 <= line_no <= len(lines), (
-            f"{key}: evidence line {line_no} exceeds source file ({len(lines)} lines)")
-        text = lines[line_no - 1]
+    Fails hard on: a line-number anchor, an anchor for another key, a missing
+    source file, a missing marker, a duplicated marker, a marker that sits on a
+    line other than the key read (or on prose), so the M7 failure class
+    ("line mentions the key somewhere") can never pass again.
+    """
+    evidence = str(evidence)
+    if _LEGACY_LINE_ANCHOR_RE.match(evidence):
+        return [
+            f"{where}: line-number anchor {evidence!r} is not accepted; "
+            f"use '<path>#{prefix}:{key}'"
+        ]
+
+    match = _ANCHOR_RE.match(evidence)
+    if not match:
+        return [
+            f"{where}: unparseable evidence {evidence!r}; "
+            f"expected '<path>#{prefix}:{key}'"
+        ]
+
+    expected = f"{prefix}:{key}"
+    anchor = match["anchor"]
+    if anchor != expected:
+        return [
+            f"{where}: anchor {anchor!r} belongs to another key; "
+            f"expected {expected!r}"
+        ]
+
+    source = Path(root) / str(source_rel)
+    if not source.is_file():
+        return [f"{where}: source file {source_rel} is missing"]
+
+    lines = source.read_text(encoding="utf-8", errors="replace").splitlines()
+    marker = _marker_re(anchor)
+    hits = [number for number, line in enumerate(lines, start=1) if marker.search(line)]
+    if not hits:
+        return [f"{where}: marker '# {anchor}' is missing in {source_rel}"]
+    if len(hits) > 1:
+        return [
+            f"{where}: marker '# {anchor}' is ambiguous in {source_rel} "
+            f"(lines {hits}); a marker must anchor exactly one line"
+        ]
+
+    if not require_read:
+        # Credentials have no read expression; the file must at least name the
+        # key (outside the marker comment itself) so a stale path cannot point
+        # at an unrelated file.
+        text = "\n".join(marker.sub("", line) for line in lines)
         tail = key.split(".")[-1]
-        assert "project.yaml" in text or key in text or tail in text, (
-            f"{key}: line {entry['reader']}:{line_no} does not mention "
-            f"`project.yaml` or `{key}`: {text!r}")
+        if key not in text and tail not in text:
+            return [
+                f"{where}: {source_rel} neither names {key!r} nor its leaf "
+                f"{tail!r}"
+            ]
+        return []
+
+    line = lines[hits[0] - 1]
+    code = marker.sub("", line)
+    tail = key.split(".")[-1]
+    if tail not in code:
+        return [
+            f"{where}: {source_rel}:{hits[0]} does not read key {key!r}: "
+            f"{line.strip()!r}"
+        ]
+    if not _READ_CALL_RE.search(code):
+        return [
+            f"{where}: {source_rel}:{hits[0]} is prose, not a config read: "
+            f"{line.strip()!r}"
+        ]
+    return []
 
 
-def test_a_credential_key_evidence_paths_exist():
-    for entry in _registry()["credentials"]["keys"]:
-        match = _EVIDENCE_RE.match(str(entry["evidence"]))
-        assert match, f"{entry['key']}: unparseable evidence {entry['evidence']!r}"
-        path = _ROOT / match["path"]
-        assert path.is_file(), f"{entry['key']}: evidence path {match['path']} is missing"
-        assert int(match["line"]) <= len(path.read_text(encoding="utf-8").splitlines())
+def _registry_anchor_errors(registry, root):
+    """All anchor errors of a registry mapping, resolved against *root*."""
+    errors = []
+    for entry in registry.get("readers") or []:
+        key = str(entry["key"])
+        reader = str(entry["reader"])
+        evidence = str(entry["evidence"])
+        errors.extend(_anchor_errors_for_entry(
+            root, f"readers[{key}]", key, evidence, READER_PREFIX, reader,
+            require_read=True))
+        if "#" in evidence:
+            evidence_path = evidence.split("#", 1)[0]
+            if Path(evidence_path).name != Path(reader).name:
+                errors.append(
+                    f"readers[{key}]: evidence path {evidence_path!r} is not a "
+                    f"copy of reader {reader!r}")
+    for entry in (registry.get("credentials") or {}).get("keys") or []:
+        key = str(entry["key"])
+        evidence = str(entry["evidence"])
+        errors.extend(_anchor_errors_for_entry(
+            root, f"credentials.keys[{key}]", key, evidence,
+            CREDENTIAL_PREFIX, evidence.split("#", 1)[0], require_read=False))
+    return errors
+
+
+def test_a_registry_anchors_are_unique_key_markers():
+    """Every entry resolves to exactly one marker on the line that reads the key."""
+    errors = _registry_anchor_errors(_registry(), _ROOT)
+    assert errors == [], "\n".join(errors)
+
+
+# --- negative guards: each failure mode is a hard error, not a warning -------
+
+_READER = "hooks/1-generic/dod-push-check.sh"
+_READ_LINE = (
+    'TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")'
+    '  # runtime-reader:variables.TEST_COMMAND\n'
+)
+# The M7 fixture: an `echo` line that mentions both `project.yaml` and the key,
+# immediately followed by the real read.
+_PROSE_THEN_READ = (
+    'CONFIG="$PWD/.meta-config/project.yaml"\n'
+    'echo "Set variables.TEST_COMMAND in .meta-config/project.yaml"'
+    '  # runtime-reader:variables.TEST_COMMAND\n'
+    'TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")\n'
+)
+
+
+def _write_source(root, rel, text):
+    path = Path(root) / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _reader_registry(key, evidence, reader=_READER):
+    return {"readers": [{"key": key, "reader": reader,
+                         "evidence": evidence, "effect": "test"}]}
+
+
+def test_a_line_number_anchor_is_rejected_even_when_the_line_mentions_the_key(tmp_path):
+    """M7 regression: the old ``:1119`` anchor pointed at an ``echo`` line that
+    happened to contain ``project.yaml``. That anchor type is now a hard error,
+    although the old "mentions the key" predicate would still go green."""
+    _write_source(tmp_path, _READER, _PROSE_THEN_READ)
+    old_line = _PROSE_THEN_READ.splitlines()[1]
+    assert "project.yaml" in old_line and "TEST_COMMAND" in old_line
+
+    errors = _registry_anchor_errors(
+        _reader_registry("variables.TEST_COMMAND",
+                         ".claude/hooks/dod-push-check.sh:2"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "line-number anchor" in errors[0]
+
+
+def test_a_marker_on_a_prose_line_is_rejected(tmp_path):
+    """Same line, now with a marker: the marker must sit on the read itself."""
+    _write_source(tmp_path, _READER, _PROSE_THEN_READ)
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "is prose, not a config read" in errors[0]
+
+
+def test_a_missing_marker_is_an_error(tmp_path):
+    _write_source(tmp_path, _READER,
+                  'TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")\n')
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "is missing" in errors[0]
+
+
+def test_a_duplicate_marker_is_an_error(tmp_path):
+    _write_source(tmp_path, _READER, _READ_LINE + _READ_LINE)
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "is ambiguous" in errors[0]
+
+
+def test_a_marker_in_another_file_does_not_count(tmp_path):
+    """The marker must live in the file the registry names as `reader`."""
+    _write_source(tmp_path, "hooks/1-generic/other-hook.sh", _READ_LINE)
+    _write_source(tmp_path, _READER, "echo no-read-here\n")
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert f"is missing in {_READER}" in errors[0]
+
+
+def test_a_evidence_path_must_match_the_named_reader(tmp_path):
+    _write_source(tmp_path, _READER, _READ_LINE)
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/other-hook.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "is not a copy of reader" in errors[0]
+
+
+def test_a_marker_for_another_key_is_an_error(tmp_path):
+    _write_source(
+        tmp_path, _READER,
+        'TEST_TIMEOUT=$(read_config_var "$CONFIG_FILE" "TEST_TIMEOUT")'
+        '  # runtime-reader:variables.TEST_TIMEOUT\n')
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_TIMEOUT"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "belongs to another key" in errors[0]
+
+
+def test_a_marker_on_a_read_of_another_key_is_an_error(tmp_path):
+    _write_source(
+        tmp_path, _READER,
+        'TEST_TIMEOUT=$(read_config_var "$CONFIG_FILE" "TEST_TIMEOUT")'
+        '  # runtime-reader:variables.TEST_COMMAND\n')
+    errors = _registry_anchor_errors(
+        _reader_registry(
+            "variables.TEST_COMMAND",
+            ".claude/hooks/dod-push-check.sh#runtime-reader:variables.TEST_COMMAND"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "does not read key" in errors[0]
+
+
+def _credential_registry(key, evidence):
+    return {"credentials": {"keys": [{"key": key, "evidence": evidence}]}}
+
+
+def test_a_credential_marker_is_required(tmp_path):
+    _write_source(tmp_path, "scripts/lib/permissions.py", "token = None\n")
+    errors = _registry_anchor_errors(
+        _credential_registry(
+            "admin-ui.token",
+            "scripts/lib/permissions.py#credential-key:admin-ui.token"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "is missing" in errors[0]
+
+
+def test_a_credential_marker_must_point_at_a_file_that_names_the_key(tmp_path):
+    _write_source(
+        tmp_path, "scripts/lib/unrelated.py",
+        "# credential-key:admin-ui.token\n"
+        "def nothing_to_do_here():\n"
+        "    return 1\n")
+    errors = _registry_anchor_errors(
+        _credential_registry(
+            "admin-ui.token",
+            "scripts/lib/unrelated.py#credential-key:admin-ui.token"),
+        tmp_path)
+    assert len(errors) == 1
+    assert "neither names" in errors[0]
 
 
 # ------------------------------------------------------------ (b) ratchet

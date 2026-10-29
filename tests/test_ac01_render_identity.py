@@ -333,6 +333,118 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   paths. No agent or rule template touched and no golden (``slimming-golden``/``compact-golden``)
   touched; ``AC01_EXCEPTIONS`` is NOT extended (no blanket pattern, no widened regex).
 
+- Issue #1033 (``dod-push-check`` 2.1.6 de-duplicated branch list, 2026-10-27): the hook template edit
+  changes the rendered hook, so exactly one hash moved and was rebaselined:
+  ``Claude/.claude/hooks/dod-push-check.sh`` (``3f53fa17…`` -> ``f9823b65…``, 1 of 1085 hashes).
+  Only Claude renders the hook - no other provider artifact, ``AGENTS.md`` or ``context-hashes.json``
+  changed, and no golden (``slimming-golden``/``compact-golden``) was touched.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Welle 2 (#949/#951/#953/#954; ``dod-push-check`` 2.1.7, ``hook_common.sh`` 1.1.0, 2026-10-27): the
+  hardened git-push flag/short-cluster walk and the shared protected-branch helper change two rendered
+  hook files. Affected: ``Claude/.claude/hooks/dod-push-check.sh`` (2.1.6 -> 2.1.7),
+  ``Claude/.claude/hooks/lib/hook_common.sh`` and ``Gemini/.agents/hooks/lib/hook_common.sh`` (-> 1.1.0).
+  Pending sync, hashes land with the sync run. Only Claude renders ``dod-push-check`` and only
+  Claude/Gemini render the hook lib - no other provider artifact, ``AGENTS.md`` or
+  ``context-hashes.json`` changes, and no golden (``slimming-golden``/``compact-golden``) is touched.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Hook hardening rebaseline after the sync write run (2026-10-28, ``fix/bug-session-2026-10-27``):
+  completes the "Welle 2" entry above and absorbs the remaining hook edits of the series
+  (``hook_common.sh`` 1.2.0, ``orchestrator-guard-impl.sh`` 1.8.0, ``repo-containment-impl.sh``
+  1.3.0, ``repo-containment.sh`` 1.1.0, ``antigravity-json-adapter.sh`` comment). A full re-render
+  of the provider matrix measured **10 of 1085 hashes changed; 0 added/removed**: the 5 Claude
+  hook renders (``dod-push-check.sh``, ``lib/hook_common.sh``, ``orchestrator-guard-impl.sh``,
+  ``repo-containment-impl.sh``, ``repo-containment.sh``) and the 5 Gemini ``.agents/hooks``
+  counterparts (``antigravity-json-adapter.sh``, ``lib/hook_common.sh``, ``orchestrator-guard-impl.sh``,
+  ``repo-containment-impl.sh``, ``repo-containment.sh``). Only Claude renders ``dod-push-check`` and
+  only Gemini renders ``antigravity-json-adapter``, hence 5+5 rather than 6+6. No agent/rule artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden (``slimming-golden``/``compact-golden``) changed.
+  The manifest was patched **per entry** (10 single-line replacements, 1077 lines untouched) — not
+  via ``--write`` — and every new digest was independently recomputed from the rendered file bytes
+  before being written. The repo's own ``.meta-config/generated-file-hashes.json`` was refreshed by
+  the sync's post-write capture stage (same 10 entries); it was verified against the on-disk deployed
+  files (375/375 entries consistent, 0 stale). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Issue #1037 (``AGENT_META_REPO`` builder derivation, 2026-10-28, ``fix/bug-session-2026-10-27``):
+  ``build_variables()`` now derives the upstream ``owner/repo`` slug when a project has no explicit
+  ``variables.AGENT_META_REPO`` entry (source: the embedded ``.gitmodules`` URL, else the agent-meta
+  checkout's own git remote) instead of shipping a literal ``{{AGENT_META_REPO}}``. The matrix
+  fixture therefore pins ``AGENT_META_REPO: example/agent-meta``: an unpinned value would be derived
+  from the *cloning* remote and make this baseline fork-dependent (the derivation itself is covered
+  end-to-end by scenario ``87-project-description``). A full re-render measured **36 of 1085 hashes
+  changed; 0 added/removed** — the 9 copied ``.meta-config/project.yaml`` fixtures (new pinned line)
+  plus exactly ``agent-meta-scout``/``documenter``/``meta-feedback`` × 9 providers. No rule artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden (``slimming-golden``/``compact-golden``) changed.
+  The manifest was patched **per entry** (36 single-line replacements, everything else untouched) and
+  re-verified against the rendered bytes; ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Issues #983/#1037 (placeholder fallbacks, ``project.description``, escaped reference examples,
+  2026-10-28, ``fix/bug-session-2026-10-27``): the 36 verified single-entry changes above move the
+  ``ac01-baseline`` fixture tree, so its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows
+  the rebaselined tree. The digest was recomputed from the fixture bytes
+  (``9ead7c80…``) before re-pinning; ``slimming-golden`` and ``compact-golden`` are unchanged.
+
+- Welle 6 (#943/#944; ``hook_common.sh`` 1.2.0 -> 1.3.0, ``orchestrator-guard-impl.sh`` 1.8.0 ->
+  1.9.0, ``repo-containment-impl.sh`` 1.3.0 -> 1.4.0, 2026-10-29, ``fix/bug-session-2026-10-27``):
+  three hook templates changed, so **6 of 1085 hashes moved; 0 added/removed** — both Claude and
+  Gemini render all three hooks, hence 3+3 rather than 5+5 as in the wave-2 entry above.
+  ``Claude/.claude/hooks/lib/hook_common.sh`` (``64232380…`` -> ``9c9f93de…``),
+  ``Claude/.claude/hooks/orchestrator-guard-impl.sh`` (``1decf629…`` -> ``dd180856…``),
+  ``Claude/.claude/hooks/repo-containment-impl.sh`` (``27931566…`` -> ``a19a9341…``) and the
+  ``Gemini/.agents/hooks`` counterparts (``lib/hook_common.sh`` ``64232380…`` -> ``9c9f93de…``,
+  ``orchestrator-guard-impl.sh`` ``500d68af…`` -> ``38ef9f41…``, ``repo-containment-impl.sh``
+  ``973eb45c…`` -> ``b9168700…``). No agent/rule artifact, ``AGENTS.md``, ``context-hashes.json``
+  or golden content changed; ``compact-golden`` and ``slimming-golden`` digests were re-verified as
+  unchanged. The manifest was patched **per entry** (6 single-line replacements, 1079 lines
+  untouched) — not via ``--write`` — after independently recomputing each digest from the rendered
+  file bytes; the repo's own ``.meta-config/generated-file-hashes.json`` was refreshed by the sync's
+  post-write capture stage (same 6 entries). Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``9ead7c80…`` -> ``b644e7cc…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+
+- Review findings F1-F5 (wave-6 hook fixes; ``hook_common.sh`` 1.3.0 -> 1.3.1,
+  ``orchestrator-guard-impl.sh`` 1.9.0 -> 1.9.1, ``repo-containment-impl.sh``
+  1.4.0 -> 1.4.1, 2026-10-29, ``fix/bug-session-2026-10-27``): the ANSI-C /
+  dynamic-heredoc / comment splitter fixes, the command-wrapper + ``case`` +
+  function-body classification and the fail-closed fixed jail root change the
+  same three hook templates, so **6 of 1085 hashes moved; 0 added/removed** --
+  ``Claude/.claude/hooks`` and ``Gemini/.agents/hooks`` for ``lib/hook_common.sh``
+  (``9c9f93de…`` -> ``40b5cbf6…``), ``orchestrator-guard-impl.sh`` (Claude
+  ``dd180856…`` -> ``6b5db2c3…``, Gemini ``38ef9f41…`` -> ``e58cac4e…``) and
+  ``repo-containment-impl.sh`` (Claude ``a19a9341…`` -> ``559a4fa1…``, Gemini
+  ``b9168700…`` -> ``0ea36712…``). No agent/rule artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched
+  **per entry** (6 single-line replacements, 1079 lines untouched) after
+  independently recomputing each digest from the rendered file bytes; the
+  ``ac01-baseline`` AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows
+  the rebaselined tree (``b644e7cc…`` -> ``5da1fbad…``). ``AC01_EXCEPTIONS`` is
+  NOT extended.
+
+- Final state of the wave-6 series (#943/#944; ``hook_common.sh`` 1.3.1 -> 1.4.0,
+  ``orchestrator-guard-impl.sh`` 1.9.1 -> 1.9.2, ``repo-containment-impl.sh``
+  1.4.1 -> 1.5.0, 2026-10-29, ``fix/bug-session-2026-10-27``): the deployed
+  ``.claude/hooks``/``.agents/hooks`` copies still carried the F1-F5 revisions, so
+  the sync run that brings them to the final revisions moves **6 of 1085 hashes;
+  0 added/removed** -- ``Claude/.claude/hooks`` and ``Gemini/.agents/hooks`` for
+  ``lib/hook_common.sh`` (``40b5cbf6…`` -> ``2433634e…``, one identical render for
+  both providers: the lib carries no ``{{AGENT_META_PROVIDER}}``),
+  ``orchestrator-guard-impl.sh`` (Claude ``6b5db2c3…`` -> ``9bf5e0e2…``, Gemini
+  ``e58cac4e…`` -> ``9143c0d3…``) and ``repo-containment-impl.sh`` (Claude
+  ``559a4fa1…`` -> ``04006165…``, Gemini ``0ea36712…`` -> ``fd02819b…``). Only
+  these three hooks are rendered by both providers, hence 3+3 and not the 5+5 of
+  the wave-2 entry. No agent/rule artifact, ``AGENTS.md``, ``context-hashes.json``
+  or golden content changed. The manifest was patched **per entry** (6 single-line
+  replacements, 1081 of the 1087 lines untouched) -- not via ``--write`` -- after independently
+  recomputing each digest from the rendered file bytes with the harness's own
+  ``_hash_file``. The repo's own ``.meta-config/generated-file-hashes.json`` was
+  refreshed by the sync's post-write capture stage (same 6 entries). Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``5da1fbad…`` -> ``6bb30524…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``5642151d…``/``9d854180…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -389,7 +501,11 @@ def _make_project(root: Path, provider: str) -> Path:
         'agent-meta-version: "2.0.0-beta.1"\n'
         f"ai-providers:\n- {provider}\n"
         "dod-preset: rapid-prototyping\n"
-        "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n",
+        # AGENT_META_REPO is pinned to a neutral slug: since issue #1037 the
+        # builder derives it from the checkout, and a derived value would make
+        # this manifest depend on the cloning remote (fork CI would drift).
+        "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n"
+        "  AGENT_META_REPO: example/agent-meta\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)

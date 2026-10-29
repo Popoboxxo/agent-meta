@@ -114,6 +114,8 @@ agent-meta besitzt in `opencode.json` nur die folgenden Pfade:
 - `mcp.servers.<name>` — nur Server-Namen aus dem aktiven Katalog
 - `default_agent` — nur auf Tier `permission` (v1 und v2 vor C3)
 
+Der Deny (v1-Map wie v2-Tripel) wird nur geschrieben, solange die Datei einen gültigen `default_agent` trägt: Deny und funktionierender Einstiegspunkt sind **eine** Invariante (D1a, `bb7fd43c`, `f1030e12`). Fehlt der Wert oder ist er unbrauchbar (leer, kein String), wird ein verwalteter Deny zurückgenommen und genau eine laute Warnung nennt den Zustand („SUSPENDED").
+
 `cli.json` wird je Top-Level-Key des `cli`-Objekts verwaltet. Alles andere bleibt unangetastet:
 `plugin`/`plugins`, `instructions`, `model`, `$schema`, `theme`, fremde `mcp`-Server und
 User-Einträge in `permissions[]` überleben einen Sync unverändert.
@@ -349,11 +351,13 @@ ai-providers:
 6. **v1-MCP-Writer (R-15)** — der eingefrorene v1-Pfad ersetzt den flachen `mcp`-Block
    vollständig; bei aktiven Servern gehen eigene `mcp`-Einträge verloren. Der Migrationspfad ist
    v2 mit verwalteten Pfaden je Server.
-7. **`default_agent` auf Tier `plugin` (Amendment B4)** — auf v2 läuft der Managed-Merge für
+7. **`default_agent` auf Tier `plugin`** — auf v2 läuft der Managed-Merge für
    `default_agent` nicht mehr (die Spec-A-Aufrufbedingung ist Tier `permission`). `settings-init`
    schreibt den Wert einmalig; ein später gelöschter Wert wird nicht wieder ergänzt und ein
-   abweichender User-Wert erzeugt keine Warnung. Der Schutz liegt auf der Agent-Ebene und in den
-   `permissions[]`-Tripeln.
+   abweichender User-Wert erzeugt keine Warnung. **Seit D1a(iii) (`f1030e12`) hängt der Deny daran:**
+   ohne gültigen `default_agent` werden die `permissions[]`-Tripel zurückgenommen (genau eine laute
+   Warnung), statt halbaktiv stehenzubleiben. Der Schutz liegt auf der Agent-Ebene und in den
+   Tripeln — solange der Einstiegspunkt gültig ist.
 8. **Plugin ist observe-only** — das v2-Gate-Plugin protokolliert nur; es blockiert keine
    Tool-Calls. Die Durchsetzung trägt weiterhin der Permission-Deny. `MODE=enforce` bleibt bis
    zum bestandenen P6-Test gesperrt.

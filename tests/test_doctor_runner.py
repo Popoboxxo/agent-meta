@@ -342,6 +342,20 @@ def test_file_size_lines(tmp_path, monkeypatch):
     assert finding.verified_state == "DOCUMENTED"
 
 
+def test_instruction_soft_cap_is_retired(tmp_path, monkeypatch):
+    """Issue #1035 (retired, not fixed): the 4000-char cap was a Code-Review
+    visibility heuristic from an unverified audit quote (verified-state
+    DOCUMENTED), not a provider limit on reading the file, and a consumer edit
+    to the synced instruction file is overwritten on the next sync. The registry
+    therefore carries no such seed any more: an oversized `rules_dir` artifact
+    yields no finding, and the seed is not merely skipped by a predicate."""
+    assert "instruction-soft-cap-chars" not in {e["id"] for e in _REGISTRY["issues"]}
+    put(tmp_path, ".github/instructions/a2a-delegation-gates.instructions.md", "x" * 6972)
+    report = run(tmp_path, monkeypatch, _REGISTRY["issues"], providers=("Copilot",))
+    assert by_issue(report, "instruction-soft-cap-chars") == []
+    assert "instruction-soft-cap-chars" not in {issue for issue, _ in report.skipped}
+
+
 # ---------------------------------------------------------------- kind: regex
 
 def test_regex_agent_name_suffix(tmp_path, monkeypatch):
@@ -394,6 +408,26 @@ def test_path_exists_required_suffix(tmp_path, monkeypatch):
     assert finding.verified_state == "UNVERIFIED"
     put(tmp_path, ".claude/rules/plain.md")      # no suffix required => predicate false
     assert run(tmp_path, monkeypatch, ids, providers=("Claude",)).findings == ()
+
+
+def test_path_exists_glob_ignores_dotfiles(tmp_path, monkeypatch):
+    """Issue #1034: dot-prefixed manifests are not rule files."""
+    ids = real("rules-file-wrong-suffix")
+    put(tmp_path, ".github/instructions/good.instructions.md")
+    put(tmp_path, ".github/instructions/.agent-meta-managed", "good.instructions.md\n")
+    put(tmp_path, ".github/instructions/.agent-meta-managed-mcp", "mcp\n")
+    put(tmp_path, ".github/instructions/.agent-meta-managed-tools", "tools\n")
+    assert run(tmp_path, monkeypatch, ids, providers=("Copilot",)).findings == ()
+
+
+def test_directory_enumeration_ignores_dotfiles(tmp_path, monkeypatch):
+    """Issue #1034: the dir-wide enumeration skips dotfiles as well."""
+    e = entry("df1", {"kind": "regex", "pattern": "TODO", "expect": "match"},
+              target={"artifact": "rules_dir"})
+    put(tmp_path, ".claude/rules/rule.md", "TODO here\n")
+    assert [f.file for f in run(tmp_path, monkeypatch, [e]).findings] == [".claude/rules/rule.md:1"]
+    put(tmp_path, ".claude/rules/.managed", "TODO here\n")
+    assert [f.file for f in run(tmp_path, monkeypatch, [e]).findings] == [".claude/rules/rule.md:1"]
 
 
 def test_path_exists_bind_then_project_role(tmp_path, monkeypatch):

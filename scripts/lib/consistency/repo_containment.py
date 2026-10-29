@@ -77,14 +77,21 @@ def _is_truthy(value: object) -> bool:
 def check_repo_containment_support(
     project_root: Path, config: dict, provider_config: dict
 ) -> list[Finding]:
-    """Warn when repo-containment is effectively active for a provider with no
+    """Warn when repo-containment is effectively active for provider(s) with no
     mirrored PreToolUse hook (``provider_hooks_supported(pc) == false``).
 
     Containment defaults to enabled, so this warning can fire even when the
     project never wrote a ``repo_containment`` block -- that is the intended
     visibility for the "default ON but only a prompt convention here" gap.
+
+    Issue #1036: the per-provider warning is aggregated into ONE project-wide
+    finding that names every affected provider. Detection is unchanged (same
+    effective-state resolver, same hook-support predicate, same severity); only
+    the aggregation changed, mirroring the single-notice pattern already used
+    for ``orchestrator-strict``. A default project with seven hook-less
+    providers emits one WARNING instead of seven.
     """
-    findings: list[Finding] = []
+    affected: list[tuple[str, str]] = []
 
     active_providers = providers_lib.resolve_providers(config, provider_config)
     for provider in active_providers:
@@ -99,19 +106,25 @@ def check_repo_containment_support(
             if not pc.get("has_hooks", False)
             else "has_hooks: true but no verified hook_protocol"
         )
-        findings.append(Finding(
-            Severity.WARNING,
-            "repo-containment.no-hook-support",
-            ".meta-config/project.yaml",
-            f"repo_containment is active for provider '{provider}', but this "
-            f"provider has no PreToolUse hook wiring (config/ai-providers.yaml: "
-            f"{reason}) -- containment has no runtime effect there and works only "
-            f"as a prompt convention.",
-            f"Add a repo_containment.provider-overrides entry to scope containment "
-            f"to hook-capable providers only, or accept that writes are not gated "
-            f"on '{provider}'.",
-        ))
-    return findings
+        affected.append((provider, reason))
+
+    if not affected:
+        return []
+
+    providers_text = ", ".join(
+        f"'{provider}' ({reason})" for provider, reason in affected
+    )
+    return [Finding(
+        Severity.WARNING,
+        "repo-containment.no-hook-support",
+        ".meta-config/project.yaml",
+        f"repo_containment is active for {len(affected)} provider(s) without "
+        f"PreToolUse hook wiring: {providers_text} -- containment has no runtime "
+        f"effect there and works only as a prompt convention.",
+        "Add repo_containment.provider-overrides entries to scope containment to "
+        "hook-capable providers only, or accept that writes are not gated on these "
+        "providers.",
+    )]
 
 
 def _check_wrapper_markers(meta: dict, relpath: str) -> list[Finding]:

@@ -496,7 +496,7 @@ def _load_viz_config(root: Path) -> dict:
         _ensure_scripts_on_path(root)
         from lib.config import load_config
         config = load_config(config_path)
-        viz_cfg = config.get("viz") or {}
+        viz_cfg = config.get("viz") or {}  # runtime-reader:viz
         server_cfg = viz_cfg.get("server") or {}
         mcp_cfg = viz_cfg.get("mcp") or {}
         report_cfg = viz_cfg.get("report") or {}
@@ -539,11 +539,11 @@ def _load_admin_ui_config(root: Path) -> dict:
         _ensure_scripts_on_path(root)
         from lib.config import load_config
         config = load_config(config_path)
-        admin_cfg = config.get("admin-ui") or {}
+        admin_cfg = config.get("admin-ui") or {}  # runtime-reader:admin-ui
         return {
             "bind_host":     str(admin_cfg.get("bind-host", DEFAULT_HOST)),
             "token":         admin_cfg.get("token"),
-            "token_file":    admin_cfg.get("token-file"),
+            "token_file":    admin_cfg.get("token-file"),  # credential-key:admin-ui.token-file
             "allowed_hosts": list(admin_cfg.get("allowed-hosts", list(DEFAULT_ALLOWED_HOSTS))),
             "enabled":       bool(admin_cfg.get("enabled", True)),
             "port":          int(admin_cfg.get("port", DEFAULT_PORT)),

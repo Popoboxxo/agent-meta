@@ -1047,6 +1047,9 @@ issues:
     introduced-in: <agent-meta-version|null>
     fixed-in: <agent-meta-version|null>         # Runner überspringt, wenn VERSION ≥ fixed-in
 ```
+
+> **Extended (2026-10-27, D7, `26d2affa`).** `fix-owner` accepts a fourth value, `agent-meta`, for a **sync-owned framework artifact**: the fix is a template/sync change, and a consumer edit to the artifact would be overwritten on the next sync. First user: `instruction-soft-cap-chars` (`config/known-issues.yaml`). `project-config` stays the owner for project-owned configuration (the four seeds that carry it are unchanged), and the §4.5 sentence "Fixes führt ausschließlich `agent-meta-manager` bzw. ein Framework-Issue/PR aus" is read with this fourth owner. *(Retired 2026-10-29, #1035 — not fixed: that first user was withdrawn, so no shipped seed carries the `agent-meta` value any more; the value itself stays in the grammar.)*
+
 Detektor-Felder:
 
 | kind | Felder | Semantik |
@@ -1095,7 +1098,7 @@ Seed-Einträge (Phase 0; `verified-state` aus Studie, nichts darüber hinaus):
 |---|---|---|---|---|
 | `context-hard-cap-truncation` | `context_hard_cap_bytes` present | `file-size` bytes `≥` `limit_key` | ERROR | VERIFIED-RUNTIME (Codex, Studie §3.2) |
 | `context-soft-cap-bytes` | `context_soft_cap_bytes` present | `file-size` bytes | WARNING | VERIFIED-SOURCE (Kimi, Studie §3.5) |
-| `instruction-soft-cap-chars` | `context_soft_cap_chars` present | `file-size` chars | WARNING | UNVERIFIED (Copilot 4,000; Antigravity 12,000) |
+| `instruction-soft-cap-chars` | `context_soft_cap_chars` present | `file-size` chars | WARNING | UNVERIFIED (Copilot 4,000; Antigravity 12,000). **Retired 2026-10-29 (#1035) — not fixed**, see note below the table |
 | `context-soft-cap-lines` | `context_soft_cap_lines` present | `file-size` lines | WARNING | DOCUMENTED (Claude 200) |
 | `dangling-pointer` | — | `finding-ref` `context.dangling-pointer` | ERROR | VERIFIED-RUNTIME (Studie §4.4) |
 | `rule-unreachable` | — | `finding-ref` `context.rule-unreachable` | ERROR | VERIFIED-RUNTIME |
@@ -1123,12 +1126,14 @@ Seed-Einträge (Phase 0; `verified-state` aus Studie, nichts darüber hinaus):
 `agent_ext` ist ein bestehender Key laut Studie §10.1 (Artefakt-Contract); exakter Key-Name UNVERIFIED (Planer prüft).
 Je Eintrag Fixtures `tests/fixtures/doctor/<id>/{positive,negative}/` (QG-10).
 
+> **Retired (2026-10-29, #1035) — not fixed.** `instruction-soft-cap-chars` is gone from `config/known-issues.yaml`: the 4,000-char Copilot value is a Code-Review visibility heuristic from an unverified audit quote (study `docs/analysis/2026-10-11-context-budget-provider-study.md:311`, `DOCUMENTED`), not a provider limit on reading the file — the retirement record puts the enforced gate content of `rules/1-generic/a2a-delegation-gates.md` at roughly 3700 chars, so a truncation would only cut documentation prose. The seed rows stay as history of the Phase-0 set; do not re-add without a verified provider limit.
+
 (Rev. 3, Review B-6) **Formalisierung der Seeds** (überschreibt die Kurzformen der Tabelle oben, IDs unverändert):
 
 | id | Rev.-3-Formalisierung | Phase-0-Pflicht (AC-37) |
 |---|---|---|
 | `context-hard-cap-truncation` | `verified-state-by-capability` über `surface_verified_state`; Top-Level `verified-state: VERIFIED-SOURCE` (konservativ). Codex-Findings tragen `VERIFIED-RUNTIME` (Studie §3.2), ZCode-Findings `VERIFIED-SOURCE` (Studie §4.2). Die Severity bleibt in beiden Fällen ERROR (kein UNVERIFIED); korrigiert ist nur die je Provider ausgewiesene Evidenz. Die neue Oberfläche `context_file` in `surface_verified_state` wird in IC-09 ergänzt | ja |
-| `instruction-soft-cap-chars` | `verified-state-by-capability`: Copilot-Wert `DOCUMENTED` (Audit-Zitat), Antigravity `UNVERIFIED`; Top-Level `UNVERIFIED` | ja |
+| `instruction-soft-cap-chars` | `verified-state-by-capability`: Copilot-Wert `DOCUMENTED` (Audit-Zitat), Antigravity `UNVERIFIED`; Top-Level `UNVERIFIED`. **Retired 2026-10-29 (#1035) — not fixed**, so the AC-37 requirement no longer applies; the formalisation is kept as history | ja |
 | `unread-channel` | `verified-state` nicht mehr „gemischt": `derive: surface_verified_state.rules` je Provider, Top-Level-Fallback `SOURCE-DERIVED` | ja |
 | `dispatch-depth-missing` | Prädikat `{capability: agent_config_format, op: eq, value: toml}` (Capability-Key, Q21); Detektor `toml-key` `agents.max_depth` `op: lt` `value_key: required_depth` | ja |
 | `dead-variable-code-quality-rules` | Detektor `variable-unreferenced` mit `key: CODE_QUALITY_RULES` (statt `regex`) | ja |
@@ -1892,6 +1897,8 @@ readers:
   `project.yaml` bzw. den Key; (b) Vollständigkeits-Ratchet: ein Grep über `hooks/**/*.sh` nach
   `project.yaml`/`read_config_var` findet keinen Leser, der nicht registriert ist.
 - Quelle nur `agent_meta_root` (wie IC-21).
+
+> **Superseded (2026-10-27, D5, `24233481`).** `evidence` is no longer a line number. It is `<path>#<anchor>`, where the anchor is the marker `# runtime-reader:<key>` (readers) or `# credential-key:<key>` (credentials) and must appear exactly once on the line of `reader` that reads the key (resp. defines the credential path). A missing, duplicated, mis-filed, key-mismatched **or line-number** anchor is rejected by `tests/test_runtime_config_readers.py`. The `…:170`-style values in the YAML block above and in the Rev. 3.1 additions are history; the shipped registry is `config/runtime-config-readers.yaml`.
 
 **(Rev. 3.1, Re-Review N-3, Nutzerentscheidung) Ergänzungen:**
 - **Weitere Laufzeit-Leser (Python), am Code geprüft:**

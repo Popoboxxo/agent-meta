@@ -95,8 +95,11 @@ if not isinstance(d, dict):
 # gate on (orchestrator-guard-impl.sh intercepts Write|Edit|Bash). Names are
 # from the official docs' matcher examples + observed AGY tool-call logs
 # (run_command, write_to_file, replace_file_content, read_file, view_file,
-# list_dir, manage_task); unknown names pass through unchanged — the hook
-# scripts then treat them as non-mutating (fail-open for non-Bash tools).
+# list_dir, manage_task); unknown names pass through unchanged. The
+# fail-closed guards (orchestrator-guard-impl.sh, repo-containment-impl.sh)
+# BLOCK a tool_name outside their shared hook_known_tool_name() list instead
+# of treating it as non-mutating (review finding M2), so a native AGY tool
+# that can write must be mapped above rather than rely on pass-through.
 TOOL_MAP = {
     'run_command': 'Bash',
     'write_to_file': 'Write',

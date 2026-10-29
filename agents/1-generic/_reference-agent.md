@@ -1,6 +1,6 @@
 ---
 name: template-reference-worker
-version: "1.2.0"
+version: "1.2.1"
 description: "Didactic reference template — all agent-meta features in Modern Mode."
 hint: "Teaching-only template — not intended for production delegation."
 prompt_mode: modern
@@ -73,10 +73,10 @@ Format per `<output_contract>`.
 ## Project context
 {{PROJECT_CONTEXT}}
 
-**Goal:** {{PROJECT_GOAL}} | **Languages:** {{PROJECT_LANGUAGES}} | **Tech stack:** {{TECH_STACK}} | **Project:** `{{PROJECT_NAME}}` (prefix `{{PREFIX}}`)
+**Goal:** {{PROJECT_GOAL}} | **Languages:** {{PROJECT_LANGUAGES}} | **Tech stack:** {{%TECH_STACK%}} | **Project:** `{{PROJECT_NAME}}` (prefix `{{PREFIX}}`)
 
 ## Sync variables
-{{PROJECT_NAME}}, {{PREFIX}}, {{EXTENSION_DIR}}, {{SNIPPETS_DIR}}, {{AGENT_RULES}}, {{MAX_PARALLEL_AGENTS}}, {{A2A_MAX_DEPTH}}, {{A2A_T_SIZE_LIMIT}}
+{{PROJECT_NAME}}, {{PREFIX}}, {{EXTENSION_DIR}}, {{SNIPPETS_DIR}}, {{%AGENT_RULES%}}, {{MAX_PARALLEL_AGENTS}}, {{A2A_MAX_DEPTH}}, {{A2A_T_SIZE_LIMIT}}
 
 ## Layer architecture
 `1-generic -> 2-platform -> 3-project/<role>.md -> 0-external`. Extensions (`-ext.md`) are additive.
@@ -118,7 +118,7 @@ Quick reference: `IPayload {t,ctx,con,refs,pri,dep}`, `t` max. {{A2A_T_SIZE_LIMI
 When in doubt, use a higher tier. Max. 1 escalation per task.
 
 ## Language
-User: {{COMMUNICATION_LANGUAGE}} | External docs: {{EXTERNAL_DOCS_LANGUAGE}} | Internal docs: {{INTERNAL_DOCS_LANGUAGE}} | Code: {{CODE_LANGUAGE}}. Details: rule `language.md`.
+User: {{COMMUNICATION_LANGUAGE}} | External docs: {{%EXTERNAL_DOCS_LANGUAGE%}} | Internal docs: {{INTERNAL_DOCS_LANGUAGE}} | Code: {{CODE_LANGUAGE}}. Details: rule `language.md`.
 </context>
 
 <tools>
@@ -172,5 +172,5 @@ NEXT:
 {{#if DOD_SECURITY_AUDIT}}| security audit before release{{/if}}
 
 **Commits:** `<type>(REQ-xxx): <english imperative>`; first line <=72 characters.
-**Language:** User {{COMMUNICATION_LANGUAGE}} | External {{EXTERNAL_DOCS_LANGUAGE}} | Internal {{INTERNAL_DOCS_LANGUAGE}} | Code {{CODE_LANGUAGE}}. Rule `language.md`.
+**Language:** User {{COMMUNICATION_LANGUAGE}} | External {{%EXTERNAL_DOCS_LANGUAGE%}} | Internal {{INTERNAL_DOCS_LANGUAGE}} | Code {{CODE_LANGUAGE}}. Rule `language.md`.
 </constraints>

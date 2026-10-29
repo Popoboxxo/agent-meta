@@ -50,6 +50,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -1547,9 +1548,672 @@ def test_unparseable_payload_fails_closed(raw):
     assert "not valid JSON" in result.stderr
 
 
-def test_empty_payload_is_still_a_noop():
+def test_empty_payload_fails_closed():
+    """Review finding M2: an empty payload is not a documented PreToolUse
+    event -- it used to exit 0 here ("no tool name -> allow"). The guard
+    cannot evaluate a call whose payload never arrived, so it fails closed
+    like repo-containment-impl.sh always did.
+
+    CONFLICT NOTE: this replaces the former test_empty_payload_is_still_a_noop
+    (asserted returncode 0), which pinned exactly the fail-open M2 names.
+    """
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input="", capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT), env=_clean_env(),
     )
-    assert result.returncode == 0
+    assert result.returncode == 2, result.stderr
+    assert "empty PreToolUse payload" in result.stderr
+
+
+# --- review finding M2: payload/tool_name fail-closed ----------------------
+
+def _garbage_python_env(tmp_path) -> dict:
+    """Environment whose `python3` is a shim that EXITS 0 printing junk --
+    the M2 fail-open trigger. The rest of PATH stays intact so bash/cat/
+    dirname/... still work inside the hook."""
+    shim_dir = tmp_path / "garbage-python"
+    shim_dir.mkdir()
+    shim = shim_dir / "python3"
+    shim.write_text("#!/bin/sh\necho garbage\n", encoding="utf-8")
+    shim.chmod(0o755)
+    env = _clean_env()
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def _tool_payload(tool, **extra) -> dict:
+    payload = {"tool_name": tool, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}
+    payload.update(extra)
+    return payload
+
+
+def test_garbage_python_interpreter_fails_closed(tmp_path):
+    """M2: `python3` on PATH that exits 0 printing junk made tool_name
+    'garbage', which matched `*) exit 0` -- the destructive git push below
+    went through. The shared hook_json_usable() gate must block it instead."""
+    env = _garbage_python_env(tmp_path)
+    payload = _bash_payload("git push --force origin main")
+    payload["cwd"] = _PROJECT_ROOT.as_posix()
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT), env=env,
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "does not behave like a Python interpreter" in result.stderr
+
+
+@pytest.mark.parametrize("tool", ["Frobnicate", "bash", "run_command"])
+def test_unknown_tool_name_fails_closed(tool):
+    """M2: an unrecognized tool_name used to hit `*) exit 0` (allow)."""
+    result = _run_hook(_tool_payload(tool))
+    assert result.returncode == 2, result.stderr
+    assert f"unknown tool_name '{tool}'" in result.stderr
+
+
+@pytest.mark.parametrize("payload", [
+    {"tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},                    # missing
+    {"tool_name": None, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}, # null
+    {"tool_name": ["Bash"], "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},  # array
+    {"tool_name": {"name": "Bash"}, "tool_input": {},
+     "cwd": _PROJECT_ROOT.as_posix()},                                      # object
+])
+def test_missing_or_non_scalar_tool_name_fails_closed(payload):
+    """hook_json_get reports null/object/array as "missing"; all of them, and
+    an absent key, are unclassifiable payloads and must block (M2)."""
+    result = _run_hook(payload)
+    assert result.returncode == 2, result.stderr
+    assert "no usable tool_name" in result.stderr
+
+
+@pytest.mark.parametrize("tool", [
+    "Read", "Glob", "Grep", "WebFetch", "WebSearch", "TodoWrite", "Task",
+    "Skill", "mcp__playwright__browser_navigate",
+])
+def test_known_non_mutating_tools_stay_allowed(tool):
+    """M2 must not over-block: every known non-mutating tool keeps passing
+    through untouched (this project's config has orchestrator.strict: true,
+    so the pass-through is proven under strict mode too)."""
+    result = _run_hook(_tool_payload(tool))
+    assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_outdated_helper_lib_fails_closed(tmp_path):
+    """A deployed lib/hook_common.sh from before hook_known_tool_name existed
+    (sync.py not re-run) must block with a clear message instead of failing
+    obscurely on the missing function."""
+    hooks_dir = tmp_path / "hooks"
+    (hooks_dir / "lib").mkdir(parents=True)
+    (hooks_dir / "orchestrator-guard.sh").write_text(
+        _HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "orchestrator-guard-impl.sh").write_text(
+        _IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # Pre-M2 lib surface: no hook_known_tool_name.
+    (hooks_dir / "lib" / "hook_common.sh").write_text(
+        "#!/bin/bash\n"
+        "hook_have_python() { command -v python3 >/dev/null 2>&1; }\n"
+        "hook_python_bin() { printf '%s' python3; }\n"
+        "hook_json_get() { printf '%s' \"${3:-}\"; }\n"
+        "hook_json_usable() { return 0; }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [_BASH, str(hooks_dir / "orchestrator-guard.sh")],
+        input=json.dumps(_bash_payload("git status")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "outdated" in result.stderr
+    assert "hook_common.sh" in result.stderr
+
+
+# --- issue #943: residual guard gaps (W2-B2b) ------------------------------
+# Each case pins one sub-finding from the security review: (a) quadratic
+# fork-bomb regex, (b) subshell grouping, (c) backslash-newline continuation,
+# (d) whole-tree pathspecs, (e) gc immediate pruning, (f) update-ref --stdin
+# deletes, (g) worktree remove --force, (h) force-create/delete branch,
+# (i) false positives, (j) quoted operators / heredoc text, (k) lone-surrogate
+# payload and classifier failure, (l) submodule walk-up, (m) documented gaps,
+# (n) test isolation from the real audit log.
+
+_SENTINEL = "#agent-meta:agent=git\n"
+
+
+def test_fork_bomb_scan_does_not_hang_on_a_300kb_command(tmp_path):
+    """(a) The old regex was quadratic (20 KB ~ 5 s -> hook timeout = allow).
+    The pure-Python 100 ms bound is pinned in test_hook_common_lib.py; here we
+    prove the whole hook still returns promptly for a 300 KB command."""
+    command = "echo " + "a" * 300_000
+    started = time.perf_counter()
+    result = _run_with(_bash_payload(command), tmp_path)
+    elapsed = time.perf_counter() - started
+    assert result.returncode == 0, result.stderr
+    assert elapsed < 5.0, f"300 KB command took {elapsed:.1f}s (quadratic scan?)"
+
+
+def test_subshell_parentheses_do_not_hide_a_destructive_push(tmp_path):
+    """(b) shlex.split('(git push)') produced the token '(git', so the
+    invocation was invisible."""
+    result = _run_with(_bash_payload(_SENTINEL + "(git push --force origin main)"), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_backslash_newline_continuation_keeps_force_flag(tmp_path):
+    """(c) Splitting at '\\n' made 'git push \\<newline> --force' two
+    statements; the force flag was never attributed to the push."""
+    command = _SENTINEL + "git push \\\n--force origin main"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git checkout HEAD -- ./",
+    "git checkout -- '*'",
+    "git checkout :/",
+    "git restore :/",
+    "git restore .",
+    "git restore --source HEAD -- *",
+])
+def test_whole_tree_pathspecs_are_destructive(tmp_path, command):
+    """(d) './', '*', ':/' and 'HEAD -- ./' wipe the whole working tree, but
+    only the literal '.' was recognised."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git checkout -- path/file.txt",
+    "git restore path/file.txt",
+])
+def test_single_path_restore_stays_a_plain_mutation(tmp_path, command):
+    """(d) counter-check: restoring one path is not a whole-tree wipe."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git gc --prune=now",
+    "git -c gc.reflogExpire=now gc --prune=now",
+    "git -c gc.pruneExpire=now gc",
+    "git --config-env gc.reflogExpire=EXPIRY gc",
+])
+def test_immediate_gc_pruning_is_destructive(tmp_path, command):
+    """(e) 'gc --prune=now' (and a gc.*Expire=now config) deletes unreachable
+    objects immediately; neither was classified."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_gc_without_immediate_expiry_is_not_destructive(tmp_path):
+    """(e) counter-check: a plain gc / '=never' expiry is not destructive."""
+    result = _run_with(_bash_payload(_SENTINEL + "git -c gc.reflogExpire=never gc"), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_update_ref_stdin_delete_line_is_destructive(tmp_path):
+    """(f) 'update-ref --stdin' with delete lines was invisible."""
+    command = _SENTINEL + "git update-ref --stdin <<EOF\ndelete refs/heads/main\nEOF"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_update_ref_stdin_without_delete_stays_a_mutation(tmp_path):
+    """(f) counter-check: an inspectable create-only stdin is a plain
+    mutation (allowed with the git sentinel)."""
+    command = _SENTINEL + "git update-ref --stdin <<EOF\ncreate refs/heads/x HEAD\nEOF"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_update_ref_stdin_from_a_pipe_fails_closed(tmp_path):
+    """(f) the pipe body is not visible to the hook -> unclassifiable, so it
+    must be treated as destructive rather than allowed."""
+    result = _run_with(_bash_payload(_SENTINEL + "printf 'delete refs/heads/x\\n' | git update-ref --stdin"), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git worktree remove -f ../wt",
+    "git worktree remove --force ../wt",
+])
+def test_worktree_remove_force_is_destructive(tmp_path, command):
+    """(g) force-removing a worktree discards local modifications."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_worktree_remove_without_force_stays_a_mutation(tmp_path):
+    """(g) counter-check: without --force git refuses a dirty worktree."""
+    result = _run_with(_bash_payload(_SENTINEL + "git worktree remove ../wt"), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git checkout -B main",
+    "git switch -C main",
+    "git branch -f main HEAD",
+    "git branch -D old",
+])
+def test_force_create_and_delete_branch_are_destructive(tmp_path, command):
+    """(h) '-B'/'-C'/'-f'/'-D' reset or delete a branch tip."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git checkout -b x",
+    "git switch -c x",
+    "git branch -d old",
+])
+def test_plain_branch_create_and_merged_delete_stay_mutations(tmp_path, command):
+    """(h) counter-check: lowercase -b/-c create and -d only deletes a merged
+    branch; those remain plain mutations (allowed with the sentinel)."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git checkout -bfoo",              # '-b foo' -- 'f' is part of the value
+    "man git pull",                    # git is an argument to man
+    "git am --show-current-patch",     # read-only
+    "git cherry-pick --abort",         # recovery action
+    "git switch -",                    # previous-branch shorthand
+])
+def test_over_blocked_git_commands_are_allowed_with_sentinel(tmp_path, command):
+    """(i) these were false positives. The real `git` role must be able to run
+    them; the mutation gate itself is unchanged (see the counter-checks)."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    'echo "a; git push --force b"',
+    "cat <<'EOF'\nplan: git push --force\nEOF",
+    "echo 'reset; --hard'",
+])
+def test_operators_and_heredoc_text_are_not_commands(tmp_path, command):
+    """(j) quoted operators and heredoc bodies were split into fake commands,
+    tripping the destructive gate."""
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_command_after_heredoc_terminator_is_still_scanned(tmp_path):
+    """(j)/#944 SR-B-16: skipping the body must not stop scanning after it."""
+    command = "cat <<'EOF'\nprose only\nEOF\ngit push --force origin main"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_lone_surrogate_payload_is_classified_not_dropped(tmp_path):
+    """(k) a lone-surrogate escape used to crash the classifier, which then
+    fell back to 'none' (allow). The destructive push must block."""
+    payload = _bash_payload("git push --force " + chr(0xD800) + " origin main")
+    payload["cwd"] = tmp_path.as_posix()
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload).encode(),
+        capture_output=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 2, result.stderr[:200]
+    assert b"user approval" in result.stderr
+
+
+def test_lone_surrogate_benign_command_is_allowed(tmp_path):
+    """(k) counter-check: the surrogate-safe read must not block a harmless
+    command just because it contains an undecodable byte."""
+    payload = _bash_payload("git status " + chr(0xD800))
+    payload["cwd"] = tmp_path.as_posix()
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload).encode(),
+        capture_output=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 0, result.stderr[:200]
+
+
+def _classifier_python_shim(tmp_path, body: str) -> dict:
+    """PATH whose python3 is the real interpreter EXCEPT for the classifier
+    script (recognised by the MUTATING marker)."""
+    shim_dir = tmp_path / "classifier-shim"
+    shim_dir.mkdir()
+    real = shutil.which("python3") or "python3"
+    shim = shim_dir / "python3"
+    shim.write_text(
+        "#!/bin/sh\n"
+        'case "${2:-}" in\n'
+        "  *MUTATING*) " + body + " ;;\n"
+        "esac\n"
+        'exec "' + real + '" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    env = _clean_env()
+    env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def test_classifier_crash_fails_closed(tmp_path):
+    """(k) the old '|| echo none narrow none' allowed the call whenever the
+    classifier died. A crash must block."""
+    env = _classifier_python_shim(tmp_path, "exit 1")
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_bash_payload("git status")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert "classifier exited rc=1" in result.stderr
+
+
+def test_classifier_garbage_output_fails_closed(tmp_path):
+    """(k) exit 0 with output that is not '<category> <scope> <bom>' is also
+    unevaluable and must block."""
+    env = _classifier_python_shim(tmp_path, "printf 'garbage\\n'; exit 0")
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_bash_payload("git status")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 2, result.stderr
+    assert "malformed output" in result.stderr
+
+
+def _meta_project(path: Path, orchestrator_block: str) -> Path:
+    (path / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (path / ".meta-config" / "project.yaml").write_text(orchestrator_block, encoding="utf-8")
+    return path
+
+
+def test_submodule_meta_config_is_skipped_when_an_enclosing_project_exists(tmp_path):
+    """(l) a nested agent-meta checkout carries its own .meta-config/ (strict
+    here). A session inside it belongs to the enclosing (non-strict) project,
+    so an ordinary Write must not be strict-blocked."""
+    outer = _meta_project(tmp_path / "outer", "orchestrator:\n  mode: default\n")
+    sub = _meta_project(outer / ".agent-meta", "orchestrator:\n  mode: strict\n")
+    deep = sub / "hooks" / "x"
+    deep.mkdir(parents=True)
+    result = _run_with(_MAIN_THREAD_WRITE, deep)
+    assert result.returncode == 0, result.stderr
+
+
+def test_submodule_meta_config_is_the_fallback_when_nothing_encloses_it(tmp_path):
+    """(l) a session opened only inside the submodule still resolves to it."""
+    sub = _meta_project(tmp_path / ".agent-meta", "orchestrator:\n  mode: strict\n")
+    result = _run_with(_MAIN_THREAD_WRITE, sub)
+    assert result.returncode == 2, result.stderr
+    assert "STRICT MODE" in result.stderr
+
+
+def test_header_lists_known_gaps():
+    """(m) the remaining gaps are documented in the implementation header."""
+    header = _IMPL_PATH.read_text(encoding="utf-8").split("\nINPUT=$(cat)", 1)[0]
+    assert "Known gaps" in header
+    for gap in ("command substitution", "heredoc body", "bash -c"):
+        assert gap in header, f"header does not document {gap!r}"
+
+
+def test_strict_cases_never_write_the_repo_audit_log():
+    """(n) STRICT_CASES used to append to the real .claude/hooks/
+    .guard-audit.log (#945 / W2-E2). They run against a temp project now."""
+    real_log = _REPO_ROOT / ".claude" / "hooks" / ".guard-audit.log"
+    before = real_log.read_bytes() if real_log.exists() else None
+    result = _run_hook(_bash_payload("#agent-meta:agent=git\ngit status"))
+    assert result.returncode == 0, result.stderr
+    after = real_log.read_bytes() if real_log.exists() else None
+    assert after == before
+
+
+def test_fork_bomb_text_in_a_heredoc_body_is_not_a_bomb(tmp_path):
+    """(j) a heredoc body is prose; a fork-bomb example in documentation must
+    not trip the destructive gate."""
+    command = "cat <<'EOF'\n:(){ :|:& };:\nEOF"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_commented_out_fork_bomb_is_not_a_bomb(tmp_path):
+    """(j) a commented-out command is not code (the sentinel line already
+    relies on this)."""
+    command = "# :(){ :|:& };:\necho hi"
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+# --- review findings F1-F4: splitter / command-word regressions ----------
+# Wave-6 made the shared scanner quote/heredoc-aware and introduced
+# command_start(). Both are right, but they dropped four blocking paths that
+# HEAD still caught (F1-F4). These pin each one end to end.
+
+
+@pytest.mark.parametrize("command", [
+    "echo $'it\\'s'; git push --force origin main",
+    "echo $'it\\'s'; rm -rf /",
+])
+def test_f1_ansi_c_quoting_does_not_swallow_a_later_command(tmp_path, command):
+    """F1: $'it\\'s' desynced the quote state, so the whole rest of the line
+    (force push / recursive rm) became invisible. The destructive gate must
+    still block even with the git sentinel."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "cat <<$X\nX\ngit push --force origin main",
+    "cat <<${X}\nX\ngit push --force origin main",
+    "cat <<`X`\nX\ngit push --force origin main",
+    'cat <<"$X"\nX\ngit push --force origin main',
+])
+def test_f2_dynamic_heredoc_delimiter_does_not_hide_the_body(tmp_path, command):
+    """F2: a delimiter the scanner cannot resolve must not suppress an
+    unknown amount of following input (fail closed)."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "timeout 30 git push --force origin main",
+    "flock /tmp/l git push --force origin main",
+    "setsid git push --force origin main",
+    "watch git push --force origin main",
+    "strace git push --force origin main",
+    "chroot /x git push --force origin main",
+    "busybox git push --force origin main",
+    "case x in x) git push --force;; esac",
+    "f(){ git push --force; }; f",
+    "function f { git push --force; }; f",
+])
+def test_f3_wrappers_case_arms_and_function_bodies_are_classified(tmp_path, command):
+    """F3: command_start() only inspected the first word per statement, so a
+    wrapper, a `case` arm or an inline function body hid the real command."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "timeout 30 git commit -m x",
+    "flock /tmp/l git commit -m x",
+])
+def test_f3_wrapped_mutation_still_hits_the_mutation_gate(tmp_path, command):
+    """F3 second half: without a git sentinel a wrapped `git commit` was not
+    even seen as a mutation."""
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations are forbidden" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "timeout 30 man git pull",
+    "timeout 30 echo git push --force origin main",
+    "timeout 30 git status",
+])
+def test_f3_wrappers_do_not_reintroduce_the_argument_false_positive(tmp_path, command):
+    """F3 counter-check: unwrapping must not degrade to 'any token named
+    git'. A git ARGUMENT behind a wrapper stays ordinary text."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_f4_trailing_comment_is_not_an_executable_fork_bomb(tmp_path):
+    """F4: a bomb-shaped trailing comment reached the fork-bomb scan while the
+    statement stream already dropped it. `git status` is benign."""
+    result = _run_with(_bash_payload("git status # :(){ :|:& };:"), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_f4_a_real_fork_bomb_is_still_destructive(tmp_path):
+    """F4 counter-check: cutting comments must not disarm the fork-bomb gate."""
+    result = _run_with(_bash_payload(":(){ :|:& };:"), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+# --- review findings F-NEW-1/F-NEW-2: regressions from the F3 fix ----------
+# The F3 fix taught command_start() to unwrap a wrapper's positional prefix
+# and to skip `case`/function prefixes, but it (1) stopped at a `--`
+# end-of-options marker that follows such a prefix, and (2) did not recognise
+# `in` when the shared splitter put `case WORD` and `in PATTERN)` onto
+# different statements. Both reopened the destructive and mutation gates.
+# These pin the general shape (marker transparent on every path; `case ... in`
+# across statements) plus the wrapper option-arity bug that hid commands
+# behind flag-like options (`setsid --wait`, `ionice -t`).
+
+_F_NEW_1_DESTRUCTIVE = [
+    # '--' after the wrapper's positional prefix (DURATION / FILE / ROOT)
+    "timeout 5 -- git push --force origin main",
+    "flock -w 5 /tmp/l -- git push --force origin main",
+    "chroot /x -- git push --force origin main",
+    # '--' directly before the command word / after wrapper options
+    "timeout -- 5 git push --force origin main",
+    "env -- git push --force origin main",
+    "timeout 5 -- -- git push --force origin main",
+    # wrapper chains with the marker in different positions
+    "timeout 5 flock /tmp/l -- git push --force origin main",
+    "sudo env X=1 timeout 5 -- git push --force origin main",
+    "sudo -- env X=1 timeout 5 -- git push --force origin main",
+    "chroot --userspec=u:g /x -- git push --force origin main",
+    # flag-like wrapper options must not swallow the wrapped command word
+    "setsid --wait git push --force origin main",
+    "setsid -w git push --force origin main",
+    "setsid -f git push --force origin main",
+    "ionice -t git push --force origin main",
+    "ionice -u 1000 git push --force origin main",
+    "ionice -P 1 git push --force origin main",
+]
+
+
+@pytest.mark.parametrize("command", _F_NEW_1_DESTRUCTIVE)
+def test_f_new_1_dash_marker_does_not_hide_a_force_push(tmp_path, command):
+    """F-NEW-1: `--` at command position is transparent, so the wrapped force
+    push is still destructive even with a valid git sentinel."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "timeout 5 -- git commit -m x",
+    "flock /tmp/l -- git commit -m x",
+    "chroot /x -- git commit -m x",
+])
+def test_f_new_1_dash_marker_does_not_hide_a_mutation(tmp_path, command):
+    """F-NEW-1 second half: a wrapped `git commit` behind `--` must still hit
+    the mutation gate without a sentinel."""
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations are forbidden" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "man git pull",
+    "timeout 30 man git pull",
+    "timeout 30 -- man git pull",
+    "git status",
+    "timeout 30 -- git status",
+    "echo git push --force",
+    "timeout 30 -- echo git push --force origin main",
+])
+def test_f_new_1_dash_marker_keeps_git_as_an_argument(tmp_path, command):
+    """F-NEW-1 counter-check: a transparent `--` must not turn a git ARGUMENT
+    (`man git pull`, `echo git push`) into a git invocation."""
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "timeout 5 -- git commit -m x",
+    "timeout 5 -- git push origin main",
+])
+def test_f_new_1_dash_marker_keeps_allowed_mutations_allowed(tmp_path, command):
+    """F-NEW-1 counter-check: the marker must not make a plain mutation
+    (add/commit or a non-destructive push) newly blocked for the git role."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+_F_NEW_2_CASE_SPLIT = [
+    # the regression: `case x` and `in x) ...` are separate statements
+    "case x\nin x) git push --force;; esac",
+    "case x\nin\nx) git push --force;;\nesac",
+    # alternation across a newline
+    "case $x\nin\n  a|b)\n    git push --force\n    ;;\nesac",
+    # extglob / bracket pattern terminators are `)` runs, not a single ')'
+    "case x\nin @(a|b)) git push --force;; esac",
+    "case x\nin\n  @(a|b))\n    git push --force\n    ;;\nesac",
+    "case x\nin [)]) git push --force;; esac",
+    # nested function body inside a split case arm
+    "case x\nin\n  x)\n    f(){ git push --force; }; f\n    ;;\nesac",
+]
+
+
+@pytest.mark.parametrize("command", _F_NEW_2_CASE_SPLIT)
+def test_f_new_2_split_case_arm_is_classified(tmp_path, command):
+    """F-NEW-2: `in` is a reserved word, so a `case` whose `in PATTERN)` lands
+    on a later statement is still unwrapped to the arm's command list."""
+    result = _run_with(_bash_payload(_SENTINEL + command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+def test_f_new_2_split_case_arm_hits_the_mutation_gate(tmp_path):
+    """F-NEW-2 second half: without a sentinel the split arm's `git commit`
+    must be a mutation, not the literal command word `in`."""
+    result = _run_with(
+        _bash_payload("case x\nin x) git commit -m x;; esac"), tmp_path
+    )
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations are forbidden" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "case x in x) git status;; esac",
+    "case x\nin x) git status;; esac",
+    "case x\nin\n  @(a|b))\n    git status\n    ;;\nesac",
+])
+def test_f_new_2_split_case_arm_keeps_read_only_allowed(tmp_path, command):
+    """F-NEW-2 counter-check: unwrapping a split case arm must not block a
+    read-only command in that arm."""
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_header_names_the_exact_residual_gaps():
+    """F-DOC-1: the old header claimed a case pattern could never hide the
+    command list after its ')', which was false for the split `case`/`in`
+    shape. The header must now name the structural interpreter/wrapper gaps
+    explicitly instead of implying completeness."""
+    header = _IMPL_PATH.read_text(encoding="utf-8").split("\nINPUT=$(cat)", 1)[0]
+    for gap in ("eval", "bash -c", "env -S", "UNKNOWN wrapper"):
+        assert gap in header, f"header does not name {gap!r}"
+    assert "never hide the command list" not in header, (
+        "F-DOC-1: the disproven 'never hide' claim is still in the header"
+    )

@@ -24,6 +24,20 @@ Task 7 couples the deny to that entry point (AC-10): without an explicit AND
 generated primary role no deny is written, exactly one warning names
 ``primary-role``, and a deny managed by an earlier sync is rolled back.
 
+Follow-up decisions on top of the merged spec:
+
+- D1a: deny and entry point are ONE invariant. A state error (the managed
+  ``default_agent`` was deleted / is unusable while the gate is wanted) suspends
+  the gate with a loud warning instead of leaving a half-active lockout. This
+  holds for BOTH deny forms: the Spec-A ``permission`` map (this file) and the
+  v2 ``permissions[]`` triples (M1, the closing section).
+- D1b: the legacy strict default is ``true`` in exactly one source
+  (``variables._resolve_orch_mode``; ``orchestrator_strict`` delegates).
+- D1c: an explicitly set, differing user ``default_agent`` is respected and the
+  warning names that edit/shell stay locked for it.
+- D2b: the flip reaches existing projects through a version-driven grace window
+  (WARNING, gate deferred) before it becomes hard.
+
 Run: python -m pytest tests/test_opencode_runtime_gate.py -v
 """
 from __future__ import annotations
@@ -130,9 +144,20 @@ def test_runtime_gate_entries_mapping_form_under_strict(tmp_path):
     assert isolation._opencode_runtime_gate_entries(
         {"orchestrator": {"mode": "advisory"}}, "Opencode", framework, provider_config
     ) == {}
+    # D1b: the legacy default is strict. M6: a root WITHOUT a readable VERSION
+    # now counts as inside the D2b grace window (announce instead of silently
+    # hardening), so the empty orchestrator block produces no deny here.
     assert isolation._opencode_runtime_gate_entries(
         {}, "Opencode", framework, provider_config
     ) == {}
+
+    # ... and once the version proves the window has passed, the implicit
+    # default is hard and the deny is back — identical to ``mode: strict``.
+    hard_framework = _write_caps(tmp_path / "fw-hard", "Opencode", "permission")
+    (hard_framework / "VERSION").write_text("2.1.0\n", encoding="utf-8")
+    assert isolation._opencode_runtime_gate_entries(
+        {}, "Opencode", hard_framework, provider_config
+    ) == {"edit": {"**": "deny"}, "bash": {"**": "deny"}}
 
     # provider-overrides may narrow strict off for the provider.
     narrowed = {
@@ -542,7 +567,9 @@ def test_differing_user_default_agent_not_overwritten_warns(tmp_path):
     assert data["permission"]["edit"]["**"] == "deny"
     assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
     assert len(log.warnings) == 1, log.warnings
-    for token in ("build", "orchestrator", "provider-overrides"):
+    # D1c: the concrete consequence is named — edit/shell stay locked for the
+    # user's agent (it is respected, never overwritten).
+    for token in ("build", "orchestrator", "provider-overrides", "edit", "shell"):
         assert token in log.warnings[0], log.warnings
 
     # Without strict the gate is not effective: no consequence hint.
@@ -553,7 +580,10 @@ def test_differing_user_default_agent_not_overwritten_warns(tmp_path):
     )
     quiet_log = SyncLog()
 
-    _sync(quiet_root, framework, {}, _pc(), quiet_log)
+    _sync(
+        quiet_root, framework, {"orchestrator": {"mode": "advisory"}},
+        _pc(), quiet_log,
+    )
 
     assert _read_json(quiet_root / "opencode.json")["default_agent"] == "build"
     assert not (quiet_root / _STATE_FILE).exists()
@@ -572,8 +602,9 @@ def test_same_user_default_agent_records_prior_and_survives_rollback(tmp_path):
         encoding="utf-8",
     )
     before = (project_root / "opencode.json").read_bytes()
+    advisory = {"orchestrator": {"mode": "advisory"}}
 
-    _sync(project_root, framework, {}, _pc(), SyncLog())
+    _sync(project_root, framework, advisory, _pc(), SyncLog())
 
     assert (project_root / "opencode.json").read_bytes() == before
     assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
@@ -581,7 +612,7 @@ def test_same_user_default_agent_records_prior_and_survives_rollback(tmp_path):
         "prior": "orchestrator",
     }
 
-    _sync(project_root, framework, {}, _pc(primary=False), SyncLog())
+    _sync(project_root, framework, advisory, _pc(primary=False), SyncLog())
 
     assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
     assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
@@ -737,9 +768,10 @@ def test_sync_action_names_only_what_changed(tmp_path):
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
 
     # Non-strict: no deny at all — only the entry point changes.
+    non_strict = {"orchestrator": {"mode": "advisory"}}
     non_strict_root = _make_project(tmp_path)
     non_strict_log = SyncLog()
-    _sync(non_strict_root, framework, {}, _pc(), non_strict_log)
+    _sync(non_strict_root, framework, non_strict, _pc(), non_strict_log)
     writes = [a for a in non_strict_log.actions if "WRITE" in a]
     assert len(writes) == 1, non_strict_log.actions
     assert "default_agent" in writes[0]
@@ -759,7 +791,7 @@ def test_sync_action_names_only_what_changed(tmp_path):
 
     # Strict -> non-strict: the text reports the removal, not a write.
     rollback_log = SyncLog()
-    _sync(strict_root, framework, {}, _pc(), rollback_log)
+    _sync(strict_root, framework, non_strict, _pc(), rollback_log)
     writes = [a for a in rollback_log.actions if "WRITE" in a]
     assert len(writes) == 1, rollback_log.actions
     assert "runtime-gate deny removed" in writes[0], writes[0]
@@ -1039,3 +1071,410 @@ def test_isolation_namespace_still_returns_list(tmp_path):
     }
     # Missing runtime-gate namespace still degrades to a dict, not a list.
     assert isolation._read_state(state_path, _RUNTIME_GATE_KEY) == {}
+
+
+# ---------------------------------------------------------------------------
+# D1a: deny and entry point are ONE invariant (no half-active gate)
+# ---------------------------------------------------------------------------
+
+def test_deleted_default_agent_suspends_gate_instead_of_locking_out(tmp_path):
+    """D1a: a managed key the user deleted is a state error, not a silent
+    half-active gate — the deny is taken back and a loud warning is emitted.
+
+    Without the invariant the second sync would keep the project-wide deny while
+    no agent is pre-selected: exactly the #1006 lockout.
+    """
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    assert data["permission"]["bash"]["**"] == "deny"
+
+    # The user deletes the managed entry point.
+    data.pop("default_agent")
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(project_root, framework, config, _pc(), log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert "default_agent" not in data
+    # The managed deny is rolled back (prior was absent) — the document keeps
+    # NO project-wide edit/bash deny without an entry point.
+    assert "**" not in data["permission"]["edit"]
+    assert "**" not in data["permission"]["bash"]
+    assert _RUNTIME_GATE_KEY not in _read_state(project_root)
+    assert _DEFAULT_AGENT_KEY in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    warning = log.warnings[0]
+    assert "SUSPENDED" in warning, warning
+    assert "orchestrator" in warning, warning
+    assert "lock" in warning.lower(), warning
+
+
+def test_unusable_default_agent_value_suspends_gate(tmp_path):
+    """D1a: a non-string ``default_agent`` (unusable value) is not a valid
+    entry point either — the deny is not written."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": 42}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(
+        project_root, framework, {"orchestrator": {"mode": "strict"}},
+        _pc(), log,
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permission" not in data, "no deny without a usable entry point"
+    assert data["default_agent"] == 42, "a user value is never overwritten"
+    assert any("SUSPENDED" in w for w in log.warnings), log.warnings
+
+
+# ---------------------------------------------------------------------------
+# M1: the same D1a invariant on the v2 ``permissions[]`` surface
+# ---------------------------------------------------------------------------
+#
+# The v2 deny is a list of ``{action, resource, effect}`` triples written by
+# ``reconcile_opencode_surface_gate``. Before this guard the triples were
+# written without ever validating the ``default_agent`` in the document, so a
+# deleted managed key produced the #1006 lockout in the other list form.
+
+_V2_TRIPLES = [
+    {"action": "edit", "resource": "**", "effect": "deny"},
+    {"action": "shell", "resource": "**", "effect": "deny"},
+]
+
+
+def _v2_pc() -> dict:
+    """A resolved v2 owner (plugin tier via its machine flags, observe baked)."""
+    return {
+        "Opencode": {
+            "primary-role": "orchestrator",
+            "has_plugins": True,
+            "plugin_protocol": "opencode-plugin-js",
+            "mcp-config": {
+                "format": "opencode-json-v2",
+                "committed-file": "opencode.json",
+                "surface-formats": {
+                    "v1": "opencode-json",
+                    "v2": "opencode-json-v2",
+                },
+            },
+            "agent-transform": {"frontmatter-mechanism": "opencode-native-v2"},
+        }
+    }
+
+
+_GENERATED = SimpleNamespace(roles=frozenset({"orchestrator"}))
+_V2_STRICT = {"orchestrator": {"mode": "strict"}}
+
+
+def _reconcile_v2(project_root, framework, log, provider_config=None, dry_run=False):
+    isolation.reconcile_opencode_surface_gate(
+        project_root,
+        _V2_STRICT,
+        "Opencode",
+        provider_config if provider_config is not None else _v2_pc(),
+        framework,
+        log,
+        dry_run,
+        active_set=_GENERATED,
+    )
+
+
+def _v2_denies(project_root) -> list:
+    data = _read_json(project_root / "opencode.json")
+    return [entry for entry in data.get("permissions", []) if entry.get("effect") == "deny"]
+
+
+def test_m1_v2_deleted_default_agent_suspends_triples_instead_of_locking_out(tmp_path):
+    """D1a on v2: a deleted managed ``default_agent`` takes the triples back.
+
+    Without the guard the second run kept both deny triples while no agent was
+    pre-selected — every agent without its own ``allow`` lost edit/shell.
+    """
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "orchestrator"}) + "\n", encoding="utf-8"
+    )
+
+    _reconcile_v2(project_root, framework, SyncLog())
+    assert _v2_denies(project_root) == _V2_TRIPLES
+    assert _read_state(project_root)[isolation._STATE_V2_PERMISSIONS] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }
+
+    # The user deletes the managed entry point.
+    data = _read_json(project_root / "opencode.json")
+    data.pop("default_agent")
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _reconcile_v2(project_root, framework, log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permissions" not in data, "no half-active gate: deny and entry point go together"
+    assert isolation._STATE_V2_PERMISSIONS not in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    warning = log.warnings[0]
+    for token in ("SUSPENDED", "permissions", "orchestrator", "lock"):
+        assert token in warning, warning
+
+    # Not a one-way switch: restoring the entry point brings the gate back.
+    data["default_agent"] = "orchestrator"
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+    _reconcile_v2(project_root, framework, SyncLog())
+
+    assert _v2_denies(project_root) == _V2_TRIPLES
+    assert isolation._STATE_V2_PERMISSIONS in _read_state(project_root)
+
+
+def test_m1_v2_missing_default_agent_never_creates_a_deny_only_document(tmp_path):
+    """D1a on v2: without a document there is no entry point — so no deny.
+
+    The writer used to create ``opencode.json`` out of nothing and fill it with
+    the two deny triples (reachable when settings-init never ran, e.g. with
+    ``context_file.auto_generate: false``).
+    """
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
+    log = SyncLog()
+
+    _reconcile_v2(project_root, framework, log)
+
+    assert not (project_root / "opencode.json").exists(), (
+        "a deny-only document is the lockout and must not be created"
+    )
+    assert not (project_root / _STATE_FILE).exists(), "no state for a gate that is not there"
+    assert len(log.warnings) == 1, log.warnings
+    assert "SUSPENDED" in log.warnings[0], log.warnings[0]
+
+
+def test_m1_v2_unusable_default_agent_value_suspends_triples(tmp_path):
+    """D1a on v2: a non-string value is no entry point either."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": 42}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _reconcile_v2(project_root, framework, log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permissions" not in data
+    assert data["default_agent"] == 42, "a user value is never overwritten"
+    assert any("SUSPENDED" in warning for warning in log.warnings), log.warnings
+
+
+def test_m1_v2_user_default_agent_value_keeps_the_triples(tmp_path):
+    """D1c on v2: a differing but usable user value is respected, gate stays."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "developer"}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _reconcile_v2(project_root, framework, log)
+
+    assert _v2_denies(project_root) == _V2_TRIPLES
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "developer"
+    assert log.warnings == [], log.warnings
+
+
+def test_m1_v2_planned_entry_point_merge_is_not_a_suspension(tmp_path):
+    """D1a on v2 + tier ``permission``: the same-run Spec-A merge counts.
+
+    On that tier ``_sync_opencode_runtime_gate`` runs first and writes the
+    ``default_agent``; a dry run does not persist it. Reconcile must not report
+    a suspension that the real run never produces (one decision, no reader/
+    writer drift).
+    """
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    provider_config = _v2_pc()
+    # Without the plugin flags the same v2 surface resolves to tier
+    # ``permission`` — the tier that dispatches the Spec-A writer (IC-7).
+    provider_config["Opencode"].pop("has_plugins")
+    provider_config["Opencode"].pop("plugin_protocol")
+
+    # Real run shape: the document exists but the merge has not happened yet.
+    project_root = _make_project(tmp_path)
+    (project_root / "opencode.json").write_text(
+        json.dumps({"permissions": []}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _reconcile_v2(project_root, framework, log, provider_config)
+
+    assert _v2_denies(project_root) == _V2_TRIPLES
+    assert not any("SUSPENDED" in warning for warning in log.warnings), log.warnings
+
+    # Dry run: nothing is written, and the decision is the same one.
+    dry_root = tmp_path / "dry"
+    dry_root.mkdir()
+    dry_log = SyncLog()
+
+    _reconcile_v2(dry_root, framework, dry_log, provider_config, dry_run=True)
+
+    assert not (dry_root / "opencode.json").exists()
+    assert not any("SUSPENDED" in warning for warning in dry_log.warnings), dry_log.warnings
+
+
+# ---------------------------------------------------------------------------
+# D1b: the legacy strict default is ``true`` — ONE source
+# ---------------------------------------------------------------------------
+
+def test_legacy_strict_default_is_true_in_one_source():
+    """D1b: template rendering and runtime gate resolve the same default."""
+    from lib import variables
+    from lib.consistency import orchestrator_strict as orch_strict
+
+    assert variables._resolve_orch_mode({}) == "strict"
+    assert variables._resolve_orch_mode({"enabled": True}) == "strict"
+    assert variables._resolve_orch_mode({"enabled": False}) == "main-chat"
+    assert variables._resolve_orch_mode({}, {"mode": "advisory"}) == "advisory"
+
+    # The gate resolver delegates to that single source (no second resolver):
+    # VERSION of this checkout is inside the D2b grace window, so the *implicit*
+    # default is announced, while every explicit setting is hard.
+    assert orch_strict._resolve_effective_strict(
+        {"mode": "strict"}, "Opencode", _REPO_ROOT
+    ) is True
+    assert orch_strict._resolve_effective_strict(
+        {"mode": "advisory"}, "Opencode", _REPO_ROOT
+    ) is False
+    assert orch_strict._resolve_effective_strict(
+        {"enabled": False}, "Opencode", _REPO_ROOT
+    ) is False
+    # Fail-soft for an invalid mode (the checker must not abort the process —
+    # same behaviour as before the resolver unification).
+    assert orch_strict._resolve_effective_strict(
+        {"mode": "bogus"}, "Opencode", _REPO_ROOT
+    ) is False
+
+
+# ---------------------------------------------------------------------------
+# D2b: version-driven grace window for the implicit strict default
+# ---------------------------------------------------------------------------
+
+def _framework_with_version(tmp_path: Path, version: str) -> Path:
+    root = _write_caps(tmp_path / f"fw-{version}", "Opencode", "permission")
+    (root / "VERSION").write_text(version + "\n", encoding="utf-8")
+    return root
+
+
+def test_strict_default_grace_window_is_data_driven(tmp_path):
+    """D2b: < 2.1.0 announces (gate off), >= 2.1.0 enforces (gate on)."""
+    from lib.consistency import orchestrator_strict as orch_strict
+
+    grace_root = _framework_with_version(tmp_path, "2.0.0-beta.4")
+    hard_root = _framework_with_version(tmp_path, "2.1.0")
+
+    assert orch_strict.strict_default_grace_active(grace_root) is True
+    assert orch_strict.strict_default_grace_active(hard_root) is False
+    # M6: a missing or unreadable VERSION is INSIDE the window — the announced
+    # flip must never harden silently.
+    assert orch_strict.strict_default_grace_active(tmp_path / "no-version") is True
+    unreadable = _framework_with_version(tmp_path, "2.0.0")
+    (unreadable / "VERSION").write_bytes(b"\xff\xfe not utf-8\n")
+    assert orch_strict.strict_default_grace_active(unreadable) is True
+
+    # Implicit default: deferred inside the window, hard afterwards.
+    assert orch_strict._resolve_effective_strict({}, "Opencode", grace_root) is False
+    assert orch_strict._resolve_effective_strict({}, "Opencode", hard_root) is True
+    assert orch_strict._resolve_effective_strict(
+        {}, "Opencode", tmp_path / "no-version"
+    ) is False
+    # Explicit settings are ALWAYS hard, even inside the grace window.
+    assert orch_strict._resolve_effective_strict(
+        {"strict": True}, "Opencode", grace_root
+    ) is True
+    assert orch_strict._resolve_effective_strict(
+        {"mode": "strict"}, "Opencode", grace_root
+    ) is True
+    assert orch_strict._resolve_effective_strict(
+        {"strict": False}, "Opencode", hard_root
+    ) is False
+
+    notice = orch_strict.strict_default_notice({}, grace_root)
+    assert notice is not None
+    assert "2.1.0" in notice, notice
+    assert "advisory" in notice and "strict" in notice, notice
+    assert orch_strict.strict_default_notice({}, hard_root) is None
+    assert orch_strict.strict_default_notice({"mode": "strict"}, grace_root) is None
+    # main-chat never receives the strict-default notice.
+    assert orch_strict.strict_default_notice({"enabled": False}, grace_root) is None
+
+
+def test_m4_gate_reader_and_writer_agree_inside_the_grace_window(tmp_path):
+    """M4: the read-side helpers used to drop ``agent_meta_root``, applied no
+    grace and reported "wanted" while the writer suppressed the deny for the
+    whole window. Both paths must resolve the window identically."""
+    provider_config = {"Opencode": {"has_hooks": False}}
+    grace_root = _framework_with_version(tmp_path, "2.0.0-beta.4")
+    hard_root = _framework_with_version(tmp_path, "2.1.0")
+
+    for config in ({}, {"orchestrator": {}}):
+        assert isolation.opencode_runtime_gate_wanted(
+            config, "Opencode", grace_root, provider_config
+        ) is False
+        assert isolation._opencode_runtime_gate_entries(
+            config, "Opencode", grace_root, provider_config
+        ) == {}
+        assert isolation.opencode_runtime_gate_wanted(
+            config, "Opencode", hard_root, provider_config
+        ) is True
+        # An explicitly configured strict is hard even inside the window.
+        assert isolation.opencode_runtime_gate_wanted(
+            {"orchestrator": {"mode": "strict"}}, "Opencode", grace_root,
+            provider_config,
+        ) is True
+
+    # The reader agrees with what the writer puts on disk.
+    grace_project = _make_project(tmp_path)
+    _sync(grace_project, grace_root, {}, _pc(), SyncLog())
+    assert "permission" not in _read_json(grace_project / "opencode.json")
+
+
+def test_default_strict_grace_defers_gate_but_still_writes_entry_point(tmp_path):
+    """D2b end-to-end: the behaviour change does not break existing projects.
+
+    A project without explicit config keeps the pre-flip gate behaviour for one
+    minor release (no deny) while the entry point still lands, so the eventual
+    flip cannot produce the #1006 lockout.
+    """
+    grace_root = _framework_with_version(tmp_path, "2.0.0")
+    project = _make_project(tmp_path)
+    log = SyncLog()
+
+    _sync(project, grace_root, {}, _pc(), log)
+
+    data = _read_json(project / "opencode.json")
+    assert "permission" not in data, "grace: no gate deny yet"
+    assert data["default_agent"] == "orchestrator", "entry point lands immediately"
+    assert _RUNTIME_GATE_KEY not in _read_state(project)
+
+    hard_root = _framework_with_version(tmp_path, "2.1.0")
+    hard_project = tmp_path / "project-hard"
+    hard_project.mkdir()
+
+    _sync(hard_project, hard_root, {}, _pc(), SyncLog())
+
+    data = _read_json(hard_project / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
