@@ -94,7 +94,10 @@ innerhalb der bestehenden Permission-Familien:
 
 Auf v2 schreibt dieselbe Gate-Ebene stattdessen `permissions[]`-Tripel
 (`{action, resource: "**", effect: "deny"}`, ans Listenende); die PARTIAL-Grenze (keine
-Delegations-Provenienz) gilt dort unverändert.
+Delegations-Provenienz) gilt dort unverändert. Seit D1a(iii) (`f1030e12`) gilt auch dort die
+Invariante „Deny und funktionierender Einstiegspunkt sind eins": ohne gültigen `default_agent` in
+derselben Datei werden die Tripel nicht geschrieben bzw. zurückgenommen — genau eine laute Warnung
+nennt den Zustand.
 
 Offene Phase-0-Risiken (dokumentiert, nicht versteckt):
 
