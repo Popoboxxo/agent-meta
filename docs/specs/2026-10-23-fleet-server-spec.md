@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-FLEET-SERVER-2026-10-23
 title: Fleet-Server (Phasen 1-4) — Read-Only-Dashboard, Config-Ansicht, Remote-Sync-Trigger, Remote-Config-Edit
-status: Entwurf
+status: APPROVED (2026-10-29)
 revision: 1.4
 supersedes: docs/superpowers/specs/2026-09-07-fleet-server-phase1-2-design.md
 issues: "#682 §7 (Primärquelle, IDEA); abgegrenzt: #877, #977, #528-#531"
@@ -9,7 +9,7 @@ issues: "#682 §7 (Primärquelle, IDEA); abgegrenzt: #877, #977, #528-#531"
 
 # Fleet-Server (Phasen 1-4) — Spec
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-29)
 > Trace-Anker: `spec-id: SPEC-FLEET-SERVER-2026-10-23`
 >
 > Supersedes `docs/superpowers/specs/2026-09-07-fleet-server-phase1-2-design.md` (Legacy-Pfad; die Datei bleibt erhalten und bekommt in Plan F1 einen Hinweis-Header auf diese Spec).
@@ -21,6 +21,8 @@ issues: "#682 §7 (Primärquelle, IDEA); abgegrenzt: #877, #977, #528-#531"
 > Evidenzmarker: **VERIFIED** = im Repo geprüft (Datei:Symbol bzw. Grep). **NEU** = existiert heute nicht, wird durch diese Spec definiert.
 >
 > Revision 1.4 (2026-10-28, Nutzerentscheidungen D9-D12): O-F1 (Long-Poll statt SSE), O-F9 (Token-Kette Env > Datei) und O-F2 (Kommentarverlust: Spec-Default bestätigt) geschlossen; AC-54/gemeinsames `SyncExecutor`-Gate gestrichen, Fleet nutzt ein eigenes modulweites Busy-Gate, R-16 wird akzeptiertes Risiko (D11); `load_fleet_settings(root, env_token_present)` (IC-4/IC-5); Write-Worker prüft Dedupe/Arg-Prüfungen vor dem Gate-Acquire; `apply_config_ops`-Fehler → `error/invalid_args`; gemeinsamer Helper `config_file_sha256`; neue offene Koordinationsfrage O-F10 (Szenario-ID 79). Korrektur innerhalb 1.4 (2026-10-28): D12 war fälschlich als Admin-UI-Parität (Schreiben mit Backup, `comments_lost` im Ack, Warnung im Dialog) eingetragen; die bindende Nutzerentscheidung zu O-F2 lautet **Abbruch bei Kommentarverlust** — `put-config` schreibt nicht, Terminal-Ack `error/comments_lost`, Datei unverändert, kein Backup (D12, DECISION A9, IC-7, IC-13, IC-15, AC-44, AC-45, R-17); Instanz-Ack-Code `lossy_write` durch `comments_lost` ersetzt, `comments_lost` aus dem `put-config`-Ok-Result entfernt.
+>
+> Revision 1.4 — Freigabe (2026-10-29): Freigabe durch den User per Auftrag vom 2026-10-29; offene Fragen mit Default: Default gilt.
 
 ---
 

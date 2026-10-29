@@ -20,7 +20,7 @@ pipeline_stages:
 **Architecture:** F2 ergänzt F1 additiv. Server (`scripts/fleet-server.py`): Write-Gate-Kette (Admin-Token → Write-Token → `write_disabled` → Offline → Nonce) vor dem bestehenden Enqueue. Client (`scripts/lib/fleet_client.py`): Write-Pfad im Poll-Thread (Gate, Dedupe, Arg-Prüfung, danach nicht-blockierendes modulweites Fleet-Busy-Gate `FLEET_WRITE_GATE`) plus genau ein Worker-Thread `fleet-write`; reine Funktionen `validate_write_args` und `apply_config_ops`. Admin-Server (`scripts/admin-server.py`): Extract-Method `AdminRequestHandler._validate_project_document`, neuer keyword-only Parameter `roundtrip_guard: bool = False` in `ConfigManager.write`, injizierte Write-Handler `trigger-sync` und `put-config`. `SyncExecutor`, `_run`, `_record_run` und alle Admin-Routen bleiben unverändert (D11). Dashboard (`docs/ui/fleet-ui.html`): Bestätigungsdialog und Config-Edit-Dialog.
 **Tech Stack:** Python 3.9/3.11/3.12 (nur Stdlib; PyYAML nur über bestehendes `lib.config`/`ConfigManager`), unittest/pytest (`python3 -m pytest`), Vanilla-JS/HTML, Markdown.
 **Spec:** docs/specs/2026-10-23-fleet-server-spec.md
-**Spec-ID:** `spec-id: SPEC-FLEET-SERVER-2026-10-23` (Rev. 1.4, Entwurf). Plan F1 (Fundament, Phase 1+2): `docs/plans/2026-10-23-fleet-server-f1-plan.md` (Task-Gruppen F1-A bis F1-I, F1-T laut Spec-Trace-Anker). **Abhängigkeit: F2 startet erst nach Merge von F1.**
+**Spec-ID:** `spec-id: SPEC-FLEET-SERVER-2026-10-23` (Rev. 1.4, APPROVED (2026-10-29)). Plan F1 (Fundament, Phase 1+2): `docs/plans/2026-10-23-fleet-server-f1-plan.md` (Task-Gruppen F1-A bis F1-I, F1-T laut Spec-Trace-Anker). **Abhängigkeit: F2 startet erst nach Merge von F1.**
 
 ## Entry-/Exit-Kriterien
 
