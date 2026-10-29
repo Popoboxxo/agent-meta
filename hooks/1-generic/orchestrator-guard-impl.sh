@@ -1254,6 +1254,7 @@ fi
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
   echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
+  echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2
   echo "Ask the user to approve and run this command manually." >&2
   exit 2
 fi

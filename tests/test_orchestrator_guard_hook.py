@@ -1690,6 +1690,18 @@ def test_fork_bomb_scan_does_not_hang_on_a_300kb_command(tmp_path):
     assert elapsed < 5.0, f"300 KB command took {elapsed:.1f}s (quadratic scan?)"
 
 
+def test_fork_bomb_window_block_names_scan_limits(tmp_path):
+    """AC-A.7 (#943 follow-up): a body without an unquoted '}' in its first 512
+    characters is blocked fail-closed (wave 3, PR A). The block message must
+    name that limit, so a long inline function body is not mistaken for an
+    arbitrary refusal. The command carries no digits, so 'first 512' can only
+    come from the message."""
+    result = _run_with(_bash_payload("f(){ " + "x" * 520 + " f|f& };f"), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+    assert "first 512" in result.stderr, f"stderr={result.stderr!r}"
+
+
 def test_subshell_parentheses_do_not_hide_a_destructive_push(tmp_path):
     """(b) shlex.split('(git push)') produced the token '(git', so the
     invocation was invisible."""
