@@ -1,6 +1,7 @@
 # CI- und Test-Verbesserungsplan
 
-**Status:** DRAFT
+**Status:** APPROVED
+**Freigabe:** Nutzer, 2026-10-29 ('Setze den Plan in die Tat um'); Revision 2 inkl.
 **Datum:** 2026-10-29
 **Basis:** Read-only-Analyse auf Branch `docs/bugfix-wave-3-spec-plan` (HEAD `e5d5d75a`)
 **Scope:** `.github/workflows/*`, `tests/`, `.claude/hooks/`, Repo-Settings (read-only via `gh`)
