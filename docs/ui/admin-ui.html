@@ -925,17 +925,49 @@ function promptForToken(errorMessage) {
   return activeTokenPrompt;
 }
 
+// fetch() with an optional abort deadline (issue #897 AC3). Each attempt gets
+// its own AbortController + timer, so a 401 token prompt — which can wait on
+// the user indefinitely — does not consume the request budget. A deadline hit
+// surfaces as an Error named "TimeoutError" so callers can tell "too slow or
+// hung" apart from a network or HTTP failure. Without a deadline this is a
+// plain fetch() passthrough.
+async function timedFetch(url, opts, timeoutMs) {
+  if (!timeoutMs) return fetch(url, opts);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      const err = new Error("Request timed out after " + (timeoutMs / 1000) + "s.");
+      err.name = "TimeoutError";
+      err.timeoutMs = timeoutMs;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Central auth-aware fetch: injects the Bearer token when present and, on a
 // 401, prompts for a token and retries until the request succeeds or the
 // user cancels. When no token is configured server-side, nothing is injected
 // and the request passes through untouched (loopback behaviour unchanged).
-async function authFetch(url, options = {}) {
+//
+// ``timeout.timeoutMs`` is an OPT-IN per-call deadline. There is deliberately
+// no global default: most endpoints are short-lived, but a few (backup
+// creation, large syncs) legitimately run for minutes, so a blanket timeout
+// would abort healthy requests. Only callers that must never hang on a
+// never-settling request pass an explicit budget.
+async function authFetch(url, options = {}, timeout = {}) {
   const opts = { ...options };
   opts.headers = new Headers(options.headers || {});
   const existingToken = getToken();
   if (existingToken) opts.headers.set("Authorization", "Bearer " + existingToken);
+  const timeoutMs = timeout.timeoutMs || 0;
 
-  let res = await fetch(url, opts);
+  let res = await timedFetch(url, opts, timeoutMs);
   if (res.status !== 401) return res;
 
   let lastError = "";
@@ -946,7 +978,7 @@ async function authFetch(url, options = {}) {
       throw new APIError(res.status, await safeJson(res));
     }
     opts.headers.set("Authorization", "Bearer " + newToken);
-    res = await fetch(url, opts);
+    res = await timedFetch(url, opts, timeoutMs);
     if (res.status !== 401) {
       // Persist only after the server accepted the token — never store a
       // rejected token in sessionStorage.
@@ -982,12 +1014,14 @@ class API {
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.json();
   }
-  async post(path, body = {}) {
+  // ``options.timeoutMs`` is optional; omitting it keeps the request
+  // unbounded, exactly as before (opt-in only, see authFetch).
+  async post(path, body = {}, options = {}) {
     const res = await authFetch(this.base + path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }, options);
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.json();
   }
@@ -8327,6 +8361,15 @@ async function viewProjectProviderTierOverrides() {
 }
 
 /* ----------------------- Backups ------------------------ */
+// Backup creation zips every provider directory synchronously on the server.
+// Even a large project archives in seconds-to-tens-of-seconds; 180 s is roughly
+// 10x a realistic worst case, so hitting it means the request hung (stuck
+// handler, dropped connection) rather than ran slowly. Without this deadline a
+// never-settling request would never reach the `finally` that closes the
+// "Backup in progress" overlay (#897 AC3).
+const BACKUP_CREATE_TIMEOUT_MS = 180000;
+const BACKUP_CREATE_TIMEOUT_SECONDS = BACKUP_CREATE_TIMEOUT_MS / 1000;
+
 async function viewBackups() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["System Backups"]));
@@ -8405,13 +8448,23 @@ async function viewBackups() {
       showModal("Backup in progress", body, []);
       status.textContent = "Creating backup…";
       try {
-        await api.post("/api/backups/create", { label });
+        await api.post("/api/backups/create", { label }, { timeoutMs: BACKUP_CREATE_TIMEOUT_MS });
       } catch(e) {
-        status.textContent = "Backup failed.";
-        alert("Error: " + e);
+        if (e && e.name === "TimeoutError") {
+          // Distinguishable from a generic failure: the server may still be
+          // writing the archive, so point the user at the list instead of a
+          // blanket retry.
+          status.textContent = "Backup timed out.";
+          alert("Backup timed out after " + BACKUP_CREATE_TIMEOUT_SECONDS +
+                "s. It may still complete on the server — reload the list before retrying.");
+        } else {
+          status.textContent = "Backup failed.";
+          alert("Error: " + e);
+        }
       } finally {
         // Always close the "in progress" overlay, even if the error dialog
-        // itself throws (#897).
+        // itself throws (#897). This must hold for every settlement path:
+        // success, HTTP/network error and the aborted (timeout) request above.
         hideModal();
         load();
       }
