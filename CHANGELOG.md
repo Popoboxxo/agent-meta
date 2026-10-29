@@ -22,6 +22,21 @@
   `orchestrator-strict.default-flip-grace` finding (WARNING) until `2.1.0`. An explicitly
   configured `strict` is never affected, and the window is data (`_STRICT_DEFAULT_GRACE_UNTIL`
   compared against `VERSION`), not a provider branch.
+- **Derived defaults for three previously literal placeholders (#1037, #983)**: `PROJECT_DESCRIPTION`
+  is now seeded from the new `project.description` schema field, `AGENT_META_REPO` from the embedded
+  `.gitmodules` URL or the agent-meta checkout's own git remote, and `TECH_STACK` from
+  `PROJECT_LANGUAGES`. An explicit `variables:` entry always wins, and with no source at all the key
+  stays undefined on purpose — there is no blank-string fallback, so the unresolved-placeholder notice
+  reports it. A project that only sets `project: {name, description}` no longer ships
+  `{{PROJECT_DESCRIPTION}}` into `CLAUDE.md`/`AGENTS.md`, and `{{AGENT_META_REPO}}` (27× across a
+  9-provider sync) no longer leaks into the `meta-feedback`/`agent-meta-scout`/`documenter` output.
+- **`handoff.advisory: true` as a data marker (#1031)**: the eight literature-anchored review roles
+  (`memory-architect`, `context-engineer`, `red-team-agent`, `secrets-manager`, `chaos-engineer`,
+  `reproducible-builds-engineer`, `ux-researcher`, `privacy-compliance-officer`) declare it in
+  `config/role-defaults.yaml`, and `consistency/handoff_contracts` skips `output-not-consumed` only for
+  a handoff carrying that flag instead of an allowlist of role names in code. Only an exact `True`
+  counts — any other value leaves the check sharp — and the `target_roles` existence check still
+  applies to every producer.
 
 ### Fixed
 - Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
@@ -79,6 +94,45 @@
   the writer instead of reporting "gate wanted" while the deny was suppressed. A missing or
   non-UTF-8 `VERSION` counts as *inside* the window — announced, never silently hardened — so only
   a readable version that proves the window has passed flips the implicit strict default.
+- **Runtime gate is rolled back before a provider is removed (#1020)**: `remove_provider_dir` — the
+  legacy-cleanup and provider-deactivation path — now calls
+  `isolation.rollback_opencode_runtime_gate` *before* the provider root disappears, because that
+  directory carries the state file recording the managed keys. It takes back the v1
+  `permission.edit/bash["**"]` deny (recorded prior restored), the v2 `permissions[]` deny triples,
+  and `default_agent` (recorded prior restored); the provider-removal paths additionally take back
+  the recorded provider-isolation globs. The helper is tier- and strict-independent — keyed on
+  `gate_state_present` rather than the resolved tier — and ownership-guarded via
+  `owns_gate_surface` (the resolved `settings_file`/`mcp-config.committed-file` data, never a
+  provider-name literal), so deactivating e.g. Claude can never take back Opencode's gate. A state
+  file left with nothing but the provenance marker is pruned.
+- **One `repo-containment.no-hook-support` finding per project (#1036)**: the per-provider warnings
+  are aggregated into a single project-wide WARNING that names every affected provider and its
+  reason — a default project with seven hook-less providers emits one finding instead of seven.
+  Detection, severity and the finding id are unchanged. In the same pass,
+  `check_orchestrator_strict_hook_support` no longer returns early for a config without an
+  `orchestrator` block: `{}` is the valid implicit-strict default, so the hard default is announced
+  per provider once the D2b grace window has passed; only a malformed (non-mapping) block is skipped.
+- **Undefined placeholders warn until 2.1.0 and abort afterwards (#983)**: an unresolved placeholder
+  now warns and names the future `SyncError` verbatim while `_UNRESOLVED_PLACEHOLDER_GRACE_UNTIL`
+  (2.1.0) lies in the future, and raises exactly that error once it has passed. Both substitution
+  engines share one helper, so the notice and the error text cannot drift apart, and a missing or
+  non-UTF-8 `VERSION` counts as inside the window. The decision applies only to tokens that survive
+  conditional-block stripping: a token in an inactive `{{#if}}`/`{{#unless}}` branch (e.g.
+  `{{PIPELINE_DETAILS_DIR}}` in the inactive `ORCH_MODE_MAIN_CHAT` branch) neither warns nor aborts,
+  which is what keeps agent-meta's own sync from aborting at the flip.
+- **Reference template documents placeholders instead of shipping them (#983)**: `TECH_STACK`,
+  `AGENT_RULES` and `EXTERNAL_DOCS_LANGUAGE` are escaped (`{{%VAR%}}`, rendering literally) in the
+  non-deployable `agents/1-generic/_reference-agent.md`, and `TECH_STACK` became a derived builder
+  variable — the `_UNKNOWN_TEMPLATE_RATCHET` set in `consistency/placeholders` is now empty.
+- **`instruction-soft-cap-chars` is owned by the framework (#1035)**: the finding's `fix-owner` moves
+  from `project-config` to the new `agent-meta` value, added to `_FIX_OWNERS` and documented in
+  `config/known-issues.yaml`: the fix is a template/sync change, and a consumer edit to the artifact
+  is overwritten on the next sync.
+- **`ac01-baseline` AC-T4 digest re-pinned (#983, #1037)**: the 36-entry rebaseline (the nine copied
+  `.meta-config/project.yaml` fixtures plus `agent-meta-scout`/`documenter`/`meta-feedback` × 9
+  providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in
+  `tests/test_opencode_v2_surface.py` was recomputed from the fixture bytes before re-pinning.
+  `AC01_EXCEPTIONS` is not extended and `slimming-golden`/`compact-golden` are unchanged.
 
 ## [2.0.0-beta.4] - 2026-10-26
 
