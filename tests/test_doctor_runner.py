@@ -342,16 +342,18 @@ def test_file_size_lines(tmp_path, monkeypatch):
     assert finding.verified_state == "DOCUMENTED"
 
 
-def test_instruction_soft_cap_is_owned_by_the_framework(tmp_path, monkeypatch):
-    """Issue #1035: the instruction file is written by sync.py, so a consumer
-    edit is overwritten on the next sync and the registry owner must be the
-    framework itself, not the project config."""
-    ids = real("instruction-soft-cap-chars")
+def test_instruction_soft_cap_is_retired(tmp_path, monkeypatch):
+    """Issue #1035 (retired, not fixed): the 4000-char cap was a Code-Review
+    visibility heuristic from an unverified audit quote (verified-state
+    DOCUMENTED), not a provider limit on reading the file, and a consumer edit
+    to the synced instruction file is overwritten on the next sync. The registry
+    therefore carries no such seed any more: an oversized `rules_dir` artifact
+    yields no finding, and the seed is not merely skipped by a predicate."""
+    assert "instruction-soft-cap-chars" not in {e["id"] for e in _REGISTRY["issues"]}
     put(tmp_path, ".github/instructions/a2a-delegation-gates.instructions.md", "x" * 6972)
-    (finding,) = run(tmp_path, monkeypatch, ids, providers=("Copilot",)).findings
-    assert finding.issue_id == "instruction-soft-cap-chars"
-    assert finding.severity is Severity.WARNING
-    assert finding.fix_owner == "agent-meta"
+    report = run(tmp_path, monkeypatch, _REGISTRY["issues"], providers=("Copilot",))
+    assert by_issue(report, "instruction-soft-cap-chars") == []
+    assert "instruction-soft-cap-chars" not in {issue for issue, _ in report.skipped}
 
 
 # ---------------------------------------------------------------- kind: regex

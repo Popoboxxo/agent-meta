@@ -35,9 +35,11 @@ _REGISTRY_PATH = _ROOT / "config" / "known-issues.yaml"
 
 
 # Mandatory seeds: IC-21 table + Rev. 2.2 + Rev. 3/3.1/3.4 additions.
+# `instruction-soft-cap-chars` is deliberately absent: retired in issue #1035
+# (see test_instruction_soft_cap_seed_is_retired).
 REQUIRED_SEEDS = {
     "context-hard-cap-truncation", "context-soft-cap-bytes",
-    "instruction-soft-cap-chars", "context-soft-cap-lines", "dangling-pointer",
+    "context-soft-cap-lines", "dangling-pointer",
     "rule-unreachable", "unread-channel", "rules-file-wrong-suffix",
     "orchestrator-missing-subagent-allowlist", "agent-name-suffix",
     "agent-frontmatter-strict-schema", "dispatch-depth-missing",
@@ -169,14 +171,6 @@ def test_seed_formalisations(registry):
     assert seeds["unread-channel"]["verified-state"] == "SOURCE-DERIVED"
     assert seeds["unread-channel"]["verified-state-by-capability"] == {
         "derive": "surface_verified_state.rules"}
-    soft = seeds["instruction-soft-cap-chars"]
-    assert soft["verified-state"] == "UNVERIFIED"
-    assert soft["verified-state-by-capability"] == {
-        "context_soft_cap_chars": {4000: "DOCUMENTED", 12000: "UNVERIFIED"}}
-    # Issue #1035: the file is written by sync.py and a consumer edit is
-    # overwritten on the next run, so the owner is the framework itself.
-    assert soft["fix-owner"] == "agent-meta"
-    assert soft["target"] == {"artifact": "rules_dir"}
 
     surf = seeds["surface-unverified"]
     assert surf["detector"]["key"] == "surface_verified_state.*"
@@ -272,11 +266,24 @@ def test_sync_log_check_literal_in_delegation_table(registry):
     assert f'"{det["check"]}"' in text
 
 
-def test_value_dispatch_keys_match_capability_values(registry, ctx):
-    spec = _by_id(registry)["instruction-soft-cap-chars"]["verified-state-by-capability"]
-    (cap_key, mapping), = spec.items()
-    actual = {c[cap_key] for c in ctx["caps"].values() if c.get(cap_key) is not None}
-    assert set(mapping) == actual
+def _is_value_dispatch(spec):
+    """`{<capability-key>: {<capability-value>: <state>}}` (not the `derive` form)."""
+    return "derive" not in spec and any(isinstance(v, dict) for v in spec.values())
+
+
+def test_value_dispatch_form_is_unused_but_still_valid(registry, ctx):
+    """The per-value dispatch form lost its only user when
+    `instruction-soft-cap-chars` was retired (issue #1035), so no registry entry
+    can drift against the capability values any more. The grammar stays
+    supported: a future entry that needs it must still validate."""
+    assert [e["id"] for e in registry["issues"]
+            if _is_value_dispatch(e.get("verified-state-by-capability", {}))] == []
+    cap_key = "context_soft_cap_bytes"
+    actual = sorted({c[cap_key] for c in ctx["caps"].values() if c.get(cap_key) is not None})
+    assert actual, "fixture assumption: the capability matrix carries concrete values"
+    entry = _sample(registry)                     # context-soft-cap-bytes
+    entry["verified-state-by-capability"] = {cap_key: {actual[0]: "DOCUMENTED"}}
+    assert validate_entry(entry, ctx) == []
 
 
 def test_variable_unreferenced_message_binds_length(registry):
@@ -299,7 +306,11 @@ def test_agent_meta_is_an_accepted_fix_owner(registry):
 
 
 def test_generated_artifacts_are_owned_by_the_framework(registry):
-    """Fully sync-written artifacts cannot be fixed by the consumer project."""
+    """Fully sync-written artifacts cannot be fixed by the consumer project.
+
+    `instruction-soft-cap-chars` was the first entry to use the `agent-meta`
+    owner and is retired (issue #1035); the rule still holds for its siblings.
+    """
     generated = {"rules_dir", "agents_dir", "skills_dir"}
     owners = {
         e["id"]: e["fix-owner"] for e in registry["issues"]
@@ -307,7 +318,23 @@ def test_generated_artifacts_are_owned_by_the_framework(registry):
     }
     assert owners, "fixture assumption: the registry targets generated dirs"
     assert "project-config" not in set(owners.values()), owners
-    assert owners["instruction-soft-cap-chars"] == "agent-meta"
+    assert "agent-meta-manager" in set(owners.values()), owners
+
+
+def test_instruction_soft_cap_seed_is_retired(registry):
+    """Issue #1035: `instruction-soft-cap-chars` was retired, not fixed.
+
+    The 4000-char cap is a Code-Review visibility heuristic from an unverified
+    audit quote (verified-state DOCUMENTED), not a provider limit on reading the
+    file; the enforced gate content of `rules/1-generic/a2a-delegation-gates.md`
+    ends inside that window, the finding was unactionable for the consumer
+    (sync-owned artifact) and the framework-side split buys nothing. A retired
+    entry must not come back as a `fixed-in` suppression: it is gone.
+    """
+    assert "instruction-soft-cap-chars" not in _by_id(registry)
+    assert not [e for e in registry["issues"]
+                if e["target"]["artifact"] == "rules_dir"
+                and e["detector"].get("kind") == "file-size"]
 
 
 # ------------------------------------------------------ validator self-checks

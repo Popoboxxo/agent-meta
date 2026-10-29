@@ -13,7 +13,8 @@ case below ``positive/`` or ``negative/``. The doctor runs in-process
 (``run_doctor``; the CLI is covered by ``test_doctor_cli.py``); the active set,
 registry load and ``subprocess`` are the only things stubbed, see ``_run_case``.
 
-Coverage matrix (30 seeds): all seeds are fixturable. Seeds that need a stub
+Coverage matrix (29 seeds): all registered seeds are fixturable (the retired
+``instruction-soft-cap-chars`` seed owns no fixture directory). Seeds that need a stub
 because the real environment cannot be put into a small tree are marked
 ``STUBBED`` below with the reason; ``NOT_FIXTURABLE`` is empty on purpose and
 exists so that a future gap must be named with a reason instead of silently
