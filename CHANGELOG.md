@@ -78,6 +78,47 @@
   non-zero without output — or is missing — reads as unusable; the old probe compared the result
   against its own fallback default, so a broken shim looked usable and the block came from the
   payload check with a misleading message instead of the interpreter check.
+- **`hook_common.sh` 1.4.0 (#943, #944)**: adds `hook_shell_scan_py` — one
+  quote/heredoc/ANSI-C-aware statement splitter plus the **linear-time fork-bomb detector** shared by
+  both fail-closed guards — and `hook_shell_resolver_py`, the single command-word resolver (wrapper
+  grammar with positional arity, a transparent `--`, one-line and split `case … in` arms, function
+  bodies, subshells/groups and leading keywords) that replaces the per-hook copy. The splitter keeps
+  its quote state in sync for ANSI-C (`$'...'`) and locale (`$"..."`) quoting (F1), over-scans a
+  heredoc whose delimiter it cannot resolve instead of letting it hide the rest of the command (F2),
+  and cuts a trailing `#` comment from the cleaned code as well as from the statement stream (F4).
+  `hook_is_meta_submodule_dir` makes the project-root walk-up skip a nested `.agent-meta` (or
+  `external/agent-meta`) checkout's own `.meta-config/` in favour of the enclosing project, keeping it
+  as the fallback when nothing encloses it (#943 (l)).
+- **`orchestrator-guard-impl.sh` 1.9.2 (#943, #944)**: the git classification runs on the shared
+  splitter/resolver instead of raw regexes, so quoted or heredoc text is no longer cut into false
+  statements, `case … in …) git push --force;; esac` arms and inline function bodies
+  (`f(){ git push --force; }; f`) are classified, a lone `--` is transparent after a wrapper's own
+  options and positional prefix as well as directly before the command word (`timeout 5 -- git push
+  --force` no longer stops at the marker, F-NEW-1), and known wrappers (sudo/env/timeout/flock/
+  setsid/watch/strace/chroot/busybox/…) are unwrapped explicitly with their positional arity. A scan
+  failure — interpreter crash or malformed classifier output — now fails **closed** with exit 2
+  instead of the previous `|| echo "none narrow none"` allow-on-death fallback (#943 (k)). The
+  residual gaps stay deliberate and documented in the header (convention boundary, #592): command
+  substitution/backticks, `eval`, `bash -c`/`sh -c`, `env -S`, `xargs … sh -c`, alias or variable
+  indirection (`g=git; $g push`), unknown wrappers (firejail/unshare/nsenter, …), and destructive
+  commands fed through stdin other than the inspected `git update-ref --stdin` delete lines.
+- **`repo-containment-impl.sh` 1.5.0 (#943, #944)**: the write-target detector takes its command word
+  from the shared `hook_shell_resolver_py` — the same walk orchestrator-guard uses — so
+  `timeout 5 -- touch /outside`, `flock -w 5 /x -- …`, `chroot /x -- …`, `case` arms, function
+  bodies, `( … )` groups and `if`/`for`/`while` bodies resolve to a target instead of being allowed.
+  Statements split on the shared quote/heredoc-aware splitter, and in-place (`perl -pi`,
+  `sed -Ei`/`-ni` clusters) and destination (`cp -t DIR`, trailing flags no longer mistaken for the
+  destination) spellings are recognised (#944 SR-B-19). A crashing detector now fails **closed** (it
+  used to end in `|| true`, silently allowing), and the jail root prefers an anchor that does not come
+  from the payload — `$CLAUDE_PROJECT_DIR` carrying `.meta-config/`, then the deployment layout's
+  `<root>/.claude/hooks/` — instead of promoting an out-of-project or forged payload `cwd` to root
+  (#944 SR-B-18); a nested `.agent-meta` submodule's `.meta-config/` is skipped in favour of the
+  enclosing project.
+- **Deployed hook set and render hashes re-baselined (#943, #944)**: the three hardened hooks were
+  redeployed to `.agents/hooks/` — `hook_common` 1.4.0, `orchestrator-guard-impl` 1.9.2,
+  `repo-containment-impl` 1.5.0 — with the six `generated-file-hashes.json` / AC-T4 baseline entries
+  patched individually, and the AC-T4 digest recomputed from the fixture bytes and re-pinned in
+  `tests/test_opencode_v2_surface.py`.
 - **`dod-push-check` regression tests (#949, #951, #953, #954)**: one flag walk / one
   protected-list builder are asserted, plus the fail-closed path for an outdated deployed lib
   (#949); the hook tests are hermetic against a caller's `AGENT_META_*` environment, and

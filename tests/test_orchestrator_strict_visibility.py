@@ -288,4 +288,3 @@ def test_default_config_without_orchestrator_block_still_handles_malformed_shape
     """A malformed block (non-dict) is still skipped, never raised through."""
     config = {"ai-providers": ["Claude", "Opencode"], "orchestrator": "strict"}
     assert _check(config) == []
-
