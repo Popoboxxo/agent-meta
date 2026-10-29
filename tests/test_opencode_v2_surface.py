@@ -5287,7 +5287,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # (5 Claude + 5 Gemini hook renders); `slimming-golden`/`compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "3999aca6937fe02173fe4007da6ada86c5b589b80b4d13c52750eb5268e11c7c",
+    "ac01-baseline": "9ead7c80f5c1ebf19454005e297ee743cc6fdded941dd3df9488e963f4b3b27a",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }

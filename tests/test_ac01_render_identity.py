@@ -366,6 +366,24 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   the sync's post-write capture stage (same 10 entries); it was verified against the on-disk deployed
   files (375/375 entries consistent, 0 stale). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1037 (``AGENT_META_REPO`` builder derivation, 2026-10-28, ``fix/bug-session-2026-10-27``):
+  ``build_variables()`` now derives the upstream ``owner/repo`` slug when a project has no explicit
+  ``variables.AGENT_META_REPO`` entry (source: the embedded ``.gitmodules`` URL, else the agent-meta
+  checkout's own git remote) instead of shipping a literal ``{{AGENT_META_REPO}}``. The matrix
+  fixture therefore pins ``AGENT_META_REPO: example/agent-meta``: an unpinned value would be derived
+  from the *cloning* remote and make this baseline fork-dependent (the derivation itself is covered
+  end-to-end by scenario ``87-project-description``). A full re-render measured **36 of 1085 hashes
+  changed; 0 added/removed** — the 9 copied ``.meta-config/project.yaml`` fixtures (new pinned line)
+  plus exactly ``agent-meta-scout``/``documenter``/``meta-feedback`` × 9 providers. No rule artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden (``slimming-golden``/``compact-golden``) changed.
+  The manifest was patched **per entry** (36 single-line replacements, everything else untouched) and
+  re-verified against the rendered bytes; ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Issues #983/#1037 (placeholder fallbacks, ``project.description``, escaped reference examples,
+  2026-10-28, ``fix/bug-session-2026-10-27``): the 36 verified single-entry changes above move the
+  ``ac01-baseline`` fixture tree, so its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows
+  the rebaselined tree. The digest was recomputed from the fixture bytes
+  (``9ead7c80…``) before re-pinning; ``slimming-golden`` and ``compact-golden`` are unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -422,7 +440,11 @@ def _make_project(root: Path, provider: str) -> Path:
         'agent-meta-version: "2.0.0-beta.1"\n'
         f"ai-providers:\n- {provider}\n"
         "dod-preset: rapid-prototyping\n"
-        "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n",
+        # AGENT_META_REPO is pinned to a neutral slug: since issue #1037 the
+        # builder derives it from the checkout, and a derived value would make
+        # this manifest depend on the cloning remote (fork CI would drift).
+        "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n"
+        "  AGENT_META_REPO: example/agent-meta\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
