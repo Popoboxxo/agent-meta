@@ -426,15 +426,28 @@ hook_is_meta_submodule_dir() {
 # is_fork_bomb(command) is linear in the input length: the old
 # '([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{([^}]*)\}' rescanned the rest of a
 # long identifier chain from every position (quadratic; 20 KB ~ 5 s, so the
-# hook timeout disabled the gate -- a fail-open, issue #943 (a)). The manual
-# scan bounds the name to 64 and the body to 512 characters.
+# hook timeout disabled the gate -- a fail-open, issue #943 (a)).
+#   * the function name is scanned exactly, at any length: a backward scan
+#     starts only at a '(' followed by ')', and the identifier in front of it
+#     ends at that '(', so the scans of two '()' pairs never overlap (O(n)
+#     overall). The former 64-character cap skipped longer names, a second
+#     fail-open (issue #943);
+#   * the body is bounded at 512 characters: no unquoted '}' inside that
+#     window FAILS CLOSED (block instead of allow). A long inline function
+#     body without braces in it is thereby blocked -- the accepted
+#     false-alarm class (spec RK-1);
+#   * the body still ends at the first unquoted '}', with no brace nesting, so
+#     a bomb carrying '${...}' or '{ ...; }' before its self-call is not
+#     detected: known gap, documented in rules/1-generic/branch-guard.md and
+#     tracked as a follow-up issue (spec Q10).
+# No exception is swallowed: a failure propagates as a non-zero hook exit
+# (which the guards treat as a block) instead of silently returning False.
 hook_shell_scan_py() {
   cat <<'PY'
 _IDENT_CHARS = frozenset(
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_:'
 )
 _WS = ' \t'
-_MAX_FUNC_NAME = 64
 _MAX_FUNC_BODY = 512
 
 
@@ -740,10 +753,8 @@ def is_fork_bomb(command):
         s = e
         while s > 0 and command[s - 1] in _IDENT_CHARS:
             s -= 1
-            if e - s > _MAX_FUNC_NAME:
-                break
         name = command[s:e]
-        if not name or len(name) > _MAX_FUNC_NAME:
+        if not name:
             continue
         if not (name[0].isalpha() or name[0] in '_:'):
             continue
@@ -754,7 +765,10 @@ def is_fork_bomb(command):
             continue
         close = command.find('}', j + 1, j + 1 + _MAX_FUNC_BODY)
         if close < 0:
-            continue
+            # No unquoted '}' in the first _MAX_FUNC_BODY characters: the body
+            # cannot be inspected, so fail closed (block) instead of skipping
+            # the header -- a skip is an allow (issue #943).
+            return True
         body = command[j + 1:close]
         if name in body and _body_calls_itself_piped(body, name):
             return True
