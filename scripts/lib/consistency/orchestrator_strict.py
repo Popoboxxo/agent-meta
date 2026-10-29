@@ -184,6 +184,11 @@ def check_orchestrator_strict_hook_support(project_root: Path, config: dict,
                                             agent_meta_root: Path) -> list[Finding]:
     """Report when orchestrator.strict is active but not runtime-enforced.
 
+    A config without an ``orchestrator`` block is a valid default (implicit
+    strict) and reaches the provider loop: once the D2b grace window has
+    passed, the hard default is announced through the same tier findings as an
+    explicit ``mode: strict``. Only a malformed (non-mapping) block is skipped.
+
     ``project_root`` is used for finding paths only; the capability registry is
     loaded from ``agent_meta_root`` (F-12). An unreadable registry degrades to
     the fail-safe ``advisory`` tier via ``load_provider_capabilities`` -- the
@@ -206,7 +211,13 @@ def check_orchestrator_strict_hook_support(project_root: Path, config: dict,
             "'advisory' to keep the current behaviour).",
         ))
 
-    if not orch:
+    # An absent ``orchestrator`` block is a VALID default config: the mode
+    # resolver treats ``{}`` as the implicit strict default. Only a malformed
+    # block (e.g. ``orchestrator: "strict"``) is skipped, so the hard default is
+    # announced per provider once the D2b grace window has passed (issue #1036
+    # follow-up). Returning early for ``{}`` used to hide the hard default: the
+    # grace notice disappears at 2.1.0 and nothing replaced it.
+    if not isinstance(orch, dict):
         return findings
 
     capabilities = providers_lib.load_provider_capabilities(agent_meta_root)

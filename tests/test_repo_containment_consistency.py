@@ -124,6 +124,50 @@ def test_warns_when_provider_override_re_enables_hookless_provider():
     assert any("Opencode" in f.message for f in findings)
 
 
+def test_all_hookless_providers_are_aggregated_into_one_finding():
+    """Issue #1036: seven hook-less providers -> ONE project-wide WARNING.
+
+    Before the aggregation every provider produced its own finding (7 per
+    default run). Detection is unchanged -- the same providers and reasons are
+    named, only the aggregation differs.
+    """
+    config = {"ai-providers": list(_provider_config())}
+    findings = check_repo_containment_support(
+        _REPO_ROOT, config, _provider_config()
+    )
+
+    assert len(findings) == 1, [f.message for f in findings]
+    finding = findings[0]
+    assert finding.severity == Severity.WARNING
+    assert finding.check == "repo-containment.no-hook-support"
+
+    expected = {
+        "Opencode", "Continue", "Copilot", "Mammouth", "Codex", "ZCode",
+        "KimiCode",
+    }
+    for provider in expected:
+        assert f"'{provider}'" in finding.message, provider
+    # Hook-capable providers are not named as affected.
+    for provider in ("Claude", "Gemini"):
+        assert f"'{provider}'" not in finding.message, provider
+    assert "7 provider(s)" in finding.message
+    # The reason distinction is preserved, not flattened.
+    assert "'Mammouth' (has_hooks: true but no verified hook_protocol)" in (
+        finding.message
+    )
+    assert "'Opencode' (has_hooks: false)" in finding.message
+
+
+def test_aggregated_finding_still_warns_only():
+    """Aggregation must not change the severity or fail the run."""
+    findings = check_repo_containment_support(
+        _REPO_ROOT, {"ai-providers": list(_provider_config())},
+        _provider_config(),
+    )
+    assert not any(f.severity == Severity.ERROR for f in findings)
+    assert print_json_report(findings) == 0
+
+
 # --- Template drift ERROR ----------------------------------------------
 
 
