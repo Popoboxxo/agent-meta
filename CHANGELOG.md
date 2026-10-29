@@ -41,6 +41,11 @@
   applies to every producer.
 
 ### Fixed
+- **No false `--check` drift when the compact bootstrap form is already on disk**: the hard-cap
+  fallback recomposed the compact block and logged an `UPDATE` even when it was byte-identical to
+  the file, so `sync.py --check` reported one file out of sync and exited 1 for a shared context
+  file that exceeds a reader cap in its full form only. The final content is now compared again and
+  reported as a skip.
 - Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
 - **`dod-push-check` 2.1.6 (#1033)**: the protected-branch list in the push-block message is
   de-duplicated — a configured `GIT_MAIN_BRANCH` of `main`/`master` no longer appears twice.

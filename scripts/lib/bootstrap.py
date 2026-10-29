@@ -249,6 +249,21 @@ class BootstrapEngine:
                         str(target_path.relative_to(project_root)),
                         "bootstrap: explicit roster exceeds a reader hard cap, compact form used",
                     )
+        if new_content == existing:
+            # The compact fallback can reproduce the block already on disk byte
+            # for byte (shared context file over a reader cap in full form only).
+            # Logging UPDATE there reports false drift in --check, so the
+            # equality check from above must run again on the final content.
+            if log:
+                log.skip(
+                    str(target_path.relative_to(project_root)),
+                    "bootstrap instructions unchanged",
+                )
+            return {
+                "status": "skipped",
+                "mechanism": "api-based",
+                "reason": "bootstrap instructions unchanged (compact form)",
+            }
         if log:
             log.action("UPDATE", str(target_path.relative_to(project_root)), "bootstrap instructions")
         if not dry_run:
