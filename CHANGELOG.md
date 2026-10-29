@@ -177,6 +177,16 @@
   providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in
   `tests/test_opencode_v2_surface.py` was recomputed from the fixture bytes before re-pinning.
   `AC01_EXCEPTIONS` is not extended and `slimming-golden`/`compact-golden` are unchanged.
+- **`hook_common.sh` 1.5.0 / `orchestrator-guard-impl.sh` 1.9.3 (#943 follow-up)**: the fork-bomb scan
+  in `hook_shell_scan_py` now reads a function name exactly at any length — the 64-character cap is
+  gone — and **fails closed** when a body has no unquoted `}` in its first 512 characters: the
+  candidate is blocked instead of being skipped. That is the deliberate false-alarm class: a long
+  inline function body (more than 512 characters before its closing `}`) is now blocked and needs an
+  explicit user approval, where it used to pass silently. The destructive block message names the
+  limit and states that the block is fail-closed. Known gap, documented in
+  `rules/1-generic/branch-guard.md` (`Bekannte Grenzen`, item 5): the body still ends at the first
+  unquoted `}` without brace nesting, so a bomb with `${…}` or `{ …; }` before its self-call is not
+  detected.
 
 ## [2.0.0-beta.4] - 2026-10-26
 

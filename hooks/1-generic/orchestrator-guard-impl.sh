@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.9.2
+# version: 1.9.3
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
