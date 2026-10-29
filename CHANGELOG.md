@@ -167,10 +167,11 @@
   `AGENT_RULES` and `EXTERNAL_DOCS_LANGUAGE` are escaped (`{{%VAR%}}`, rendering literally) in the
   non-deployable `agents/1-generic/_reference-agent.md`, and `TECH_STACK` became a derived builder
   variable — the `_UNKNOWN_TEMPLATE_RATCHET` set in `consistency/placeholders` is now empty.
-- **`instruction-soft-cap-chars` is owned by the framework (#1035)**: the finding's `fix-owner` moves
-  from `project-config` to the new `agent-meta` value, added to `_FIX_OWNERS` and documented in
-  `config/known-issues.yaml`: the fix is a template/sync change, and a consumer edit to the artifact
-  is overwritten on the next sync.
+- **`instruction-soft-cap-chars` retired, not fixed (#1035)**: the entry is removed from
+  `config/known-issues.yaml`, leaving a rationale comment in its place. `context_soft_cap_chars` is a
+  code-review visibility heuristic from an unverified audit quote, not a provider limit — the enforced
+  gate content ends inside that window — and a consumer edit is overwritten on the next sync, so the
+  warning was unactionable.
 - **`ac01-baseline` AC-T4 digest re-pinned (#983, #1037)**: the 36-entry rebaseline (the nine copied
   `.meta-config/project.yaml` fixtures plus `agent-meta-scout`/`documenter`/`meta-feedback` × 9
   providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in

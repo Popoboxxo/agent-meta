@@ -114,7 +114,8 @@
   - `unread-channel`: `verified-state` = „gemischt", kein zulässiger Enum-Wert, der Registry-Test schlägt fehl.
   - `context-hard-cap-truncation` („VERIFIED-RUNTIME (Codex)") gilt per Prädikat auch für ZCode, dessen Cap in der
     Studie nur VERIFIED-SOURCE ist (Studie §4.2). `instruction-soft-cap-chars` mischt Copilot (Audit-Zitat) und
-    Antigravity (UNVERIFIED).
+    Antigravity (UNVERIFIED). *(Addressed 2026-10-29, #1035 — not fixed: the seed was retired instead, because the
+    4,000-char value is a Code-Review visibility heuristic, not a provider read limit.)*
 - Korrektur: Grammatik erweitern (`value_key`, `pattern_from_config`, Rollen-Prädikat
   `active_role_where: {tools_without: [Write, Edit]}`, Map-Wildcard `*` mit Bindung, `source: doctor`). `verified-state`
   je Provider auflösen, entweder über einen optionalen Block `verified-state-by-capability` oder abgeleitet aus
