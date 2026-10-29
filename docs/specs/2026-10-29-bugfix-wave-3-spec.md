@@ -1,6 +1,6 @@
 # Bugfix-Welle 3 — Spec (Rest-Welle)
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-29)
 >
 > spec-id: SPEC-bugfix-wave-3
 >
@@ -27,6 +27,7 @@
 | 3 | 2026-10-29 | Q3-Default (a) → (b) (Name exakt, Body fail-closed); AC-A.1/A.2/A.3/A.5/A.7/A.8/A.9 angepasst; neu **AC-A.10** (»Bekannte Grenzen« in `rules/1-generic/branch-guard.md`) und **Q10** (Body endet am ersten `}`, Folge-Issue); Variante (a) wird Alternative, Variante (i) notiert. R3 um `config/project-config.schema.json` (»Extends«, »host:port«) erweitert, AC-B.7 verschärft (kein `Additional allowed`, Beispiele mit Loopback-Hinweis). AC-B.1 »enthält«, AC-B.3 mit zwei neuen Charakterisierungstests. AC-A.9-Drift aus Rebaseline-Logs und Matrix-Render belegt (13 statt »4 + unverifiziert«). | Review-Findings S-1…S-10 zu Rev. 2; Nachmessung 2026-10-29 (Py 3.13): `f(){ : ${x}; f|f& };f` und `f(){ { :; }; f|f& };f` → `False` (heute und unter (b)). |
 | 3.1 | 2026-10-29 | Minor-Findings: Drift-Zahlen als `13 + k` (k ∈ {0, 6}); AC-A.10-Zielwert ≥ 1 Treffer; Q3 (c) 11 bzw. 13 Einträge; R3-Schema-Bullet (Auto-Fill-Satz ersetzt); RK-1/RK-5 präzisiert; Entscheidungsregister »Status Rev. 3«. | Review Rev. 3 (M1–M6, INFO-1…6). |
 | 3.2 | 2026-10-29 | Rev. 3.2: User-Entscheidungen Q3/Q5/Q9/Q10 — Q3 = (b), Q5 = Doku an Code (»Replaces«), Q9 = »Refs«, Q10 = (ii) Folge-Issue durch User + »Bekannte Grenzen«; im Register als GESCHLOSSEN geführt. Q4/Q6/Q7/Q8 offen mit Default. | Entscheidung des Users, 2026-10-29. |
+| 3.2-F | 2026-10-29 | Freigabe durch den User per Auftrag vom 2026-10-29; offene Fragen mit Default: Default gilt | Status Entwurf → APPROVED (2026-10-29); nur Kopf/Log, kein Inhalt geändert. |
 
 Überholt aus Rev. 1 (nicht mehr gültig): Abschnitte »Scope-Befund A«, »PR 1«–»PR 4«, »Begründung
 des 4-PR-Schnitts«, Fix-Vertrag #943 mit Lookbehind-Regex und Body-Fenster 1024 (die gemergte

@@ -7,13 +7,13 @@ pipeline_stages:
 
 > Status: geplant (Entwurf), Revision 3.2 (2026-10-29)
 >
-> **Freigabevermerk:** Die zugehörige Spec trägt `Status: Entwurf`. Dieser Plan ist **nicht ausführbar**, bis der Nutzer bzw. `concept-reviewer` die Spec auf `Status: APPROVED` setzt und diesen Plan freigibt. Der Approval-Marker wird nie vom Planer gesetzt.
+> **Freigabevermerk:** Die zugehörige Spec trägt `Status: APPROVED (2026-10-29)` (Freigabe durch den User per Auftrag vom 2026-10-29; offene Fragen mit Default: Default gilt). Der Approval-Marker wird nie vom Planer gesetzt.
 
 **Goal:** Die vier nach PR #1038 verbliebenen Restpunkte der Welle 3 in zwei PRs schließen: PR A lässt den Fork-Bomb-Scanner Namen exakt prüfen und an der Body-Grenze fail-closed sein und dokumentiert die `}`-Lücke (R1, #943-Rest, Q3 (b)/Q10, mit genau einem AC-01-Rebaseline); PR B schreibt die drei Managed-Indizes über `write_atomic` (R2, #961-Rest), ergänzt den Host-Header-Hinweis und korrigiert die `--allowed-hosts`-Doku (R3, #897-Rest) und dokumentiert zcode ZC-1 als wontfix (R4, #856) — ohne Rebaseline.
 **Architecture:** Kein neues Subsystem. PR A ändert nur die emittierte Python-Funktion `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh`, eine Meldungszeile in `orchestrator-guard-impl.sh` und einen Punkt in »Bekannte Grenzen« von `rules/1-generic/branch-guard.md`; PR B tauscht drei `Path.write_text`-Aufrufe gegen das vorhandene `io.write_atomic`, erweitert zwei Hinweistexte und korrigiert Hilfe-/Doku-/Schema-Texte.
 **Tech Stack:** Bash-Hooks mit eingebettetem Python 3.9+, Python-Stdlib, pytest, Markdown.
 **Spec:** `docs/specs/2026-10-29-bugfix-wave-3-spec.md`
-**Spec-ID:** `spec-id: SPEC-bugfix-wave-3` (Status Entwurf, Revision 3.2, 2026-10-29)
+**Spec-ID:** `spec-id: SPEC-bugfix-wave-3` (Status APPROVED 2026-10-29, Revision 3.2, 2026-10-29)
 **Tracking:** Refs #943 (R1), Refs #961 (R2), Refs #897 (R3), #856 (R4; Schließen durch den User)
 
 ## Änderungslog des Plans
