@@ -60,6 +60,7 @@ from lib.log import SyncLog
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
     sync_opencode_v2_managed_keys,
+    v2_active,
 )
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
@@ -235,7 +236,10 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.hooks import sync_hooks
     from lib.isolation import (
         _sync_opencode_runtime_gate,
+        gate_state_present,
+        owns_gate_surface,
         reconcile_opencode_surface_gate,
+        rollback_opencode_runtime_gate,
     )
     from lib.providers import (
         load_provider_capabilities,
@@ -319,6 +323,18 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 test_repo_path, config, provider, provider_config,
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
+            )
+        elif (
+            owns_gate_surface(provider_config, provider)
+            and not v2_active(provider_config, provider)
+            and gate_state_present(test_repo_path)
+        ):
+            # #1020 (a): same decoupled rollback as the production stage — the
+            # test repo must match a normal sync after a tier change away from
+            # ``permission`` (v2 documents roll back via the surface reconcile).
+            rollback_opencode_runtime_gate(
+                test_repo_path, provider, provider_config, log, dry_run,
+                config=config,
             )
         # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: same tier-independent surface
         # reconcile as the production per-provider stage (mirrored so a

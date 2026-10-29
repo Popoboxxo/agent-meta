@@ -53,6 +53,21 @@ _STATE_V2_PERMISSIONS = "opencode-v2-permissions"
 _STATE_V2_CLI = "opencode-v2-cli"
 _STATE_V2_MCP = "opencode-v2-mcp"
 
+# Provenance marker: recognizes the companion file as agent-meta's own product
+# (the injection-drift scanner's is_managed_artifact predicate checks for the
+# canonical sentinel). Free-form key read by no code — every reader looks up its
+# own namespace — so it cannot collide with the managed namespaces. It is also
+# the only key allowed to remain when the rollback helper prunes an emptied
+# state file (#1020).
+_STATE_PROVENANCE_KEY = "_agent-meta"
+_STATE_PROVENANCE_VALUE = "agent-meta managed — do not edit manually"
+
+# The document the managed runtime gate lives in (v1 ``permission`` map, v2
+# ``permissions[]`` list, ``default_agent``). A provider OWNS the gate surface
+# iff its resolved data declares exactly this file as ``settings_file`` or
+# ``mcp-config.committed-file`` — never a provider-name literal (#1020).
+_GATE_SETTINGS_FILE = "opencode.json"
+
 # The dict-valued namespaces: ``_read_state`` returns ``{}`` (never ``[]``) for
 # these, so an absent/mis-typed record degrades to an empty mapping the callers
 # can use directly. Every other namespace is list-valued.
@@ -243,10 +258,77 @@ def _write_state(state_path: Path, value, dry_run: bool,
     # cannot collide with isolation-deny / runtime-gate-deny. Without it,
     # `.claude/agent-meta-state.json` / `.opencode/agent-meta-state.json` were
     # misread as foreign artifacts on the first post-sync scan (issue #802).
-    data.setdefault("_agent-meta", "agent-meta managed — do not edit manually")
+    data.setdefault(_STATE_PROVENANCE_KEY, _STATE_PROVENANCE_VALUE)
     write_atomic(
         state_path,
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+    )
+
+
+def _prune_state_file_if_empty(state_path: Path, dry_run: bool = False) -> bool:
+    """Delete the companion state file when it carries no managed record left.
+
+    #1020: after a rollback only the provenance marker may remain — an empty
+    tracker would otherwise keep the provider directory alive and keep the file
+    in the repository. Conservative by construction: the file is deleted ONLY
+    when the provenance marker identifies it as agent-meta's product **and** no
+    namespace (isolation-deny, runtime-gate-deny, default-agent, opencode-v2-*)
+    is left. An unparseable/foreign file has no marker and is never touched.
+    """
+    data = _load_state_data(state_path)
+    if data.get(_STATE_PROVENANCE_KEY) != _STATE_PROVENANCE_VALUE:
+        return False
+    if any(key != _STATE_PROVENANCE_KEY for key in data):
+        return False
+    if dry_run or not state_path.exists():
+        return False
+    try:
+        state_path.unlink()
+    except OSError:
+        return False
+    return True
+
+
+def _provider_entry_of(provider_config: dict, provider: str) -> dict:
+    """One provider entry out of a registry or a single entry (defensive)."""
+    if isinstance(provider_config, dict):
+        entry = provider_config.get(provider)
+        if isinstance(entry, dict):
+            return entry
+        return provider_config
+    return {}
+
+
+def owns_gate_surface(provider_config: dict, provider: str) -> bool:
+    """True iff *provider*'s resolved data declares the managed gate document.
+
+    #1020: the gate writer/rollback must never touch the shared document for a
+    foreign provider, and must not key the decision on a provider name. The
+    ownership marker is the resolved ``settings_file`` / ``mcp-config.
+    committed-file`` value — the same data the writers already use.
+
+    Fixtures that declare neither key (unit tests of the writer) are non-owners;
+    their dispatch is driven by the runtime-gate tier alone, exactly as before.
+    """
+    pc = _provider_entry_of(provider_config, provider)
+    mcp_config = pc.get("mcp-config")
+    committed = mcp_config.get("committed-file") if isinstance(mcp_config, dict) else None
+    return _GATE_SETTINGS_FILE in (
+        pc.get("settings_file"), committed,
+    )
+
+
+def gate_state_present(project_root: Path) -> bool:
+    """True iff the companion state file records a managed gate key (#1020).
+
+    Used to decouple the ROLLBACK from the ``permission`` tier: a project whose
+    tier moved away from ``permission`` still carries the recorded deny /
+    entry point and needs the writer's rollback branch to run.
+    """
+    state_path = safe_path(Path(project_root), _OPENCODE_STATE_FILE)
+    return bool(
+        _read_state(state_path, _STATE_RUNTIME_GATE_KEY)
+        or _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
     )
 
 
@@ -623,10 +705,12 @@ def _sync_opencode_runtime_gate(
     config: dict,
     provider: str,
     provider_config: dict,
-    agent_meta_root: Path,
+    agent_meta_root: Path | None,
     log: SyncLog,
     dry_run: bool,
     active_set=None,
+    *,
+    rollback_only: bool = False,
 ) -> None:
     """Merge the Main-Chat runtime-gate deny and ``default_agent`` into the
     EXISTING opencode.json.
@@ -657,9 +741,23 @@ def _sync_opencode_runtime_gate(
     never a single provider entry: both the gate-tier lookup
     (``_opencode_runtime_gate_entries``) and the entry-point lookup
     (``_opencode_entry_point``) index it by ``provider``.
+
+    ``rollback_only=True`` (#1020) ignores tier and strict mode entirely: no
+    entry is computed, so the regular rollback branches run unconditionally.
+    Used when the gate is no longer requested (tier change) or when the
+    provider is being removed — ``config``/``agent_meta_root`` are then unused
+    and may be ``None``.
     """
-    settings_path = safe_path(project_root, "opencode.json")
+    settings_path = safe_path(project_root, _GATE_SETTINGS_FILE)
     state_path = safe_path(project_root, _OPENCODE_STATE_FILE)
+
+    if rollback_only and not settings_path.exists():
+        # Nothing managed can be left in the document; only stale state can
+        # remain. Drop the gate namespaces instead of creating the file.
+        _write_state(state_path, {}, dry_run, _STATE_RUNTIME_GATE_KEY)
+        _write_state(state_path, {}, dry_run, _STATE_DEFAULT_AGENT_KEY)
+        _prune_state_file_if_empty(state_path, dry_run)
+        return
 
     existing = _read_json_safe(settings_path, log)
     if existing is None and settings_path.exists():
@@ -671,7 +769,11 @@ def _sync_opencode_runtime_gate(
     if not isinstance(gate_state, dict):
         gate_state = {}
 
-    entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
+    entries = (
+        {}
+        if rollback_only
+        else _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
+    )
 
     # D2b grace (M4): the version-bounded window for the IMPLICIT strict default
     # is already part of ``entries`` — the entries function receives
@@ -694,8 +796,13 @@ def _sync_opencode_runtime_gate(
 
     is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
 
-    # Entry point (#1006/IC-6): an explicit AND generated primary role.
-    entry = _opencode_entry_point(provider, provider_config, active_set)
+    # Entry point (#1006/IC-6): an explicit AND generated primary role. A
+    # rollback must not re-derive it — the managed value is taken back below.
+    entry = (
+        None
+        if rollback_only
+        else _opencode_entry_point(provider, provider_config, active_set)
+    )
 
     # Gate-deny coupled to the entry point (#1006/IC-6 step 2): without an
     # explicit and generated primary role the deny would lock EVERY agent —
@@ -785,8 +892,19 @@ def _sync_opencode_runtime_gate(
         if permission_changed:
             existing["permission"] = permission
 
+        if rollback_only and permission_changed:
+            # A full rollback must not leave residue (#1020): an emptied family
+            # (``edit: {}``) is not a user decision and would keep the document
+            # from returning to its pre-gate shape. Only containers WE emptied
+            # are pruned — the untouched families keep their keys.
+            for family in _RUNTIME_GATE_FAMILIES:
+                if permission.get(family) == {}:
+                    permission.pop(family, None)
+            if not permission:
+                existing.pop("permission", None)
+
     settings_content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
-    rel_settings = "opencode.json"
+    rel_settings = _GATE_SETTINGS_FILE
 
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -813,6 +931,128 @@ def _sync_opencode_runtime_gate(
         )
     if new_da_state != da_state:
         _write_state(state_path, new_da_state, dry_run, _STATE_DEFAULT_AGENT_KEY)
+
+
+def _rollback_opencode_isolation_deny(
+    project_root: Path, log: SyncLog, dry_run: bool,
+) -> None:
+    """Take back the provider-isolation globs recorded in ``isolation-deny``.
+
+    #1020 (b): only the Opencode surface keeps its isolation entries in a
+    SHARED document (``opencode.json``); every other provider's artifact lives
+    inside its own directory and disappears with it. When the Opencode
+    provider is removed/deactivated its writers never run again — the state
+    file is deleted with the directory, so the denies would stay unowned.
+
+    Conservative: a glob is removed only while its value is still the managed
+    ``"deny"`` (a user-changed value is left alone), and the record is dropped
+    either way because the provider no longer manages it. An unparseable
+    document keeps the state for a later retry.
+    """
+    root = Path(project_root)
+    state_path = safe_path(root, _OPENCODE_STATE_FILE)
+    managed = [glob for glob in _read_state(state_path) if isinstance(glob, str)]
+    if not managed:
+        return
+
+    file_path = safe_path(root, _GATE_SETTINGS_FILE)
+    existing = _read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, keep the record
+        existing = {}
+    elif not isinstance(existing, dict):
+        return
+
+    permission = existing.get("permission")
+    if not isinstance(permission, dict):
+        permission = {}
+
+    changed = False
+    for family in ("read", "edit"):
+        mapping = _permission_mapping(permission.get(family))
+        for glob in managed:
+            if mapping.get(glob) == _RUNTIME_GATE_DECISION:
+                mapping.pop(glob, None)
+                changed = True
+        if mapping:
+            permission[family] = mapping
+        else:
+            permission.pop(family, None)
+
+    if changed:
+        if permission:
+            existing["permission"] = permission
+        else:
+            existing.pop("permission", None)
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(file_path, content, log, _GATE_SETTINGS_FILE, dry_run=dry_run):
+            log.action("WRITE", _GATE_SETTINGS_FILE, "provider-isolation deny removed")
+
+    # Whether or not a value was still ours, we no longer manage it.
+    _write_state(state_path, [], dry_run)
+
+
+def rollback_opencode_runtime_gate(
+    project_root: Path,
+    provider: str,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+    config: dict | None = None,
+    *,
+    include_isolation_deny: bool = False,
+) -> None:
+    """Roll back every managed runtime-gate key of *provider* (#1020).
+
+    Tier- and strict-independent, complete but conservative: only values
+    recorded in a state namespace are removed or restored — a user value is
+    never touched. Covers
+
+    * the v1 ``permission.edit/bash["**"]`` deny map (recorded prior restored),
+    * the v2 ``permissions[]`` deny triples (``opencode-v2-permissions``),
+    * ``default_agent`` from the ``default-agent`` namespace (prior restored).
+
+    Two call sites need it because the per-provider stage never runs for them:
+    the resolved tier no longer requests the gate (tier change away from
+    ``permission``) and the provider is being removed (legacy cleanup /
+    provider deactivation). In both cases the state file would otherwise stop
+    the rollback from ever happening and be deleted with the provider
+    directory, leaving an unowned deny in the shared document.
+
+    Ownership guard first: a foreign provider returns before any read (N-M2),
+    so removing e.g. Claude can never take back Opencode's gate. On a v2
+    document the writer's v1 map branch is skipped by its surface guard; the
+    shared rollback helpers then handle the v1 map and the list-form triples.
+    ``config`` is unused (kept for symmetry with the writer) and may be ``None``.
+
+    ``include_isolation_deny`` additionally takes back the provider-isolation
+    globs recorded in the ``isolation-deny`` namespace (#1020 (b)). Only the
+    provider-REMOVAL paths set it: the isolation stage runs after this helper
+    in a normal sync and re-writes the globs for active providers, so rolling
+    them back on a mere tier change would only cause write churn.
+    """
+    if not owns_gate_surface(provider_config, provider):
+        return
+
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    if include_isolation_deny:
+        _rollback_opencode_isolation_deny(project_root, log, dry_run)
+    _sync_opencode_runtime_gate(
+        Path(project_root), config or {}, provider, provider_config, None, log,
+        dry_run, rollback_only=True,
+    )
+    if opencode_v2_config.owns_opencode_surface(provider_config, provider):
+        _rollback_opencode_v1_gate_map(project_root, provider_config, log, dry_run)
+        _sync_opencode_v2_gate_permissions(
+            project_root, provider_config, [], log, dry_run
+        )
+    _prune_state_file_if_empty(
+        safe_path(Path(project_root), _OPENCODE_STATE_FILE), dry_run
+    )
 
 
 # ---------------------------------------------------------------------------

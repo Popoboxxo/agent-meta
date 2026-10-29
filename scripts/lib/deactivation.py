@@ -234,10 +234,20 @@ def remove_provider_dir(
     provider_config: dict,
     log: SyncLog,
     dry_run: bool = False,
+    config: dict | None = None,
 ) -> bool:
     """Remove a provider's root directory.
 
     Returns True on success, False if the directory didn't exist.
+
+    #1020: before the root directory (and with it the agent-meta state file
+    that records the managed keys) disappears, the runtime-gate keys this
+    provider wrote into a SHARED document are rolled back — otherwise
+    ``opencode.json`` keeps an unowned ``permission.edit/bash`` deny and
+    ``default_agent`` after deactivation. The rollback is ownership- and
+    state-guarded (``isolation.rollback_opencode_runtime_gate``): a foreign
+    provider, or one without managed state, is a no-op. ``config`` is optional
+    for positional compatibility; the rollback itself needs no project config.
     """
     provider_root = _get_provider_root_dir(provider, provider_config)
     if not provider_root:
@@ -245,6 +255,14 @@ def remove_provider_dir(
         return False
 
     target_dir = project_root / provider_root
+
+    from .isolation import rollback_opencode_runtime_gate
+
+    rollback_opencode_runtime_gate(
+        project_root, provider, provider_config, log, dry_run, config=config,
+        include_isolation_deny=True,
+    )
+
     if not target_dir.exists():
         log.note("deactivation", f"provider directory already removed: {provider_root}")
         return False
@@ -294,7 +312,8 @@ def deactivate_providers(
             provider_result["backed_up"] = True
             provider_result["backup_file"] = str(zip_path.relative_to(project_root))
 
-        removed = remove_provider_dir(project_root, provider, provider_config, log, dry_run)
+        removed = remove_provider_dir(project_root, provider, provider_config, log,
+                                      dry_run, config=config)
         provider_result["removed"] = removed
 
         results[provider] = provider_result
