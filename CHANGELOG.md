@@ -15,7 +15,9 @@
   a managed deny back) and emits a loud state-error warning naming how to restore the invariant,
   instead of writing the half-active gate that locked the main chat out. A user-set
   `default_agent` is respected and not overwritten (D1c); edit/shell stay locked for it while the
-  gate is active. v2 surfaces are excluded because their deny lives in `permissions[]`.
+  gate is active. The v2 surface obeys the same invariant even though its deny is a `permissions[]`
+  triple: a triple is never written without a valid `default_agent`, an already recorded one is
+  rolled back, and exactly one loud warning names the remedy (D1a(iii)).
 - **Announced strict-default flip with a version-driven grace window (D2b, #1006)**: a project
   that only inherits the new strict default keeps the pre-flip behaviour — the entry point still
   lands, the deny waits — and gets one run-level warning plus the new
