@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Bugfix-Welle 3 (Rest-Welle) — Implementation Plan
 
-> Status: geplant (Entwurf), Revision 3 (2026-10-29)
+> Status: geplant (Entwurf), Revision 3.2 (2026-10-29)
 >
 > **Freigabevermerk:** Die zugehörige Spec trägt `Status: Entwurf`. Dieser Plan ist **nicht ausführbar**, bis der Nutzer bzw. `concept-reviewer` die Spec auf `Status: APPROVED` setzt und diesen Plan freigibt. Der Approval-Marker wird nie vom Planer gesetzt.
 
@@ -13,14 +13,15 @@ pipeline_stages:
 **Architecture:** Kein neues Subsystem. PR A ändert nur die emittierte Python-Funktion `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh`, eine Meldungszeile in `orchestrator-guard-impl.sh` und einen Punkt in »Bekannte Grenzen« von `rules/1-generic/branch-guard.md`; PR B tauscht drei `Path.write_text`-Aufrufe gegen das vorhandene `io.write_atomic`, erweitert zwei Hinweistexte und korrigiert Hilfe-/Doku-/Schema-Texte.
 **Tech Stack:** Bash-Hooks mit eingebettetem Python 3.9+, Python-Stdlib, pytest, Markdown.
 **Spec:** `docs/specs/2026-10-29-bugfix-wave-3-spec.md`
-**Spec-ID:** `spec-id: SPEC-bugfix-wave-3` (Status Entwurf, Revision 3, 2026-10-29)
+**Spec-ID:** `spec-id: SPEC-bugfix-wave-3` (Status Entwurf, Revision 3.2, 2026-10-29)
 **Tracking:** Refs #943 (R1), Refs #961 (R2), Refs #897 (R3), #856 (R4; Schließen durch den User)
 
 ## Änderungslog des Plans
 
 - **Rev. 2 (2026-10-29):** Plan auf Rest-Welle umgebaut. Entfallen: PR 0/0a/0b (Tasks 1–3, 34), PR 1 (Tasks 4–14), PR 2 (15–21), PR 4 (22–27), PR 3 (28–33), bedingte Rebaselines (35, 36) — deren Code-Scope ist mit PR #1038 auf `main` (Verifikationsnachweis: Spec »Stand nach PR #1038«). Task-IDs neu ab 1; AC-IDs neu (AC-A.n, AC-B.n).
-- **Rev. 3.1 (2026-10-29):** Minor-Findings eingearbeitet: Drift-Zahlen `13 + k` (Task 4), `_MAX_FUNC_NAME`-Grep-Bereich (Task 1), AC-A.10 ≥ 1 Treffer, AC-01-Lauf aus Task 6 Step 5 entfernt (in Task 10 Step 1 enthalten), CR-Byte-Formulierung, Wildcard-Phrasen-Hinweis (Task 7), Folge-Issue-Hinweis im Status.
 - **Rev. 3 (2026-10-29):** Review-Findings P-1…P-8 und Spec Rev. 3 eingearbeitet; Task-Nummern unverändert. Task 1 auf Q3-Default (b) (Rot-Zählung `4 failed, 8 passed`, alle fünf Tests parametrisiert, `{`-Kette im Linearitätstest); Task 2 Grenzphrase `first 512`; Task 3 mit AC-A.10 (`rules/1-generic/branch-guard.md`) und `# changelog:` nur bei `hook_common.sh`; Task 4 Patch je Eintrag statt `--write`, Drift 13 Einträge; Task 6 mit zwei Charakterisierungstests (`3 failed, 2 passed`); Task 7 inkl. `config/project-config.schema.json` und Abschluss-Grep. Neu Q10 und Folge-Issue-Entwurf im Status-Abschnitt.
+- **Rev. 3.1 (2026-10-29):** Minor-Findings eingearbeitet: Drift-Zahlen `13 + k` (Task 4), `_MAX_FUNC_NAME`-Grep-Bereich (Task 1), AC-A.10 ≥ 1 Treffer, AC-01-Lauf aus Task 6 Step 5 entfernt (in Task 10 Step 1 enthalten), CR-Byte-Formulierung, Wildcard-Phrasen-Hinweis (Task 7), Folge-Issue-Hinweis im Status.
+- **Rev. 3.2 (2026-10-29):** User-Entscheidungen Q3/Q5/Q9/Q10 (vom User bestätigt): Q3 = (b), Q5 = Doku an Code (»Replaces«, Code unverändert), Q9 = »Refs«, Q10 = (ii) Folge-Issue durch User + »Bekannte Grenzen«. Gates in Entry, Task 1, Task 7 entschärft (Varianten bleiben Alternativen, nicht blockierend); Q-Tabelle aktualisiert.
 
 ## Status — ehemaliger PR 0 (Housekeeping, kein Agent-Task)
 
@@ -30,7 +31,7 @@ pipeline_stages:
 - #856: OPEN — nach Merge von PR B schließt der User mit dem Kommentar-Entwurf aus Task 10 (Spec Q6).
 - #971: offen, Kriterium fehlt (Spec Q8). #192: bleibt offen.
 - **Hinweis (möglicher Folge-Issue, nicht Scope):** Der Index bleibt stale, nachdem alle Einträge entfernt wurden; nur Text, keine Änderung in dieser Welle.
-- **Q10-Folge-Issue (`}`-Lücke):** legt der User an (nur bei Q10 = (ii)); kein Agent führt `gh issue create` aus. Text-Entwurf (Englisch), nicht ausgeführt:
+- **Q10-Folge-Issue (`}`-Lücke):** legt der User an (Q10 = (ii), vom User bestätigt 2026-10-29); kein Agent führt `gh issue create` aus. Text-Entwurf (Englisch), nicht ausgeführt:
 
   > **Title:** `fix: fork-bomb scan ends a function body at the first '}'`
   >
@@ -48,7 +49,7 @@ pipeline_stages:
 
 **Entry (vor Task 1 bzw. Task 6):**
 1. Spec `Status: APPROVED` und dieser Plan freigegeben.
-2. Vor PR A: Q3 (R1-Vertrag), Q4 (#945), Q7 (`function NAME`-Form), Q10 (`}`-Lücke) entschieden. Vor PR B Task 7: Q5 entschieden.
+2. Vor PR A: Q4 (#945) und Q7 (`function NAME`-Form) entschieden bzw. Default akzeptiert; Q3 (b), Q10 (ii), Q5 und Q9 sind vom User bestätigt (2026-10-29).
 3. `origin/main` = `3e340690` oder neuer; Arbeitsbranch je PR durch den `git`-Agenten angelegt. Kein Code auf `main` (`.claude/rules/branch-guard.md`).
 
 **Exit (gesamt):** PR A und PR B gemergt (A vor B); je PR die eigenen Exit-Kriterien erfüllt; `python3 -m pytest tests -q` ohne `failed`/`error` auf `main` nach dem zweiten Merge; alle Checkboxen gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`).
@@ -116,14 +117,14 @@ pipeline_stages:
 ## PR A — `fix/fork-bomb-window-gap` (R1)
 
 **Branch:** `fix/fork-bomb-window-gap` (vom `git`-Agenten auf aktuellem `origin/main` angelegt).
-**Entry:** Spec APPROVED; Q3, Q4, Q7, Q10 entschieden.
+**Entry:** Spec APPROVED; Q3 (b) und Q10 (ii) vom User bestätigt (2026-10-29); Q4, Q7 mit Default.
 **Exit:** (1) `python3 -m pytest tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py -q` grün; (2) `python3 scripts/sync.py --validate` Exit 0; (3) `python3 -m pytest tests -q` ohne `failed`/`error`; (4) Versionen + `CHANGELOG.md` (AC-A.8) und »Bekannte Grenzen« (AC-A.10); (5) genau ein Rebaseline (AC-A.9); (6) `python3 scripts/consistency-check.py` ohne `hooks.stale-deployed-version`.
 **Rollback:** `git revert` des Merge-Commits durch den `git`-Agenten (nimmt `hashes.json`/`_FIXTURE_TREES`/`.agents/hooks/*`/Regeltext mit); danach `python3 scripts/sync.py` für die lokalen `.claude/hooks/`- und Regel-Kopien. Folge: Fork-Bomben mit Namen > 64 bzw. Body > 512 passieren wieder (fail-open, Nutzer informieren).
 
 ### Task 1: R1 — `is_fork_bomb` Name exakt, Body-Grenze fail-closed
 **Agent:** senior-developer · **Issue:** Refs #943 · **AC:** AC-A.1, AC-A.2, AC-A.3, AC-A.4, AC-A.5, AC-A.6
 **Depends on:** —
-**Gate:** Q3 und Q10 entschieden. Default Q3 (b) unten. Bei Q3 (a): Varianten-AC der Spec (`"a"*65 + "(){ :; }"` und n = 20 000/300 000 → `1`, Test heißt `test_fork_bomb_fails_closed_on_long_function_name`, `_MAX_FUNC_NAME` bleibt, Rot-Zählung `7 failed, 5 passed`). Bei Q3 (c) oder Q10 (i): Stopp und Plan-Revision.
+**Gate:** Q3 (b) und Q10 (ii) vom User bestätigt (2026-10-29) — nicht blockierend. Vertrag unten gilt. Alternative (nur bei späterer Änderung der Entscheidung) Q3 (a): Varianten-AC der Spec (`"a"*65 + "(){ :; }"` und n = 20 000/300 000 → `1`, Test heißt `test_fork_bomb_fails_closed_on_long_function_name`, `_MAX_FUNC_NAME` bleibt, Rot-Zählung `7 failed, 5 passed`). Jede Abweichung von der bestätigten Entscheidung (a/c/i) → Stopp, Spec-/Plan-Revision; die Varianten-AC für (a) liegen vorbereitet in der Spec.
 **Files:**
 - Modify: `hooks/1-generic/lib/hook_common.sh`
 - Modify: `tests/test_hook_common_lib.py`
@@ -202,7 +203,7 @@ pipeline_stages:
 ## PR B — `fix/index-lf-admin-hint-zcode-doc` (R2, R3, R4)
 
 **Branch:** `fix/index-lf-admin-hint-zcode-doc` (vom `git`-Agenten angelegt; Entwicklung parallel zu PR A, Merge nach PR A auf frischem `main`).
-**Entry:** Spec APPROVED; Q5 vor Task 7, Q6 vor Task 10 entschieden.
+**Entry:** Spec APPROVED; Q5 vom User bestätigt (2026-10-29); Q6 vor Task 10 entschieden.
 **Exit:** (1) `python3 -m pytest tests/test_newline_normalization.py tests/test_hook_lib_sync.py tests/test_release_gate_checksums.py tests/test_admin_server.py -q` grün; (2) `python3 scripts/sync.py --validate` Exit 0; (3) `python3 -m pytest tests -q` ohne `failed`/`error`; (4) `python3 -m pytest tests/test_ac01_render_identity.py -q` grün **ohne** Rebaseline (AC-B.4; bei Rot: Stopp, Ursache melden — kein Rebaseline in PR B ohne Plan-Revision); (5) `CHANGELOG.md`-Einträge inkl. Modus 0600.
 **Rollback:** `git revert` des Merge-Commits durch den `git`-Agenten. Folge: Indizes wieder per `write_text` (CRLF unter Windows), Host-Meldung ohne Hinweis, Doku wieder falsch; bereits mit 0600 geschriebene Indizes bleiben (kein Datenverlust).
 
@@ -226,7 +227,7 @@ pipeline_stages:
 ### Task 7: R3 — Host-Header-Hinweis, Hilfetext, How-to und Schema
 **Agent:** developer · **Issue:** Refs #897 · **AC:** AC-B.5, AC-B.6, AC-B.7 · **parallel_group:** gB
 **Depends on:** —
-**Gate:** Q5 entschieden. Bei »Code an Hilfetext angleichen« Stopp und Plan-Revision (Verhaltensänderung, socket-freier Helfer nötig).
+**Gate:** Q5 vom User bestätigt (Doku an Code, 2026-10-29) — nicht blockierend. Bei einer späteren Änderung auf »Code an Hilfetext angleichen« Stopp und Plan-Revision (Verhaltensänderung, socket-freier Helfer nötig).
 **Files:**
 - Modify: `scripts/admin-server.py`
 - Modify: `tests/test_admin_server.py`
@@ -245,7 +246,7 @@ pipeline_stages:
 - [ ] Step 6: commit `fix: hint on host header rejection and fix allowed-hosts help` (61 Zeichen)
 
 ### Task 8: R4 — zcode ZC-1 Entscheidungsnotiz
-**Agent:** junior-developer · **Issue:** #856 · **AC:** AC-B.8 · **parallel_group:** gB
+**Agent:** junior-developer · **Issue:** Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.8 · **parallel_group:** gB
 **Depends on:** —
 **Files:**
 - Modify: `docs/providers/zcode.md`
@@ -256,7 +257,7 @@ pipeline_stages:
 - [ ] Step 4: commit `chore: record zcode ZC-1 wontfix decision` (41 Zeichen)
 
 ### Task 9: PR B — Changelog
-**Agent:** junior-developer · **Issue:** Refs #961, Refs #897, #856 · **AC:** AC-B.3 (Changelog-Teil)
+**Agent:** junior-developer · **Issue:** Refs #961, Refs #897, Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.3 (Changelog-Teil)
 **Depends on:** 6, 7, 8
 **Files:**
 - Modify: `CHANGELOG.md`
@@ -266,7 +267,7 @@ pipeline_stages:
 - [ ] Step 3: commit `chore: add changelog entries for index LF and admin hint` (56 Zeichen)
 
 ### Task 10: PR B — Exit-Gate, PR-Text, #856-Kommentar-Entwurf
-**Agent:** developer · **Issue:** Refs #961, Refs #897, #856 · **AC:** AC-B.4, AC-B.9, Exit-Kriterien PR B
+**Agent:** developer · **Issue:** Refs #961, Refs #897, Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.4, AC-B.9, Exit-Kriterien PR B
 **Depends on:** 9
 **Files:**
 - Create: `.tmp/wave3-prB-description.md`
@@ -303,18 +304,18 @@ pipeline_stages:
 
 ## Offene Fragen (aus der Spec, mit Entscheidungszeitpunkt)
 
-| ID | Frage | Default | Entscheidung bis |
+| ID | Frage | Default / Entscheidung | Entscheidung bis |
 |---|---|---|---|
 | Q1 | Reopen vs. neue Issues (Rev. 1) | gegenstandslos | — |
 | Q2 | D5 formal aufheben (Rev. 1) | gegenstandslos | — |
-| Q3 | R1-Vertrag (a) fail-closed an beiden Grenzen / (b) Name exakt + Body fail-closed / (c) belassen; Fenster 512 oder 1024 | **(b)**, 512 | vor Task 1, durch User |
+| Q3 | R1-Vertrag (a) fail-closed an beiden Grenzen / (b) Name exakt + Body fail-closed / (c) belassen; Fenster 512 oder 1024 | **GESCHLOSSEN – vom User bestätigt, 2026-10-29: (b)**, 512 | — (entschieden) |
 | Q4 | #945 vor PR A vorziehen? | Nein | vor PR-A-Start, durch User |
-| Q5 | `--allowed-hosts`: Doku an Code oder Code an Doku? | Doku an Code (»replaces«) | vor Task 7, durch User |
+| Q5 | `--allowed-hosts`: Doku an Code oder Code an Doku? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29:** Doku an Code (»Replaces«), Code unverändert | — (entschieden) |
 | Q6 | #856 nach PR B schließen? | Ja, durch den User (Entwurf Task 10) | vor Task 10, durch User |
 | Q7 | `function NAME { … }`-Form in R1 aufnehmen? | Nein, Folge-Issue durch den User | vor Task 1, durch User |
 | Q8 | Kriterium für #971 | bleibt offen | offen, durch User |
-| Q9 | Geschlossene Bezugs-Issues (#943, #961, #897): »Refs« oder Reopen? | »Refs« | vor Task 5 / Task 10, durch User |
-| Q10 | `}`-Lücke: (ii) dokumentieren + Folge-Issue oder (i) in PR A mitschließen? | (ii), Folge-Issue durch den User (Entwurf im Status-Abschnitt) | vor Task 1, durch User |
+| Q9 | Geschlossene Bezugs-Issues (#943, #961, #897): »Refs« oder Reopen? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29:** »Refs« statt »Closes« (#943, #961, #897) | — (entschieden) |
+| Q10 | `}`-Lücke: (ii) dokumentieren + Folge-Issue oder (i) in PR A mitschließen? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29: (ii)** — Folge-Issue durch den User (Entwurf im Status-Abschnitt) plus Eintrag in »Bekannte Grenzen« (AC-A.10/Task 3 Pflicht) | — (entschieden) |
 
 ## Annahmen und Self-Review
 

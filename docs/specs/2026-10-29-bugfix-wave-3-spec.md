@@ -4,7 +4,7 @@
 >
 > spec-id: SPEC-bugfix-wave-3
 >
-> **Revision:** 3.1 (2026-10-29) — ersetzt Revision 2, siehe »Änderungslog«.
+> **Revision:** 3.2 (2026-10-29) — ersetzt Revision 3.1, siehe »Änderungslog«.
 > **Betroffener Bereich:** Fork-Bomb-Scanner (`hooks/1-generic/lib/hook_common.sh`), Destructive-Gate
 > (`hooks/1-generic/orchestrator-guard-impl.sh`), Regel »Bekannte Grenzen« (`rules/1-generic/branch-guard.md`),
 > Managed-Index-Schreibpfade (`scripts/lib/hooks.py`, `scripts/lib/hook_plugins.py`),
@@ -26,6 +26,7 @@
 | 2 | 2026-10-29 | Umbau auf Rest-Welle: PR 1–4 und PR 0/0a/0b entfallen; neu PR A (R1) und PR B (R2–R4). AC neu nummeriert (AC-A.n, AC-B.n). Befund A (»Fix-Commits existieren nicht«) gestrichen. Q1/Q2 gegenstandslos, Q3 durch neuen R1-Vertrag ersetzt. Verifikation der erledigten Bugs als eigener Abschnitt. | PR #1038 hat B1, B2 (bis auf Restlücke), B3, B4, SR-B-19, B6–B10, B12 und den `create_hook`-Teil von B5 nach `main` gebracht; die in Rev. 1 als fehlend gemeldeten Commits `587e8684`, `c85ee04e`, `ebfa789b`, `24233481`, `26d2affa`, `63b12bde`, `af9abe9e`, `f9c33165` existieren jetzt (`git log -1 <hash>`, geprüft 2026-10-29). |
 | 3 | 2026-10-29 | Q3-Default (a) → (b) (Name exakt, Body fail-closed); AC-A.1/A.2/A.3/A.5/A.7/A.8/A.9 angepasst; neu **AC-A.10** (»Bekannte Grenzen« in `rules/1-generic/branch-guard.md`) und **Q10** (Body endet am ersten `}`, Folge-Issue); Variante (a) wird Alternative, Variante (i) notiert. R3 um `config/project-config.schema.json` (»Extends«, »host:port«) erweitert, AC-B.7 verschärft (kein `Additional allowed`, Beispiele mit Loopback-Hinweis). AC-B.1 »enthält«, AC-B.3 mit zwei neuen Charakterisierungstests. AC-A.9-Drift aus Rebaseline-Logs und Matrix-Render belegt (13 statt »4 + unverifiziert«). | Review-Findings S-1…S-10 zu Rev. 2; Nachmessung 2026-10-29 (Py 3.13): `f(){ : ${x}; f|f& };f` und `f(){ { :; }; f|f& };f` → `False` (heute und unter (b)). |
 | 3.1 | 2026-10-29 | Minor-Findings: Drift-Zahlen als `13 + k` (k ∈ {0, 6}); AC-A.10-Zielwert ≥ 1 Treffer; Q3 (c) 11 bzw. 13 Einträge; R3-Schema-Bullet (Auto-Fill-Satz ersetzt); RK-1/RK-5 präzisiert; Entscheidungsregister »Status Rev. 3«. | Review Rev. 3 (M1–M6, INFO-1…6). |
+| 3.2 | 2026-10-29 | Rev. 3.2: User-Entscheidungen Q3/Q5/Q9/Q10 — Q3 = (b), Q5 = Doku an Code (»Replaces«), Q9 = »Refs«, Q10 = (ii) Folge-Issue durch User + »Bekannte Grenzen«; im Register als GESCHLOSSEN geführt. Q4/Q6/Q7/Q8 offen mit Default. | Entscheidung des Users, 2026-10-29. |
 
 Überholt aus Rev. 1 (nicht mehr gültig): Abschnitte »Scope-Befund A«, »PR 1«–»PR 4«, »Begründung
 des 4-PR-Schnitts«, Fix-Vertrag #943 mit Lookbehind-Regex und Body-Fenster 1024 (die gemergte
@@ -73,7 +74,7 @@ Nach PR #1038 bleiben vier echte Restpunkte:
 ## Ziel
 
 - R1: Das Destructive-Gate prüft Funktionsnamen exakt (ohne Längengrenze) und ist an der Body-Grenze
-  fail-closed (Default-Vertrag Q3 (b)), Laufzeit bleibt linear; die Body-Grenze, die daraus folgende
+  fail-closed (Vertrag Q3 (b), vom User bestätigt), Laufzeit bleibt linear; die Body-Grenze, die daraus folgende
   Fehlalarm-Klasse und die verbleibende `}`-Lücke (Q10) sind dokumentiert und in der Block-Meldung bzw.
   in »Bekannte Grenzen« erkennbar.
 - R2: Alle drei Managed-Index-Schreibpfade schreiben über `scripts/lib/io.py:write_atomic` (LF).
@@ -106,7 +107,7 @@ Nach PR #1038 bleiben vier echte Restpunkte:
 
 Bindende User-Entscheidungen vom 2026-10-29, Status nach PR #1038.
 
-| ID | Entscheidung | Status Rev. 3 |
+| ID | Entscheidung | Status Rev. 3.2 |
 |---|---|---|
 | D1 | Scope: alle 4 PRs / 13 Bugs. | **Neu bewertet:** 9 der 13 Bugs sind auf `main`; Scope = Rest-Welle R1–R4 in PR A/PR B. |
 | D2 | Schließ-Kandidaten #948, #950, #952, #953, #207, #534, #865, #962; #961/#971 erst nach Fix/Verifikation; #192 bleibt offen. | #948/#950/#952/#953 geschlossen. #207/#534/#865/#962 offen — **schließt der User selbst** per `! gh issue close`. #953-Folge-Issue legt der User an (Body `.tmp/issue-953-followup.md`). #961 geschlossen (R2 = Rest, »Refs«). #971 offen (Kriterium fehlt, Q8). #192 bleibt offen. Kein Agent-Task. |
@@ -188,7 +189,7 @@ Methode: Grep/Read gegen `3e340690`, Existenz der Tests geprüft, Testläufe **n
     `.claude/hooks/lib/hook_common.sh` (gitignored).
   - Linearität der heutigen Implementierung: 300 KB Bezeichner mit `(){ :; }` 34 ms, `"f(){ "*60000`
     87 ms (gemessen 2026-10-29).
-- **Fix-Vertrag (Default Q3 (b): Name exakt, Body fail-closed):**
+- **Fix-Vertrag (Q3 (b), vom User bestätigt 2026-10-29: Name exakt, Body fail-closed):**
   - Der Rückwärts-Scan des Namens ist unbegrenzt; `_MAX_FUNC_NAME` und beide Prüfungen darauf
     (:743-747) entfallen. Der Name wird wie jeder andere inhaltlich geprüft (`_body_calls_itself_piped`).
     Begründung Linearität: ein Rückwärts-Scan startet nur an einem `(` mit folgendem `)`; der davor
@@ -278,13 +279,13 @@ Methode: Grep/Read gegen `3e340690`, Existenz der Tests geprüft, Testläufe **n
   vollständigem Header (`NAME\s*(\s*)\s*{`) → `True`, `_MAX_FUNC_NAME = 64` bleibt. AC-A.1: auch
   harmlos `"a"*65 + "(){ :; }"` → `True`; AC-A.5: n = 20 000/300 000 → `True`; AC-A.7 zusätzlich
   `over 64 characters`. **Fehlalarm:** jede Inline-Funktion mit Namen > 64 Zeichen wird hart geblockt,
-  ohne Sentinel-Ausweg (RK-1) — Grund, warum (b) Default ist: (b) erkennt dieselben Bomben ohne diese
+  ohne Sentinel-Ausweg (RK-1) — Grund, warum (b) gewählt wurde: (b) erkennt dieselben Bomben ohne diese
   Fehlalarm-Klasse und bleibt linear.
-- **Variante Q3 (c) — belassen + dokumentieren:** AC-A.1 (Bombe)/AC-A.3/AC-A.5 (`{`-Kette) kehren sich
+- **Variante Q3 (c) — belassen + dokumentieren (nicht gewählt, 2026-10-29):** AC-A.1 (Bombe)/AC-A.3/AC-A.5 (`{`-Kette) kehren sich
   um (Tests pinnen `False` als bekannte Lücke), AC-A.7 entfällt, Doku in `hook_common.sh`-Header und
   zusätzlich zu AC-A.10 in »Bekannte Grenzen«; Version Patch. Drift wie AC-A.9 (11 bzw. 13 Einträge, je nach Bump von `orchestrator-guard-impl.sh`;
   da AC-A.10 ohnehin die Regel ändert; `context-hashes.json` möglich, bei Revision messen).
-- **Variante Q10 (i) — `}`-Lücke in PR A mitschließen (Alternative zu Folge-Issue):** Body-Ende als
+- **Variante Q10 (i) — `}`-Lücke in PR A mitschließen (Alternative zu Folge-Issue; nicht gewählt, 2026-10-29):** Body-Ende als
   das tiefenpassende `}` innerhalb des 512er-Fensters (Zähler für `{`/`}`), sonst fail-closed. Prototyp
   (Scratch, auf (b)): beide Q10-Beispiele `True`, alle AC-A.1–A.5-Fälle unverändert, `"f(){ x} " * 60000`
   119 ms, 600 000-Zeichen-Name 113 ms (linear). Dann zusätzliche AC (Q10-Beispiele → `True`), AC-A.10
@@ -350,7 +351,7 @@ Methode: Grep/Read gegen `3e340690`, Existenz der Tests geprüft, Testläufe **n
   (`config/project-config.schema.json:1927`, `admin-ui.allowed-hosts.description`: »List of host:port
   origins … Extends the default loopback set«) behaupten »Extends«, Code ersetzt (:547, :5673); das
   Schema nennt zudem »host:port«, der Code erwartet Hosts (Port wird angehängt, :980/:988).
-- **Fix-Vertrag (Default Q5):**
+- **Fix-Vertrag (Q5, vom User bestätigt 2026-10-29: Doku an Code):**
   - `host header not allowed`-Meldung erhält denselben Hinweis wie die Origin-Meldung
     (`--allowed-hosts <host>` bzw. `admin-ui.allowed-hosts`) plus `include loopback names if needed`.
     Logik unverändert; ein Origin wird nie aus dem Host-Header abgeleitet.
@@ -370,8 +371,8 @@ Methode: Grep/Read gegen `3e340690`, Existenz der Tests geprüft, Testläufe **n
   - Keine Verhaltensänderung des Servers.
   - Keine Helfer-Extraktion: `check_origin` ist statisch (direkt testbar), der Hilfetext ist per
     `python3 scripts/admin-server.py --help` prüfbar (Exit 0, geprüft 2026-10-29). Eine Extraktion aus
-    `AdminServer.__init__` (bindet einen Socket) wird nur nötig, wenn Q5 auf »Code an Hilfetext
-    angleichen« entschieden wird (dann socket-freier Helfer für die effektive Host-Liste).
+    `AdminServer.__init__` (bindet einen Socket) entfällt (Q5 entschieden: Doku an Code); nur bei
+    Revision von Q5 nötig (dann socket-freier Helfer für die effektive Host-Liste).
 - **AC:**
   - **AC-B.5** `check_origin(origin=None, host="evil.example:7420", allowed_hosts=DEFAULT_ALLOWED_HOSTS,
     bind_host="127.0.0.1", bind_port=7420)` wirft `SecurityError`, Text enthält
@@ -465,15 +466,15 @@ neue Tests vor dem Fix rot (TDD) — ausgenommen ausdrücklich als Charakterisie
 
 ## Risiken
 
-- **RK-1 — Fehlalarm-Klasse R1 (Default (b)):** jede Funktionsdefinition im ungequoteten Befehlstext
+- **RK-1 — Fehlalarm-Klasse R1 (Q3 (b)):** jede Funktionsdefinition im ungequoteten Befehlstext
   (nach Entfernen von Heredoc-Bodies, Kommentaren und gequoteten Spannen) ohne ungequotetes `}` in den
   ersten 512 Body-Zeichen wird **hart** geblockt — das Destructive-Gate hat keinen Sentinel-Ausweg.
   Ausweg: Funktion kürzen, Skript als Datei statt inline, Ausführung durch den User. Gemindert durch die
   Grenzen-Zeile in der Meldung (AC-A.7; erscheint bei jedem Destructive-Block, nicht nur bei diesem Fehlalarm). Unter Variante (a) kommt jede Funktion mit Namen > 64 Zeichen
-  hinzu (Grund für Default (b)). Alternative: Q3 (c).
+  hinzu (Grund für (b)). Verworfene Alternative (nur bei Revision der User-Entscheidung): Q3 (c).
 - **RK-7 — `}`-Lücke bleibt fail-open (Q10):** Fork-Bomben mit `${…}` oder `{ …; }` vor dem
   Selbstaufruf passieren das Destructive-Gate weiterhin, bis das Folge-Issue umgesetzt ist (oder
-  Variante Q10 (i) gewählt wird). Gemindert nur durch Dokumentation (AC-A.10); Convention boundary.
+  Variante Q10 (i) gewählt wird — verworfen, nur bei Revision der User-Entscheidung). Gemindert nur durch Dokumentation (AC-A.10); Convention boundary.
 - **RK-2 — Veraltete deployte Lib unbemerkt:** `check_stale_deployed_hooks`
   (`scripts/lib/consistency/hook_drift.py:29-86`) vergleicht nur Namen aus `<hooks_dir>/.agent-meta-managed`
   (Top-Level-Skripte), nicht `lib/hook_common.sh`. Ein Projekt ohne Re-Sync behält den fail-open-Scanner
@@ -489,18 +490,18 @@ neue Tests vor dem Fix rot (TDD) — ausgenommen ausdrücklich als Charakterisie
 
 ## Offene Fragen
 
-| ID | Frage | Default | Entscheidung bis |
+| ID | Frage | Default / Entscheidung | Entscheidung bis |
 |---|---|---|---|
 | Q1 | (Rev. 1) Reopen vs. neue Issues für geschlossene, angeblich unbehobene Issues | **gegenstandslos** — Fixes sind gemergt, Commits existieren | — |
 | Q2 | (Rev. 1) D5 formal aufheben? | **gegenstandslos** — nur die Rebaseline-Regel bleibt | — |
-| Q3 | R1-Vertrag: (a) fail-closed an beiden Grenzen; (b) Name unbegrenzt exakt prüfen + Body fail-closed; (c) belassen und dokumentieren? Zusatz: Body-Fenster 512 beibehalten oder auf 1024 erhöhen (weniger Fehlalarme, Laufzeit weiter linear)? | **(b)**, Fenster 512 — erkennt die Bombe mit langem Namen exakt, linear (36/72 ms bzw. 57/117 ms für 300 000/600 000 Zeichen), ohne die Fehlalarm-Klasse »Name > 64« von (a) (RK-1) | vor PR-A-Task 1, durch User |
+| Q3 | R1-Vertrag: (a) fail-closed an beiden Grenzen; (b) Name unbegrenzt exakt prüfen + Body fail-closed; (c) belassen und dokumentieren? Zusatz: Body-Fenster 512 beibehalten oder auf 1024 erhöhen (weniger Fehlalarme, Laufzeit weiter linear)? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29: (b)** (Namen exakt prüfen, Body fail-closed bei 512), Fenster 512 — erkennt die Bombe mit langem Namen exakt, linear (36/72 ms bzw. 57/117 ms für 300 000/600 000 Zeichen), ohne die Fehlalarm-Klasse »Name > 64« von (a) (RK-1) | — (entschieden) |
 | Q4 | #945 (Guard-Test-Isolation, CI-Timeouts) vor PR A vorziehen? | Nein — neue Timing-Tests laufen im Subprozess mit Watchdog, Grenze > Faktor 8 über Messwert (RK-5) | vor PR-A-Start, durch User |
-| Q5 | `--allowed-hosts`: Hilfetext/How-to an Code anpassen (»replaces«) oder Code an Hilfetext (»extends«, Verhaltensänderung)? | Hilfetext/How-to anpassen | vor PR-B-Task 2, durch User |
+| Q5 | `--allowed-hosts`: Hilfetext/How-to an Code anpassen (»replaces«) oder Code an Hilfetext (»extends«, Verhaltensänderung)? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29:** Doku an den Code anpassen (»Replaces«), Code unverändert, kein Umbau von `--allowed-hosts` | — (entschieden) |
 | Q6 | #856 nach Merge von PR B schließen (ZC-1 wontfix documented, ZC-2 fixed in #807)? | Ja, durch den User mit dem Kommentar-Entwurf aus dem Plan | vor PR-B-Beschreibung, durch User |
 | Q7 | Form `function NAME { … }` (ohne `()`) in R1 aufnehmen? | Nein — vorbestehende Lücke, Folge-Issue durch den User | vor PR-A-Task 1, durch User |
 | Q8 | Kriterium für das Schließen von #971 (D2)? | #971 bleibt offen, bis der User ein Kriterium nennt | offen, durch User |
-| Q9 | Bereits geschlossene Bezugs-Issues (#943, #961, #897) in den PRs: »Refs« oder Reopen + »Closes«? | »Refs«, kein Reopen | vor den PR-Beschreibungen, durch User |
-| Q10 | `}`-Lücke (Body endet am ersten `}`; `${…}`, `{ …; }`): (ii) in PR A nur in »Bekannte Grenzen« dokumentieren + Folge-Issue, oder (i) in PR A per tiefenpassendem `}` im Fenster mitschließen? | (ii): Folge-Issue durch den User (Text-Entwurf im Plan-Status, nicht ausgeführt); Doku AC-A.10 | vor PR-A-Task 1, durch User |
+| Q9 | Bereits geschlossene Bezugs-Issues (#943, #961, #897) in den PRs: »Refs« oder Reopen + »Closes«? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29:** »Refs« statt »Closes« für #943, #961, #897; kein Reopen | — (entschieden) |
+| Q10 | `}`-Lücke (Body endet am ersten `}`; `${…}`, `{ …; }`): (ii) in PR A nur in »Bekannte Grenzen« dokumentieren + Folge-Issue, oder (i) in PR A per tiefenpassendem `}` im Fenster mitschließen? | **GESCHLOSSEN – vom User bestätigt, 2026-10-29: (ii)** — Folge-Issue durch den User (Text-Entwurf im Plan-Status bleibt, nicht ausgeführt) plus Eintrag in »Bekannte Grenzen« (AC-A.10 und Plan-Task 3 bleiben Pflicht) | — (entschieden) |
 
 ## Trace-Anker
 
