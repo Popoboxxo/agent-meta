@@ -5286,8 +5286,16 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `antigravity-json-adapter.sh` comment): `ac01-baseline` re-pinned — 10 hashes
 # (5 Claude + 5 Gemini hook renders); `slimming-golden`/`compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issues #943/#944 (wave 6: `lib/hook_common.sh` 1.3.0, `orchestrator-guard-impl.sh` 1.9.0,
+# `repo-containment-impl.sh` 1.4.0): `ac01-baseline` re-pinned — 6 hashes (3 Claude + 3 Gemini
+# hook renders, both providers render all three); `slimming-golden`/`compact-golden` unchanged.
+# Review findings F1-F5 (wave-6 hook fixes: `lib/hook_common.sh` 1.3.1,
+# `orchestrator-guard-impl.sh` 1.9.1, `repo-containment-impl.sh` 1.4.1):
+# `ac01-baseline` re-pinned — the same 6 hook hashes (3 Claude + 3 Gemini);
+# `slimming-golden`/`compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "9ead7c80f5c1ebf19454005e297ee743cc6fdded941dd3df9488e963f4b3b27a",
+    "ac01-baseline": "6bb30524c60de1efa4638e27c9887751273bb002bdf6a948bc1c9229db894cc6",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }
