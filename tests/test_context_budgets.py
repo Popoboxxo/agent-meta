@@ -218,16 +218,42 @@ TOLERANCE_MAX_BYTES = 4096
 # +5,971 B roster/always-loaded on the six roster providers (seven of the eight enriched
 # roles are active in the matrix; `se-senior-developer` is gated off), orchestrator,
 # entry-file and rules unchanged.
+# RE-PIN (wave 3 PR A, `rules/1-generic/branch-guard.md` item 5, 2026-10-29): measured on
+# this tree with `measure_artifacts`, not derived arithmetically. Item 5 documents the
+# `}` gap of the fork-bomb scan pattern and the fail-closed 512-character body limit; it
+# grows the rendered rules text by 382 B and with it every artifact that embeds that text.
+# Complete list of non-zero deltas (old pin -> measured Ist):
+#   * rules (rules dir of the three `has_rules` providers): Claude 17,268 -> 17,650 (+382),
+#     Continue 20,140 -> 20,522 (+382), Copilot 19,936 -> 20,318 (+382).
+#   * entry-file, six AGENTS.md providers (they embed the rules text; Claude's CLAUDE.md
+#     and Continue/Copilot instruction files do not): Codex 23,847 -> 24,229,
+#     Gemini 32,490 -> 32,872, KimiCode 23,861 -> 24,243, Mammouth 23,858 -> 24,240,
+#     Opencode 23,922 -> 24,304, ZCode 24,760 -> 25,142 — +382 each. Claude 2,511 and
+#     Continue 358 unchanged.
+#   * always-loaded: +382 where only `rules` (Continue 20,498 -> 20,880, Copilot
+#     30,823 -> 31,205) or only the entry file (Gemini 32,490 -> 32,872) carries the rule;
+#     +376 on the six roster providers, i.e. +382 rules -6 roster (Claude 700,689 ->
+#     701,065, Codex 697,771 -> 698,147, KimiCode 691,005 -> 691,381, Mammouth
+#     686,262 -> 686,638, Opencode 700,682 -> 701,058, ZCode 688,878 -> 689,254).
+#   * harness-roster, six roster providers: -6 B each (Claude 680,910 -> 680,904, Codex
+#     673,924 -> 673,918, KimiCode 667,144 -> 667,138, Mammouth 662,404 -> 662,398,
+#     Opencode 676,760 -> 676,754, ZCode 664,118 -> 664,112). NOT an item-5 effect — the
+#     rule is not part of the roster: a pre-existing pin surplus, confirmed by re-rendering
+#     the pin commit (c858d18d, whose Claude roster already measures 680,904 B). Absorbed
+#     here so it is not inherited silently; the file responsible is not identified.
+#   * orchestrator, all nine: unchanged (Claude 90,241, Codex 89,856, Continue 74,393,
+#     Copilot 74,269, Gemini 90,263, KimiCode 76,322, Mammouth 74,694, Opencode 89,928,
+#     ZCode 74,965).
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 700689, "entry-file": 2511, "harness-roster": 680910, "orchestrator": 90241, "rules": 17268},
-    "Codex": {"always-loaded": 697771, "entry-file": 23847, "harness-roster": 673924, "orchestrator": 89856},
-    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 74393, "rules": 20140},
-    "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 74269, "rules": 19936},
-    "Gemini": {"always-loaded": 32490, "entry-file": 32490, "orchestrator": 90263},
-    "KimiCode": {"always-loaded": 691005, "entry-file": 23861, "harness-roster": 667144, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 686262, "entry-file": 23858, "harness-roster": 662404, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 700682, "entry-file": 23922, "harness-roster": 676760, "orchestrator": 89928},
-    "ZCode": {"always-loaded": 688878, "entry-file": 24760, "harness-roster": 664118, "orchestrator": 74965},
+    "Claude": {"always-loaded": 701065, "entry-file": 2511, "harness-roster": 680904, "orchestrator": 90241, "rules": 17650},
+    "Codex": {"always-loaded": 698147, "entry-file": 24229, "harness-roster": 673918, "orchestrator": 89856},
+    "Continue": {"always-loaded": 20880, "entry-file": 358, "orchestrator": 74393, "rules": 20522},
+    "Copilot": {"always-loaded": 31205, "entry-file": 10887, "orchestrator": 74269, "rules": 20318},
+    "Gemini": {"always-loaded": 32872, "entry-file": 32872, "orchestrator": 90263},
+    "KimiCode": {"always-loaded": 691381, "entry-file": 24243, "harness-roster": 667138, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 686638, "entry-file": 24240, "harness-roster": 662398, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 701058, "entry-file": 24304, "harness-roster": 676754, "orchestrator": 89928},
+    "ZCode": {"always-loaded": 689254, "entry-file": 25142, "harness-roster": 664112, "orchestrator": 74965},
 }
 
 
@@ -435,8 +461,25 @@ def test_ac07_missing_ceiling_is_a_violation():
 # +1,430, Gemini entry-file +936; all other artifacts unchanged.
 # Against the branch pin the merged tree adds exactly #1013's evidence gates: +5,971 B
 # roster/always-loaded on the six roster providers, nothing else changes.
+# RE-PIN (wave 3 PR A, `rules/1-generic/branch-guard.md` item 5, 2026-10-29): measured with
+# `render_into_work_dir(..., profile="compact")` + `measure_artifacts`, not derived
+# arithmetically. Exactly ONE pin of this table is re-pinned, because exactly one entry
+# actually fails: `test_compact_profile_within_ceilings` — and
+# `test_compact_inflated_artifact_exceeds_ceiling`, which re-asserts the same table after
+# restoring the inflated artifact — report `Claude/rules: 17650 > 17613`.
+#   * Claude/rules 17,268 -> 17,650 (+382, the item-5 text).
+# The other measured compact deltas stay inside the existing tolerance, so their pins stay
+# unchanged on purpose (same practice as the Task-31 block above): Continue/rules
+# 20,140 -> 20,522 (+382, ceiling 20,542), Copilot/rules 19,936 -> 20,318 (+382, ceiling
+# 20,334), Continue/always-loaded 20,498 -> 20,880, Copilot/always-loaded 30,823 -> 31,205,
+# Claude/always-loaded 644,429 -> 644,817 (+382 rules +6 roster), and harness-roster +6 B on
+# the six roster providers (Claude 624,700 -> 624,706, Codex 617,615 -> 617,621, KimiCode
+# 625,745 -> 625,751, Mammouth 621,046 -> 621,052, Opencode 620,524 -> 620,530, ZCode
+# 622,715 -> 622,721 = same pre-existing pin drift as in the `full` table, not an item-5
+# effect). entry-file, orchestrator and the shared multi-provider AGENTS.md (12,193 B) are
+# unchanged.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 644429, "entry-file": 2461, "harness-roster": 624700, "orchestrator": 34031, "rules": 17268},
+    "Claude": {"always-loaded": 644429, "entry-file": 2461, "harness-roster": 624700, "orchestrator": 34031, "rules": 17650},
     "Codex": {"always-loaded": 621028, "entry-file": 3413, "harness-roster": 617615, "orchestrator": 33547},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 34621, "rules": 20140},
     "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 34495, "rules": 19936},
