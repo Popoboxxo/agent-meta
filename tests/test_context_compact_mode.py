@@ -337,6 +337,62 @@ def test_bootstrap_compact_fallback_when_full_form_exceeds_hard_cap(tmp_path):
     assert "define_subagent(name=" not in written
 
 
+def test_bootstrap_compact_fallback_skips_when_compact_form_already_on_disk(tmp_path):
+    """Compact fallback must not log UPDATE when the composed content is identical.
+
+    Regression: the fallback recomposed the compact block (identical to the file
+    on disk) and logged UPDATE unconditionally, so `sync.py --check` reported
+    false drift and exited 1 for a shared context file that sits over a reader's
+    hard cap only in its full form.
+    """
+    from scripts.lib.io import SyncError
+    from scripts.lib.log import SyncLog
+
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    for index in range(20):
+        (agents_dir / f"agent-{index}.md").write_text(
+            "---\ndescription: Agent %d\n---\nbody\n" % index, encoding="utf-8")
+
+    engine = BootstrapEngine()
+    compact = engine.generate_gemini_bootstrap_instructions(
+        agents_dir, compact=True, agents_label="agents")
+
+    project = tmp_path / "project"
+    project.mkdir()
+    before = (
+        "# project\n\n"
+        "<!-- agent-meta:bootstrap-begin:Gemini -->\n"
+        + compact
+        + "\n<!-- agent-meta:bootstrap-end:Gemini -->\n"
+    )
+    (project / "AGENTS.md").write_text(before, encoding="utf-8")
+
+    calls: list[int] = []
+
+    def guard(_path, content):
+        size = len(content.encode("utf-8"))
+        calls.append(size)
+        if size > 1200:
+            raise SyncError("context.over-hard-cap: fake reader cap")
+
+    log = SyncLog()
+    result = engine._bootstrap_api_based(
+        "Gemini",
+        agents_dir,
+        {"action": "inject-bootstrap-instructions", "context_file": "AGENTS.md"},
+        project,
+        log=log,
+        hard_cap_guard=guard,
+    )
+
+    assert len(calls) == 2 and calls[0] > calls[1]  # full form over cap, compact fits
+    assert result["status"] == "skipped"
+    assert "compact" in result["reason"]
+    assert log.actions == []  # no spurious UPDATE -> no false --check drift
+    assert (project / "AGENTS.md").read_text(encoding="utf-8") == before
+
+
 # ---------------------------------------------------------------------------
 # Phase B integration — full pipeline against the real templates
 # ---------------------------------------------------------------------------
