@@ -4,7 +4,7 @@
 pytest>=7.0
 pyyaml>=6.0
 questionary>=2.0
-tomli>=1.2; python_version < "3.11"
+tomli>=2.5.0; python_version < "3.11"
 jsonschema>=4.0
 pytest-xdist>=3.0
 pytest-split>=0.8
