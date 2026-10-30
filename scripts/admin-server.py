@@ -989,7 +989,12 @@ class AuthService:
         # Always allow the actual bind host (covers explicit ``--host``).
         allowed_host_values.add(f"{bind_host}:{bind_port}")
         if host not in allowed_host_values:
-            raise SecurityError(f"host header not allowed: {host!r}")
+            raise SecurityError(
+                f"host header not allowed: {host!r} -- to use the admin UI from this "
+                "address, start the server with --allowed-hosts <host> or add it to "
+                "admin-ui.allowed-hosts in .meta-config/project.yaml; "
+                "include loopback names if needed"
+            )
 
 
 def _warn_if_world_readable(path: Path) -> None:
@@ -5692,7 +5697,8 @@ class AdminServer:
                     addrs = []
                 hint = " ".join(addrs) if addrs else "<ip-or-hostname>"
                 print(f"  * Wildcard bind: writes from other machines need "
-                      f"--allowed-hosts {hint} (or admin-ui.allowed-hosts)", file=sys.stderr)
+                      f"--allowed-hosts {hint} (or admin-ui.allowed-hosts); "
+                      f"include loopback names if needed", file=sys.stderr)
         self.root = root.resolve()
         self.host = host
         self.port = port
@@ -5924,9 +5930,10 @@ def main() -> None:
                              "REQUIRED when --host is non-loopback. "
                              "Equivalent to ADMIN_UI_TOKEN env var or admin-ui.token in project.yaml.")
     parser.add_argument("--allowed-hosts", nargs="*", default=None,
-                        help="Additional allowed origin hosts for CORS/DNS-rebinding protection. "
+                        help="Allowed origin hosts for CORS/DNS-rebinding protection. "
                              "Default: 127.0.0.1 localhost ::1. "
-                             "Extends (does not replace) the default loopback set.")
+                             "Replaces the default loopback set; "
+                             "include loopback names if needed.")
     parser.add_argument("--root", default=".",
                         help="Project root directory (default: current directory)")
     parser.add_argument("--watch", action="store_true",

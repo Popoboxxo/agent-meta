@@ -59,7 +59,7 @@ The server accepts the following flags (verified against the built-in `--help`):
 | `--port PORT` | int, default `7420` | TCP port the Admin UI binds to. |
 | `--host HOST` | default `127.0.0.1` | Bind address. **Non-loopback addresses (e.g. `0.0.0.0`) require `--admin-token` or the `ADMIN_UI_TOKEN` env var.** |
 | `--admin-token TOKEN` | default none | Authentication token for remote access. Required when `--host` is non-loopback. Equivalent to the `ADMIN_UI_TOKEN` env var or `admin-ui.token` in `project.yaml`. |
-| `--allowed-hosts [HOST …]` | default none | Additional allowed origin hosts for the CORS / DNS-rebinding protection. **Extends** (does not replace) the default loopback set `127.0.0.1 localhost ::1`. |
+| `--allowed-hosts [HOST …]` | default none | Origin hosts for the CORS / DNS-rebinding protection. **Replaces** the default loopback set `127.0.0.1 localhost ::1` (it does not extend it); include loopback names if loopback access must keep working. |
 | `--root DIR` | default `.` | Project root directory (where `.meta-config/project.yaml` lives). |
 | `--watch` | flag | Enable the filesystem watcher: polls config files every 2 s and emits events to `.meta-viz/events.jsonl` (feeds the live-events stream). |
 | `--no-viz` | flag | Skip starting the Viz dashboard and MCP server subprocesses. Useful for lightweight / CI environments that only need the Admin UI. |
@@ -154,6 +154,7 @@ admin-ui:
   port: 7420
   token: "<your-token>"          # exact key path: admin-ui.token
   # token-file: ".secrets/admin-token"   # alternative: read token from a file
+  # replaces the default loopback set -- include loopback names if needed
   allowed-hosts: ["myhost.example.com"]
 ```
 
@@ -163,8 +164,10 @@ admin-ui:
 - **Never commit the token to version control.** The schema explicitly warns
   about this; use `token-file` or the `ADMIN_UI_TOKEN` env var for secret
   management (Docker secrets, password managers, …).
-- `admin-ui.allowed-hosts` is an array of hostnames/IPs; it extends the default
-  loopback set `["127.0.0.1", "localhost", "::1"]`.
+- `admin-ui.allowed-hosts` is an array of hostnames/IPs; it replaces the default
+  loopback set `["127.0.0.1", "localhost", "::1"]`. The effective list is
+  CLI > config > default — a configured list does not extend the defaults, so
+  include loopback names if you still need loopback access.
 - **File permissions.** `.meta-config/project.yaml` (and the other
   `.meta-config/*.yaml` runtime configs) may hold this token in plaintext. The
   server writes it with `0o600` (owner read/write only) whenever it saves the
@@ -216,7 +219,9 @@ How the token travels afterwards:
 **Full remote operation needs `--allowed-hosts`.** Mutating requests are
 rejected with `403` when the browser's `Origin`/`Host` header does not match an
 allowed host (default: loopback only). If you reach the UI as
-`http://myhost.example.com:7420`, add that name at server start:
+`http://myhost.example.com:7420`, add that name at server start. The list
+replaces the loopback default, so include loopback names if you still need
+loopback access:
 
 ```bash
 python3 scripts/admin-server.py --host 0.0.0.0 --admin-token '<your-token>' \
