@@ -18,14 +18,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib import env as env_mod  # noqa: E402
+from lib import hook_plugins as hook_plugins_mod  # noqa: E402
 from lib import hooks as hooks_mod  # noqa: E402
 from lib import io as io_mod  # noqa: E402
+from lib.hook_plugins import sync_hook_lib, sync_release_gates  # noqa: E402
+from lib.hooks import sync_hooks  # noqa: E402
 from lib.io import is_unchanged, write_atomic, write_checked  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
+from lib.providers import load_providers_config  # noqa: E402
 
 _LF_CONTENT = "#!/bin/bash\necho one\necho two\n"
 _CRLF_CONTENT = b"#!/bin/bash\r\necho one\r\necho two\r\n"
@@ -285,3 +291,198 @@ def test_create_hook_dry_run_writes_nothing(tmp_path, monkeypatch):
 
     assert calls == []
     assert not (tmp_path / ".claude" / "hooks" / "dry-demo.sh").exists()
+
+
+# --- managed hook indices: LF-deterministic atomic writes (#961) ------------
+
+_HOOK_SOURCE = """\
+#!/bin/bash
+# hook: test-guard
+# version: 1.0.0
+# event: PreToolUse
+# matcher: ""
+# description: test guard
+# enabled_by_default: true
+
+exit 0
+"""
+
+
+@pytest.fixture
+def managed_agent_meta_root(tmp_path):
+    """Minimal agent-meta source tree: one hook, one gate, one lib file."""
+    root = tmp_path / "agent-meta"
+    generic = root / "hooks" / "1-generic"
+    generic.mkdir(parents=True)
+    (generic / "test-guard.sh").write_text(_HOOK_SOURCE, encoding="utf-8")
+
+    gates_dir = generic / "release-gates"
+    gates_dir.mkdir()
+    (gates_dir / "demo-gate.sh").write_text(
+        "#!/bin/bash\n"
+        "# hook: demo-gate\n"
+        "# version: 1.0.0\n"
+        "# event: Manual\n"
+        "# description: demo gate\n"
+        "# enabled_by_default: false\n"
+        'echo "[INFO] demo-gate: ran"\n',
+        encoding="utf-8",
+    )
+
+    lib_dir = generic / "lib"
+    lib_dir.mkdir()
+    (lib_dir / "hook_common.sh").write_text(
+        "#!/bin/bash\n# lib: hook_common\nfoo() { :; }\n", encoding="utf-8"
+    )
+    return root
+
+
+@pytest.fixture
+def managed_project_root(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    return project
+
+
+def _spy_write_atomic(module, monkeypatch):
+    """Record every ``write_atomic`` call of ``module`` and write for real."""
+    calls = []
+    real = module.write_atomic
+
+    def spy(path, content, mode="w"):
+        calls.append(Path(path))
+        return real(path, content, mode)
+
+    monkeypatch.setattr(module, "write_atomic", spy)
+    return calls
+
+
+def test_hook_managed_index_writes_lf_through_write_atomic(
+    managed_agent_meta_root, managed_project_root, monkeypatch
+):
+    """``sync_hooks`` must persist its index via ``write_atomic`` (AC-B.1).
+
+    ``Path.write_text`` translates ``\\n`` to ``os.linesep`` in text mode, so
+    the index landed as CRLF on Windows and every sync rewrote it.
+    """
+    providers = load_providers_config(_REPO_ROOT)
+    calls = _spy_write_atomic(hooks_mod, monkeypatch)
+
+    sync_hooks(
+        managed_agent_meta_root,
+        managed_project_root,
+        {"platforms": [], "hooks": {}},
+        SyncLog(),
+        dry_run=False,
+        provider="Claude",
+        provider_config=providers,
+    )
+
+    index = managed_project_root / ".claude" / "hooks" / ".agent-meta-managed"
+    assert index in calls, f"managed index not written through write_atomic: {calls}"
+    raw = index.read_bytes()
+    assert 13 not in raw, f"managed index contains a CR byte: {raw!r}"
+
+
+def test_release_gate_managed_index_writes_lf_through_write_atomic(
+    managed_agent_meta_root, managed_project_root, monkeypatch
+):
+    """``sync_release_gates`` must persist its index via ``write_atomic``."""
+    calls = _spy_write_atomic(hook_plugins_mod, monkeypatch)
+
+    sync_release_gates(
+        managed_agent_meta_root,
+        managed_project_root,
+        {"platforms": []},
+        SyncLog(),
+        dry_run=False,
+    )
+
+    index = (
+        managed_project_root
+        / ".claude"
+        / "hooks"
+        / "release-gates"
+        / ".agent-meta-managed"
+    )
+    assert index in calls, f"managed index not written through write_atomic: {calls}"
+    raw = index.read_bytes()
+    assert 13 not in raw, f"managed index contains a CR byte: {raw!r}"
+
+
+def test_hook_lib_managed_index_writes_lf_through_write_atomic(
+    managed_agent_meta_root, managed_project_root, monkeypatch
+):
+    """``sync_hook_lib`` must persist its index via ``write_atomic``."""
+    calls = _spy_write_atomic(hook_plugins_mod, monkeypatch)
+
+    sync_hook_lib(
+        managed_agent_meta_root,
+        managed_project_root,
+        {"platforms": []},
+        SyncLog(),
+        dry_run=False,
+    )
+
+    index = managed_project_root / ".claude" / "hooks" / "lib" / ".agent-meta-managed"
+    assert index in calls, f"managed index not written through write_atomic: {calls}"
+    raw = index.read_bytes()
+    assert 13 not in raw, f"managed index contains a CR byte: {raw!r}"
+
+
+def test_hook_managed_index_dry_run_writes_nothing(
+    managed_agent_meta_root, managed_project_root, monkeypatch
+):
+    """Characterization (#630): a dry run writes no managed index at all."""
+    calls = _spy_write_atomic(hooks_mod, monkeypatch)
+
+    sync_hooks(
+        managed_agent_meta_root,
+        managed_project_root,
+        {"platforms": [], "hooks": {}},
+        SyncLog(),
+        dry_run=True,
+    )
+
+    index = managed_project_root / ".claude" / "hooks" / ".agent-meta-managed"
+    assert not index.exists()
+    assert index not in calls, f"dry run wrote the managed index: {calls}"
+
+
+def test_hook_managed_index_rewritten_empty_after_revocation(
+    managed_agent_meta_root, managed_project_root
+):
+    """Characterization (#630): revoking ``hook_protocol`` empties the index."""
+    config = {"platforms": [], "hooks": {}}
+    providers = load_providers_config(_REPO_ROOT)
+    index = managed_project_root / ".claude" / "hooks" / ".agent-meta-managed"
+
+    sync_hooks(
+        managed_agent_meta_root,
+        managed_project_root,
+        config,
+        SyncLog(),
+        dry_run=False,
+        provider="Claude",
+        provider_config=providers,
+    )
+    assert index.exists()
+    assert index.read_text(encoding="utf-8").strip(), "expected a non-empty index"
+
+    revoked = dict(providers)
+    revoked["Claude"] = {
+        key: value
+        for key, value in providers["Claude"].items()
+        if key != "hook_protocol"
+    }
+    sync_hooks(
+        managed_agent_meta_root,
+        managed_project_root,
+        config,
+        SyncLog(),
+        dry_run=False,
+        provider="Claude",
+        provider_config=revoked,
+    )
+    assert index.exists()
+    assert index.read_bytes() == b""

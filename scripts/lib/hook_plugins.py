@@ -157,9 +157,7 @@ def sync_release_gates(
 
     if not dry_run and now_managed:
         managed_index_path.parent.mkdir(parents=True, exist_ok=True)
-        managed_index_path.write_text(
-            "\n".join(sorted(now_managed)) + "\n", encoding="utf-8"
-        )
+        write_atomic(managed_index_path, "\n".join(sorted(now_managed)) + "\n")
 
     # Issue #603: regenerate the checksum manifest so the dispatcher's
     # pre-execution SHA-256 verification stays in step with legitimately
@@ -345,6 +343,4 @@ def sync_hook_lib(
 
     if not dry_run and now_managed:
         managed_index_path.parent.mkdir(parents=True, exist_ok=True)
-        managed_index_path.write_text(
-            "\n".join(sorted(now_managed)) + "\n", encoding="utf-8"
-        )
+        write_atomic(managed_index_path, "\n".join(sorted(now_managed)) + "\n")
