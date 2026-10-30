@@ -121,4 +121,4 @@ Pre-rendered, fully self-contained copies of [agent-meta](https://github.com/Pop
 | `validator` | Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit. | [`agents/validator.md`](agents/validator.md) |
 
 ---
-Generated from agent-meta v2.0.0-beta.4. Regenerate via `python scripts/sync.py --render-standalone` (or the Admin UI's Sync page).
+Generated from agent-meta v2.0.0-beta.5. Regenerate via `python scripts/sync.py --render-standalone` (or the Admin UI's Sync page).

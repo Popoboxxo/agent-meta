@@ -2,7 +2,7 @@
 # carry the deny tokens the compact gate card must keep visible (`delete_conclusion`,
 # `set_config`, `browser_run_code_unsafe`, `workspace.delete`). Used by
 # tests/test_context_anchors.py for the `compact` provider matrix.
-agent-meta-version: "2.0.0-beta.4"
+agent-meta-version: "2.0.0-beta.5"
 ai-providers:
   - Claude
 dod-preset: rapid-prototyping

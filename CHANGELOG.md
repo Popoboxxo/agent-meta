@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.5] - 2026-10-30
+
 ### Added
 - **Strict-first orchestrator mode from a single resolver (D1b, #1006)**: the effective mode now
   resolves in exactly one place, `variables._resolve_orch_mode` (`_ORCH_STRICT_DEFAULT = True`, the
@@ -39,6 +41,13 @@
   a handoff carrying that flag instead of an allowlist of role names in code. Only an exact `True`
   counts — any other value leaves the check sharp — and the `target_roles` existence check still
   applies to every producer.
+- **Hermetic local CI runner (#945, PR #1054)**: `scripts/ci-local.sh` mirrors the CI test job in an
+  isolated `.tmp/ci-venv` with `PYTHONNOUSERSITE=1` and the same flags as
+  `.github/workflows/orchestration-test.yml` — `smoke` runs `sync.py --validate`, `full` adds
+  `pytest -n 2 --dist loadfile`. `tests/README.md` documents the hermetic local run.
+- **CI workflow hardening (#945)**: each workflow now gates itself instead of sharing a global `paths`
+  trigger filter, workflow jobs declare explicit `permissions` with `persist-credentials: false`, and
+  a weekly OpenSSF Scorecard workflow plus a Dependabot config for pip and GitHub Actions were added.
 
 ### Fixed
 - **No false `--check` drift when the compact bootstrap form is already on disk**: the hard-cap
@@ -192,6 +201,12 @@
   `rules/1-generic/branch-guard.md` (`Bekannte Grenzen`, item 5): the body still ends at the first
   unquoted `}` without brace nesting, so a bomb with `${…}` or `{ …; }` before its self-call is not
   detected.
+- **`hook_common.sh` 1.6.0 (#1055, PR #1067)**: `hook_known_tool_name` now knows `Agent` and
+  `SendMessage`. `Agent` replaced `Task` in the harness, so the closed allow-list classified the
+  delegation tool as unknown and blocked **every** delegation; `SendMessage` (the Tier-A progress
+  push) was blocked for the same reason. `EnterWorktree`/`ExitWorktree` stay deliberately blocked
+  (`no-worktree-isolation`), and raw provider-native names stay out for the adapter reason already
+  documented. The accept/reject tests and `generated-file-hashes.json` were extended with the bump.
 - **Managed hook indices are LF and owner-only (#961)**: the `.agent-meta-managed` indices written by
   `sync_hooks`, `sync_release_gates` and `sync_hook_lib` now go through `write_atomic` instead of
   `write_text`, which translated `\n` to `os.linesep` — so a Windows sync can no longer land CRLF

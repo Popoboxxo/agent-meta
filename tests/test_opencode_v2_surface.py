@@ -5305,10 +5305,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `hook_known_tool_name` case list): `ac01-baseline` re-pinned — 2 hashes
 # (`Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`);
 # `slimming-golden`/`compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Release 2.0.0-beta.5 (VERSION bump 2.0.0-beta.4 -> 2.0.0-beta.5): version
+# strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1085) and
+# `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
+# trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "2557a205b0c4568de741780153abf1c6cc9c3aa0e6a501e34ee81e093fd0ac26",
+    "ac01-baseline": "81df5f3c5370d6073d73b2527c8a45c59885323baa36630b66fbda739e31ccdc",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
-    "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
+    "compact-golden": "24afd5ebeb6573a84cfa0f61e7fd82d069593b707fe0efb782af788c02b176bb",
 }
 
 
