@@ -307,6 +307,11 @@ def test_push_arg_parser_short_clusters_and_o_value():
 
 
 # --- hook_known_tool_name (review finding M2, #954 follow-up) -------------
+#
+# There is NO automated consistency check against the harness's actual tool
+# list, and none can exist: the list is maintained by hand (the audit log
+# contains no `tool_name` records, verified). A new built-in therefore has to
+# be added here deliberately, together with its accept case below.
 
 def _known(name: str) -> str:
     return _call(
@@ -318,6 +323,7 @@ def _known(name: str) -> str:
     "Bash", "Write", "Edit", "Read", "Glob", "Grep", "TodoWrite", "Task",
     "WebFetch", "WebSearch", "NotebookEdit", "MultiEdit", "Skill",
     "mcp__playwright__browser_navigate", "mcp__reqogniloom__workspace_get",
+    "Agent", "SendMessage",
 ])
 def test_hook_known_tool_name_accepts_known_tools(name):
     """The shared allow-list both security guards consult (M2): every name
@@ -336,6 +342,8 @@ def test_hook_known_tool_name_accepts_known_tools(name):
     "123",         # JSON number -> "123"
     "True",        # JSON true
     "mcp__",       # namespace without server/tool
+    "EnterWorktree",   # creates a directory: forbidden by no-worktree-isolation
+    "ExitWorktree",
 ])
 def test_hook_known_tool_name_rejects_unknown_or_non_canonical(name):
     """Anything not on the list fails closed: unknown means unclassifiable,
