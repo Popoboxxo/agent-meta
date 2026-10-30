@@ -9,12 +9,17 @@
 ## Lokal ausführen
 
 ```bash
-python3 -m pytest -q -n 8 --dist loadfile        # Standard: gecappt, dateiweise verteilt
+scripts/ci-local.sh          # smoke: Venv in .tmp/ci-venv + sync.py --validate
+scripts/ci-local.sh full     # zusätzlich pytest -n 2 --dist loadfile (wie CI)
+PYTHONNOUSERSITE=1 python3 -m pytest -q -n 2 --dist loadfile   # manuell, CI-Flags
 python3 -m pytest -q -n 0 tests/test_sync_validation_gate.py   # ein Modul seriell
 ```
 
-`--dist loadfile` hält ein Test-Modul bei genau einem Worker. Auf geteilten
-Hosts ist `-n 8` die Obergrenze.
+`--dist loadfile` hält ein Test-Modul bei genau einem Worker. CI nutzt `-n 2`;
+lokal gilt `-n 2` als Standard, `-n 8` nur als Obergrenze auf geteilten Hosts.
+`PYTHONNOUSERSITE=1` blendet User-site-Pakete aus, damit lokal dieselben
+Abhängigkeiten wie in CI (`tests/requirements.txt`) greifen; `ci-local.sh`
+setzt es und nutzt ein frisches Venv.
 
 ## Worker-Cap: niemals `-n auto`
 
