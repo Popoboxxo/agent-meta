@@ -1924,7 +1924,7 @@
             "localhost",
             "::1"
           ],
-          "description": "List of host:port origins allowed for CORS / DNS-rebinding protection. Extends the default loopback set. Use when binding to a specific network interface."
+          "description": "Hostnames/IPs (without port; the server port is appended) allowed for CORS / DNS-rebinding protection. Replaces the default loopback set; include loopback names if needed. Use when binding to a specific network interface."
         }
       },
       "additionalProperties": true

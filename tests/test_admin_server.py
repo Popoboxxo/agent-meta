@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -840,6 +841,56 @@ class TestCheckOrigin(unittest.TestCase):
         })
         with self.assertRaises(admin_server.SecurityError):
             handler._check_origin()
+
+    def test_host_header_rejection_names_allowlist_hint(self) -> None:
+        """#897 (AC-B.5): a rejected Host header names the way out, mirroring
+        the Origin rejection message — ``--allowed-hosts``, the config key and
+        the loopback caveat. The rejection logic itself stays unchanged."""
+        with self.assertRaises(admin_server.SecurityError) as ctx:
+            admin_server.AuthService.check_origin(
+                origin=None,
+                host="evil.example:7420",
+                allowed_hosts=admin_server.DEFAULT_ALLOWED_HOSTS,
+                bind_host="127.0.0.1",
+                bind_port=7420,
+            )
+        message = str(ctx.exception)
+        self.assertIn("host header not allowed", message)
+        self.assertIn("--allowed-hosts", message)
+        self.assertIn("admin-ui.allowed-hosts", message)
+        self.assertIn("loopback names", message)
+
+    def test_allowed_hosts_help_states_replace_semantics(self) -> None:
+        """#897 (AC-B.7): ``--allowed-hosts`` *replaces* the default loopback
+        set (CLI > config > default, no extension). The CLI help and the schema
+        description must state that; the schema must not promise ``host:port``
+        values (the server appends the port itself)."""
+        result = subprocess.run(
+            [sys.executable, str(_ADMIN_SERVER_PATH), "--help"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode, 0, result.stderr.decode("utf-8", "replace")
+        )
+        help_text = " ".join(result.stdout.decode("utf-8", "replace").split())
+        self.assertIn("Replaces", help_text)
+        self.assertNotIn("does not replace", help_text)
+        self.assertNotIn("Additional allowed", help_text)
+
+        schema = json.loads(
+            (_PROJECT_ROOT / "config" / "project-config.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        description = schema["properties"]["admin-ui"]["properties"][
+            "allowed-hosts"
+        ]["description"]
+        self.assertIn("Replaces", description)
+        self.assertNotIn("Extends", description)
+        self.assertNotIn("host:port", description)
 
 
 # --------------------------------------------------------------------------- #

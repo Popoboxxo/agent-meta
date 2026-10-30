@@ -214,6 +214,11 @@ ai-providers:
    `~/.zcode/v2/config.json`; per-role models ride in the agent files instead.
 5. **Skills sync adapter** — the skills surface is verified; commands are synced
    since issue #807, the skills capability grows with P6.
+6. **Workspace agent auto-load (ZC-1)** — stays wontfix and is documented here
+   instead: agent-meta does not write to `~/.zcode/agents`, because that path is
+   outside the project root and would violate repo containment. The supported
+   path is the `AGENTS.md` bootstrap (section "Agents as definition store +
+   bootstrap"). ZC-2 (commands capability under-claim) was fixed in #807.
 
 ## Open P6 items
 

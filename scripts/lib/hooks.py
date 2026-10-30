@@ -632,9 +632,9 @@ def sync_hooks(
     # protocol-revocation cleanup) so the index doesn't keep listing files
     # that were just deleted by the stale-hook-script pass above.
     if not dry_run and (now_managed or previously_managed):
-        managed_index_path.write_text(
+        write_atomic(
+            managed_index_path,
             "\n".join(sorted(now_managed)) + ("\n" if now_managed else ""),
-            encoding="utf-8",
         )
 
     # Merge hooks into the provider's registration artifact. The writer is
