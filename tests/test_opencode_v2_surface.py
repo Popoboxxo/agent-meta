@@ -5301,8 +5301,12 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # renders: Claude/Continue/Copilot rule files plus `AGENTS.md` of
 # Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode); `slimming-golden`/
 # `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1055 (hook tool allow-list: `lib/hook_common.sh` 1.5.0 -> 1.6.0,
+# `hook_known_tool_name` case list): `ac01-baseline` re-pinned — 2 hashes
+# (`Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`);
+# `slimming-golden`/`compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "9b3b07892f0d786a9c8c34e44277c715fcf62ad984fbf0d4bb9453a1f712c5c3",
+    "ac01-baseline": "2557a205b0c4568de741780153abf1c6cc9c3aa0e6a501e34ee81e093fd0ac26",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }

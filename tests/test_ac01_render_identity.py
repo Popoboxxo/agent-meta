@@ -471,6 +471,22 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` were re-verified as unchanged (``5642151d…``/``9d854180…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1055 (hook tool allow-list; ``hook_common.sh`` 1.5.0 -> 1.6.0, 2026-10-30,
+  ``fix/hook-known-tool-name``): the ``hook_known_tool_name`` case list in the shared hook lib
+  gains the current built-ins (``Agent``, ``SendMessage`` and peers), and exactly the two renders
+  of that lib move - ``Claude/.claude/hooks/lib/hook_common.sh`` (``979780e4…`` -> ``d9331ffe…``)
+  and ``Gemini/.agents/hooks/lib/hook_common.sh`` (``979780e4…`` -> ``d9331ffe…``; one identical
+  render for both providers, the lib carries no ``{{AGENT_META_PROVIDER}}``). **2 of 1085 hashes
+  moved; 0 added/removed.** No rule file changed, so no rule render drifted, and no agent artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden content changed. The manifest was patched
+  **per entry** (2 single-line replacements, 1085 of the 1087 lines untouched) - not via
+  ``--write`` - after independently recomputing each digest from the rendered file bytes with the
+  harness's own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its
+  AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``9b3b0789…`` -> ``2557a205…``); ``slimming-golden`` and
+  ``compact-golden`` were re-verified as unchanged (``5642151d…``/``9d854180…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
