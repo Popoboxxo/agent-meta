@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Bugfix-Welle 3 (Rest-Welle) — Implementation Plan
 
-> Status: geplant (Entwurf), Revision 3.2 (2026-10-29)
+> Status: **DONE (2026-10-30)** — PR A #1047 (Merge `6f52326a`), PR B #1048 (Merge `3294c7e5`), `main` = `3294c7e5`; volle Suite grün in CI (18/18 Checks je PR); Erweiterungen Task 4b/4c ausgeführt (vom User freigegeben). Alle Checkboxen gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`).
 >
 > **Freigabevermerk:** Die zugehörige Spec trägt `Status: APPROVED (2026-10-29)` (Freigabe durch den User per Auftrag vom 2026-10-29; offene Fragen mit Default: Default gilt). Der Approval-Marker wird nie vom Planer gesetzt.
 
@@ -129,17 +129,17 @@ pipeline_stages:
 - Modify: `hooks/1-generic/lib/hook_common.sh`
 - Modify: `tests/test_hook_common_lib.py`
 **Interfaces:** Produces `is_fork_bomb(command: str) -> bool`: Rückwärts-Scan des Namens unbegrenzt (`_MAX_FUNC_NAME` entfällt), Name wird wie bisher per `_body_calls_itself_piped` geprüft; kein `}` in `command[j+1 : j+1+_MAX_FUNC_BODY]` (512) → `True`; Body endet weiter am ersten `}` (Q10, dokumentiert in Task 3); linear, keine Exception-Unterdrückung; Consumes `hook_shell_scan_py` (:431), einziger Aufrufer `orchestrator-guard-impl.sh:1157`.
-- [ ] Step 1: Blast-Radius prüfen: `Grep` `is_fork_bomb` in `hooks/` und `scripts/` → genau Definition `hooks/1-generic/lib/hook_common.sh` (~:722) und Aufruf `hooks/1-generic/orchestrator-guard-impl.sh` (~:1157); `Grep` `hook_shell_scan_py` → Konsumenten `orchestrator-guard-impl.sh`, `repo-containment-impl.sh` (ruft `is_fork_bomb` nicht); `Grep` `_MAX_FUNC_NAME` in `hooks/`, `scripts/`, `tests/`, `.agents/` → nur `hook_common.sh` (:437, :743, :746) und die gerenderte Kopie `.agents/hooks/lib/hook_common.sh`; Treffer in `docs/` (Spec/Plan) und `.claude/` (gitignorte Deploy-Kopien) sind erwartet und ignorierbar. Weitere Treffer in den vier Pfaden = Geschwisterpfad → Stopp und melden.
-- [ ] Step 2: Testhelfer `_scan` (`tests/test_hook_common_lib.py` ~:378) um `timeout: Optional[float] = None` erweitern (an `subprocess.run` durchreichen; `from typing import Optional`). Alle fünf Tests per `@pytest.mark.parametrize("expr,expected", [...], ids=[...])`; Eingaben im Subprozess per Ausdruck erzeugen (`expr` als Quelltext, nicht als Literal einbetten). Tests schreiben (fail):
+- [x] Step 1: Blast-Radius prüfen: `Grep` `is_fork_bomb` in `hooks/` und `scripts/` → genau Definition `hooks/1-generic/lib/hook_common.sh` (~:722) und Aufruf `hooks/1-generic/orchestrator-guard-impl.sh` (~:1157); `Grep` `hook_shell_scan_py` → Konsumenten `orchestrator-guard-impl.sh`, `repo-containment-impl.sh` (ruft `is_fork_bomb` nicht); `Grep` `_MAX_FUNC_NAME` in `hooks/`, `scripts/`, `tests/`, `.agents/` → nur `hook_common.sh` (:437, :743, :746) und die gerenderte Kopie `.agents/hooks/lib/hook_common.sh`; Treffer in `docs/` (Spec/Plan) und `.claude/` (gitignorte Deploy-Kopien) sind erwartet und ignorierbar. Weitere Treffer in den vier Pfaden = Geschwisterpfad → Stopp und melden.
+- [x] Step 2: Testhelfer `_scan` (`tests/test_hook_common_lib.py` ~:378) um `timeout: Optional[float] = None` erweitern (an `subprocess.run` durchreichen; `from typing import Optional`). Alle fünf Tests per `@pytest.mark.parametrize("expr,expected", [...], ids=[...])`; Eingaben im Subprozess per Ausdruck erzeugen (`expr` als Quelltext, nicht als Literal einbetten). Tests schreiben (fail):
   - `test_fork_bomb_scans_long_function_name_exactly`: `"b"*70 + "(){ " + "b"*70 + "|" + "b"*70 + "& };" + "b"*70` → `1`; `"a"*65 + "(){ :; }"` → `0`.
   - `test_fork_bomb_function_name_at_limit_is_scanned`: `"a"*64 + "(){ :; }"` → `0`; `"b"*64 + "(){ " + "b"*64 + "|" + "b"*64 + "& };"` → `1`; `"a"*100 + "()"` → `0`.
   - `test_fork_bomb_fails_closed_on_exhausted_body_window`: `"f(){ " + "x"*520 + " f|f& };f"`, `"f(){ " + "x"*980 + " f|f& };f"` → `1`.
   - `test_fork_bomb_closed_body_within_window_is_scanned`: `"f(){ " + "x"*500 + " }"`, `"f(){ x} " * 60000` → `0`.
   - `test_fork_bomb_scan_stays_linear_on_long_header_names`: `"a"*20000 + "(){ :; }"` → `0`, `"a"*300000 + "(){ :; }"` → `0`, `{`-Kette `"f(){ " * 60000` → `1`; Messung `time.perf_counter` im Subprozess, `_scan(…, timeout=5)`, `subprocess.TimeoutExpired` → `pytest.fail("watchdog …")`, Grenze `< 1000` ms je Fall.
-- [ ] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_hook_common_lib.py -k "long_function_name_exactly or name_at_limit or exhausted_body_window or closed_body_within_window or linear_on_long_header_names" -q` → Erwartung `4 failed, 8 passed`. Rot: Bombe mit Namen 70, Body 520, Body 980, `{`-Kette. Grün (Charakterisierung): harmloser 65er, 3× Grenzfall 64/ohne `{`, 2× geschlossener Body, 2× langer harmloser Name (Werte am 2026-10-29 gegen `3e340690` an der emittierten Funktion gemessen, Py 3.13). Abweichung → Stopp, neu messen.
-- [ ] Step 4: Implementieren in `hook_shell_scan_py`: im Rückwärts-Scan Abbruch `if e - s > _MAX_FUNC_NAME: break` und `len(name) > _MAX_FUNC_NAME` entfernen, Konstante `_MAX_FUNC_NAME` streichen; bei `close < 0` → `return True` statt `continue`. Header-Kommentar (~:426-430) auf: Name unbegrenzt (linear, weil sich die Rückwärts-Scans zweier `()`-Paare nie überdecken), Body fail-closed ohne ungequotetes `}` in den ersten 512 Zeichen (Fehlalarm-Klasse Spec RK-1), Body endet am ersten ungequoteten `}` ohne Verschachtelung (bekannte Lücke, Spec Q10). Kein `try/except`.
-- [ ] Step 5: Grün: `python3 -m pytest tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py -q` → alle passed (inkl. AC-A.6-Liste der Spec). Messwerte der Laufzeittests notieren (PR-Text, Task 5).
-- [ ] Step 6: commit `fix: scan fork-bomb names exactly and fail closed on body limit` (63 Zeichen)
+- [x] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_hook_common_lib.py -k "long_function_name_exactly or name_at_limit or exhausted_body_window or closed_body_within_window or linear_on_long_header_names" -q` → Erwartung `4 failed, 8 passed`. Rot: Bombe mit Namen 70, Body 520, Body 980, `{`-Kette. Grün (Charakterisierung): harmloser 65er, 3× Grenzfall 64/ohne `{`, 2× geschlossener Body, 2× langer harmloser Name (Werte am 2026-10-29 gegen `3e340690` an der emittierten Funktion gemessen, Py 3.13). Abweichung → Stopp, neu messen.
+- [x] Step 4: Implementieren in `hook_shell_scan_py`: im Rückwärts-Scan Abbruch `if e - s > _MAX_FUNC_NAME: break` und `len(name) > _MAX_FUNC_NAME` entfernen, Konstante `_MAX_FUNC_NAME` streichen; bei `close < 0` → `return True` statt `continue`. Header-Kommentar (~:426-430) auf: Name unbegrenzt (linear, weil sich die Rückwärts-Scans zweier `()`-Paare nie überdecken), Body fail-closed ohne ungequotetes `}` in den ersten 512 Zeichen (Fehlalarm-Klasse Spec RK-1), Body endet am ersten ungequoteten `}` ohne Verschachtelung (bekannte Lücke, Spec Q10). Kein `try/except`.
+- [x] Step 5: Grün: `python3 -m pytest tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py -q` → alle passed (inkl. AC-A.6-Liste der Spec). Messwerte der Laufzeittests notieren (PR-Text, Task 5).
+- [x] Step 6: commit `fix: scan fork-bomb names exactly and fail closed on body limit` (63 Zeichen)
 
 ### Task 2: R1 — Grenzen-Zeile im Destructive-Gate
 **Agent:** developer · **Issue:** Refs #943 · **AC:** AC-A.7
@@ -148,12 +148,12 @@ pipeline_stages:
 - Modify: `hooks/1-generic/orchestrator-guard-impl.sh`
 - Modify: `tests/test_orchestrator_guard_hook.py`
 **Interfaces:** Produces eine zusätzliche stderr-Zeile im Destructive-Gate (nach `Detected command: …`), Englisch, konditional, mit der Grenzphrase `first 512` und »unquoted '}'« (Variante (a): zusätzlich `over 64 characters`); Klassifikator-Ausgabe unverändert; Consumes Task 1.
-- [ ] Step 1: `Grep` `destructive operation requires explicit user approval` in `hooks/1-generic/orchestrator-guard-impl.sh` → genau 1 Treffer (~:1255).
-- [ ] Step 2: Test schreiben (fail): `test_fork_bomb_window_block_names_scan_limits` — `_run_with(_bash_payload("f(){ " + "x"*520 + " f|f& };f"), tmp_path)` (Muster `test_fork_bomb_scan_does_not_hang_on_a_300kb_command`, ~:1681) → `returncode == 2`, stderr enthält `user approval` und `first 512`.
-- [ ] Step 3: `python3 -m pytest tests/test_orchestrator_guard_hook.py -k window_block_names_scan_limits -q` → `1 failed` (exit 2 bereits durch Task 1, `first 512` fehlt in stderr).
-- [ ] Step 4: Zeile ergänzen, z. B. `echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2`.
-- [ ] Step 5: `python3 -m pytest tests/test_orchestrator_guard_hook.py -q` → alle passed.
-- [ ] Step 6: commit `fix: name fork-bomb scan limits in destructive block message` (60 Zeichen)
+- [x] Step 1: `Grep` `destructive operation requires explicit user approval` in `hooks/1-generic/orchestrator-guard-impl.sh` → genau 1 Treffer (~:1255).
+- [x] Step 2: Test schreiben (fail): `test_fork_bomb_window_block_names_scan_limits` — `_run_with(_bash_payload("f(){ " + "x"*520 + " f|f& };f"), tmp_path)` (Muster `test_fork_bomb_scan_does_not_hang_on_a_300kb_command`, ~:1681) → `returncode == 2`, stderr enthält `user approval` und `first 512`.
+- [x] Step 3: `python3 -m pytest tests/test_orchestrator_guard_hook.py -k window_block_names_scan_limits -q` → `1 failed` (exit 2 bereits durch Task 1, `first 512` fehlt in stderr).
+- [x] Step 4: Zeile ergänzen, z. B. `echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2`.
+- [x] Step 5: `python3 -m pytest tests/test_orchestrator_guard_hook.py -q` → alle passed.
+- [x] Step 6: commit `fix: name fork-bomb scan limits in destructive block message` (60 Zeichen)
 
 ### Task 3: PR A — Versionen, Changelog und »Bekannte Grenzen«
 **Agent:** junior-developer · **Issue:** Refs #943 · **AC:** AC-A.8, AC-A.10
@@ -164,12 +164,12 @@ pipeline_stages:
 - Modify: `rules/1-generic/branch-guard.md`
 - Modify: `CHANGELOG.md`
 **Interfaces:** Produces `hook_common.sh` `# version: 1.5.0` (Minor) mit vorangestelltem `v1.5.0: …` in der vorhandenen `# changelog:`-Zeile, `orchestrator-guard-impl.sh` `# version: 1.9.3` (Patch, **ohne** `# changelog:` — die Datei hat keinen Header-Changelog); neuer Punkt 5 in »Bekannte Lücken« von `rules/1-generic/branch-guard.md`; `CHANGELOG.md` [Unreleased] `### Fixed`-Eintrag; Consumes Tasks 1–2, Skill `conventions`.
-- [ ] Step 1: `Grep` `^# version:` in beiden Hook-Dateien → `1.4.0` bzw. `1.9.2` (sonst Stufen neu ableiten und melden); `Grep` `^# changelog:` → genau 1 Treffer in `hook_common.sh` (:5), 0 in `orchestrator-guard-impl.sh`.
-- [ ] Step 2: Header bumpen; nur in `hook_common.sh` den Changelog-Eintrag vorn ergänzen (Format der vorhandenen Einträge).
-- [ ] Step 3: `rules/1-generic/branch-guard.md`, Liste »Bekannte Lücken« (nach Punkt 4, ~:32), Deutsch: `5. Der Fork-Bomb-Scan des Destructive-Gates beendet den Funktionskörper am ersten ungequoteten `}` (keine Verschachtelung): Bomben mit `${…}` oder `{ …; }` vor dem Selbstaufruf (z. B. `f(){ : ${x}; f|f& };f`) werden nicht erkannt. Ein Funktionskörper ohne ungequotetes `}` in den ersten 512 Zeichen wird dagegen geblockt (fail-closed, mögliche Fehlalarme). Fix: Folge-Issue.` (Nummer des Folge-Issues nachtragen, sobald der User es angelegt hat; sonst ohne Nummer.) `Grep` `ersten ungequoteten` → ≥ 1 Treffer (AC-A.10).
-- [ ] Step 4: `CHANGELOG.md` (Englisch), z. B. `- **`hook_common.sh` 1.5.0 / `orchestrator-guard-impl.sh` 1.9.3 (#943 follow-up)**: the fork-bomb scan checks function names of any length exactly and fails closed when a body has no unquoted `}` in its first 512 characters (blocks instead of being skipped); the destructive block message names the limit. Known gap, documented in `rules/1-generic/branch-guard.md`: the body still ends at the first `}` (no nesting).` Fehlalarm-Klasse (lange Inline-Funktionskörper) ausdrücklich nennen.
-- [ ] Step 5: `Grep` `^# version:` → `1.5.0` / `1.9.3`; `python3 scripts/sync.py --validate` → Exit 0.
-- [ ] Step 6: commit `chore: bump hook versions and document fork-bomb scan gap` (57 Zeichen)
+- [x] Step 1: `Grep` `^# version:` in beiden Hook-Dateien → `1.4.0` bzw. `1.9.2` (sonst Stufen neu ableiten und melden); `Grep` `^# changelog:` → genau 1 Treffer in `hook_common.sh` (:5), 0 in `orchestrator-guard-impl.sh`.
+- [x] Step 2: Header bumpen; nur in `hook_common.sh` den Changelog-Eintrag vorn ergänzen (Format der vorhandenen Einträge).
+- [x] Step 3: `rules/1-generic/branch-guard.md`, Liste »Bekannte Lücken« (nach Punkt 4, ~:32), Deutsch: `5. Der Fork-Bomb-Scan des Destructive-Gates beendet den Funktionskörper am ersten ungequoteten `}` (keine Verschachtelung): Bomben mit `${…}` oder `{ …; }` vor dem Selbstaufruf (z. B. `f(){ : ${x}; f|f& };f`) werden nicht erkannt. Ein Funktionskörper ohne ungequotetes `}` in den ersten 512 Zeichen wird dagegen geblockt (fail-closed, mögliche Fehlalarme). Fix: Folge-Issue.` (Nummer des Folge-Issues nachtragen, sobald der User es angelegt hat; sonst ohne Nummer.) `Grep` `ersten ungequoteten` → ≥ 1 Treffer (AC-A.10).
+- [x] Step 4: `CHANGELOG.md` (Englisch), z. B. `- **`hook_common.sh` 1.5.0 / `orchestrator-guard-impl.sh` 1.9.3 (#943 follow-up)**: the fork-bomb scan checks function names of any length exactly and fails closed when a body has no unquoted `}` in its first 512 characters (blocks instead of being skipped); the destructive block message names the limit. Known gap, documented in `rules/1-generic/branch-guard.md`: the body still ends at the first `}` (no nesting).` Fehlalarm-Klasse (lange Inline-Funktionskörper) ausdrücklich nennen.
+- [x] Step 5: `Grep` `^# version:` → `1.5.0` / `1.9.3`; `python3 scripts/sync.py --validate` → Exit 0.
+- [x] Step 6: commit `chore: bump hook versions and document fork-bomb scan gap` (57 Zeichen)
 
 ### Task 4: PR A — Rebaseline auf frischem `main` und Self-Sync
 **Agent:** developer · **Issue:** Refs #943 · **AC:** AC-A.9
@@ -183,12 +183,12 @@ pipeline_stages:
 - Modify: `.agents/hooks/orchestrator-guard-impl.sh`
 - Modify: `.meta-config/generated-file-hashes.json`
 **Interfaces:** Produces neu gepinntes AC-01-Manifest (`13 + k` Einträge, k ∈ {0, 6}), Rebaseline-Log-Eintrag, neuer `ac01-baseline`-Digest in `_FIXTURE_TREES`, versionierte Self-Sync-Kopien; Consumes Tasks 1–3.
-- [ ] Step 1: Drift beobachten: `python3 -m pytest tests/test_ac01_render_identity.py -q` → `1 failed` mit Drift-Liste. **Erwartet (abschließend, `13 + k` von 1085, k ∈ {0, 6}):** 4 Hook-Renders `Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`, `Claude/.claude/hooks/orchestrator-guard-impl.sh`, `Gemini/.agents/hooks/orchestrator-guard-impl.sh`; 9 Regel-Renders `Claude/.claude/rules/branch-guard.md`, `Continue/.continue/rules/branch-guard.md`, `Copilot/.github/instructions/branch-guard.instructions.md`, `Codex/AGENTS.md`, `Gemini/AGENTS.md`, `KimiCode/AGENTS.md`, `Mammouth/AGENTS.md`, `Opencode/AGENTS.md`, `ZCode/AGENTS.md`. Zulässig zusätzlich nur `<Provider>/.meta-config/context-hashes.json` dieser sechs `AGENTS.md`-Provider (k = 6, nicht erwartet, Spec AC-A.9; falls vorhanden im Log benennen und die Zahlen unten als `13 + k` ansetzen). `<Provider>/.meta-config/generated-file-hashes.json` driftet nicht (`_hash_file` hasht nur die Schlüssel). **Stop-Kriterium:** jede andere Zeile ⇒ nicht schreiben, Ursache klären, melden.
-- [ ] Step 2: **Kein `--write`.** Gerenderte Matrix in `.tmp/` (`render_matrix_hashes` aus dem Harness) bzw. die Drift-Liste aus Step 1; jeden neuen Digest unabhängig mit `_hash_file` aus den gerenderten Bytes berechnen und in `hashes.json` **je Eintrag** ersetzen (`13 + k` Einzeilen-Ersetzungen, `1087 - (13 + k)` der 1087 Zeilen unberührt; k = 0: 1074). Rebaseline-Log im Docstring (Englisch, Muster :363/:399/:439): `Wave 3 rest (PR A, #943 follow-up; hook_common.sh 1.4.0 -> 1.5.0, orchestrator-guard-impl.sh 1.9.2 -> 1.9.3, branch-guard rule known-gap entry): 13 + k of 1085 hashes moved (k = 0 or 6, fill in measured value); 0 added/removed -- 4 hook renders (Claude + Gemini) and 9 branch-guard rule renders (Claude/Continue/Copilot rule files, AGENTS.md of Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode), alt -> neu je Eintrag (8 Hex-Zeichen). Patched per entry (13 + k single-line replacements, 1087 - (13 + k) of the 1087 lines untouched; k = 0: 13 and 1074) -- not via --write -- after independently recomputing each digest with _hash_file. AC01_EXCEPTIONS is NOT extended.` Digest: `python3 -m pytest tests/test_opencode_v2_surface.py -k test_ac_t4_fixtures_unchanged -q` meldet `ac01-baseline: expected <alt>, got <neu>` → `got` nach unabhängiger Neuberechnung aus den Fixture-Bytes übernehmen; Log-Kommentar über `_FIXTURE_TREES` (Muster ~:5280-5296) ergänzen.
-- [ ] Step 3: Diff-Nachweis (Git-Lesebefehl): `git diff --stat tests/fixtures/ac01-baseline/hashes.json` → `13 + k insertions(+), 13 + k deletions(-)` (k = 0: 13/13), Zeilen = Liste aus Step 1; `tests/fixtures/slimming-golden`, `tests/fixtures/compact-golden` unverändert (enthalten den Regelabschnitt nicht).
-- [ ] Step 4: Self-Sync: `python3 scripts/sync.py`; danach `.agents/hooks/lib/hook_common.sh` und `.agents/hooks/orchestrator-guard-impl.sh` tragen 1.5.0 / 1.9.3; `.meta-config/generated-file-hashes.json` ändert die Werte der betroffenen Hook-/Regel-Kopien (u. a. `.claude/rules/branch-guard.md`, ~:103); `AGENTS.md` des Repos bleibt unverändert (nur Compact-Zeiger, ~:57); `python3 scripts/consistency-check.py` ohne `hooks.stale-deployed-version`. Nur Pfade aus `Files:` committen; weitere Sync-Diffs (`git status --short`) ohne Bezug zu Tasks 1–3 über den `git`-Agenten zurücksetzen lassen und melden; mit Bezug, aber nicht in `Files:` → Stopp, Plan ergänzen.
-- [ ] Step 5: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → alle passed.
-- [ ] Step 6: commit `chore: rebaseline AC-01 hashes for fork-bomb scan limits` (56 Zeichen)
+- [x] Step 1: Drift beobachten: `python3 -m pytest tests/test_ac01_render_identity.py -q` → `1 failed` mit Drift-Liste. **Erwartet (abschließend, `13 + k` von 1085, k ∈ {0, 6}):** 4 Hook-Renders `Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`, `Claude/.claude/hooks/orchestrator-guard-impl.sh`, `Gemini/.agents/hooks/orchestrator-guard-impl.sh`; 9 Regel-Renders `Claude/.claude/rules/branch-guard.md`, `Continue/.continue/rules/branch-guard.md`, `Copilot/.github/instructions/branch-guard.instructions.md`, `Codex/AGENTS.md`, `Gemini/AGENTS.md`, `KimiCode/AGENTS.md`, `Mammouth/AGENTS.md`, `Opencode/AGENTS.md`, `ZCode/AGENTS.md`. Zulässig zusätzlich nur `<Provider>/.meta-config/context-hashes.json` dieser sechs `AGENTS.md`-Provider (k = 6, nicht erwartet, Spec AC-A.9; falls vorhanden im Log benennen und die Zahlen unten als `13 + k` ansetzen). `<Provider>/.meta-config/generated-file-hashes.json` driftet nicht (`_hash_file` hasht nur die Schlüssel). **Stop-Kriterium:** jede andere Zeile ⇒ nicht schreiben, Ursache klären, melden.
+- [x] Step 2: **Kein `--write`.** Gerenderte Matrix in `.tmp/` (`render_matrix_hashes` aus dem Harness) bzw. die Drift-Liste aus Step 1; jeden neuen Digest unabhängig mit `_hash_file` aus den gerenderten Bytes berechnen und in `hashes.json` **je Eintrag** ersetzen (`13 + k` Einzeilen-Ersetzungen, `1087 - (13 + k)` der 1087 Zeilen unberührt; k = 0: 1074). Rebaseline-Log im Docstring (Englisch, Muster :363/:399/:439): `Wave 3 rest (PR A, #943 follow-up; hook_common.sh 1.4.0 -> 1.5.0, orchestrator-guard-impl.sh 1.9.2 -> 1.9.3, branch-guard rule known-gap entry): 13 + k of 1085 hashes moved (k = 0 or 6, fill in measured value); 0 added/removed -- 4 hook renders (Claude + Gemini) and 9 branch-guard rule renders (Claude/Continue/Copilot rule files, AGENTS.md of Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode), alt -> neu je Eintrag (8 Hex-Zeichen). Patched per entry (13 + k single-line replacements, 1087 - (13 + k) of the 1087 lines untouched; k = 0: 13 and 1074) -- not via --write -- after independently recomputing each digest with _hash_file. AC01_EXCEPTIONS is NOT extended.` Digest: `python3 -m pytest tests/test_opencode_v2_surface.py -k test_ac_t4_fixtures_unchanged -q` meldet `ac01-baseline: expected <alt>, got <neu>` → `got` nach unabhängiger Neuberechnung aus den Fixture-Bytes übernehmen; Log-Kommentar über `_FIXTURE_TREES` (Muster ~:5280-5296) ergänzen.
+- [x] Step 3: Diff-Nachweis (Git-Lesebefehl): `git diff --stat tests/fixtures/ac01-baseline/hashes.json` → `13 + k insertions(+), 13 + k deletions(-)` (k = 0: 13/13), Zeilen = Liste aus Step 1; `tests/fixtures/slimming-golden`, `tests/fixtures/compact-golden` unverändert (enthalten den Regelabschnitt nicht).
+- [x] Step 4: Self-Sync: `python3 scripts/sync.py`; danach `.agents/hooks/lib/hook_common.sh` und `.agents/hooks/orchestrator-guard-impl.sh` tragen 1.5.0 / 1.9.3; `.meta-config/generated-file-hashes.json` ändert die Werte der betroffenen Hook-/Regel-Kopien (u. a. `.claude/rules/branch-guard.md`, ~:103); `AGENTS.md` des Repos bleibt unverändert (nur Compact-Zeiger, ~:57); `python3 scripts/consistency-check.py` ohne `hooks.stale-deployed-version`. Nur Pfade aus `Files:` committen; weitere Sync-Diffs (`git status --short`) ohne Bezug zu Tasks 1–3 über den `git`-Agenten zurücksetzen lassen und melden; mit Bezug, aber nicht in `Files:` → Stopp, Plan ergänzen.
+- [x] Step 5: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → alle passed.
+- [x] Step 6: commit `chore: rebaseline AC-01 hashes for fork-bomb scan limits` (56 Zeichen)
 
 ### Task 5: PR A — Exit-Gate und PR-Beschreibung
 **Agent:** developer · **Issue:** Refs #943 · **AC:** Exit-Kriterien PR A
@@ -196,9 +196,9 @@ pipeline_stages:
 **Files:**
 - Create: `.tmp/wave3-prA-description.md`
 **Interfaces:** Produces Exit-Nachweis und PR-Text (Entwurf); Consumes Tasks 1–4. Push/PR durch den `git`-Agenten.
-- [ ] Step 1: `python3 scripts/sync.py --validate` → Exit 0; `python3 -m pytest tests -q` → ohne `failed`/`error`.
-- [ ] Step 2: PR-Text (Titel `fix: fail closed at fork-bomb scan limits`), Inhalt: Problem (Messwerte Spec R1), Vertrag (Q3-Entscheidung), Fehlalarm-Klasse, dokumentierte `}`-Lücke (Q10, Verweis auf das Folge-Issue des Users, falls angelegt), Rot-/Grün-Läufe, Laufzeitwerte aus Task 1 Step 5, Rebaseline-Umfang. Zeile `Refs #943` (geschlossen, Q9; kein `Closes`).
-- [ ] Step 3: Kein Commit; Hand-off an den `git`-Agenten.
+- [x] Step 1: `python3 scripts/sync.py --validate` → Exit 0; `python3 -m pytest tests -q` → ohne `failed`/`error`.
+- [x] Step 2: PR-Text (Titel `fix: fail closed at fork-bomb scan limits`), Inhalt: Problem (Messwerte Spec R1), Vertrag (Q3-Entscheidung), Fehlalarm-Klasse, dokumentierte `}`-Lücke (Q10, Verweis auf das Folge-Issue des Users, falls angelegt), Rot-/Grün-Läufe, Laufzeitwerte aus Task 1 Step 5, Rebaseline-Umfang. Zeile `Refs #943` (geschlossen, Q9; kein `Closes`).
+- [x] Step 3: Kein Commit; Hand-off an den `git`-Agenten.
 
 ## PR B — `fix/index-lf-admin-hint-zcode-doc` (R2, R3, R4)
 
@@ -215,14 +215,14 @@ pipeline_stages:
 - Modify: `scripts/lib/hook_plugins.py`
 - Modify: `tests/test_newline_normalization.py`
 **Interfaces:** Produces `sync_hooks`, `sync_release_gates`, `sync_hook_lib` schreiben `.agent-meta-managed` über `write_atomic(path, content)` (LF, Modus 0600), Bedingungen (`not dry_run`, #630-Leerindex) unverändert; Consumes `scripts/lib/io.py:write_atomic` (bereits importiert, `hooks.py:9`, `hook_plugins.py:16`).
-- [ ] Step 1: `Grep` `\.write_text\(` in `scripts/lib/hooks.py` und `scripts/lib/hook_plugins.py` → genau 3 Treffer (`hooks.py` ~:635, `hook_plugins.py` ~:160, ~:348).
-- [ ] Step 2: Tests schreiben nach Muster `test_create_hook_writes_lf_through_write_atomic` / `test_create_hook_dry_run_writes_nothing` (Spy auf `write_atomic` im jeweiligen Modul per `monkeypatch.setattr`, ~:246-288). Aufruf-Vorlagen: `tests/test_antigravity_hooks_registration.py` (~:85-92, `sync_hooks`/`sync_hook_lib` mit echtem `agent_meta_root` und `load_providers_config`), `tests/test_release_gate_checksums.py` bzw. `tests/test_hook_lib_sync.py` (`sync_release_gates`, Dry-Run-Vorbild `test_dry_run_makes_no_filesystem_changes` :82). Annotationen Py3.9-kompatibel (`Optional[...]`).
+- [x] Step 1: `Grep` `\.write_text\(` in `scripts/lib/hooks.py` und `scripts/lib/hook_plugins.py` → genau 3 Treffer (`hooks.py` ~:635, `hook_plugins.py` ~:160, ~:348).
+- [x] Step 2: Tests schreiben nach Muster `test_create_hook_writes_lf_through_write_atomic` / `test_create_hook_dry_run_writes_nothing` (Spy auf `write_atomic` im jeweiligen Modul per `monkeypatch.setattr`, ~:246-288). Aufruf-Vorlagen: `tests/test_antigravity_hooks_registration.py` (~:85-92, `sync_hooks`/`sync_hook_lib` mit echtem `agent_meta_root` und `load_providers_config`), `tests/test_release_gate_checksums.py` bzw. `tests/test_hook_lib_sync.py` (`sync_release_gates`, Dry-Run-Vorbild `test_dry_run_makes_no_filesystem_changes` :82). Annotationen Py3.9-kompatibel (`Optional[...]`).
   - Vorher rot: `test_hook_managed_index_writes_lf_through_write_atomic` (`hooks_mod.sync_hooks`), `test_release_gate_managed_index_writes_lf_through_write_atomic` (`hook_plugins.sync_release_gates`), `test_hook_lib_managed_index_writes_lf_through_write_atomic` (`hook_plugins.sync_hook_lib`); je Assertion: Spy-Aufrufliste **enthält** den Pfad `<…>/.agent-meta-managed` (weitere Aufrufe zulässig), Index-Bytes enthalten kein CR-Byte (13) (AC-B.1).
   - Charakterisierung, vorher **und** nachher grün (AC-B.3): `test_hook_managed_index_dry_run_writes_nothing` (`sync_hooks(…, dry_run=True)` → `.agent-meta-managed` existiert nicht, Spy-Liste ohne Index-Pfad); `test_hook_managed_index_rewritten_empty_after_revocation` (Lauf 1 mit echter Provider-Config für `Claude` → Index nicht leer; Lauf 2 mit Kopie dieser Config ohne `hook_protocol`, Gate `provider_hooks_supported` `hooks.py:~486` → Index existiert, `read_bytes() == b""`).
-- [ ] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_newline_normalization.py -k "managed_index" -q` → `3 failed, 2 passed` (rot: Index-Pfad fehlt in der Spy-Liste, weil `write_text` schreibt; grün: die zwei Charakterisierungstests — im PR so vermerken). Abweichung bei den Charakterisierungstests → Stopp, Vorbedingung klären.
-- [ ] Step 4: Die drei Aufrufe durch `write_atomic(managed_index_path, <gleicher Inhalt>)` ersetzen; vorhandene `mkdir`-Aufrufe dürfen bleiben.
-- [ ] Step 5: Grün: `python3 -m pytest tests/test_newline_normalization.py tests/test_hook_lib_sync.py tests/test_release_gate_checksums.py tests/test_antigravity_hooks_registration.py -q` → alle passed (inkl. `5 passed` für `-k managed_index`); `Grep` `\.write_text\(` in beiden Modulen → 0 Treffer (AC-B.2).
-- [ ] Step 6: commit `fix: write hook managed indices through write_atomic` (52 Zeichen)
+- [x] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_newline_normalization.py -k "managed_index" -q` → `3 failed, 2 passed` (rot: Index-Pfad fehlt in der Spy-Liste, weil `write_text` schreibt; grün: die zwei Charakterisierungstests — im PR so vermerken). Abweichung bei den Charakterisierungstests → Stopp, Vorbedingung klären.
+- [x] Step 4: Die drei Aufrufe durch `write_atomic(managed_index_path, <gleicher Inhalt>)` ersetzen; vorhandene `mkdir`-Aufrufe dürfen bleiben.
+- [x] Step 5: Grün: `python3 -m pytest tests/test_newline_normalization.py tests/test_hook_lib_sync.py tests/test_release_gate_checksums.py tests/test_antigravity_hooks_registration.py -q` → alle passed (inkl. `5 passed` für `-k managed_index`); `Grep` `\.write_text\(` in beiden Modulen → 0 Treffer (AC-B.2).
+- [x] Step 6: commit `fix: write hook managed indices through write_atomic` (52 Zeichen)
 
 ### Task 7: R3 — Host-Header-Hinweis, Hilfetext, How-to und Schema
 **Agent:** developer · **Issue:** Refs #897 · **AC:** AC-B.5, AC-B.6, AC-B.7 · **parallel_group:** gB
@@ -234,16 +234,16 @@ pipeline_stages:
 - Modify: `docs/howto/admin-ui-remote-access.md`
 - Modify: `config/project-config.schema.json`
 **Interfaces:** Produces `SecurityError`-Text `host header not allowed: '<host>' -- … --allowed-hosts <host> … admin-ui.allowed-hosts … include loopback names if needed` (Logik unverändert); Wildcard-Startup-Hinweis mit demselben Zusatz; `--allowed-hosts`-Hilfetext »Allowed origin hosts … Replaces the default loopback set …«; How-to (:62, :157, :166, :216-224) und Schema-`description` von `admin-ui.allowed-hosts` konsistent; Consumes `AuthService.check_origin` (statisch, ~:948), Wildcard-Hinweis in `AdminServer.__init__` (~:5694), `main()`-Parser (~:5926).
-- [ ] Step 1: `Grep -i` `host header not allowed|does not replace|extends the default|\*\*Extends\*\*|Additional allowed|host:port origins|writes from other machines` in `scripts/admin-server.py`, `docs/howto/admin-ui-remote-access.md`, `config/project-config.schema.json` → Treffer notieren (erwartet: admin-server ~:992, ~:5694, ~:5927, ~:5929; How-to ~:62, ~:166; Schema ~:1927).
-- [ ] Step 2: Tests schreiben (fail) in `TestCheckOrigin` (`tests/test_admin_server.py` ~:768): `test_host_header_rejection_names_allowlist_hint` (`AuthService.check_origin(origin=None, host="evil.example:7420", allowed_hosts=DEFAULT_ALLOWED_HOSTS, bind_host="127.0.0.1", bind_port=7420)` → `SecurityError`, Text enthält `host header not allowed`, `--allowed-hosts`, `admin-ui.allowed-hosts`, `loopback names`), `test_allowed_hosts_help_states_replace_semantics` (`subprocess.run([sys.executable, <admin-server-Pfad>, "--help"], timeout=30)` → Exit 0, normalisierter Text (Whitespace zusammengezogen) enthält `Replaces`, weder `does not replace` noch `Additional allowed`; zusätzlich `json.load` von `config/project-config.schema.json` → `properties.admin-ui.properties.allowed-hosts.description` enthält `Replaces`, weder `Extends` noch `host:port`). Kein separater Schema-Test (Schema nicht in `hashes.json`, nicht gerendert, Spec R3).
-- [ ] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_admin_server.py -k "allowlist_hint or replace_semantics" -q` → `2 failed`.
-- [ ] Step 4: Implementieren (Englisch):
+- [x] Step 1: `Grep -i` `host header not allowed|does not replace|extends the default|\*\*Extends\*\*|Additional allowed|host:port origins|writes from other machines` in `scripts/admin-server.py`, `docs/howto/admin-ui-remote-access.md`, `config/project-config.schema.json` → Treffer notieren (erwartet: admin-server ~:992, ~:5694, ~:5927, ~:5929; How-to ~:62, ~:166; Schema ~:1927).
+- [x] Step 2: Tests schreiben (fail) in `TestCheckOrigin` (`tests/test_admin_server.py` ~:768): `test_host_header_rejection_names_allowlist_hint` (`AuthService.check_origin(origin=None, host="evil.example:7420", allowed_hosts=DEFAULT_ALLOWED_HOSTS, bind_host="127.0.0.1", bind_port=7420)` → `SecurityError`, Text enthält `host header not allowed`, `--allowed-hosts`, `admin-ui.allowed-hosts`, `loopback names`), `test_allowed_hosts_help_states_replace_semantics` (`subprocess.run([sys.executable, <admin-server-Pfad>, "--help"], timeout=30)` → Exit 0, normalisierter Text (Whitespace zusammengezogen) enthält `Replaces`, weder `does not replace` noch `Additional allowed`; zusätzlich `json.load` von `config/project-config.schema.json` → `properties.admin-ui.properties.allowed-hosts.description` enthält `Replaces`, weder `Extends` noch `host:port`). Kein separater Schema-Test (Schema nicht in `hashes.json`, nicht gerendert, Spec R3).
+- [x] Step 3: Rot-Lauf (ohne `-x`): `python3 -m pytest tests/test_admin_server.py -k "allowlist_hint or replace_semantics" -q` → `2 failed`.
+- [x] Step 4: Implementieren (Englisch):
   - Host-Meldung um den Hinweis ergänzen (Wortlaut der Origin-Meldung ~:982-986 wiederverwenden) plus `; include loopback names if needed`; Wildcard-Hinweis (~:5694-5695) ebenso ergänzen.
   - Hilfetext z. B. `"Allowed origin hosts for CORS/DNS-rebinding protection. Default: 127.0.0.1 localhost ::1. Replaces the default loopback set: include loopback names if needed."`
   - How-to :62 (Tabellenzeile ohne »Additional«/»**Extends**«), :166 (»replaces the default loopback set«), YAML-Block :157 (Kommentar oder Liste mit Loopback-Namen, Text `loopback names`), Beispiel :216-224 (Satz: the list replaces the loopback default, include loopback names if needed).
   - Schema `admin-ui.allowed-hosts.description`, z. B. `"Hostnames/IPs (without port; the server port is appended) allowed for CORS / DNS-rebinding protection. Replaces the default loopback set; include loopback names if needed. Use when binding to a specific network interface."`; JSON gültig (`python3 -c "import json; json.load(open('config/project-config.schema.json'))"`).
-- [ ] Step 5: Grün: `python3 -m pytest tests/test_admin_server.py -q` → alle passed, darunter unverändert `TestCheckOrigin::test_dns_rebinding_forged_host_rejected_even_with_matching_origin` und `TestCheckOriginBindHost` (AC-B.6). Abschluss-Grep (AC-B.7; die Phrase `loopback names` muss je in einem zusammenhängenden String-Literal stehen — der Wildcard-Hinweis ist ein mehrzeiliger f-String, ein Zeilenumbruch mitten in der Phrase würde den Grep ≥ 3 verfehlen): `Grep -i` `\*\*Extends\*\*|extends the default|Additional allowed` in `scripts/admin-server.py`, `docs/howto/admin-ui-remote-access.md`, `config/project-config.schema.json` → **0 Treffer**; `Grep` `does not replace` in denselben Dateien → 0; `Grep` `loopback names` → admin-server ≥ 3, How-to ≥ 2. `python3 scripts/sync.py --validate` → Exit 0.
-- [ ] Step 6: commit `fix: hint on host header rejection and fix allowed-hosts help` (61 Zeichen)
+- [x] Step 5: Grün: `python3 -m pytest tests/test_admin_server.py -q` → alle passed, darunter unverändert `TestCheckOrigin::test_dns_rebinding_forged_host_rejected_even_with_matching_origin` und `TestCheckOriginBindHost` (AC-B.6). Abschluss-Grep (AC-B.7; die Phrase `loopback names` muss je in einem zusammenhängenden String-Literal stehen — der Wildcard-Hinweis ist ein mehrzeiliger f-String, ein Zeilenumbruch mitten in der Phrase würde den Grep ≥ 3 verfehlen): `Grep -i` `\*\*Extends\*\*|extends the default|Additional allowed` in `scripts/admin-server.py`, `docs/howto/admin-ui-remote-access.md`, `config/project-config.schema.json` → **0 Treffer**; `Grep` `does not replace` in denselben Dateien → 0; `Grep` `loopback names` → admin-server ≥ 3, How-to ≥ 2. `python3 scripts/sync.py --validate` → Exit 0.
+- [x] Step 6: commit `fix: hint on host header rejection and fix allowed-hosts help` (61 Zeichen)
 
 ### Task 8: R4 — zcode ZC-1 Entscheidungsnotiz
 **Agent:** junior-developer · **Issue:** Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.8 · **parallel_group:** gB
@@ -251,10 +251,10 @@ pipeline_stages:
 **Files:**
 - Modify: `docs/providers/zcode.md`
 **Interfaces:** Produces Punkt 6 in »Deliberate limitations« (Englisch): ZC-1 (workspace agent auto-load) stays wontfix (documented); agent-meta does not write to `~/.zcode/agents` because that is outside the project root and would violate repo containment; the AGENTS.md bootstrap (section »Agents as definition store + bootstrap«) is the supported path; ZC-2 (commands capability under-claim) was fixed in #807; Consumes D8, `docs/providers/zcode.md:61-86`, `:207-216`. Regressionstest: keiner (D8).
-- [ ] Step 1: `Read` `docs/providers/zcode.md` Zeilen 61–86 und 205–224; `Grep` `ZC-1|wontfix` → 0 Treffer (Ausgangsstand).
-- [ ] Step 2: Punkt 6 ergänzen (Stil der Punkte 1–5).
-- [ ] Step 3: `Grep` `ZC-1`, `wontfix`, `repo containment`, `~/.zcode/agents`, `#807` → je ≥ 1 Treffer; `python3 scripts/sync.py --validate` → Exit 0.
-- [ ] Step 4: commit `chore: record zcode ZC-1 wontfix decision` (41 Zeichen)
+- [x] Step 1: `Read` `docs/providers/zcode.md` Zeilen 61–86 und 205–224; `Grep` `ZC-1|wontfix` → 0 Treffer (Ausgangsstand).
+- [x] Step 2: Punkt 6 ergänzen (Stil der Punkte 1–5).
+- [x] Step 3: `Grep` `ZC-1`, `wontfix`, `repo containment`, `~/.zcode/agents`, `#807` → je ≥ 1 Treffer; `python3 scripts/sync.py --validate` → Exit 0.
+- [x] Step 4: commit `chore: record zcode ZC-1 wontfix decision` (41 Zeichen)
 
 ### Task 9: PR B — Changelog
 **Agent:** junior-developer · **Issue:** Refs #961, Refs #897, Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.3 (Changelog-Teil)
@@ -262,9 +262,9 @@ pipeline_stages:
 **Files:**
 - Modify: `CHANGELOG.md`
 **Interfaces:** Produces `### Fixed`-Einträge (Englisch) unter [Unreleased]: managed hook indices via `write_atomic` (LF; files now created with mode 0600 instead of the umask default), host-header rejection and wildcard hints (include loopback names), `--allowed-hosts` help/how-to/schema description state replace semantics (schema: hosts, not host:port); zcode ZC-1 note; Consumes Tasks 6–8. Kein Versions-Bump (keine Hook-/Agent-Datei), kein `VERSION`-Bump.
-- [ ] Step 1: Einträge schreiben; `Grep` `0600` und `#897` in `CHANGELOG.md` → neue Treffer im [Unreleased]-Block.
-- [ ] Step 2: `python3 scripts/sync.py --validate` → Exit 0.
-- [ ] Step 3: commit `chore: add changelog entries for index LF and admin hint` (56 Zeichen)
+- [x] Step 1: Einträge schreiben; `Grep` `0600` und `#897` in `CHANGELOG.md` → neue Treffer im [Unreleased]-Block.
+- [x] Step 2: `python3 scripts/sync.py --validate` → Exit 0.
+- [x] Step 3: commit `chore: add changelog entries for index LF and admin hint` (56 Zeichen)
 
 ### Task 10: PR B — Exit-Gate, PR-Text, #856-Kommentar-Entwurf
 **Agent:** developer · **Issue:** Refs #961, Refs #897, Refs #856 (Schließen durch User, Q6) · **AC:** AC-B.4, AC-B.9, Exit-Kriterien PR B
@@ -273,10 +273,10 @@ pipeline_stages:
 - Create: `.tmp/wave3-prB-description.md`
 - Create: `.tmp/wave3-issue-856-close.md`
 **Interfaces:** Produces Exit-Nachweis, PR-Text und den #856-Schließkommentar als Handoff-Text an den User; Consumes Tasks 6–9. Push/PR durch den `git`-Agenten; Issue-Schließung nur durch den User.
-- [ ] Step 1: `python3 scripts/sync.py --validate` → Exit 0; `python3 -m pytest tests -q` → ohne `failed`/`error`; `python3 -m pytest tests/test_ac01_render_identity.py -q` → grün ohne Rebaseline (AC-B.4).
-- [ ] Step 2: PR-Text (Titel `fix: LF managed indices, admin host hint, zcode ZC-1 note`), je Issue eine Zeile: `Refs #961`, `Refs #897` (beide geschlossen, Q9), `Refs #856` (Schließen durch den User, Q6). Modus-0600-Hinweis aufnehmen.
-- [ ] Step 3: Kommentar-Entwurf in `.tmp/wave3-issue-856-close.md` (Englisch), zur Ausführung durch den User nach Merge, z. B. `! /home/hermes/.local/bin/gh issue close 856 --reason "not planned" --comment "ZC-1 (workspace agent auto-load) stays wontfix (documented): agent-meta does not write to ~/.zcode/agents because that would violate repo containment; the AGENTS.md bootstrap is documented in docs/providers/zcode.md (Deliberate limitations). ZC-2 (commands capability under-claim) was fixed in #807."` Gültige `--reason`-Werte der installierten `gh`-Version: unverifiziert (User prüft mit `gh issue close --help`).
-- [ ] Step 4: Kein Commit; Hand-off an den `git`-Agenten (PR) und an den User (#856).
+- [x] Step 1: `python3 scripts/sync.py --validate` → Exit 0; `python3 -m pytest tests -q` → ohne `failed`/`error`; `python3 -m pytest tests/test_ac01_render_identity.py -q` → grün ohne Rebaseline (AC-B.4).
+- [x] Step 2: PR-Text (Titel `fix: LF managed indices, admin host hint, zcode ZC-1 note`), je Issue eine Zeile: `Refs #961`, `Refs #897` (beide geschlossen, Q9), `Refs #856` (Schließen durch den User, Q6). Modus-0600-Hinweis aufnehmen.
+- [x] Step 3: Kommentar-Entwurf in `.tmp/wave3-issue-856-close.md` (Englisch), zur Ausführung durch den User nach Merge, z. B. `! /home/hermes/.local/bin/gh issue close 856 --reason "not planned" --comment "ZC-1 (workspace agent auto-load) stays wontfix (documented): agent-meta does not write to ~/.zcode/agents because that would violate repo containment; the AGENTS.md bootstrap is documented in docs/providers/zcode.md (Deliberate limitations). ZC-2 (commands capability under-claim) was fixed in #807."` Gültige `--reason`-Werte der installierten `gh`-Version: unverifiziert (User prüft mit `gh issue close --help`).
+- [x] Step 4: Kein Commit; Hand-off an den `git`-Agenten (PR) und an den User (#856).
 
 ## Anhang — Traceability AC → Task → Test
 
@@ -334,3 +334,26 @@ pipeline_stages:
 - `Files:`-Blöcke: PR A und PR B überschneiden sich nur in `CHANGELOG.md` (Task 3 / Task 9, unterschiedliche PRs, seriell gemergt); `gB` = {6, 7, 8} disjunkt. Prüfung vor Ausführung per `scripts/lib/orchestration.py::check_plan_file_overlap`.
 - Kein Task führt Git-Mutationen, `gh`-Schreibaufrufe oder Issue-Änderungen aus; `gh`-Befehle stehen nur als User-Handoff-Entwürfe (Task 10, Q10-Folge-Issue im Status-Abschnitt).
 - Validator-Hinweis: `scripts/lib/consistency/spec_plan.py` stuft nur `*-design.md` als Spec ein; Warnungen zur Spec-Datei sind erwartet (Spec RK-6).
+
+## Ausführungsnachweis (Ledger)
+
+| Task | Commit |
+|---|---|
+| 1 | `9e98e153` |
+| 2 | `e32ad46e` |
+| 3 | `66cf60ed` |
+| 4 | `b95e5727` |
+| 4b | `c7ea971b` |
+| 4c | `2cd8b160` |
+| 5 | ohne Commit (Hand-off `.tmp/wave3-prA-description.md`) |
+| 6 | `35a1144c` |
+| 7 | `ffb37887` |
+| 8 | `f8f000e0` |
+| 9 | `6c22cfa7` |
+| 10 | ohne Commit (Hand-off `.tmp/wave3-prB-description.md`) |
+
+**Merges:** PR A `6f52326a` (#1047), Zwischen-Merge `9dd32b5f` (`main` in PR B, `CHANGELOG.md`-Konflikt von Hand gelöst), PR B `3294c7e5` (#1048) = `main`.
+
+**Abweichungen:** (a) PR A und PR B seriell statt parallel gebaut — `no-worktree-isolation` verbietet zwei ausgecheckte Branches in einem Tree. (b) `parallel_group gB` (Tasks 6–8) seriell ausgeführt — jeder Task endet in einem Commit, parallele Commits streiten um `.git/index.lock`. (c) Tasks 4b/4c während der Ausführung ergänzt (Bootstrap-`--check`-False-Positive; gemessenes Context-Budget neu gepinnt), vom User freigegeben.
+
+**CI:** 18/18 Checks je PR grün (PR #1047 und #1048); `python3 -m pytest tests -q` ohne `failed`/`error` auf `main` nach dem zweiten Merge.
