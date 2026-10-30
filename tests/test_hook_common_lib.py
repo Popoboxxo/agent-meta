@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -375,12 +376,21 @@ def _shell_scan_source() -> str:
     return r.stdout
 
 
-def _scan(code: str) -> subprocess.CompletedProcess:
+def _scan(code: str, timeout: Optional[float] = None) -> subprocess.CompletedProcess:
     """Run `code` with the emitted scanner definitions in scope."""
     return subprocess.run(
         [sys.executable, "-c", _shell_scan_source() + "\n" + code],
-        capture_output=True, text=True,
+        capture_output=True, text=True, timeout=timeout,
     )
+
+
+def _fork_bomb_verdict(expr: str) -> subprocess.CompletedProcess:
+    """Classify the command built by the Python expression `expr`.
+
+    The command is built INSIDE the child process (as source text) so a
+    multi-hundred-KB input never travels through the command line.
+    """
+    return _scan(f"print(int(is_fork_bomb({expr})))")
 
 
 def test_shell_scan_py_emits_compilable_source():
@@ -452,6 +462,85 @@ def test_fork_bomb_detector_ignores_a_quoted_string_argument():
     r = _scan("print(int(is_fork_bomb(strip_quoted('echo \\\":(){ :|:& };:\\\"'))))")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "0"
+
+
+@pytest.mark.parametrize("expr,expected", [
+    # AC-A.1: a name longer than the old 64-character cap is scanned exactly,
+    # so this bomb is detected instead of being dropped as "no match".
+    ('"b"*70 + "(){ " + "b"*70 + "|" + "b"*70 + "& };" + "b"*70', 1),
+    # ... while a long name with a harmless body stays a non-bomb.
+    ('"a"*65 + "(){ :; }"', 0),
+], ids=["bomb-with-70-char-name", "harmless-65-char-name"])
+def test_fork_bomb_scans_long_function_name_exactly(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
+    # AC-A.2 (characterisation): at and below the old cap nothing changes.
+    ('"a"*64 + "(){ :; }"', 0),
+    ('"b"*64 + "(){ " + "b"*64 + "|" + "b"*64 + "& };"', 1),
+    # An identifier followed by "()" but no body is not a bomb.
+    ('"a"*100 + "()"', 0),
+], ids=["harmless-64-char-name", "bomb-with-64-char-name", "no-body"])
+def test_fork_bomb_function_name_at_limit_is_scanned(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
+    # AC-A.3: no unquoted '}' inside the 512-character body window -> fail
+    # closed (block) instead of skipping the header (fail open).
+    ('"f(){ " + "x"*520 + " f|f& };f"', 1),
+    ('"f(){ " + "x"*980 + " f|f& };f"', 1),
+], ids=["bomb-body-past-window", "bomb-body-far-past-window"])
+def test_fork_bomb_fails_closed_on_exhausted_body_window(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
+    # AC-A.4 (characterisation): a body closed inside the window is still
+    # classified by content, not by the window rule.
+    ('"f(){ " + "x"*500 + " }"', 0),
+    ('"f(){ x} " * 60000', 0),
+], ids=["closed-body-at-window-edge", "many-closed-bodies"])
+def test_fork_bomb_closed_body_within_window_is_scanned(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
+    # AC-A.5: the unlimited backward name scan stays linear (one scan per
+    # '()' pair, they never overlap), so a 300 KB header is not a timeout.
+    ('"a"*20000 + "(){ :; }"', 0),
+    ('"a"*300000 + "(){ :; }"', 0),
+    # A header with no closing '}' in the body window fails closed.
+    ('"f(){ " * 60000', 1),
+], ids=["20k-char-name", "300k-char-name", "brace-chain"])
+def test_fork_bomb_scan_stays_linear_on_long_header_names(expr, expected):
+    code = (
+        "import time\n"
+        f"command = {expr}\n"
+        "start = time.perf_counter()\n"
+        "result = is_fork_bomb(command)\n"
+        "elapsed_ms = (time.perf_counter() - start) * 1000\n"
+        "print(int(result), elapsed_ms)\n"
+    )
+    try:
+        r = _scan(code, timeout=5)
+    except subprocess.TimeoutExpired:
+        pytest.fail("watchdog: the fork-bomb scan did not finish within 5 s")
+    assert r.returncode == 0, r.stderr
+    result, elapsed_ms = r.stdout.split()
+    assert result == str(expected)
+    assert float(elapsed_ms) < 1000.0, (
+        f"fork-bomb scan of the {expr!r} command took {elapsed_ms} ms"
+    )
 
 
 def test_split_shell_statements_and_clean_drops_bodies_keeps_terminator():

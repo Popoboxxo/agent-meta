@@ -41,6 +41,11 @@
   applies to every producer.
 
 ### Fixed
+- **No false `--check` drift when the compact bootstrap form is already on disk**: the hard-cap
+  fallback recomposed the compact block and logged an `UPDATE` even when it was byte-identical to
+  the file, so `sync.py --check` reported one file out of sync and exited 1 for a shared context
+  file that exceeds a reader cap in its full form only. The final content is now compared again and
+  reported as a skip.
 - Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
 - **`dod-push-check` 2.1.6 (#1033)**: the protected-branch list in the push-block message is
   de-duplicated — a configured `GIT_MAIN_BRANCH` of `main`/`master` no longer appears twice.
@@ -177,6 +182,16 @@
   providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in
   `tests/test_opencode_v2_surface.py` was recomputed from the fixture bytes before re-pinning.
   `AC01_EXCEPTIONS` is not extended and `slimming-golden`/`compact-golden` are unchanged.
+- **`hook_common.sh` 1.5.0 / `orchestrator-guard-impl.sh` 1.9.3 (#943 follow-up)**: the fork-bomb scan
+  in `hook_shell_scan_py` now reads a function name exactly at any length — the 64-character cap is
+  gone — and **fails closed** when a body has no unquoted `}` in its first 512 characters: the
+  candidate is blocked instead of being skipped. That is the deliberate false-alarm class: a long
+  inline function body (more than 512 characters before its closing `}`) is now blocked and needs an
+  explicit user approval, where it used to pass silently. The destructive block message names the
+  limit and states that the block is fail-closed. Known gap, documented in
+  `rules/1-generic/branch-guard.md` (`Bekannte Grenzen`, item 5): the body still ends at the first
+  unquoted `}` without brace nesting, so a bomb with `${…}` or `{ …; }` before its self-call is not
+  detected.
 - **Managed hook indices are LF and owner-only (#961)**: the `.agent-meta-managed` indices written by
   `sync_hooks`, `sync_release_gates` and `sync_hook_lib` now go through `write_atomic` instead of
   `write_text`, which translated `\n` to `os.linesep` — so a Windows sync can no longer land CRLF
