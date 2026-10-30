@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Python deps (root + tests); minor/patch grouped to avoid PR floods
+  - package-ecosystem: pip
+    directories: ["/", "/tests"]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    cooldown:
+      default-days: 7
+    groups:
+      python-deps:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions (SHA-pinned; Dependabot bumps SHA + tag comment)
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    cooldown:
+      default-days: 7
+    groups:
+      actions-deps:
+        patterns: ["*"]
