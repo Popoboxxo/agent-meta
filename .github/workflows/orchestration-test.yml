@@ -103,26 +103,13 @@ env:
     tests/test_migration_paths.py
     tests/test_opencode_v2_surface.py
 
+# No trigger-level `paths:` filter: a path-filtered workflow never reports its
+# checks on non-matching PRs, which would hang a required check on "Expected".
+# The `changes` job decides in-job instead (plan W1-F / W2-D).
 on:
   push:
     branches: [main]
-    paths:
-      - 'scripts/**'
-      - 'tests/**'
-      - 'config/**'
-      - 'agents/**'
-      - 'VERSION'
-      - 'CHANGELOG.md'
-      - '.github/workflows/orchestration-test.yml'
   pull_request:
-    paths:
-      - 'scripts/**'
-      - 'tests/**'
-      - 'config/**'
-      - 'agents/**'
-      - 'VERSION'
-      - 'CHANGELOG.md'
-      - '.github/workflows/orchestration-test.yml'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
@@ -130,7 +117,51 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Skips the test jobs only for PRs whose changed files are ALL docs
+  # (docs/** or *.md, except CHANGELOG.md and VERSION). Main runs stay full.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run_tests: ${{ steps.filter.outputs.run_tests }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect relevant changes
+        id: filter
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+            # Fail safe: an empty/failed diff keeps the tests on.
+            if [ -n "$files" ]; then
+              run=false
+              while IFS= read -r f; do
+                case "$f" in
+                  CHANGELOG.md|VERSION) run=true ;;
+                  docs/*|*.md) ;;
+                  *) run=true ;;
+                esac
+              done <<< "$files"
+            fi
+          fi
+          echo "run_tests=$run"
+          echo "run_tests=$run" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: changes
+    if: needs.changes.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -278,6 +309,8 @@ jobs:
   # exactly the same 15 files -- so splitting them across runners adds no
   # worker overlap and keeps the "two fully-tested endpoints" invariant.
   subprocess-shard:
+    needs: changes
+    if: needs.changes.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     # 451 tests in total, but strictly serial per job. The timeout is only a
     # backstop -- the per-subprocess timeouts in tests/timeouts.py are the real
@@ -338,6 +371,8 @@ jobs:
   # competing for the assumed 2 cores. This job is new; its 30 min ceiling matches
   # the shard job because serial execution loses worker overlap.
   compat-311:
+    needs: changes
+    if: needs.changes.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -367,3 +402,20 @@ jobs:
           tests/test_sync_validation_gate.py
           tests/test_python_compat_consistency.py
           tests/test_import_acyclicity.py
+
+  # Single required check for this workflow. `if: always()` is mandatory: without
+  # it a failed need makes the gate itself `skipped`, which counts as passed.
+  orchestration-gate:
+    needs: [changes, test, subprocess-shard, compat-311]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac

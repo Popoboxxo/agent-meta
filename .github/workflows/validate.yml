@@ -94,3 +94,20 @@ jobs:
               print('\n'.join(errors)); sys.exit(1)
           print(f'OK: {len(list(Path(\"agents\").rglob(\"*.md\")))} files checked')
           "
+
+  # Single required check for this workflow. `if: always()` is mandatory: without
+  # it a failed need makes the gate itself `skipped`, which counts as passed.
+  validate-gate:
+    needs: [scenarios, validate]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
