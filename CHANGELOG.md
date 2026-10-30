@@ -177,6 +177,26 @@
   providers, 0 added/removed) moves the fixture tree, so the AC-T4 digest in
   `tests/test_opencode_v2_surface.py` was recomputed from the fixture bytes before re-pinning.
   `AC01_EXCEPTIONS` is not extended and `slimming-golden`/`compact-golden` are unchanged.
+- **Managed hook indices are LF and owner-only (#961)**: the `.agent-meta-managed` indices written by
+  `sync_hooks`, `sync_release_gates` and `sync_hook_lib` now go through `write_atomic` instead of
+  `write_text`, which translated `\n` to `os.linesep` — so a Windows sync can no longer land CRLF
+  indices — and the files are now created with mode `0600` instead of the umask default. The
+  surrounding conditions (`not dry_run`, the empty index left after a revocation) are unchanged;
+  `tests/test_newline_normalization.py` pins the write path.
+- **Host-header rejection and the wildcard-bind hint name the allowlist escape hatch (#897)**: the
+  `SecurityError` raised for a rejected `Host` header and the startup warning emitted when the Admin
+  UI binds a wildcard address now both point at `--allowed-hosts <host>` /
+  `admin-ui.allowed-hosts` and add *include loopback names if needed*. Behaviour is unchanged — the
+  message only names the escape hatch.
+- **`--allowed-hosts` documentation states the replace semantics (#897)**: the CLI help, the
+  remote-access how-to and the `admin-ui.allowed-hosts` schema description now say that the
+  configured list **replaces** the default loopback set instead of extending it, with the same
+  *include loopback names if needed* note; the schema describes hosts (the server port is appended),
+  not `host:port`.
+- **zcode ZC-1 recorded as wontfix (#856)**: `docs/providers/zcode.md` now documents the workspace
+  agent auto-load limitation as deliberate — agent-meta does not write to `~/.zcode/agents` because
+  that is outside the project root and would violate repo containment, and the `AGENTS.md` bootstrap
+  is the supported path. ZC-2 (commands capability under-claim) was fixed in #807.
 
 ## [2.0.0-beta.4] - 2026-10-26
 
