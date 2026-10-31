@@ -534,6 +534,36 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
   (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1051 (submodule push destinations, ``dod-push-check.sh`` 2.1.7 -> 2.2.0,
+  2026-10-31, ``feat/submodule-push-targets``): the hook no longer blocks every
+  repository that declares submodules just because ``--recurse-submodules`` is passed;
+  it resolves each submodule's own push destination (``remote.<name>.push``, then
+  ``push.default``/``branch.<n>.merge``, mirroring git's recursive push which forwards
+  only the remote name) and still fails closed on a protected or undeterminable
+  destination — the blanket ``--recurse-submodules`` block from #953 is replaced.
+  ``rules/1-generic/branch-guard.md`` gains the matching section »Submodule-Pushes
+  (--recurse-submodules=on-demand|only)«. Exactly **10 of 1085 hashes moved; 0
+  added/removed**: the only ``dod-push-check.sh`` render
+  (``Claude/.claude/hooks/dod-push-check.sh`` ``5c0cf724…`` -> ``e7458463…``), the
+  three branch-guard rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``97f6467d…`` -> ``c42b4025…``, ``Continue/.continue/rules/branch-guard.md``
+  ``2a3816a8…`` -> ``7d6e9e10…``, ``Copilot/.github/instructions/branch-guard.instructions.md``
+  ``7a3aaa71…`` -> ``2f62fe16…``) and the six ``AGENTS.md`` files that embed the rule
+  (``Codex/AGENTS.md`` ``f12c1325…`` -> ``2c0836ce…``, ``Gemini/AGENTS.md``
+  ``8e646aa8…`` -> ``4b3c4701…``, ``KimiCode/AGENTS.md`` ``cf8d7493…`` -> ``85ca568a…``,
+  ``Mammouth/AGENTS.md`` ``ac1d8c70…`` -> ``93561dfb…``, ``Opencode/AGENTS.md``
+  ``2dba68d2…`` -> ``a8aff59f…``, ``ZCode/AGENTS.md`` ``ce271150…`` -> ``9f3b48ae…``).
+  No agent artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (10 single-line replacements, 1077 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``e3c25b31…`` -> ``f366a90a…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

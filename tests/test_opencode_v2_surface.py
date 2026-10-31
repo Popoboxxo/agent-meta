@@ -5322,7 +5322,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # renders, 6 `AGENTS.md`); `slimming-golden`/`compact-golden` unchanged.
 # Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "e3c25b31a50da46826377eda97a7d50de8eecf70a48c95a4c26dd8b1019545d7",
+    "ac01-baseline": "f366a90acf50a04a3d9a1601d42392ea3745cee0f7be7d0ed2190e488a778e3b",
     "slimming-golden": "6b0c5724b8270ae81157ead67bef029c2cf62ba02d710b8806f539f643d35598",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
