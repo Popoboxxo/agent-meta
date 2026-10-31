@@ -31,6 +31,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "pre-release-check.sh"
 
@@ -72,7 +74,9 @@ def _run_dispatcher(project_root: Path) -> subprocess.CompletedProcess:
         [_BASH, str(project_root / "hooks" / "pre-release-check.sh")],
         capture_output=True,
         text=True,
+        cwd=str(project_root),
         env={"PROJECT_ROOT": str(project_root), "PATH": "/usr/bin:/bin:/usr/local/bin"},
+        timeout=SCRIPT_TIMEOUT,
     )
 
 

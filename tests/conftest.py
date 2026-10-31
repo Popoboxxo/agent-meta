@@ -18,9 +18,11 @@ See ``docs/concepts/repo-containment-prison-mode.md`` §5.5.
 """
 
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
+import pytest
 from pytest import PytestWarning
 
 _AGENT_META_ROOT = Path(__file__).resolve().parents[1]
@@ -72,3 +74,36 @@ def pytest_configure(config):
         ),
         stacklevel=2,
     )
+
+
+@pytest.fixture(scope="module")
+def hook_project_root(tmp_path_factory):
+    """Module-scoped throw-away project root for the hook test modules.
+
+    Carries a copy of this repo's ``.meta-config/project.yaml`` (hence
+    ``orchestrator.strict: true``, which makes the ``STRICT_CASES``
+    meaningful) plus an existing ``.claude/hooks/`` directory.
+
+    Deliberately *not* done here:
+
+    * no ``.claude/hooks/.guard-audit.log`` is created -- the hook under test
+      creates it on demand, which is what proves the write lands in the
+      fixture and not in the checkout;
+    * no repo tree is copied;
+    * nothing depends on the warning-only basetemp guard in
+      ``pytest_configure``: the fixture is isolated via ``tmp_path_factory``
+      regardless of where the basetemp lives (IC-3 "Nicht-Zusicherung").
+
+    Module scope keeps it once-per-worker-per-module under
+    ``-n 2 --dist loadfile``; callers must use the root as both the child
+    ``cwd=`` and the payload ``cwd`` so the hook sees the same project the
+    test asserts against.
+    """
+    root = tmp_path_factory.mktemp("hook-project")
+    (root / ".meta-config").mkdir()
+    shutil.copy(
+        _AGENT_META_ROOT / ".meta-config" / "project.yaml",
+        root / ".meta-config" / "project.yaml",
+    )
+    (root / ".claude" / "hooks").mkdir(parents=True)
+    return root

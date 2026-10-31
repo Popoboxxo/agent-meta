@@ -12,6 +12,14 @@
   submodule path, its destination, and — when undeterminable — the way out (push
   the superproject without the flag, then push each submodule explicitly).
   Repositories without `.gitmodules` and the `check`/`no` values are unchanged.
+- **CI robustness (#945, residual)**: residual of the wave-4 P1 test-hygiene work —
+  `tests/timeouts.py` adds the shared `SLOW_TIMEOUT` (900 s,
+  `AGENT_META_SLOW_TIMEOUT`) for the long-running `meta_optimizer` helper CLIs whose
+  runtime exceeds `SYNC_TIMEOUT`; the nine hook test modules now run their subprocess
+  calls against `tmp_path` projects via `cwd=`, including a decoy project for the
+  `repo_containment` guard (ADR-3); all 66 hook-subprocess sites pass `timeout=`; and
+  the new static guard `tests/test_hook_test_isolation.py` enforces `cwd=`/`timeout=`
+  through an AST scan.
 
 ### Fixed
 - **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:

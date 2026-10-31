@@ -22,14 +22,26 @@ from typing import Optional
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _LIB_PATH = _REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh"
 
 _BASH = shutil.which("bash") or "bash"
 
+_PROJECT_ROOT: Optional[Path] = None
+
 pytestmark = pytest.mark.skipif(
     sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bind_project_root(hook_project_root):
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = hook_project_root
+    yield
+    _PROJECT_ROOT = None
 
 
 def _call(func_call: str, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -46,6 +58,8 @@ def _call(func_call: str, env: dict | None = None) -> subprocess.CompletedProces
         capture_output=True,
         text=True,
         env=full_env,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -107,7 +121,8 @@ def test_hook_json_get_lone_surrogate_is_not_dropped(locale, escape):
     payload = '{"tool_input": {"command": "git push origin main' + escape + '"}}'
     r = subprocess.run(
         [_BASH, "-c", f'source "{_LIB_PATH}"\nhook_json_get "$1" tool_input.command', _BASH, payload],
-        capture_output=True, env=dict(os.environ, LC_ALL=locale))
+        capture_output=True, env=dict(os.environ, LC_ALL=locale),
+        cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push origin main"), (locale, r.stdout, r.stderr)
 
 
@@ -117,7 +132,8 @@ def test_hook_json_get_invalid_utf8_input_is_not_dropped(locale):
               'IN=$(printf \'{"tool_input": {"command": "git push \\377"}}\')\n'
               'hook_json_get "$IN" tool_input.command\n')
     r = subprocess.run([_BASH, "-c", script], capture_output=True,
-                       env=dict(os.environ, LC_ALL=locale))
+                       env=dict(os.environ, LC_ALL=locale),
+                       cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push "), (locale, r.stdout, r.stderr)
 
 
@@ -384,11 +400,12 @@ def _shell_scan_source() -> str:
     return r.stdout
 
 
-def _scan(code: str, timeout: Optional[float] = None) -> subprocess.CompletedProcess:
+def _scan(code: str, timeout: Optional[float] = SCRIPT_TIMEOUT) -> subprocess.CompletedProcess:
     """Run `code` with the emitted scanner definitions in scope."""
     return subprocess.run(
         [sys.executable, "-c", _shell_scan_source() + "\n" + code],
         capture_output=True, text=True, timeout=timeout,
+        cwd=str(_PROJECT_ROOT),
     )
 
 
@@ -406,6 +423,8 @@ def test_shell_scan_py_emits_compilable_source():
         [sys.executable, "-c",
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=_shell_scan_source(), capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -711,6 +730,8 @@ def _resolve(command: str) -> list[tuple[str, list[str]]]:
     r = subprocess.run(
         [sys.executable, "-c", _resolver_source() + "\n" + code],
         capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     return [(word, args) for word, args in eval(r.stdout)]  # noqa: S307 - test data
@@ -722,6 +743,8 @@ def test_shell_resolver_py_emits_compilable_source():
         [sys.executable, "-c",
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=source, capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -786,6 +809,8 @@ def test_command_start_skips_pure_assignment_statements(command):
         [sys.executable, "-c",
          "import json\n" + _resolver_source() + "\n" + code],
         capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "true"
