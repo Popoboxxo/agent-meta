@@ -100,11 +100,21 @@ Performance-Zusicherung):
 | `SYNC_TIMEOUT` | 180 s | `AGENT_META_SYNC_TIMEOUT` |
 | `SYNC_VALIDATE_TIMEOUT` | 180 s (fällt auf `SYNC_TIMEOUT` zurück) | `AGENT_META_SYNC_VALIDATE_TIMEOUT` |
 | `SCRIPT_TIMEOUT` | 60 s | `AGENT_META_SCRIPT_TIMEOUT` |
+| `SLOW_TIMEOUT` | 900 s (langlaufende Helper-CLIs der `meta_optimizer`-Familie, Laufzeit > `SYNC_TIMEOUT`) | `AGENT_META_SLOW_TIMEOUT` |
 
 `SYNC_VALIDATE_TIMEOUT=180` gilt für den repo-weiten `sync.py --validate`-Lauf.
 Ein nicht-ganzzahliger, leerer oder nicht-positiver Env-Wert fällt auf den
 Default zurück; der Import wirft nie. Neue Subprozess-Tests importieren die
 Konstanten, statt eigene Timeouts zu setzen.
+
+## CI-Job-Timeouts
+
+Jeder CI-Job trägt `timeout-minutes` (AC2 von #945) — manuelle Prüfung, kein
+automatisierter Test; nach jedem neuen Job erneut ausführen (erwartet 9 Zeilen):
+
+```bash
+python3 -c "import re,pathlib; [print(f'{p.name}: {b[0]} -> timeout-minutes: {b[1]}') for p in map(pathlib.Path,['.github/workflows/orchestration-test.yml','.github/workflows/validate.yml','.github/workflows/scorecard.yml']) for b in re.findall(r'(?m)^  ([a-z0-9_-]+):\n(?:    .*\n)*?    timeout-minutes: (\d+)',p.read_text().split('jobs:',1)[1])]"
+```
 
 Weitere Heavy-Module nutzen noch modul-lokale Obergrenzen; Vereinheitlichung
 ist ein Follow-up.
