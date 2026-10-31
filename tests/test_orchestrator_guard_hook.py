@@ -43,15 +43,14 @@ exit code.
 Run: python -m pytest tests/test_orchestrator_guard_hook.py -v
 """
 
-import atexit
 import json
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -63,11 +62,11 @@ _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard-impl.sh"
 # relative to the project it runs in. Running it against the real checkout
 # polluted that gitignored log with test lines on every local run (#945);
 # every test now runs against a throw-away copy of the real project config.
-_PROJECT_ROOT = Path(tempfile.mkdtemp(prefix="guard-test-project-"))
-(_PROJECT_ROOT / ".meta-config").mkdir()
-shutil.copy(_REPO_ROOT / ".meta-config" / "project.yaml", _PROJECT_ROOT / ".meta-config" / "project.yaml")
-(_PROJECT_ROOT / ".claude" / "hooks").mkdir(parents=True)
-atexit.register(shutil.rmtree, _PROJECT_ROOT, ignore_errors=True)
+# The root comes from the shared `hook_project_root` fixture (tests/conftest.py)
+# and is bound below, so importing this module has no filesystem side effect.
+# `Optional[Path]` rather than `Path | None`: this module has no
+# `from __future__ import annotations` and must stay Python 3.9 compatible.
+_PROJECT_ROOT: Optional[Path] = None
 
 # On Windows, plain ["bash", ...] can resolve to System32\bash.exe (the WSL
 # launcher) instead of Git Bash, depending on CreateProcess search order
@@ -79,6 +78,15 @@ _BASH = shutil.which("bash") or "bash"
 pytestmark = pytest.mark.skipif(
     sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bind_project_root(hook_project_root):
+    """Bind the shared project fixture to the module global for this module."""
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = hook_project_root
+    yield
+    _PROJECT_ROOT = None
 
 
 def _clean_env() -> dict:
@@ -1611,16 +1619,15 @@ def test_unknown_tool_name_fails_closed(tool):
 
 
 @pytest.mark.parametrize("payload", [
-    {"tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},                    # missing
-    {"tool_name": None, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}, # null
-    {"tool_name": ["Bash"], "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},  # array
-    {"tool_name": {"name": "Bash"}, "tool_input": {},
-     "cwd": _PROJECT_ROOT.as_posix()},                                      # object
+    {"tool_input": {}},                    # missing
+    {"tool_name": None, "tool_input": {}}, # null
+    {"tool_name": ["Bash"], "tool_input": {}},  # array
+    {"tool_name": {"name": "Bash"}, "tool_input": {}},  # object
 ])
 def test_missing_or_non_scalar_tool_name_fails_closed(payload):
     """hook_json_get reports null/object/array as "missing"; all of them, and
     an absent key, are unclassifiable payloads and must block (M2)."""
-    result = _run_hook(payload)
+    result = _run_hook({**payload, "cwd": _PROJECT_ROOT.as_posix()})
     assert result.returncode == 2, result.stderr
     assert "no usable tool_name" in result.stderr
 
