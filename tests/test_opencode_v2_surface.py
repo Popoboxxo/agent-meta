@@ -5312,10 +5312,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # PyYAML runtime-exception note (PR #1076, rebaselined under the rule above):
 # `slimming-golden` re-derived from the real sync render for the six touched
 # developer-role goldens; `ac01-baseline`/`compact-golden` unchanged.
+# Release 2.0.0-beta.6 (VERSION bump 2.0.0-beta.5 -> 2.0.0-beta.6): version
+# strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1085) and
+# `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
+# trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "81df5f3c5370d6073d73b2527c8a45c59885323baa36630b66fbda739e31ccdc",
+    "ac01-baseline": "6a063942fb8a30c1d83c48b79cec9a39f45140f79c6db85ef5e5416f0037056a",
     "slimming-golden": "6b0c5724b8270ae81157ead67bef029c2cf62ba02d710b8806f539f643d35598",
-    "compact-golden": "24afd5ebeb6573a84cfa0f61e7fd82d069593b707fe0efb782af788c02b176bb",
+    "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 
 

@@ -1,6 +1,6 @@
 # Meta Optimizer — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.5 (role: `meta-optimizer`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.6 (role: `meta-optimizer`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
