@@ -22,6 +22,27 @@ mit einzelnen **security-boundary**-Eigenschaften für spezifische Fälle (z.B. 
 Destructive-Gate aus #516/#809, das auch bei gültigem `git`-Sentinel blockt). `dod-push-check.sh`
 ist als **security boundary** gegen fehlendes/kaputtes `python3` fail-closed (#595).
 
+## Submodule-Pushes (`--recurse-submodules=on-demand|only`)
+
+Der DoD-Push-Check prüft bei `--recurse-submodules=on-demand` und `=only` jedes
+Submodul einzeln statt pauschal das Vorhandensein einer `.gitmodules` zu blocken
+(Issue #1051, ersetzt die Fail-closed-Pauschale aus #953):
+
+- Die Submodul-Pfade werden einmal aus `.gitmodules` gelesen; jedes Submodul wird
+  aus seiner eigenen Push-Konfiguration aufgelöst (`remote.<name>.push`, sonst
+  `push.default` / `branch.<n>.merge`). Git gibt beim Rekursiv-Push nur den
+  Remote-Namen weiter, nicht das Refspec des Superprojekts.
+- Blockiert wird, sobald ein Ziel ein geschützter Branch (`main`/`master` oder der
+  konfigurierte Main-Branch) ist **oder** nicht bestimmt werden kann (unlesbare
+  oder unvollständige Konfiguration, abgekoppelter Submodul-HEAD,
+  `push.default=nothing|matching`, Wildcard-Refspec). Die Meldung nennt
+  Submodul-Pfad und Ziel.
+- Ist ein Ziel nicht bestimmbar, nennt die Meldung den Ausweg: das Superprojekt
+  ohne `--recurse-submodules` pushen und die Submodule anschließend explizit auf
+  einen Feature-Branch pushen.
+- Repositories ohne `.gitmodules` sowie die Werte `check` und `no` bleiben
+  unverändert.
+
 ## Bekannte Grenzen
 
 Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen über eine tokenisierte Analyse des Bash-Befehls (gemeinsamer Tokenizer für Destructive- und Mutation-Gate, Issue #551), kein vollständiger Shell-Parser. Das Destructive-Gate deckt zusätzlich die kanonischen Shell-Katastrophen ab (Issue #809): rekursives `rm` auf einem gefährlichen Root (`/`, `~`/`$HOME`, Top-Level-Systemverzeichnisse wie `/etc`) sowie eine rekursive Fork-Bomb (`` :(){ :|:& };: ``). Benigne In-Repo-Löschungen (`rm -rf .tmp/...`) bleiben erlaubt. Bekannte Lücken:
