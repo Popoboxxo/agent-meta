@@ -1,7 +1,7 @@
 <!-- agent-meta:managed-begin -->
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v2.0.0-beta.4` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v2.0.0-beta.5` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 # CRITICAL GATE (runtime-partially enforced)
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.

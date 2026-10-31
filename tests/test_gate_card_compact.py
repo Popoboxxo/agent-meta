@@ -26,6 +26,9 @@ Rebaseline log:
 - Release 2.0.0-beta.4 (VERSION bump 2.0.0-beta.3 -> 2.0.0-beta.4): only the
   ``agent-meta v...`` version string in the compact gate-card header changed
   (line 4, ``v2.0.0-beta.3`` -> ``v2.0.0-beta.4``). No substantive render change.
+- Release 2.0.0-beta.5 (VERSION bump 2.0.0-beta.4 -> 2.0.0-beta.5): only the
+  ``agent-meta v...`` version string in the compact gate-card header changed
+  (line 4, ``v2.0.0-beta.4`` -> ``v2.0.0-beta.5``). No substantive render change.
 """
 from __future__ import annotations
 
