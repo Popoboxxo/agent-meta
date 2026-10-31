@@ -21,6 +21,12 @@
 #   SCENARIO_SHARD=2 SCENARIO_TOTAL=4 tests/scenarios/run.sh
 #                                         # run only shard 2 of 4 (CI matrix)
 #
+#   SCENARIO_JOBS=2 tests/scenarios/run.sh
+#                                         # run the selected scenarios two at a
+#                                         # time inside this shard (default 1 =
+#                                         # strictly sequential). Output order
+#                                         # stays the selection order.
+#
 # Selection order is fixed: (1) the positional prefix filters narrow the
 # catalog (prefix match on the scenario name), then (2) a shard selection is
 # applied to the *remaining*, locale-independently sorted list --
@@ -48,6 +54,8 @@ Usage: tests/scenarios/run.sh [--list] [<scenario-id-prefix> ...]
 Environment:
   SCENARIO_SHARD=<i>  which shard to run (1-based)
   SCENARIO_TOTAL=<n>  number of shards; both must be set together
+  SCENARIO_JOBS=<n>   scenarios to run concurrently inside this shard
+                      (default 1 = sequential)
 EOF
 }
 
@@ -151,11 +159,40 @@ if [ "$LIST_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-pass=0
-fail=0
-failed_names=()
+# --- execution --------------------------------------------------------------
+# Every scenario builds its own mktemp directory and never touches the checkout,
+# so scenarios are independent by construction. Inside a shard they were run
+# strictly sequentially (~880 s per shard for 22 scenarios), while the CI matrix
+# already fans out over four shards. SCENARIO_JOBS runs them N-at-a-time INSIDE
+# the shard instead of adding another matrix leg: the runner pool (20 concurrent
+# jobs per account), not the CPU, is what is actually scarce.
+#
+# Results are buffered per scenario and replayed in selection order, so a
+# parallel run produces the same PASS/FAIL listing as a serial one. No `wait -n`
+# (absent in bash 3.2): workers get round-robin batches and are joined with a
+# plain `wait`.
 
-for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
+SCENARIO_JOBS="${SCENARIO_JOBS:-1}"
+case "$SCENARIO_JOBS" in
+    ''|*[!0-9]*)
+        echo "error: SCENARIO_JOBS must be a positive integer (got '$SCENARIO_JOBS')" >&2
+        exit 2
+        ;;
+esac
+if [ "$SCENARIO_JOBS" -lt 1 ]; then
+    echo "error: SCENARIO_JOBS must be at least 1 (got '$SCENARIO_JOBS')" >&2
+    exit 2
+fi
+
+RESULTS_DIR="$(mktemp -d)"
+
+# Runs one scenario and records its verdict in $RESULTS_DIR.
+# .out    human-readable block (replayed in order by the caller)
+# .status 0 = pass, 1 = fail
+run_one() {
+    local name="$1"
+    local tmp_dir log_dir dry_rc sync_rc val_rc assert_script assert_rc
+
     tmp_dir="$(mktemp -d)"
     mkdir -p "$tmp_dir/.meta-config"
     cp "$CONFIGS_DIR/$name.project.yaml" "$tmp_dir/.meta-config/project.yaml"
@@ -191,24 +228,69 @@ for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
     fi
 
     if [ "$dry_rc" = "0" ] && [ "$sync_rc" = "0" ] && [ "$val_rc" = "0" ] && [ "${assert_rc:-0}" = "0" ]; then
-        echo "PASS  $name"
-        pass=$((pass + 1))
+        printf 'PASS  %s\n' "$name" >"$RESULTS_DIR/$name.out"
+        printf '0\n' >"$RESULTS_DIR/$name.status"
         rm -rf "$tmp_dir"
     else
-        assert_note=""
+        local assert_note=""
         if [ -x "$assert_script" ]; then
             assert_note=" assert=${assert_rc:-skipped}"
         fi
-        echo "FAIL  $name  (dry-run=$dry_rc sync=$sync_rc validate=$val_rc${assert_note})  logs kept at: $log_dir"
-        if [ -n "$assert_rc" ] && [ "$assert_rc" != "0" ]; then
-            echo "------ assertion output ($name) ------"
-            cat "$log_dir/assert.log"
-            echo "--------------------------------------"
+        {
+            printf 'FAIL  %s  (dry-run=%s sync=%s validate=%s%s)  logs kept at: %s\n' \
+                "$name" "$dry_rc" "$sync_rc" "$val_rc" "$assert_note" "$log_dir"
+            if [ -n "$assert_rc" ] && [ "$assert_rc" != "0" ]; then
+                echo "------ assertion output ($name) ------"
+                cat "$log_dir/assert.log"
+                echo "--------------------------------------"
+            fi
+        } >"$RESULTS_DIR/$name.out"
+        printf '1\n' >"$RESULTS_DIR/$name.status"
+    fi
+}
+
+if [ "${#SELECTED[@]}" -gt 0 ]; then
+    if [ "$SCENARIO_JOBS" -le 1 ]; then
+        for name in "${SELECTED[@]}"; do
+            run_one "$name"
+            cat "$RESULTS_DIR/$name.out"
+        done
+    else
+        workers="$SCENARIO_JOBS"
+        if [ "$workers" -gt "${#SELECTED[@]}" ]; then
+            workers="${#SELECTED[@]}"
         fi
+        w=0
+        while [ "$w" -lt "$workers" ]; do
+            (
+                i="$w"
+                while [ "$i" -lt "${#SELECTED[@]}" ]; do
+                    run_one "${SELECTED[$i]}"
+                    i=$((i + workers))
+                done
+            ) &
+            w=$((w + 1))
+        done
+        wait
+        for name in "${SELECTED[@]}"; do
+            cat "$RESULTS_DIR/$name.out"
+        done
+    fi
+fi
+
+pass=0
+fail=0
+failed_names=()
+for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
+    if [ "$(cat "$RESULTS_DIR/$name.status" 2>/dev/null || echo 1)" = "0" ]; then
+        pass=$((pass + 1))
+    else
         fail=$((fail + 1))
         failed_names+=("$name")
     fi
 done
+
+rm -rf "$RESULTS_DIR"
 
 echo "----"
 if [ "$shard_active" -eq 1 ]; then
