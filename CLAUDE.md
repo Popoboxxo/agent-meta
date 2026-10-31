@@ -37,7 +37,7 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 
 **Besondere Patterns:**
 - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
-- Platzhalter {{VARIABLE}} werden von sync.py substituiert
+- Platzhalter in doppelten geschweiften Klammern (GROSS_NAME) werden von sync.py substituiert
 - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
 - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
 
