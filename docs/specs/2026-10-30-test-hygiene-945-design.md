@@ -1,10 +1,11 @@
 # Test-Hygiene #945 (Wave 4) — Spec
 
 > spec-id: SPEC-test-hygiene-945
-> Status: Entwurf
+> Status: **APPROVED (2026-10-31)**
+> Freigabe durch den User per Auftrag vom 2026-10-31 („Lass uns mit Welle 4 weiter machen") — der Marker wird nie vom Planer gesetzt.
 > Datum: 2026-10-30 (Rev. 3)
 > Issue: #945
-> Revision: 3
+> Revision: 3.1
 > Grundlage: Systemdesign des `concept-architect` vom 2026-10-30, hier als `## Systemdesign` konserviert (es existiert keine separate Designdatei)
 > Verifizierter Stand: `main` @ `3c440c33`; Rev. 3 gegen den Arbeitsstand vom 2026-10-30 nachgeprüft (Zählung neu durchgeführt)
 > Review-Historie: Rev. 1 → `CHANGES_REQUESTED` (B1–B7, A1–A12); Rev. 2 → `CHANGES_REQUESTED` (C1–C4 + vier Kleinbefunde). Rev. 2 hat B1–B7/A1–A12 eingearbeitet, Rev. 3 alle C- und Kleinbefunde (siehe Revision-Log). **Offen nach Rev. 3:** 1 offene Frage (OQ-4) und 12 unter `Unverified / Messlücken` gelistete Punkte — mehr ist nicht offen.
@@ -47,8 +48,8 @@ Strukturmängel, die sie verdecken:
 ### Ziel
 
 Wave 4 schließt #945 vollständig: AC1, AC3, AC4 und AC6 werden umgesetzt, AC5
-wird als bewusste Ablehnung dokumentiert; AC2 bleibt unverändert (bereits
-erfüllt) und wird nur gegen Regression abgesichert. Der Fix ist in phasenweise
+wird als bewusste Ablehnung dokumentiert; AC2 ist mit PR #1088 (2026-10-31)
+erfüllt und wird nur gegen Regression abgesichert. Der Fix ist in phasenweise
 mergebare PRs zerlegt, damit jeder Schritt einzeln revertierbar ist und die
 Isolation nicht mit der repo-weiten Timeout-Adoption kollidiert. Neu ist ein
 AST-basierter Konsistenz-Check, der `timeout=` als Pflicht macht statt als
@@ -131,19 +132,26 @@ P2-Dateien ist sie es **nicht**. Die autoritative Zahl liefert
 dieser Messung abgeleitet, nicht geschätzt; sie sind mit den P2-Dateilisten
 unten deckungsgleich (32 + 31 = 63).
 
-### AC2 — bereits erfüllt
+### AC2 — erfüllt (2026-10-31)
+
+Zum Spec-Zeitpunkt war AC2 offen (die Spec listete fünf gebremste Jobs). PR #1088 hat
+am 2026-10-31 alle neun Jobs gebremst:
 
 | Workflow | Job | `timeout-minutes` |
 |---|---|---|
+| `.github/workflows/orchestration-test.yml` | `changes` | 5 |
 | `.github/workflows/orchestration-test.yml` | `test` | 30 |
 | `.github/workflows/orchestration-test.yml` | `subprocess-shard` | 30 |
 | `.github/workflows/orchestration-test.yml` | `compat-311` | 30 |
+| `.github/workflows/orchestration-test.yml` | `orchestration-gate` | 5 |
 | `.github/workflows/validate.yml` | `scenarios` | 30 |
 | `.github/workflows/validate.yml` | `validate` | 10 |
+| `.github/workflows/validate.yml` | `validate-gate` | 5 |
+| `.github/workflows/scorecard.yml` | `analysis` | 10 |
 
-Es gibt genau diese zwei Workflow-Dateien (`.github/workflows/` enthält nur
-`orchestration-test.yml` und `validate.yml`). Neue Jobs in P4 und P6 müssen
-`timeout-minutes` mitbringen, sonst bricht AC2.
+`.github/workflows/` enthält drei Workflow-Dateien (`orchestration-test.yml`,
+`validate.yml`, `scorecard.yml`); alle neun Jobs darin tragen `timeout-minutes`.
+Neue Jobs in P4 und P6 müssen `timeout-minutes` mitbringen, sonst bricht AC2.
 
 ### AC1 — erfüllt bis auf zwei Stellen
 
@@ -187,14 +195,11 @@ Es gibt genau diese zwei Workflow-Dateien (`.github/workflows/` enthält nur
   `tests/test_knowledge_engine.py`,
   `tests/test_platform_defaults_resolved_file.py`,
   `tests/test_antigravity_hooks_registration.py`.
-- Hook-Slice: **67** Aufrufe in den neun P1-Modulen (Rev. 1 nannte 69 Treffer in
-  zehn Modulen — die zehn enthielten zwei Module außerhalb des P1-Scope:
-  `tests/test_antigravity_hooks_registration.py`,
-  `tests/test_hook_registration_invariant.py`; Rev. 2 nannte 72, das war um 5 zu
-  hoch). Bereits gebremst sind **3** Aufrufe — die drei
-  `SCRIPT_TIMEOUT`-Stellen in `tests/test_antigravity_hooks_registration.py`
-  (`_repo_status`, `:268`, `:277`, `:404`), einem Modul **außerhalb** des
-  P1-Scan-Sets.
+- Hook-Slice: **67** Aufrufe in den neun P1-Modulen; **keiner** davon trägt
+  heute ein `timeout=`. Die drei gebremsten Aufrufe im Repo liegen sämtlich in
+  `tests/test_antigravity_hooks_registration.py::_repo_status`
+  (`SCRIPT_TIMEOUT`, `:268`, `:277`, `:404`) und damit **außerhalb** des
+  P1-Sets.
 - Repo-weit: **203** Aufrufe in 73 Dateien (Messung Rev. 3, siehe oben).
   `tests/test_secrets_and_isolation.py` ist **nicht** durchgehend gebremst: nur
   `_has_git` (`["git", "--version"]`, `timeout=5`) trägt ein `timeout=`, die drei
@@ -255,7 +260,7 @@ Es gibt genau diese zwei Workflow-Dateien (`.github/workflows/` enthält nur
 
 ### AC6 — nicht erfüllt
 
-- Kein Workflow enthält `playwright` (beide Workflow-Dateien geprüft).
+- Kein Workflow enthält `playwright` (alle Workflow-Dateien geprüft).
 - `tests/requirements.txt` enthält `pytest`, `pyyaml`, `questionary`, `tomli`
   (nur <3.11), `jsonschema`, `pytest-xdist`, `pytest-split` — kein Playwright.
   Wichtig für IC-10: `pytest` **und** `pytest-xdist` (für `-n 0`) kommen aus
@@ -460,6 +465,7 @@ Spec-Revision aus und ist kein Finding. Belegte Bestandsklassen
 | 300 | `tests/test_doctor_cli.py::_cli` (`sync.py`) | bewusst konservativer als `SYNC_TIMEOUT`, bleibt |
 | 600 | `tests/test_context_report.py::_run` (`sync.py`) | bewusst konservativer als `SYNC_TIMEOUT`, bleibt |
 | 900 | die sechs `RUN_TIMEOUT`-Definitionen | **wird** `SLOW_TIMEOUT` (einzige Pflichtumstellung) |
+| 900 (Literal) | `tests/active_set_render.py` (`sync_config` `:49`, `sync_configs_parallel` `:74`; kein `RUN_TIMEOUT`) | siebtes 900-Vorkommen, Bestandswert, bleibt |
 
 **Check-Semantik:** `test.subprocess-timeout-missing` prüft die **Anwesenheit**
 von `timeout=` und dass der Wert nicht das Literal `None` ist; er behauptet
@@ -785,9 +791,10 @@ dieser Eigenschaft.
 
 ### IC-13 — Doku- und Changelog-Pflichten (alle Phasen)
 
-- `tests/README.md` dokumentiert die Timeout-Tabelle und sagt heute „Weitere
-  Heavy-Module nutzen noch modul-lokale Obergrenzen; Vereinheitlichung ist ein
-  Follow-up." (`tests/README.md:104-105`). P1 ergänzt die `SLOW_TIMEOUT`-Zeile
+- `tests/README.md` dokumentiert die Timeout-Tabelle (Abschnitt **Zentrale
+  Timeouts**) und sagt heute „Weitere Heavy-Module nutzen noch modul-lokale
+  Obergrenzen; Vereinheitlichung ist ein Follow-up." (`tests/README.md`,
+  Schlussabsatz des Abschnitts). P1 ergänzt die `SLOW_TIMEOUT`-Zeile
   **und** einen kurzen Abschnitt „CI-Job-Timeouts" mit dem manuellen
   Prüfkommando für AC2 (siehe Evidenz-Matrix). P2b **präzisiert** den
   Follow-up-Satz und **entfernt ihn nicht** — nach Wave 4 bleiben die
@@ -897,7 +904,7 @@ gültig, falls die Messung sie stützt.
 | AC | Evidenz | Phase | Status nach Wave 4 |
 |---|---|---|---|
 | **AC1** | statisch: `tests/test_hook_test_isolation.py` (`cwd=`/`timeout=` an jedem Aufruf der neun Module) · lokal: `test_strict_cases_never_write_the_repo_audit_log` (Byte-Vergleich) + Decoy-Invarianten (ADR-3) · CI: sha256 vor/nach je Shard (IC-8) | P1, P4 | erfüllt (wörtlich) |
-| **AC2** | bereits erfüllt; Regressionsprüfung = **manueller** Grep über beide Workflows (`grep -c timeout-minutes` je Job-Definition), Kommando dokumentiert in `tests/README.md` (P1) und ausgeführt in P4/P6 nach dem Anlegen der neuen Jobs. Kein automatisierter Test. | P1 (Doku), P4, P6 (Ausführung) | erfüllt (bereits) |
+| **AC2** | Zum Spec-Zeitpunkt offen, geschlossen durch PR #1088 am 2026-10-31: alle neun Jobs tragen `timeout-minutes` (`orchestration-test.yml` `changes` 5, `test` 30, `subprocess-shard` 30, `compat-311` 30, `orchestration-gate` 5; `validate.yml` `scenarios` 30, `validate` 10, `validate-gate` 5; `scorecard.yml` `analysis` 10). Regressionsprüfung = **manueller** Grep über die drei Workflows (`grep -c timeout-minutes` je Job-Definition), Kommando dokumentiert in `tests/README.md` (P1) und ausgeführt in P4/P6 nach dem Anlegen der neuen Jobs. Kein automatisierter Test. | P1 (Doku), P4, P6 (Ausführung) | erfüllt (PR #1088, 2026-10-31) |
 | **AC3** | Finding `test.subprocess-timeout-missing` (ERROR) aus `check_subprocess_timeout`, registriert in `scripts/consistency-check.py` neben `check_py39_union_syntax`, läuft via `sync.py --validate` auf 3.9/3.11/3.12 · AST über `tests/**/*.py` ohne `tests/manual/`, Aliase aufgelöst, `**kwargs` fail-closed, `timeout=None` Finding, `Popen` allowlist-only (2 Einträge), keine Baseline · Unit-Tests + Registrierungs-Meta-Test | P1, P2a, P2b, P3 | erfüllt |
 | **AC4** | Job `artifacts` grün und „0 Skips mit Begründung `generated`/`run sync.py`/`unsynced`/`generated roots absent`/`not generated`" (`-rs`) · Meta-Test `tests/test_artifact_tests_list.py`, dass jedes Skip-Gate-Modul in `ARTIFACT_TESTS` steht | P4 | erfüllt (Single-Leg-Matrix) |
 | **AC5** | dokumentierte Entscheidung im neuen `validate.yml`-Kommentarblock, konsistent mit der Abwesenheit eines Per-Version-Szenario-Beins | P5 | erfüllt (Ablehnung dokumentiert) |
@@ -939,8 +946,11 @@ sich grün und die Isolations-Umstellung vom Timeout-Thema getrennt.
 **Aufwand (aus dem Bindungsmechanismus, IC-3):** ~90 geänderte Zeilen in 14
 Dateien. Der Fixture-Umzug kostet 1 Modul-Global + 1 `autouse`-Fixture + 1
 Parametrize-Umbau im Guard-Modul; der Decoy kostet 1 Modul-Global + 1
-`autouse`-Fixture + 9 `cwd=`-Ersetzungen im Containment-Modul; `timeout=` an 67
-Aufrufstellen. **Keine** Massenänderung an den `_run_hook(...)`-Aufrufstellen.
+`autouse`-Fixture + 9 `cwd=`-Ersetzungen im Containment-Modul; `timeout=` an
+**66** Aufrufstellen neu — die 67. Stelle
+(`tests/test_hook_common_lib.py::_scan`, `subprocess.run(..., timeout=timeout)`)
+reicht das Keyword bereits durch und erhält nur den Default `SCRIPT_TIMEOUT`
+statt `None`. **Keine** Massenänderung an den `_run_hook(...)`-Aufrufstellen.
 
 **Warum ein PR:** AC1 und AC3 berühren dieselben Helfer (`_run_hook`, `_call`);
 getrennte PRs würden in jedem Helfer-Hunk kollidieren.
@@ -1177,7 +1187,8 @@ behandelt werden:
 |---|---|---|
 | 1 | 2026-10-30 | Erste Spezifikation aus dem Systemdesign vom 2026-10-30: Stand je AC verifiziert, IC-1…IC-13 normiert, Phasen P1…P6 mit Rollback, AC1-Lesart und AC4-Wortlaut-Divergenz dokumentiert, vier offene Fragen, zehn Messlücken. `tests/README.md` als Doku-Pflicht ergänzt (im Design nicht gelistet). |
 | 2 | 2026-10-30 | Review Rev. 1 (`CHANGES_REQUESTED`) eingearbeitet. **B1** → ADR-3 (Decoy-Projekt), AC1-Abschnitt neu gefasst, IC-5 auf Lesevorgänge reduziert, OQ-1 gelöscht. **B2** → P4 = 3 Dateien/M inkl. `tests/test_artifact_tests_list.py`, IC-7-Erkennungstoken „not generated in this project" ergänzt. **B3** → IC-10 installiert `tests/requirements.txt` **und** `requirements-browser.txt`. **B4** → IC-11/P3 mit den zwei verbindlichen Allowlist-Einträgen, ERROR ab erstem Commit. **B5** → Messung „201 Aufrufe / 73 Dateien" in „Stand", P2a (32)/P2b (31) ersetzt P2, OQ-2 gelöscht. **B6** → P4 hängt von P1 ab, Parallelitätstabelle korrigiert. **B7** → IC-2 gilt nur für neue Werte; Bestandswert-Tabelle + Nicht-Ziel „keine Vereinheitlichung". **A1** → IC-6 Regel 1 gilt für jeden Subprozess-Aufruf der neun Module. **A2** → IC-4/IC-3 decken `_call` plus sieben direkte `test_hook_common_lib.py`-Aufrufe. **A3** → `timeout=None` ist Finding (IC-6/IC-11), `_scan`-Default wird `SCRIPT_TIMEOUT`. **A4** → IC-12 legt einen **neuen** Block in `validate.yml` an; AC5-Stand korrigiert (`orchestration-test.yml:3-59`). **A5** → IC-3/ADR-2: Basetemp-Guard ist warn-only. **A6** → Allowlist-Schema `path`/`pattern`/`reason` (+`owner`). **A7** → Bindungsmechanismus (Modul-Global + `autouse`-Fixture, ein Parametrize-Block) und P1-Aufwand benannt. **A8** → Problem-Absatz trennt „bereits tmp-basiert" von „nicht isoliert". **A9** → AC2-Evidenz als manueller Grep mit Ort (P1-Doku in `tests/README.md`, Ausführung P4/P6). **A10** → AC4 als Wortlaut-Notiz, Single-Leg-Matrix formell erfüllt, Prämisse der verworfenen Variante als ungemessen markiert. **A11** → P1-Rollback-Grenze nach P2a dokumentiert. **A12** → IC-1 verlangt Docstring-Update in `tests/timeouts.py`. Redaktionell: `tests/manual/**` aus dem Check-Scope ausgeschlossen, Unverified auf 12 Punkte nachgezogen. |
-| 3 | 2026-10-30 | Review Rev. 2 (`CHANGES_REQUESTED`, C1–C4 + Kleinbefunde) eingearbeitet — gezielter Patch, keine Neufassung. **C1** → §AC3 und §P2b: `tests/test_secrets_and_isolation.py` ist **nicht** „0 Edits", sondern **3 Edits** (`git init -q` → `SCRIPT_TIMEOUT`); nur `_has_git` (`git --version`, `timeout=5`) ist gebremst. Die Datei bleibt in P2b, das jetzt „30 mit Edits" zählt. **Nachtrag gleicher Fehlerklasse (neu bei der Nachzählung, nicht im Review):** `tests/active_set_render.py` war als „Allowlist-only (kein Edit)" geführt, obwohl `_prepare` ein `subprocess.run(["git", "init", "-q"], …)` ohne `timeout=` enthält → wandert mit einem Edit nach P2b; allowlist-only bleibt nur `tests/browser/conftest.py` (§P2b „Allowlist-only"). **C2** → §IC-3 und §ADR-2: `cwd`-Gleichheitsregel ausdrücklich auf die **acht** Nicht-Containment-Module begrenzt, ein Satz „das Containment-Modul bindet stattdessen das Decoy (ADR-3)" in beiden Abschnitten; IC-4 war bereits korrekt. **C3** → §IC-13, §P2b und §Risikotabelle: P2b darf den `tests/README.md`-Follow-up-Satz (`:104-105`) nur **präzisieren**, nie entfernen (Nicht-Ziel „keine Vereinheitlichung" bleibt wahr, weil 30/120/180/300/600 bestehen bleiben); Zielwortlaut ergänzt. **C4** → §Problem, §Messung (jetzt „Rev. 3"), §AC3, §IC-4, §P1-Aufwand, §OQ-2, §Unverified Nr. 1/2: Zählung komplett neu durchgeführt — **203 Aufrufe in 73 Dateien**, P1-Slice **67** (je Modul nachgezählt), außerhalb P1 136 in 64 Dateien, P2-Scope 134 in 63 Dateien, out-of-scope 2 in 1 Datei; IC-4 dod-Modul **15** statt 20; in `test_antigravity_hooks_registration.py` **3** statt 4 gebremste Aufrufe. Kleinbefunde: **A4-Rest** → §AC5/§IC-12: „nur zwei Inline-Kommentare" war falsch, jetzt sechs Kommentargruppen (`:13`, `:19`, `:35-36`, `:39-40`, `:46`, `:57-69`) bei unveränderter Kernaussage („kein Erklärungsblock über `jobs:`"). **A11-Rest** → §P1-Rollback und §Risikotabelle nennen jetzt identisch **P3 → P2b → P2a → P1**. **IC-10** → `-rs` im `pytest`-Kommando plus Begründung; §Evidenz-Matrix AC6 verweist darauf. **AC3-Liste** → kaputte Klammerung der Bestandsliterale repariert (300/600 sauber zugeordnet, 180 als „nicht nachgeprüft" markiert, ebenso §IC-2-Zeile 180). **Kopf** → Rev. 3, Offen-Stand explizit (1 OQ, 12 Unverified). Offene Fragen: weiterhin nur **OQ-4**. Freigabe unverändert `Status: Entwurf`. |
+| 3 | 2026-10-30 | Review Rev. 2 (`CHANGES_REQUESTED`, C1–C4 + Kleinbefunde) eingearbeitet — gezielter Patch, keine Neufassung. **C1** → §AC3 und §P2b: `tests/test_secrets_and_isolation.py` ist **nicht** „0 Edits", sondern **3 Edits** (`git init -q` → `SCRIPT_TIMEOUT`); nur `_has_git` (`git --version`, `timeout=5`) ist gebremst. Die Datei bleibt in P2b, das jetzt „30 mit Edits" zählt. **Nachtrag gleicher Fehlerklasse (neu bei der Nachzählung, nicht im Review):** `tests/active_set_render.py` war als „Allowlist-only (kein Edit)" geführt, obwohl `_prepare` ein `subprocess.run(["git", "init", "-q"], …)` ohne `timeout=` enthält → wandert mit einem Edit nach P2b; allowlist-only bleibt nur `tests/browser/conftest.py` (§P2b „Allowlist-only"). **C2** → §IC-3 und §ADR-2: `cwd`-Gleichheitsregel ausdrücklich auf die **acht** Nicht-Containment-Module begrenzt, ein Satz „das Containment-Modul bindet stattdessen das Decoy (ADR-3)" in beiden Abschnitten; IC-4 war bereits korrekt. **C3** → §IC-13, §P2b und §Risikotabelle: P2b darf den `tests/README.md`-Follow-up-Satz (Abschnitt **Zentrale Timeouts**) nur **präzisieren**, nie entfernen (Nicht-Ziel „keine Vereinheitlichung" bleibt wahr, weil 30/120/180/300/600 bestehen bleiben); Zielwortlaut ergänzt. **C4** → §Problem, §Messung (jetzt „Rev. 3"), §AC3, §IC-4, §P1-Aufwand, §OQ-2, §Unverified Nr. 1/2: Zählung komplett neu durchgeführt — **203 Aufrufe in 73 Dateien**, P1-Slice **67** (je Modul nachgezählt), außerhalb P1 136 in 64 Dateien, P2-Scope 134 in 63 Dateien, out-of-scope 2 in 1 Datei; IC-4 dod-Modul **15** statt 20; in `test_antigravity_hooks_registration.py` **3** statt 4 gebremste Aufrufe. Kleinbefunde: **A4-Rest** → §AC5/§IC-12: „nur zwei Inline-Kommentare" war falsch, jetzt sechs Kommentargruppen (`:13`, `:19`, `:35-36`, `:39-40`, `:46`, `:57-69`) bei unveränderter Kernaussage („kein Erklärungsblock über `jobs:`"). **A11-Rest** → §P1-Rollback und §Risikotabelle nennen jetzt identisch **P3 → P2b → P2a → P1**. **IC-10** → `-rs` im `pytest`-Kommando plus Begründung; §Evidenz-Matrix AC6 verweist darauf. **AC3-Liste** → kaputte Klammerung der Bestandsliterale repariert (300/600 sauber zugeordnet, 180 als „nicht nachgeprüft" markiert, ebenso §IC-2-Zeile 180). **Kopf** → Rev. 3, Offen-Stand explizit (1 OQ, 12 Unverified). Offene Fragen: weiterhin nur **OQ-4**. Freigabe unverändert `Status: Entwurf`. |
+| 3.1 | 2026-10-31 | Freigabe-Revision (redaktionell, keine Neufassung). **1** → §IC-13 und Rev.-3-Zeile: `tests/README.md`-Verweise nennen den realen Abschnitt **Zentrale Timeouts** statt einer Zeilenangabe. **2** → §AC3: von den 67 P1-Aufrufen trägt keiner `timeout=`; die drei gebremsten Stellen liegen in `tests/test_antigravity_hooks_registration.py` (`:268`, `:277`, `:404`) außerhalb des P1-Sets, die 69/10-Arithmetik entfällt. **3** → §P1 (Aufwand): **66** neue `timeout=`-Keywords plus `_scan`-Default. **4** → §IC-2 (Bestandswerte): siebtes 900-Vorkommen `tests/active_set_render.py` als Literal ergänzt. **5** → §AC2 und Evidenz-Matrix: AC2 war zum Spec-Zeitpunkt offen und ist durch PR #1088 (2026-10-31) mit neun gebremsten Jobs geschlossen. **6** → Kopf: `Status: **APPROVED (2026-10-31)**` plus Freigabezeile (Nutzerfreigabe, nie durch den Planer). |
 
 ## Trace-Anker
 
@@ -1188,5 +1199,5 @@ Der Plan referenziert diesen Wert in seinem Trace-Anker und verweist über
 Die Datei ist bewusst `*-design.md` benannt, weil
 `scripts/lib/consistency/spec_plan.py` nur dieses Muster als Spec klassifiziert.
 Die Freigabe erfolgt ausschließlich durch den Nutzer über den maschinenlesbaren
-Approval-Marker im Kopf dieser Datei (Wert `APPROVED` mit Datum) — diese
-Revision bleibt bewusst `Entwurf`.
+Approval-Marker im Kopf dieser Datei (Wert `APPROVED` mit Datum) — gesetzt am
+2026-10-31 durch den Nutzer, nie durch den Planer.
