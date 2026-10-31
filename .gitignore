@@ -20,11 +20,8 @@ graphify-out/
 
 # --- agent-meta managed (do not edit) ---
 *.sync-backup-*
-.claude/agent-memory-local/
-.claude/pending-tasks.md
-.claude/progress/
-.claude/settings.local.json
-.gemini/pending-tasks.md
+.claude/
+.gemini/
 .gemini/settings.local.json
 .mcp.json
 .meta-config/env.ps1
@@ -32,9 +29,8 @@ graphify-out/
 .meta-config/env.unset.ps1
 .meta-config/env.unset.sh
 .meta-config/secrets.local.yaml
+.opencode/
 .opencode/mcp.local.json
-.opencode/pending-tasks.md
-.opencode/settings.local.json
 .tmp/
 AGENTS.personal.md
 CLAUDE.local.md

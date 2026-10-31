@@ -154,6 +154,10 @@ project:
 hooks:
   dod-push-check:
     enabled: true
+  graphify-read-guard:
+    enabled: true
+  graphify-search-guard:
+    enabled: true
 provider-options:
   Claude: {}
   Gemini: {}
@@ -186,7 +190,7 @@ variables:
   GIT_PLATFORM: GitHub
   GIT_REMOTE_URL: https://github.com/Popoboxxo/agent-meta
   GIT_MAIN_BRANCH: main
-  SYSTEM_DEPENDENCIES: '- Python: `>=3.8`'
+  SYSTEM_DEPENDENCIES: '- Python: `>=3.9`'
   SYSTEM_URLS: ''
   BUILD_COMMAND: python scripts/sync.py
   TEST_COMMAND: python3 scripts/sync.py --validate
@@ -278,19 +282,6 @@ variables:
     im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: 'Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md
     aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag.'
-  SE_MIN_DEPTH: 2
-  SE_MAX_DEPTH: 6
-  SE_MAX_CELLS: 20
-  SE_MAX_CRITIC_ITERATIONS: 3
-  SE_MAX_PARALLEL_CELLS: 4
-  SE_BASE_DIR: SE
-se-export:
-  type: markdown
-  output_dir: docs/se
-se_output:
-  base_dir: SE
-  per_level_dirs: true
-  per_system_dirs: true
 gitignore:
   ignore-provider-dirs: true
 test-repo:
