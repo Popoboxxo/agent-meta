@@ -2,6 +2,48 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.6] - 2026-10-31
+
+### Added
+- **Parallel scenario shards (#1075)**: `tests/scenarios/run.sh` gains `SCENARIO_JOBS`
+  (default `1` = unchanged behaviour); with `N > 1` each of the N workers gets one
+  round-robin batch and the per-scenario blocks are replayed in selection order, so a
+  parallel run produces the same PASS/FAIL list as a serial one (no `wait -n`/`mapfile`,
+  bash 3.2-safe). `validate.yml` sets `SCENARIO_JOBS=2`; measured 246 s -> 150 s (six
+  scenarios, factor 1.64) with identical failure output and exit code.
+- **ADR 0001 documents PyYAML as the single runtime exception (#1076)**: new
+  `docs/adr/0001-pyyaml-runtime-ausnahme.md` records that PyYAML is the only documented
+  non-stdlib runtime dependency (every further runtime dependency needs its own ADR), and
+  `CODE_CONVENTIONS` names it explicitly, so the generated `CLAUDE.md`/`AGENTS.md` no
+  longer contradict the code. Six role renders (`data-engineer`, `developer`,
+  `junior-developer`, `principal-developer`, `refactoring-specialist`,
+  `senior-developer`) drift by that one line; the six `slimming-golden` fixtures, the
+  diff-manifest section 18 and the AC-T4 tree digest were rebaselined.
+
+### Changed
+- **PyYAML requirement `>=6.0.3` (#1057)**: `requirements.txt` and
+  `tests/requirements.txt` move the floor from `>=6.0` to the current release.
+- **Conditional pytest/jsonschema pins for the Python 3.9 CI floor (#1070)**: pytest
+  9.1.1 and jsonschema 4.26.0 declare `Requires-Python >=3.10`, so `tests/requirements.txt`
+  keeps the previous floors on 3.9 and takes the newer releases from 3.10 on via
+  `python_version` markers (mirroring the existing `tomli` marker). This superseded and
+  closed four red Dependabot PRs.
+- **GitHub Actions bumps (#1061)**: `actions/checkout` v4 -> v7 and
+  `actions/setup-python` v5 -> v7 in `orchestration-test.yml` and `validate.yml`.
+- **`project.yaml` cleanup (#1087)**: dead SE defaults (`SE_MIN_DEPTH`, `SE_MAX_DEPTH`,
+  `SE_MAX_CELLS`, `SE_MAX_CRITIC_ITERATIONS`, `SE_MAX_PARALLEL_CELLS` -- already provided
+  by `role-defaults.yaml`) and `se_output.per_*_dirs` (no consumers) are removed, the
+  `KEY_PATTERNS` text is reworded so rendered entry files contain no literal
+  `{{VARIABLE}}`, `SYSTEM_DEPENDENCIES` pins Python `>=3.9`, the graphify read/search
+  guard hooks are enabled, and `.gitignore` is simplified to whole provider directories.
+  The fixtures the SE locks assert on (`variables.SE_BASE_DIR`, the
+  `se-component-requirements` role entry, the top-level `se-export:` block) are kept
+  verbatim.
+
+### Fixed
+- **`timeout-minutes` on the scorecard `analysis` job (#1088)**: the last CI job without
+  a timeout now declares one, so AC2 of #945 (timeout on every job) is 9/9.
+
 ## [2.0.0-beta.5] - 2026-10-30
 
 ### Added
