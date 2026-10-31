@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Changed
+- **Submodule push targets are checked instead of blocking `--recurse-submodules` (#1051)**:
+  `dod-push-check.sh` resolves, for `--recurse-submodules=on-demand|only`, each
+  submodule's own push destination (`remote.<name>.push`, then `push.default` /
+  `branch.<n>.merge`) and runs the existing protected-branch test on it; the
+  blanket block on any repository with a `.gitmodules` (#953) is gone. A protected
+  or undeterminable destination still fails closed, and the message names the
+  submodule path, its destination, and — when undeterminable — the way out (push
+  the superproject without the flag, then push each submodule explicitly).
+  Repositories without `.gitmodules` and the `check`/`no` values are unchanged.
+
 ### Fixed
 - **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:
   `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh` now counts brace nesting

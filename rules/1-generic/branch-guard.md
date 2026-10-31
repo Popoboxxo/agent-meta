@@ -22,6 +22,14 @@ mit einzelnen **security-boundary**-Eigenschaften für spezifische Fälle (z.B. 
 Destructive-Gate aus #516/#809, das auch bei gültigem `git`-Sentinel blockt). `dod-push-check.sh`
 ist als **security boundary** gegen fehlendes/kaputtes `python3` fail-closed (#595).
 
+## Submodule-Pushes (`--recurse-submodules=on-demand|only`)
+
+Bei `=on-demand`/`=only` prüft der DoD-Push-Check jedes Submodul gegen sein
+eigenes Push-Ziel (#1051). Ein geschütztes **oder** unbestimmbares Ziel
+blockiert (fail closed); die Meldung nennt Submodul, Ziel und Ausweg (ohne
+`--recurse-submodules` pushen, dann auf einen Feature-Branch). Ohne
+`.gitmodules` unverändert.
+
 ## Bekannte Grenzen
 
 Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen über eine tokenisierte Analyse des Bash-Befehls (gemeinsamer Tokenizer für Destructive- und Mutation-Gate, Issue #551), kein vollständiger Shell-Parser. Das Destructive-Gate deckt zusätzlich die kanonischen Shell-Katastrophen ab (Issue #809): rekursives `rm` auf einem gefährlichen Root (`/`, `~`/`$HOME`, Top-Level-Systemverzeichnisse wie `/etc`) sowie eine rekursive Fork-Bomb (`` :(){ :|:& };: ``). Benigne In-Repo-Löschungen (`rm -rf .tmp/...`) bleiben erlaubt. Bekannte Lücken:

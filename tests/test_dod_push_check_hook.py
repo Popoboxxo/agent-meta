@@ -1030,15 +1030,24 @@ def test_952_explicit_safe_refs_and_non_cd_words_are_not_blocked(repo_on_feature
     assert result.returncode == 0, result.stderr
 
 
-# --- issue #953: --recurse-submodules=on-demand pushes submodules too ------
+# --- issue #953 / #1051: --recurse-submodules pushes submodules too --------
+#
+# #953 shipped the fail-closed half: any repo with a top-level .gitmodules
+# blocked. #1051 replaces that blanket block with a per-submodule destination
+# check against the submodule's own push configuration; an undeterminable
+# destination still fails closed and now names the way out.
 
 def test_953_recurse_submodules_on_demand_blocked_when_repo_has_submodules(repo_on_feature_branch):
+    # A .gitmodules entry whose submodule is not initialised: its push
+    # configuration cannot be read, so the check must fail closed (#1051)
+    # instead of silently allowing the flag through.
     (repo_on_feature_branch / ".gitmodules").write_text(
         '[submodule "s"]\n\tpath = s\n\turl = ../s\n', encoding="utf-8")
     for flag in ("on-demand", "only"):
         result = _run_hook(repo_on_feature_branch, f"git push --recurse-submodules={flag} origin feat/x")
         assert result.returncode == 2, (flag, result.stdout)
-        assert "submodule" in result.stderr
+        assert "submodule 's'" in result.stderr, result.stderr
+        assert "cannot be determined" in result.stderr, result.stderr
 
 
 def test_953_recurse_submodules_allowed_without_submodules_or_for_check(repo_on_feature_branch):
@@ -1221,9 +1230,13 @@ def repo_with_real_submodule(tmp_path):
     "git push --recurse-submodules only origin feat/x",
 ])
 def test_953_recurse_submodules_real_submodule_is_blocked(repo_with_real_submodule, command):
+    # The fixture's submodule tracks main, so its effective push destination
+    # is the protected branch 'main' (#1051). The block must name both the
+    # submodule path and the destination.
     result = _run_hook(repo_with_real_submodule, command)
     assert result.returncode == 2, (command, result.stdout)
-    assert "submodule" in result.stderr
+    assert "submodule 's'" in result.stderr, result.stderr
+    assert "protected branch 'main'" in result.stderr, result.stderr
 
 
 @pytest.mark.parametrize("command", [
@@ -1232,8 +1245,101 @@ def test_953_recurse_submodules_real_submodule_is_blocked(repo_with_real_submodu
     "git push origin feat/x",
 ])
 def test_953_recurse_submodules_non_pushing_values_allowed(repo_with_real_submodule, command):
+    # check / no / absent flag are never resolved against submodule targets.
     result = _run_hook(repo_with_real_submodule, command)
     assert result.returncode == 0, (command, result.stderr)
+
+
+# --- issue #1051: per-submodule push destination check ---------------------
+
+RECURSE_UNPROTECTED = [
+    "git push --recurse-submodules=on-demand origin feat/x",
+    "git push --recurse-submodules on-demand origin feat/x",
+    "git push --recurse-submodules=only origin feat/x",
+    "git push --recurse-submodules only origin feat/x",
+]
+
+
+@pytest.mark.parametrize("command", RECURSE_UNPROTECTED)
+def test_1051_submodule_push_to_unprotected_branch_allowed(repo_with_real_submodule, command):
+    """Submodule configured to push to an unprotected branch: the recurse
+    push must be allowed — the residual false positive of #953 is gone.
+    Both the '=' and the space spelling are covered."""
+    _git(repo_with_real_submodule / "s", "config", "remote.origin.push",
+         "refs/heads/main:refs/heads/feat/sub")
+    result = _run_hook(repo_with_real_submodule, command)
+    assert result.returncode == 0, (command, result.stderr)
+
+
+def test_1051_submodule_push_to_protected_branch_names_path_and_destination(
+        repo_with_real_submodule):
+    """A protected destination on the submodule's own remote blocks and the
+    message names the submodule path and the destination branch."""
+    _git(repo_with_real_submodule / "s", "config", "remote.origin.push",
+         "refs/heads/main:refs/heads/main")
+    result = _run_hook(repo_with_real_submodule,
+                       "git push --recurse-submodules=on-demand origin feat/x")
+    assert result.returncode == 2, result.stdout
+    assert "submodule 's'" in result.stderr, result.stderr
+    assert "protected branch 'main'" in result.stderr, result.stderr
+
+
+def test_1051_url_push_target_still_uses_submodule_remote_config(
+        repo_with_real_submodule, tmp_path):
+    """When the superproject push target is a URL (not a configured remote),
+    git runs a plain `git push` inside the submodule, so its branch remote's
+    push config still decides the destination — a protected target must not
+    slip through just because the URL is not a remote name."""
+    _git(repo_with_real_submodule / "s", "config", "remote.origin.push",
+         "refs/heads/main:refs/heads/main")
+    url = (tmp_path / "not-a-configured-remote.git").as_posix()
+    result = _run_hook(repo_with_real_submodule,
+                       f"git push --recurse-submodules=on-demand {url} feat/x")
+    assert result.returncode == 2, result.stdout
+    assert "submodule 's'" in result.stderr, result.stderr
+    assert "protected branch 'main'" in result.stderr, result.stderr
+
+
+def test_1051_unreadable_submodule_config_fails_closed(repo_on_feature_branch):
+    """An incomplete submodule setup (entry in .gitmodules, no repository on
+    disk) must block — and the message must name the way out (#1051)."""
+    (repo_on_feature_branch / ".gitmodules").write_text(
+        '[submodule "s"]\n\tpath = s\n\turl = ../s\n', encoding="utf-8")
+    result = _run_hook(repo_on_feature_branch,
+                       "git push --recurse-submodules=on-demand origin feat/x")
+    assert result.returncode == 2, result.stdout
+    assert "submodule 's'" in result.stderr, result.stderr
+    assert "cannot be determined" in result.stderr, result.stderr
+    assert "explicitly" in result.stderr, result.stderr  # the way out
+
+
+def test_1051_repo_without_gitmodules_is_unaffected(repo_on_feature_branch):
+    """No .gitmodules: the flag stays a no-op, exactly as before (#953)."""
+    result = _run_hook(repo_on_feature_branch,
+                       "git push --recurse-submodules=on-demand origin feat/x")
+    assert result.returncode == 0, result.stderr
+
+
+def test_1051_several_submodules_stay_within_classifier_budget(tmp_path):
+    """Six real submodules, each with its own push config: the classifier
+    still finishes far below its 20 s budget (one config read per submodule,
+    no repeated git invocations)."""
+    repo = _make_repo(tmp_path / "repo", "feat/x")
+    for i in range(6):
+        sub = _make_repo(tmp_path / f"sub{i}", "main")
+        _git(repo, "-c", "protocol.file.allow=always",
+             "submodule", "add", "-q", str(sub), f"s{i}")
+        _git(repo / f"s{i}", "config", "remote.origin.push",
+             "refs/heads/main:refs/heads/feat/sub")
+    _git(repo, "commit", "-qm", "add submodules")
+    (repo / ".meta-config").mkdir()
+    (repo / ".meta-config" / "project.yaml").write_text(
+        'variables:\n  TEST_COMMAND: "true"\n', encoding="utf-8")
+    start = time.monotonic()
+    result = _run_hook(repo, "git push --recurse-submodules=on-demand origin feat/x")
+    elapsed = time.monotonic() - start
+    assert result.returncode == 0, result.stderr
+    assert elapsed < 20, f"classifier took {elapsed:.1f}s (budget 20 s)"
 
 
 # --- issue #954: security re-review checks that were never run -------------
