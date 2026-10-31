@@ -26,12 +26,17 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment-impl.sh"
+
+#: Process ``cwd`` for the guard runs (ADR-3). Bound by ``_bind_decoy``; it is
+#: a project-carrying decoy, never the repo checkout and never a payload root.
+_DECOY_ROOT: Optional[Path] = None
 
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
@@ -91,15 +96,50 @@ def _config_at(path: Path, block: str | None = None) -> Path:
     return path
 
 
+@pytest.fixture(scope="module")
+def _decoy_project(tmp_path_factory) -> Path:
+    """Build a project-carrying directory that is never a payload root.
+
+    ADR-3: the guard must take its project root from the payload, never from
+    its own working directory. The decoy therefore carries an *active*
+    ``repo_containment`` config — a guard adopting ``$PWD`` would resolve the
+    decoy as the jail root and judge relative targets against it instead of
+    failing closed — while still differing from every per-test ``tmp_path``
+    project. The config is written explicitly (not copied from the checkout),
+    so a change to the repo config cannot silently blunt the decoy.
+    """
+    root = tmp_path_factory.mktemp("containment-decoy")
+    _write_config(
+        root,
+        'repo_containment:\n'
+        '  enabled: true\n'
+        '  tmp-sink:\n'
+        '    enabled: true\n'
+        '    path: ".tmp"\n',
+    )
+    (root / ".claude" / "hooks").mkdir(parents=True)
+    return root
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bind_decoy(_decoy_project):
+    """Bind the module-global decoy root (ADR-3, invariant 5: tmp cleanup)."""
+    global _DECOY_ROOT
+    _DECOY_ROOT = _decoy_project
+    yield
+    _DECOY_ROOT = None
+
+
 def _run_hook(
     payload: dict | str, process_cwd: Path | str | None = None
 ) -> subprocess.CompletedProcess:
     """Run the hook as a subprocess.
 
     ``process_cwd`` is the guard process' own working directory (the thing the
-    hook must never adopt as a repo root). It defaults to the agent-meta repo
-    root, which *does* carry ``.meta-config/`` — so any test that still passes
-    with that default proves the verdict came from the payload, never ``$PWD``.
+    hook must never adopt as a repo root). It defaults to a decoy project that
+    carries ``.meta-config/`` but is never a payload root — so any test that
+    still passes with that default proves the verdict came from the payload,
+    never ``$PWD``.
     """
     raw = payload if isinstance(payload, str) else json.dumps(payload)
     return subprocess.run(
@@ -107,7 +147,7 @@ def _run_hook(
         input=raw,
         capture_output=True,
         text=True,
-        cwd=str(process_cwd if process_cwd is not None else _REPO_ROOT),
+        cwd=str(process_cwd if process_cwd is not None else _DECOY_ROOT),
         env=_clean_env(),
     )
 
@@ -325,9 +365,9 @@ def test_relative_target_without_cwd_fails_closed(external_fixture):
     """AC-04: a relative target and no `cwd` cannot be anchored -> exit 2.
 
     ``$PWD`` must not stand in for the payload field: the same payload is run
-    once with the (project carrying) agent-meta repo as process cwd and once
-    from the isolated external fixture. Both stay blocked, so the guard never
-    resolves a relative target against its own working directory.
+    once with a project-carrying decoy as process cwd and once from the
+    isolated external fixture. Both stay blocked, so the guard never resolves
+    a relative target against its own working directory.
     """
     payload = _write_payload("notes.md")  # no `cwd` key at all
     assert "cwd" not in payload
@@ -338,7 +378,7 @@ def test_relative_target_without_cwd_fails_closed(external_fixture):
     assert "relative target without `cwd`" in from_outside.stderr
     assert "target:    notes.md" in from_outside.stderr
 
-    from_project_pwd = _run_hook(payload)  # process cwd = _REPO_ROOT
+    from_project_pwd = _run_hook(payload)  # process cwd = _DECOY_ROOT
     assert from_project_pwd.returncode == 2, from_project_pwd.stderr
     assert "relative target without `cwd`" in from_project_pwd.stderr
 
@@ -761,7 +801,7 @@ def test_garbage_python_interpreter_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(outside, root)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT),
         env=_garbage_python_env(tmp_path),
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
@@ -959,7 +999,7 @@ def test_detector_crash_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_bash_payload("echo hi", root)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
     )
     assert result.returncode == 2, result.stderr
     assert "detector exited rc=1" in result.stderr
@@ -1032,15 +1072,15 @@ def test_payload_cwd_cannot_redefine_the_deployed_jail_root(tmp_path):
     result = subprocess.run(
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
 
 
 def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
-    """SR-B-18: even when run from the source tree, $CLAUDE_PROJECT_DIR wins
-    over the payload cwd."""
+    """SR-B-18: even when the process cwd is a project-carrying directory,
+    $CLAUDE_PROJECT_DIR wins over the payload cwd."""
     project_a = _config_at(tmp_path / "a")
     project_b = _config_at(tmp_path / "b")
     env = _clean_env()
@@ -1048,7 +1088,7 @@ def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
@@ -1064,7 +1104,7 @@ def test_fixed_anchor_is_provider_neutral(tmp_path, provider_dir):
     result = subprocess.run(
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(other / "x.py", other)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project)}" in result.stderr
@@ -1078,7 +1118,7 @@ def test_write_inside_the_fixed_anchor_is_allowed(tmp_path):
     result = subprocess.run(
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(project / "pkg" / "x.py", project)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_clean_env(),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
     )
     assert result.returncode == 0, result.stderr
 
@@ -1146,7 +1186,7 @@ def test_f5_unresolvable_fixed_root_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
     )
     assert result.returncode == 2, result.stderr
     assert "could not be resolved" in result.stderr
@@ -1200,7 +1240,7 @@ def test_missing_pyyaml_with_enabled_false_is_reported_not_silent(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(root.parent / "outside.py", root)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_hide_pyyaml(tmp_path),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_hide_pyyaml(tmp_path),
     )
     assert result.returncode == 2, result.stderr
     assert "PyYAML" in result.stderr
@@ -1214,7 +1254,7 @@ def test_missing_pyyaml_with_enabled_true_stays_fail_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(root.parent / "outside.py", root)),
-        capture_output=True, text=True, cwd=str(_REPO_ROOT), env=_hide_pyyaml(tmp_path),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_hide_pyyaml(tmp_path),
     )
     assert result.returncode == 2, result.stderr
     assert "PyYAML" in result.stderr
