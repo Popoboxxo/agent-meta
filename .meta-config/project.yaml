@@ -145,6 +145,7 @@ roles:
 - intern-developer
 - concept-specifier
 - concept-architect
+- se-component-requirements
 - product-manager
 - app-lifecycle-governor
 project:
@@ -282,6 +283,10 @@ variables:
     im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: 'Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md
     aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag.'
+  SE_BASE_DIR: SE
+se-export:
+  type: markdown
+  output_dir: docs/se
 gitignore:
   ignore-provider-dirs: true
 test-repo:
