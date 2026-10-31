@@ -19,7 +19,9 @@ concurrency:
 jobs:
   scenarios:
     runs-on: ubuntu-latest
-    # 79 scenarios sequentially ≈ 46 min wall clock; 4 shards ≈ 12 min each.
+    # 88 scenarios sequentially ≈ 46 min wall clock; 4 shards ≈ 12 min each,
+    # in-shard parallelism (SCENARIO_JOBS) cuts that to roughly half of the
+    # per-scenario time again.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -28,6 +30,11 @@ jobs:
     env:
       SCENARIO_SHARD: ${{ matrix.shard }}
       SCENARIO_TOTAL: '4'
+      # Innerhalb des Shards zwei Szenarien gleichzeitig: lokal gemessen
+      # 246 s -> 150 s fuer 6 Szenarien (Faktor 1,64, identische PASS/FAIL-
+      # Liste). Bewusst KEIN zusaetzlicher Matrix-Arm — der Runner-Pool
+      # (20 gleichzeitige Jobs pro Account) ist der Engpass, nicht die CPU.
+      SCENARIO_JOBS: '2'
     steps:
       - uses: actions/checkout@v4
         with:
