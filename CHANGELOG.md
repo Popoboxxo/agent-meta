@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:
+  `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh` now counts brace nesting
+  (including `${...}`) inside the existing 512-character window instead of cutting
+  the body at the first unquoted `}`, so bombs such as `f(){ : ${x}; f|f& };f` and
+  `f(){ { :; }; f|f& };f` are detected instead of passing the destructive gate; a
+  body that exhausts the window still fails closed. The matching known-gap entry
+  (item 5) is removed from `rules/1-generic/branch-guard.md`.
+
 ## [2.0.0-beta.6] - 2026-10-31
 
 ### Added

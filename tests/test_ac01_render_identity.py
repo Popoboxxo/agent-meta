@@ -505,6 +505,35 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` were re-verified as unchanged (``5642151d…``/``9d854180…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1050 (fork-bomb brace nesting, 2026-10-31, ``fix/fork-bomb-brace-nesting``):
+  ``hook_common.sh`` 1.6.0 -> 1.7.0 ends the bomb body at the depth-matching ``}``
+  instead of the first one, and ``rules/1-generic/branch-guard.md`` drops its
+  »Bekannte Lücken« item 5 (the ``}``-gap entry the fix closes). Exactly
+  **11 of 1085 hashes moved; 0 added/removed**: the two ``hook_common.sh``
+  renders (``Claude/.claude/hooks/lib/hook_common.sh`` ``d9331ffe…`` ->
+  ``bcdf8b16…``, ``Gemini/.agents/hooks/lib/hook_common.sh`` ``d9331ffe…`` ->
+  ``bcdf8b16…``; one identical render for both providers, the lib carries no
+  ``{{AGENT_META_PROVIDER}}``), the three branch-guard rule renders
+  (``Claude/.claude/rules/branch-guard.md`` ``ec2e891a…`` -> ``97f6467d…``,
+  ``Continue/.continue/rules/branch-guard.md`` ``2fe5c3d9…`` -> ``2a3816a8…``,
+  ``Copilot/.github/instructions/branch-guard.instructions.md`` ``b72f7c89…`` ->
+  ``7a3aaa71…``; the removed gap entry restores the pre-gap rule text) and the
+  six ``AGENTS.md`` files that embed the rule (``Codex/AGENTS.md`` ``65bcde7a…``
+  -> ``f12c1325…``, ``Gemini/AGENTS.md`` ``77ce5928…`` -> ``8e646aa8…``,
+  ``KimiCode/AGENTS.md`` ``23d2fce9…`` -> ``cf8d7493…``, ``Mammouth/AGENTS.md``
+  ``19b910c6…`` -> ``ac1d8c70…``, ``Opencode/AGENTS.md`` ``d661b343…`` ->
+  ``2dba68d2…``, ``ZCode/AGENTS.md`` ``1f473667…`` -> ``ce271150…``). No agent
+  artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (11 single-line replacements, 1076 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``6a063942…`` -> ``e3c25b31…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

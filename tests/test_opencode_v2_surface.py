@@ -5316,8 +5316,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1085) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1050 (fork-bomb brace nesting: `lib/hook_common.sh` 1.6.0 -> 1.7.0
+# plus the dropped `}`-gap entry in the branch-guard rule): `ac01-baseline`
+# re-pinned — 11 hashes (2 `hook_common.sh` renders, 3 branch-guard rule
+# renders, 6 `AGENTS.md`); `slimming-golden`/`compact-golden` unchanged.
+# Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "6a063942fb8a30c1d83c48b79cec9a39f45140f79c6db85ef5e5416f0037056a",
+    "ac01-baseline": "e3c25b31a50da46826377eda97a7d50de8eecf70a48c95a4c26dd8b1019545d7",
     "slimming-golden": "6b0c5724b8270ae81157ead67bef029c2cf62ba02d710b8806f539f643d35598",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
