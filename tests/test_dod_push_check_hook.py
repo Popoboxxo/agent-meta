@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "dod-push-check.sh"
 
@@ -61,6 +63,7 @@ def _run_hook(cwd: Path, command: str) -> subprocess.CompletedProcess:
         text=True,
         cwd=str(cwd),
         env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -73,7 +76,8 @@ def repo_on_main(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     run = lambda *args: subprocess.run(  # noqa: E731
-        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True,
+        timeout=SCRIPT_TIMEOUT,
     )
     run("init", "-q")
     run("config", "user.email", "test@example.com")
@@ -169,6 +173,7 @@ def test_fails_closed_without_python3(repo_on_main, tmp_path):
         text=True,
         cwd=str(repo_on_main),
         env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "python3" in result.stderr.lower()
@@ -184,7 +189,8 @@ def repo_on_feature_branch(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     run = lambda *args: subprocess.run(  # noqa: E731
-        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True,
+        timeout=SCRIPT_TIMEOUT,
     )
     run("init", "-q")
     run("config", "user.email", "test@example.com")
@@ -220,7 +226,8 @@ def test_cache_invalidated_by_new_commit(repo_on_feature_branch):
     assert first.returncode == 0
 
     subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "second"],
-                    cwd=str(repo_on_feature_branch), capture_output=True, text=True, check=True)
+                    cwd=str(repo_on_feature_branch), capture_output=True, text=True,
+                    check=True, timeout=SCRIPT_TIMEOUT)
     second = _run_hook(repo_on_feature_branch, "git push origin feat/x")
     assert second.returncode == 0
     assert "cached" not in second.stdout.lower()
@@ -323,6 +330,7 @@ def _run_hook_failing_tests(cwd: Path, command: str) -> subprocess.CompletedProc
         text=True,
         cwd=str(cwd),
         env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -365,7 +373,8 @@ def multi_repo(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     run = lambda *args: subprocess.run(  # noqa: E731
-        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True,
+        timeout=SCRIPT_TIMEOUT,
     )
     run("init", "-q")
     run("config", "user.email", "test@example.com")
@@ -382,7 +391,8 @@ def multi_repo(tmp_path):
 
 def _checkout(repo: Path, where: str) -> None:
     args = ["checkout", "-q", "--detach"] if where == "detached" else ["checkout", "-q", where]
-    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, check=True)
+    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True,
+                   check=True, timeout=SCRIPT_TIMEOUT)
 
 
 def _outcome(result: subprocess.CompletedProcess) -> str:
@@ -402,7 +412,8 @@ def _assert_outcome(repo: Path, command: str, expected: str, env_extra=None) -> 
     env = _clean_env({"AGENT_META_TEST_COMMAND": "false", "AGENT_META_TEST_TIMEOUT": "5"})
     env.update(env_extra or {})
     result = subprocess.run([_BASH, str(_HOOK_PATH)], input=json.dumps(payload),
-                            capture_output=True, text=True, cwd=str(repo), env=env)
+                            capture_output=True, text=True, cwd=str(repo), env=env,
+                            timeout=SCRIPT_TIMEOUT)
     assert _outcome(result) == expected, f"command={command[:200]!r}: {_outcome(result)}"
 
 
@@ -562,7 +573,8 @@ def test_custom_main_branch_is_protected_destination(multi_repo, command, expect
 # --- W2-B1 round 2 ----------------------------------------------------------
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, check=True)
+    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True,
+                   check=True, timeout=SCRIPT_TIMEOUT)
 
 
 # F1: git resolves a destination not starting with 'refs/' via its DWIM rules
@@ -620,7 +632,7 @@ def test_f2_here_string_failure_fails_closed(multi_repo, trap, where, first_line
     result = subprocess.run(
         [_BASH, "-c", f'ulimit -f 64; {trap}exec "$0" "$1"', _BASH, str(_HOOK_PATH)],
         input=json.dumps(payload), capture_output=True, text=True,
-        cwd=str(multi_repo), env=env)
+        cwd=str(multi_repo), env=env, timeout=SCRIPT_TIMEOUT)
     assert result.returncode == 2, f"rc={result.returncode} stderr={result.stderr[-300:]!r}"
     assert "Branch-Guard: Push blocked" in result.stderr
 
@@ -841,7 +853,7 @@ def _run_payload(repo: Path, payload: bytes, env_extra=None) -> subprocess.Compl
     env = _clean_env({"AGENT_META_TEST_COMMAND": "false", "AGENT_META_TEST_TIMEOUT": "5"})
     env.update(env_extra or {})
     return subprocess.run([_BASH, str(_HOOK_PATH)], input=payload, capture_output=True,
-                          cwd=str(repo), env=env)
+                          cwd=str(repo), env=env, timeout=SCRIPT_TIMEOUT)
 
 
 def _bash_payload(command: str) -> bytes:
@@ -1081,6 +1093,7 @@ def test_1033_block_message_lists_protected_branches_once(
         text=True,
         cwd=str(repo_on_feature_branch),
         env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert f"Protected branches: {expected_list}. " in result.stderr, result.stderr
@@ -1116,7 +1129,8 @@ def test_949_missing_shared_helper_fails_closed(repo_on_feature_branch, tmp_path
     result = subprocess.run(
         [_BASH, str(hook_copy)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(repo_on_feature_branch),
-        env=_clean_env({"AGENT_META_TEST_COMMAND": "false"}))
+        env=_clean_env({"AGENT_META_TEST_COMMAND": "false"}),
+        timeout=SCRIPT_TIMEOUT)
     assert result.returncode == 2, result.stderr
     assert "outdated" in result.stderr
 
@@ -1127,7 +1141,9 @@ def _make_repo(path: Path, branch: str) -> Path:
     """Minimal repo with one commit on `branch` and a second branch main."""
     path.mkdir(parents=True)
     run = lambda *args: subprocess.run(  # noqa: E731
-        ["git", *args], cwd=str(path), capture_output=True, text=True, check=True)
+        ["git", *args], cwd=str(path), capture_output=True, text=True, check=True,
+        timeout=SCRIPT_TIMEOUT,
+    )
     run("init", "-q")
     run("config", "user.email", "test@example.com")
     run("config", "user.name", "Test")

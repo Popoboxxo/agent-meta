@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -145,6 +147,7 @@ def test_checksum_manifest_is_sha256sum_compatible(agent_meta_root, project_root
         cwd=str(gates_dir),
         capture_output=True,
         text=True,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, result.stderr
 
@@ -247,7 +250,9 @@ def _run_dispatcher(project_root: Path) -> subprocess.CompletedProcess:
         [_BASH, str(project_root / "hooks" / "pre-release-check.sh")],
         capture_output=True,
         text=True,
+        cwd=str(project_root),
         env={"PROJECT_ROOT": str(project_root), "PATH": "/usr/bin:/bin:/usr/local/bin"},
+        timeout=SCRIPT_TIMEOUT,
     )
 
 

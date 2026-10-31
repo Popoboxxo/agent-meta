@@ -30,6 +30,8 @@ from typing import Optional
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment-impl.sh"
@@ -149,6 +151,7 @@ def _run_hook(
         text=True,
         cwd=str(process_cwd if process_cwd is not None else _DECOY_ROOT),
         env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -624,7 +627,8 @@ def test_sink_path_drive_letter_falls_back_to_default(tmp_path):
 def test_hook_wrapper_and_impl_are_valid_bash():
     for script in (_HOOK_PATH, _IMPL_PATH):
         result = subprocess.run(
-            [_BASH, "-n", str(script)], capture_output=True, text=True
+            [_BASH, "-n", str(script)], capture_output=True, text=True,
+            timeout=SCRIPT_TIMEOUT,
         )
         assert result.returncode == 0, (script, result.stderr)
 
@@ -662,6 +666,7 @@ def _run_isolated(hook: Path, payload: dict, cwd: Path) -> subprocess.CompletedP
         text=True,
         cwd=str(cwd),
         env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -760,6 +765,7 @@ def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
         [_BASH, str(wrapper)],
         input=json.dumps(_bash_payload("echo hi", tmp_path)),
         capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert f"impl crashed rc={crash_rc}" in result.stderr
@@ -773,6 +779,7 @@ def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
         [_BASH, str(wrapper)],
         input=json.dumps(_bash_payload("echo hi", tmp_path)),
         capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
     assert "impl crashed" not in result.stderr
@@ -803,6 +810,7 @@ def test_garbage_python_interpreter_fails_closed(tmp_path):
         input=json.dumps(_write_payload(outside, root)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT),
         env=_garbage_python_env(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "does not behave like a Python interpreter" in result.stderr
@@ -864,6 +872,7 @@ def test_outdated_helper_lib_fails_closed(tmp_path):
         [_BASH, str(hooks_dir / "repo-containment.sh")],
         input=json.dumps(_write_payload(root / "ok.py", root)),
         capture_output=True, text=True, cwd=str(root), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "outdated" in result.stderr
@@ -1000,6 +1009,7 @@ def test_detector_crash_fails_closed(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_bash_payload("echo hi", root)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "detector exited rc=1" in result.stderr
@@ -1073,6 +1083,7 @@ def test_payload_cwd_cannot_redefine_the_deployed_jail_root(tmp_path):
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
@@ -1089,6 +1100,7 @@ def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
@@ -1105,6 +1117,7 @@ def test_fixed_anchor_is_provider_neutral(tmp_path, provider_dir):
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(other / "x.py", other)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project)}" in result.stderr
@@ -1119,6 +1132,7 @@ def test_write_inside_the_fixed_anchor_is_allowed(tmp_path):
         [_BASH, str(hook)],
         input=json.dumps(_write_payload(project / "pkg" / "x.py", project)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, result.stderr
 
@@ -1187,6 +1201,7 @@ def test_f5_unresolvable_fixed_root_fails_closed(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "could not be resolved" in result.stderr
@@ -1241,6 +1256,7 @@ def test_missing_pyyaml_with_enabled_false_is_reported_not_silent(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(root.parent / "outside.py", root)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_hide_pyyaml(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "PyYAML" in result.stderr
@@ -1255,6 +1271,7 @@ def test_missing_pyyaml_with_enabled_true_stays_fail_closed(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(root.parent / "outside.py", root)),
         capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=_hide_pyyaml(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "PyYAML" in result.stderr

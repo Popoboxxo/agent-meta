@@ -22,6 +22,8 @@ from typing import Optional
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _LIB_PATH = _REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh"
 
@@ -57,6 +59,7 @@ def _call(func_call: str, env: dict | None = None) -> subprocess.CompletedProces
         text=True,
         env=full_env,
         cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -119,7 +122,7 @@ def test_hook_json_get_lone_surrogate_is_not_dropped(locale, escape):
     r = subprocess.run(
         [_BASH, "-c", f'source "{_LIB_PATH}"\nhook_json_get "$1" tool_input.command', _BASH, payload],
         capture_output=True, env=dict(os.environ, LC_ALL=locale),
-        cwd=str(_PROJECT_ROOT))
+        cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push origin main"), (locale, r.stdout, r.stderr)
 
 
@@ -130,7 +133,7 @@ def test_hook_json_get_invalid_utf8_input_is_not_dropped(locale):
               'hook_json_get "$IN" tool_input.command\n')
     r = subprocess.run([_BASH, "-c", script], capture_output=True,
                        env=dict(os.environ, LC_ALL=locale),
-                       cwd=str(_PROJECT_ROOT))
+                       cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push "), (locale, r.stdout, r.stderr)
 
 
@@ -397,7 +400,7 @@ def _shell_scan_source() -> str:
     return r.stdout
 
 
-def _scan(code: str, timeout: Optional[float] = None) -> subprocess.CompletedProcess:
+def _scan(code: str, timeout: Optional[float] = SCRIPT_TIMEOUT) -> subprocess.CompletedProcess:
     """Run `code` with the emitted scanner definitions in scope."""
     return subprocess.run(
         [sys.executable, "-c", _shell_scan_source() + "\n" + code],
@@ -421,6 +424,7 @@ def test_shell_scan_py_emits_compilable_source():
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=_shell_scan_source(), capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -727,6 +731,7 @@ def _resolve(command: str) -> list[tuple[str, list[str]]]:
         [sys.executable, "-c", _resolver_source() + "\n" + code],
         capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     return [(word, args) for word, args in eval(r.stdout)]  # noqa: S307 - test data
@@ -739,6 +744,7 @@ def test_shell_resolver_py_emits_compilable_source():
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=source, capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -804,6 +810,7 @@ def test_command_start_skips_pure_assignment_statements(command):
          "import json\n" + _resolver_source() + "\n" + code],
         capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "true"

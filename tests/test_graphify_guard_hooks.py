@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _READ_GUARD = _REPO_ROOT / "hooks" / "0-external" / "graphify-read-guard.sh"
 _SEARCH_GUARD = _REPO_ROOT / "hooks" / "0-external" / "graphify-search-guard.sh"
@@ -57,6 +59,7 @@ def test_guard_passes_through_when_graphify_not_installed(guard_path, expected_s
         text=True,
         env={"PATH": "/usr/bin:/bin", "GRAPHIFY_BIN": ""},
         cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0
 
@@ -76,6 +79,7 @@ def test_guard_invokes_valid_graphify_on_path(guard_path, expected_subcommand, t
         text=True,
         env={"PATH": f"{fake_bin_dir}:/usr/bin:/bin"},
         cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0
     assert f"graphify-called: hook-guard" in result.stdout
@@ -100,6 +104,7 @@ def test_guard_rejects_malicious_graphify_bin_env_override(guard_path, tmp_path)
         text=True,
         env={"PATH": "/usr/bin:/bin", "GRAPHIFY_BIN": str(evil)},
         cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert "PWNED" not in result.stdout
     assert result.returncode == 0  # graphify (real name) not found -> pass through
