@@ -36,10 +36,10 @@ jobs:
       # (20 gleichzeitige Jobs pro Account) ist der Engpass, nicht die CPU.
       SCENARIO_JOBS: '2'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: pip
@@ -58,10 +58,10 @@ jobs:
     # Was 20 min; the job is cheap and serial, 10 min is ample headroom.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: pip
