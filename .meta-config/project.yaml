@@ -145,7 +145,6 @@ roles:
 - intern-developer
 - concept-specifier
 - concept-architect
-- se-component-requirements
 - product-manager
 - app-lifecycle-governor
 project:
@@ -222,7 +221,7 @@ variables:
   ENTRY_POINT_PATTERN: scripts/sync.py — Haupt-CLI für Agent-Generierung
   KEY_PATTERNS: |
     - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
-    - Platzhalter {{VARIABLE}} werden von sync.py substituiert
+    - Platzhalter in doppelten geschweiften Klammern (GROSS_NAME) werden von sync.py substituiert
     - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
     - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
   ARCHITECTURE: |
@@ -292,6 +291,8 @@ se_output:
   base_dir: SE
   per_level_dirs: true
   per_system_dirs: true
+gitignore:
+  ignore-provider-dirs: true
 test-repo:
   enabled: true
   path: ../agent-meta-test
