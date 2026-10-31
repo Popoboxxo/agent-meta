@@ -523,6 +523,27 @@ def test_fork_bomb_closed_body_within_window_is_scanned(expr, expected):
 
 
 @pytest.mark.parametrize("expr,expected", [
+    # Issue #1050: the body ends at the DEPTH-MATCHING '}' inside the
+    # 512-character window, so a brace or '${...}' before the self-call no
+    # longer hides the bomb behind the first '}'.
+    ('"f(){ : ${x}; f|f& };f"', 1),
+    ('"f(){ { :; }; f|f& };f"', 1),
+    # ... while nested braces/expansions without a self-call stay clean.
+    ('"f(){ { :; }; };f"', 0),
+    ('"f(){ : ${x}; }"', 0),
+    # An exhausted window still fails closed (block) under the depth scan,
+    # even when the preceding '${...}' is balanced.
+    ('"f(){ ${x}; " + "x"*520 + " f|f& };f"', 1),
+], ids=["bomb-after-expansion", "bomb-after-nested-braces",
+        "nested-braces-no-call", "expansion-no-call",
+        "nested-body-past-window"])
+def test_fork_bomb_ends_body_at_depth_matching_brace(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
     # AC-A.5: the unlimited backward name scan stays linear (one scan per
     # '()' pair, they never overlap), so a 300 KB header is not a timeout.
     ('"a"*20000 + "(){ :; }"', 0),
