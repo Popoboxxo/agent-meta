@@ -1927,3 +1927,34 @@ Anti-Recursion-Block) und bleiben unverändert.
 **Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
 `pytest tests/test_ac01_render_identity.py -q` → **3 passed**; `scripts/sync.py --validate` rc `0`
 (nur vorbestehende Warnungen).
+
+## 18. Re-Baseline der Golden-Baseline für 6 Rollen (PyYAML-Konventionshinweis, ADR 0001)
+
+> **Anlass:** `CODE_CONVENTIONS` in `.meta-config/project.yaml:237` nennt jetzt die dokumentierte
+> PyYAML-Runtime-Ausnahme (ADR `docs/adr/0001-pyyaml-runtime-ausnahme.md`). Die Variable rendert
+> über `{{CODE_CONVENTIONS}}` in die Agenten-Bodies; das Gate meldet die Drift als „diff not
+> attributable to declared normalizations".
+
+**Geändert (6 Fixtures):** `data-engineer`, `developer`, `junior-developer`,
+`principal-developer`, `refactoring-specialist`, `senior-developer` — je genau eine Zeile in
+`**Code conventions:**`:
+
+```diff
+-- Keine externen Python-Dependencies außer Stdlib
++- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
+```
+
+**Ursache:** Der Satz ist projektspezifischer Render-Inhalt (`CODE_CONVENTIONS`), kein migrierter
+Block. Keine `_NORMALIZATIONS`-Variante, `_LOCATORS`-Region oder Template-Version ist betroffen;
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und `_GOLDEN_ROLE_COUNT` (58) bleiben unverändert.
+
+**Herkunft:** Gegen den echten Sync-Render verifiziert
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`); je
+Fixture bleibt nur die eine `CODE_CONVENTIONS`-Zeile als Änderung, die eingefrorenen `model:`-Pins
+und Meta-Tokens bleiben unangetastet (dokumentierte inverse Ports des Gates).
+`git diff --numstat`: je Datei `1/1`.
+
+**Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
+`pytest tests/test_compact_matrix.py -q` → **121 passed**;
+`pytest tests/test_ac01_render_identity.py -q` → **5 passed** (kein AC-01-Drift, keine
+AC-01-Rebaseline); `scripts/sync.py --validate` rc `0`.
