@@ -564,6 +564,31 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
   (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- AC-07 fix on the same branch (2026-10-31, ``feat/submodule-push-targets``):
+  the #1051 section »Submodule-Pushes« overflowed all 12 AC-07 context ceilings
+  (e.g. ``Claude/rules`` 18,463 B vs. 18,003 B), so it was compressed from
+  1,195 B to 383 B. The ceilings were **not** touched. This rebaseline
+  **supersedes** the one in ``a7eb545d``: the rule text changed again, so the
+  same 9 renders move a second time — **9 of 1085 hashes moved; 0 added/removed**
+  — the three branch-guard rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``c42b4025…`` -> ``504c5ceb…``, ``Continue/.continue/rules/branch-guard.md``
+  ``7d6e9e10…`` -> ``ba868b11…``, ``Copilot/.github/instructions/branch-guard.instructions.md``
+  ``2f62fe16…`` -> ``f533e9cb…``) and the six ``AGENTS.md`` files that embed the rule
+  (``Codex/AGENTS.md`` ``2c0836ce…`` -> ``3a7de4f2…``, ``Gemini/AGENTS.md``
+  ``4b3c4701…`` -> ``8e87388a…``, ``KimiCode/AGENTS.md`` ``85ca568a…`` -> ``20bd56f8…``,
+  ``Mammouth/AGENTS.md`` ``93561dfb…`` -> ``f0e74eed…``, ``Opencode/AGENTS.md``
+  ``a8aff59f…`` -> ``add79f31…``, ``ZCode/AGENTS.md`` ``9f3b48ae…`` -> ``cbcc4578…``).
+  No agent artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (9 single-line replacements, 1078 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``f366a90a…`` -> ``d4771400…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

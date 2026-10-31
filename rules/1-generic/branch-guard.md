@@ -24,24 +24,11 @@ ist als **security boundary** gegen fehlendes/kaputtes `python3` fail-closed (#5
 
 ## Submodule-Pushes (`--recurse-submodules=on-demand|only`)
 
-Der DoD-Push-Check prüft bei `--recurse-submodules=on-demand` und `=only` jedes
-Submodul einzeln statt pauschal das Vorhandensein einer `.gitmodules` zu blocken
-(Issue #1051, ersetzt die Fail-closed-Pauschale aus #953):
-
-- Die Submodul-Pfade werden einmal aus `.gitmodules` gelesen; jedes Submodul wird
-  aus seiner eigenen Push-Konfiguration aufgelöst (`remote.<name>.push`, sonst
-  `push.default` / `branch.<n>.merge`). Git gibt beim Rekursiv-Push nur den
-  Remote-Namen weiter, nicht das Refspec des Superprojekts.
-- Blockiert wird, sobald ein Ziel ein geschützter Branch (`main`/`master` oder der
-  konfigurierte Main-Branch) ist **oder** nicht bestimmt werden kann (unlesbare
-  oder unvollständige Konfiguration, abgekoppelter Submodul-HEAD,
-  `push.default=nothing|matching`, Wildcard-Refspec). Die Meldung nennt
-  Submodul-Pfad und Ziel.
-- Ist ein Ziel nicht bestimmbar, nennt die Meldung den Ausweg: das Superprojekt
-  ohne `--recurse-submodules` pushen und die Submodule anschließend explizit auf
-  einen Feature-Branch pushen.
-- Repositories ohne `.gitmodules` sowie die Werte `check` und `no` bleiben
-  unverändert.
+Bei `=on-demand`/`=only` prüft der DoD-Push-Check jedes Submodul gegen sein
+eigenes Push-Ziel (#1051). Ein geschütztes **oder** unbestimmbares Ziel
+blockiert (fail closed); die Meldung nennt Submodul, Ziel und Ausweg (ohne
+`--recurse-submodules` pushen, dann auf einen Feature-Branch). Ohne
+`.gitmodules` unverändert.
 
 ## Bekannte Grenzen
 
