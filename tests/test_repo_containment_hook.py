@@ -628,7 +628,7 @@ def test_hook_wrapper_and_impl_are_valid_bash():
     for script in (_HOOK_PATH, _IMPL_PATH):
         result = subprocess.run(
             [_BASH, "-n", str(script)], capture_output=True, text=True,
-            timeout=SCRIPT_TIMEOUT,
+            cwd=str(_DECOY_ROOT), timeout=SCRIPT_TIMEOUT,
         )
         assert result.returncode == 0, (script, result.stderr)
 
