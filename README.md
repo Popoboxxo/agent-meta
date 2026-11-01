@@ -454,7 +454,8 @@ opt-in `off`/`advisory`/`strict` mode with per-item `check` (`agent`/`script`), 
 (`precondition`/`step`), `required` and `applies-when`. `strict` is a prompt/convention boundary
 only — the pre-release gates stay hard in every mode — and script items must be side-effect free
 because they also run in a dry run. Run it read-only with `/release-check`. Without the block
-`release.md` stays byte-identical. See
+`release.md` stays byte-identical apart from the template `version`/`generated-from`/`based-on`
+frontmatter lines. See
 [`docs/RELEASE_GATES.md`](docs/RELEASE_GATES.md#checklist-modus).
 
 See `docs/RELEASE_GATES.md` for the full config reference.

@@ -75,6 +75,26 @@ def test_item_field_types_are_hard_errors():                                # R4
     assert _errs({"items": [{"id": "x", "verification": "v"}]})            # task missing
 
 
+def test_free_text_fields_reject_placeholder_markers():                     # review fix-up
+    """The rendered block must never contain ``{{``/``}}`` (placeholder check)."""
+    for field in ("task", "verification", "script", "applies-when"):
+        item = _item(**{field: "x {{RELEASE_CHECKLIST_BLOCK}} y"})
+        if field == "script":
+            item["check"] = "script"
+        errors = _errs({"items": [item]})
+        assert any(
+            f"release-checklist.items[0].{field}" in e and "placeholder" in e
+            for e in errors
+        ), (field, errors)
+    # The closing marker alone is rejected as well.
+    assert any(
+        "placeholder" in e
+        for e in _errs({"items": [_item(verification="a }} b")]})
+    )
+    # Single braces are legitimate free text and stay valid.
+    assert not _errs({"items": [_item(task="use {x} here", verification="echo }")]})
+
+
 def test_validate_exits_with_path(capsys, tmp_path):
     with pytest.raises(SystemExit):
         rc.validate_release_checklist({"release-checklist": {"mode": "loose"}}, tmp_path / "project.yaml")

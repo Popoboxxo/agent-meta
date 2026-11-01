@@ -137,3 +137,45 @@ def test_help_mappings_checker_clean():
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     from lib.consistency.docs import check_ui_help_mappings
     assert [f.message for f in check_ui_help_mappings(REPO_ROOT) if HELP in f.message] == []
+
+
+# --------------------------------------------------------------------------- #
+# Review fix-up — the item phase default is ``precondition``, not ``step``   #
+# --------------------------------------------------------------------------- #
+
+def _release_checklist_view_body():
+    """Return the source of ``viewProjectReleaseChecklist`` (up to the next function)."""
+    start = HTML.index(f"async function {VIEW}(")
+    end = HTML.index("async function ", start + len(f"async function {VIEW}("))
+    return HTML[start:end]
+
+
+def test_new_item_draft_phase_defaults_to_precondition():
+    """A fresh item starts with the framework default phase (``precondition``)."""
+    body = _release_checklist_view_body()
+    match = re.search(r':\s*\{[^{}]*?phase:\s*"([a-z-]+)"', body)
+    assert match, "new-item draft literal not found"
+    assert match.group(1) == "precondition"
+
+
+def test_phase_less_item_keeps_precondition_on_render_and_save():
+    """A hand-written item without ``phase`` keeps its blocking effect.
+
+    The Admin UI must not display it as ``step`` and must not rewrite it to
+    ``step`` on save (which would silently drop it from the preconditions).
+    """
+    body = _release_checklist_view_body()
+    cell = re.search(r'item\.phase\s*\|\|\s*"([a-z-]+)"', body)
+    dropdown = re.search(r'Phase",\s*\n\s*\[[^\]]*\],\s*\n\s*draft\.phase\s*\|\|\s*"([a-z-]+)"', body)
+    save = re.search(r'draft\.phase\s*=\s*draft\.phase\s*\|\|\s*"([a-z-]+)";', body)
+    for name, match in (("table cell", cell), ("dropdown", dropdown), ("save", save)):
+        assert match, f"{name} phase fallback not found"
+        assert match.group(1) == "precondition", name
+
+    # Mirror ``draft.phase = draft.phase || "<default>"`` from the save handler:
+    # a phase-less item (None) resolves to the default, an explicit step survives.
+    save_default = save.group(1)
+    assert (None or save_default) == "precondition"
+    assert ("step" or save_default) == "step"
+    assert 'phase: "step"' not in body
+    assert '|| "step"' not in body

@@ -595,7 +595,7 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   providers = 14 new files), bumps the release templates
   (``release.md`` 1.13.0, ``hacs-release.md`` 1.1.1, ``sharkord-release.md``
   1.3.3; the checklist block itself is inert in the default matrix config) and
-  ``agent-meta-manager`` to 1.26.0 (recipe 14d plus the §3 row). **45 of 1085
+  ``agent-meta-manager`` to 1.26.0 (recipe 14d plus the §3 row). **31 of 1085
   hashes moved; 14 added (1085 -> 1099 render entries)**: 9 release agent
   renders, 9 manager renders, the 7 command ``.agent-meta-managed`` indexes and
   the 6 ``generated-file-hashes.json`` that gain the new command keys (Claude,

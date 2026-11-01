@@ -7848,7 +7848,7 @@ async function viewProjectReleaseChecklist() {
         el("td", {}, [item.task || ""]),
         el("td", {}, [item.verification || ""]),
         el("td", {}, [item.check === "script" ? `script: ${item.script || ""}` : "agent"]),
-        el("td", {}, [item.phase || "step"]),
+        el("td", {}, [item.phase || "precondition"]),
         el("td", {}, [item.required === false ? "no" : "yes"]),
         el("td", {}, [
           el("button", { class: "btn btn-sm", onclick: () => openItemModal(index) }, ["Edit"]),
@@ -7867,7 +7867,7 @@ async function viewProjectReleaseChecklist() {
     const isEdit = index >= 0;
     const draft = isEdit
       ? clone(items[index])
-      : { id: "", task: "", verification: "", check: "agent", phase: "step", required: true };
+      : { id: "", task: "", verification: "", check: "agent", phase: "precondition", required: true };
 
     const idInput = textInputEl("item-id", draft.id || "", "my-check", v => { draft.id = v; });
     const taskInput = textInputEl("item-task", draft.task || "", "What has to be done", v => { draft.task = v; });
@@ -7920,7 +7920,7 @@ async function viewProjectReleaseChecklist() {
       dropdownField(
         "Phase",
         ["precondition", "step"],
-        draft.phase || "step",
+        draft.phase || "precondition",
         v => { draft.phase = v; },
         {
           precondition: "precondition — checked before the release",
@@ -7965,7 +7965,7 @@ async function viewProjectReleaseChecklist() {
       const applies = appliesInput.value.trim();
       if (applies) draft["applies-when"] = applies;
       else delete draft["applies-when"];
-      draft.phase = draft.phase || "step";
+      draft.phase = draft.phase || "precondition";
       draft.required = requiredCb.checked;
       if (isEdit) items[index] = draft;
       else items.push(draft);

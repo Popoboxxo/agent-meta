@@ -536,7 +536,8 @@ Der Block `release-checklist:` in `.meta-config/project.yaml` steuert, **wie** d
 die Pre-Release-Checkliste auswertet. Er ist strikt getrennt von `release-gates:` (siehe oben):
 `release-gates:` bestimmt, **welche** Gates Schritt 0 ausführt, `release-checklist:` nur die
 Bewertung der Checklistenpunkte. Ohne Block (oder mit `mode: "off"`) bleibt die generierte
-`release.md` byte-identisch zu heute.
+`release.md` byte-identisch zu heute — abgesehen von den Template-Frontmatter-Zeilen
+`version`, `generated-from` und `based-on`.
 
 **Autorität für Struktur und Feldtypen ist das JSON-Schema**
 [`config/project-config.schema.json`](../config/project-config.schema.json) unter

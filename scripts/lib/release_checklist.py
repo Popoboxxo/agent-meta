@@ -50,6 +50,13 @@ _ITEM_KEYS: tuple[str, ...] = (
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _QUOTE_HINT = "Invalid -- quote the value: unquoted off/on are YAML booleans."
 
+# The rendered block is inserted into ``release.md`` before the unknown-
+# placeholder check, so the free-text item fields must not contain a
+# placeholder opener/closer. Enforced here; ``render_release_checklist_block``
+# only documents the invariant.
+_PLACEHOLDER_MARKERS: tuple[str, ...] = ("{{", "}}")
+_FREE_TEXT_ITEM_KEYS: tuple[str, ...] = ("task", "verification", "script", "applies-when")
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -196,6 +203,17 @@ def _collect_item_errors(
                 f"{prefix}.applies-when: expected a non-empty string"
             )
 
+    for key in _FREE_TEXT_ITEM_KEYS:
+        value = item.get(key)
+        if not isinstance(value, str):
+            continue
+        marker = next((m for m in _PLACEHOLDER_MARKERS if m in value), None)
+        if marker is not None:
+            errors.append(
+                f"{prefix}.{key}: must not contain the placeholder marker "
+                f"{marker!r}"
+            )
+
     if "script" in item:
         script = item["script"]
         if not isinstance(script, str):
@@ -314,7 +332,10 @@ def render_release_checklist_block(resolved: dict) -> str:
     """Render the checklist prose block; ``""`` when the mode is ``off``.
 
     The output is inserted into ``release.md`` before the unknown-placeholder
-    check, so it must never contain the placeholder opener ``{{``.
+    check, so it must never contain the placeholder opener ``{{``. Free-text
+    item fields that would introduce one are rejected by
+    :func:`collect_release_checklist_errors`; the renderer only documents the
+    invariant.
     """
     mode = resolved.get("mode", "off")
     if mode == "off":
