@@ -1,6 +1,6 @@
 # Opencode v2-Support (Phasen C0, B, C1/C2, C3, D) — Implementation Plan
 
-> Status: APPROVED (2026-10-22)
+> Status: complete (APPROVED 2026-10-22; umgesetzt, Phasen C0-D gemergt #1011-#1018, Release #1019)
 >
 > **Freigabe-Gate:** Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Die zugrunde liegende Spec (Rev. 1.5 inkl. Amendment B1) trägt `Status: APPROVED (2026-10-22)`. Die Entry-Kriterien E1–E4 gelten weiterhin operativ (E1 = Plan A gemergt) und werden vor der betroffenen Phase belegt. Die Abweichung A-6 (Wiederverwendung des bestehenden Schalters `provider-options.Opencode.surface-version` statt eines neuen Schlüssels, Spec OQ-B1) ist vom Nutzer bestätigt (2026-10-22); es gibt keinen neuen Schalter und keinen Alias.
 >

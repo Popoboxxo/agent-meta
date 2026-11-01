@@ -1,5 +1,5 @@
 # Tmp-Sink-Injektion Implementation Plan
-> Status: APPROVED (2026-10-24)
+> Status: complete (APPROVED 2026-10-24; umgesetzt, PR #1023 gemergt, Nachweis #1024)
 >
 > **Revision 3 (2026-10-24):** Nutzerentscheidungen Q3 (Toolchain-Cache-Opt-in), Q6 (Allowlist-Schema), Q10 (Antigravity `args.FilePath` → `file_path`), Q11 (§5.5 verweist auf `PYTEST_BASETEMP`) eingearbeitet. Neue Tasks 19–22; bestehende Task-IDs 1–18 unverändert (nur `Depends on`-Ergänzungen bei Task 15/18); `pipeline_stages` unverändert.
 
