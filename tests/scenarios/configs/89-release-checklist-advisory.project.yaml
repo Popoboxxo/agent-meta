@@ -1,0 +1,52 @@
+agent-meta-version: "2.0.0-beta.6"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+- release
+project:
+  name: scenario-release-checklist-advisory
+  prefix: s89
+  short: release-checklist-advisory
+  description: Release checklist mode advisory renders the full checklist contract with agent, script and step items (SPEC-RELEASE-CHECKLIST-2026-10-31, AC-REL-6/9/11/21-23).
+# AC-REL-6/9/11: advisory renders the contract (CHECKLIST_MODE, CHECKLIST_SUMMARY,
+# APPROVAL_REQUEST, APPROVED:, n/a (nicht ausgeführt)) plus the project items.
+release-checklist:
+  mode: "advisory"
+  items:
+  - id: changelog-unreleased
+    task: CHANGELOG.md has an "Unreleased" section for the next release.
+    verification: The section exists and lists every user-visible change.
+    check: agent
+  - id: schema-valid
+    task: The project config passes the framework validator.
+    verification: The validator exits 0.
+    check: script
+    script: python3 scripts/sync.py --validate
+  - id: docker-image-pushed
+    task: A tagged docker image is pushed to the registry.
+    verification: The registry shows the tag for this version.
+    phase: step
+    required: false
+    applies-when: the project ships a docker image
+variables:
+  PROJECT_GOAL: Verify advisory mode renders the checklist contract and every project item.
+  PROJECT_LANGUAGES: Python
+  TEST_COMMAND: python3 -m pytest
+  BUILD_COMMANDS: python3 -m build
+  DOCS_LANGUAGE: Englisch
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-release-checklist-advisory
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
