@@ -41,7 +41,10 @@ from .subagent_permissions import (
     render_subagent_permission_block,
     resolve_effective_subagent_permission_mode,
 )
-from .test_environments import validate_test_environments
+from .test_environments import (
+    build_test_environment_variables,
+    validate_test_environments,
+)
 from .pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -2471,6 +2474,9 @@ def build_variables(
 
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root, active_set)
+    # Test-environment block + gate flag (SPEC-TEST-ENVIRONMENTS-2026-10-31).
+    # project_root is needed for the project-layer platform URL fallback.
+    variables.update(build_test_environment_variables(config, project_root))
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
 
     return variables, unmapped

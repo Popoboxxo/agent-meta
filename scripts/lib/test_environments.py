@@ -424,3 +424,21 @@ def render_test_environment_block(resolved: dict) -> str:
         lines.extend(_secret_hint(name, token) for name, token in secrets)
 
     return "\n".join(lines)
+
+
+def build_test_environment_variables(
+    config: dict, project_root: "Path | None"
+) -> Dict[str, str]:
+    """Build the two template variables for the gated test-environment block.
+
+    ``TEST_ENVIRONMENT_BLOCK`` carries the rendered Markdown block (empty when
+    unconfigured) and ``TEST_ENVIRONMENTS_SET`` is ``"true"`` as soon as at
+    least one environment resolves, so the ``{{#if}}`` gate opens. The platform
+    fallback URL is only read when ``project_root`` is given.
+    """
+    project_vars = load_project_platform_vars(project_root) if project_root else None
+    resolved = resolve_test_environments(config, project_vars)
+    return {
+        "TEST_ENVIRONMENT_BLOCK": render_test_environment_block(resolved),
+        "TEST_ENVIRONMENTS_SET": "true" if resolved else "false",
+    }

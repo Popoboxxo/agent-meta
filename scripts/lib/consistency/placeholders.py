@@ -105,6 +105,9 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Convention blocks (rendered from config/conventions-presets.yaml by build_variables)
     "RELEASE_VERSIONING_BLOCK", "RELEASE_CHANGELOG_BLOCK", "GIT_ISSUE_NAMING_BLOCK",
     "RELEASE_CUSTOM_CHECKLIST_BLOCK", "RELEASE_CUTOFF_BLOCK",
+    # Test environments (build_test_environment_variables): the rendered block
+    # and its {{#if}} gate flag
+    "TEST_ENVIRONMENT_BLOCK", "TEST_ENVIRONMENTS_SET",
     # Structured release checklist (opt-in, release-checklist block)
     "RELEASE_CHECKLIST_MODE", "RELEASE_CHECKLIST_ENABLED", "RELEASE_CHECKLIST_BLOCK",
     # Issue language for feedback-created GitHub issues (issue #579)

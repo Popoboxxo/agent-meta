@@ -109,6 +109,10 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # config only — the {{#if RELEASE_CHECKLIST_ENABLED}} gate stays closed
     # standalone, so an empty string is the correct fallback.
     "RELEASE_CHECKLIST_BLOCK": "",
+    # TEST_ENVIRONMENT_BLOCK: only ever referenced inside
+    # {{#if TEST_ENVIRONMENTS_SET}} — an empty string is the correct standalone
+    # fallback (no test-environment targets outside a project install).
+    "TEST_ENVIRONMENT_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -137,6 +141,10 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
+    # Test-environment targets are project config only: standalone has none,
+    # so the gate stays closed and TEST_ENVIRONMENT_BLOCK is empty in
+    # _ORCHESTRATION_FALLBACKS.
+    "TEST_ENVIRONMENTS_SET": "false",
     "README_WARNINGS_ENABLED": "false",
     "AUTO_COMMIT_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
