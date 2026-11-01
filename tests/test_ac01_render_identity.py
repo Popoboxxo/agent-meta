@@ -635,6 +635,29 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
   (``5cbe9ea4…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): six role templates were
+  minor-bumped (``tester`` 2.9.0, ``e2e-tester`` 1.7.0, ``developer`` 4.9.0,
+  ``docker`` 1.10.0, ``devops-engineer`` 1.8.0, ``test-executor`` 1.3.0) and
+  ``agent-meta-manager`` to 1.27.0 (the test-environment recipe plus its §3
+  row). The conditional gate block is byte-neutral when ``test-environments`` is
+  unset - proven by ``test_unset_render_matches_baseline`` (the dedicated
+  baseline ``tests/fixtures/test-env-baseline/hashes.json`` stays unchanged) and
+  by the slimming gate, whose six role diffs are exactly the frontmatter pins.
+  Changed: **63 of 1099 hashes; 0 added/removed** - the seven roles (six base
+  templates + manager) x 9 providers. No rule artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or other artifact changed. The manifest was patched
+  **per entry** (63 single-line replacements, 1038 of the 1101 lines untouched)
+  - not via ``--write`` - after independently recomputing each digest from the
+  rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``f74d3088…`` -> ``ea59522c…``).
+  ``slimming-golden`` was re-derived for ``agent-meta-manager.md`` (recipe +
+  §3 row + version, manifest §20) and re-pinned for the six role version pins
+  (frontmatter only); its digest moved (``5cbe9ea4…`` -> ``a9990f4c…``).
+  ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is
+  NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

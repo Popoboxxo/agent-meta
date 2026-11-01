@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: 1.7.1
+version: 1.8.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   security best practices, staging validation, MTTG (commit-to-security-feedback)
   tracking, and environment classification.
@@ -13,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.7.1
+generated-from: 1-generic/devops-engineer.md@1.8.0
 model: claude-haiku-4-5-20251001
 ---
 

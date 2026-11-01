@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.26.0
+version: 1.27.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.26.0
+generated-from: 1-generic/agent-meta-manager.md@1.27.0
 model: claude-haiku-5-5
 ---
 
@@ -69,6 +69,7 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 | Change DoD preset | Project-wide quality requirements |
 | Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
 | Enable `auto_commit.mode` (`suggest`/`auto`/`custom`) | Changes commit behavior — `auto`/`custom` let agents commit without any confirmation step at all |
+| Enable remote test environments (`kind: remote\|both`, `remote-access: allow`, `access: deploy`) | Behavior change — agents may contact or deploy to a remote target |
 | Enable `release-checklist.mode` → `strict` | Behavior change: mandatory items stop the release (prompt convention only, no hook) |
 | Run `sync.py` | Overwrites generated files |
 | Fill values in `project.yaml` | Wrong values corrupt the project |
@@ -528,6 +529,49 @@ Neue Features oder neue `project.yaml`-Optionen bekommen ein eigenes
 Szenario dort (siehe `rules/2-platform/agent-meta-conventions.md` → Change
 Checklist) — nicht nur die eigenen Unit-Tests des Frameworks laufen lassen,
 sondern auch gegen realistische Consumer-Configs.
+## 18. Test environments (test-environments)
+
+Set up project-level test targets: local dev stack, a remote test/dev server,
+or both. Two blocks in `.meta-config/project.yaml` belong together but are
+not the same thing:
+
+- `environments:` (env-var definitions) — names, `secret: true`, no value.
+- `test-environments:` (targets) — `kind`, optional `url`, `token-env`,
+  `access`, `remote-access`, `notes`.
+
+**Ask which kind: local, remote or both.** Then:
+
+1. If a `token-env` is needed, create or verify the referenced `environments:`
+   entry **first** (`secret: true`, without a value — never a `default`).
+2. Write the block into `.meta-config/project.yaml`. Use `token-env: NAME`
+   — only the NAME, never the token value itself.
+3. Tell the user to provide the value via the shell environment or
+   `source .meta-config/env.sh` — never post the value in the chat.
+4. Re-sync with `python3 .agent-meta/scripts/sync.py` and verify
+   with `--validate`.
+5. Enabling remote access (see section 3) needs confirmation before the write.
+
+```yaml
+# .meta-config/project.yaml
+environments:
+  HA_DEV_TOKEN:
+    description: Long-lived access token of the HA dev server
+    secret: true
+test-environments:
+  ha-dev:
+    kind: both
+    url: http://ha-dev.lan:8123
+    token-env: HA_DEV_TOKEN
+    access: deploy
+    remote-access: ask
+    notes: Integration erst lokal testen, dann auf den Dev-Server.
+```
+
+`python3 scripts/sync.py --validate` fails on unknown keys, invalid enums, a
+URL with userinfo, or a `token-env` that does not reference an `environments:`
+entry with `secret: true`. The Admin UI runs the same check before a save is
+written.
+
 </workflow>
 
 <context>
