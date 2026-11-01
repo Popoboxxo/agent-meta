@@ -17,6 +17,7 @@ rejects it with "quote the value" (SPEC-RELEASE-CHECKLIST-2026-10-31 §9.4).
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 from pathlib import Path
@@ -48,6 +49,8 @@ _ITEM_KEYS: tuple[str, ...] = (
 )
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _QUOTE_HINT = "Invalid -- quote the value: unquoted off/on are YAML booleans."
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def normalize_release_checklist_mode(config: dict) -> None:
@@ -231,3 +234,263 @@ def validate_release_checklist(config: dict, config_path: Path) -> None:
     for message in errors:
         print(f"ERROR: {config_path}: {message}", file=sys.stderr)
     sys.exit(1)
+
+
+# --- Resolver --------------------------------------------------------------
+
+def _off_checklist(reason: str) -> dict:
+    """Log a warning and return the inert checklist shape."""
+    _LOGGER.warning("release-checklist: %s; treating as off", reason)
+    return {"mode": "off", "items": []}
+
+
+def resolve_release_checklist(config: dict) -> dict:
+    """Resolve ``release-checklist`` into ``{"mode": str, "items": list[dict]}``.
+
+    Never raises and never exits: any broken structure degrades to
+    ``{"mode": "off", "items": []}`` with a logged warning. Items are filled
+    with the defaults from SPEC §9.3 (``check="agent"``,
+    ``phase="precondition"``, ``required=True``); ``script`` and
+    ``applies-when`` only appear when configured.
+    """
+    try:
+        return _resolve_release_checklist(config)
+    except Exception as exc:  # noqa: BLE001 - the read path must never raise
+        return _off_checklist(f"resolver failed ({exc})")
+
+
+def _resolve_release_checklist(config: dict) -> dict:
+    if not isinstance(config, dict):
+        return _off_checklist("config is not a mapping")
+    block = config.get("release-checklist")
+    if block is None:
+        return {"mode": "off", "items": []}
+    if not isinstance(block, dict):
+        return _off_checklist(
+            f"expected a mapping, got {type(block).__name__}"
+        )
+    errors = collect_release_checklist_errors(config)
+    if errors:
+        return _off_checklist(
+            f"invalid configuration, {len(errors)} error(s): {errors[0]}"
+        )
+    mode = block.get("mode", "off")
+    if mode is False:
+        mode = "off"
+    if mode not in VALID_MODES:
+        return _off_checklist(f"invalid mode {mode!r}")
+    return {
+        "mode": mode,
+        "items": [_resolve_item(item) for item in block.get("items") or []],
+    }
+
+
+def _resolve_item(item: dict) -> dict:
+    """Fill the item defaults; keep optional keys only when present."""
+    resolved = {
+        "id": item["id"],
+        "task": item["task"],
+        "verification": item["verification"],
+        "check": item.get("check", "agent"),
+        "phase": item.get("phase", "precondition"),
+        "required": item.get("required", True),
+    }
+    if "script" in item:
+        resolved["script"] = item["script"]
+    if "applies-when" in item:
+        resolved["applies-when"] = item["applies-when"]
+    return resolved
+
+
+# --- Renderer --------------------------------------------------------------
+
+_ITEM_TABLE_HEAD = (
+    "| id | phase | check | required | task | verification | applies-when |",
+    "|----|-------|-------|----------|------|--------------|--------------|",
+)
+
+
+def render_release_checklist_block(resolved: dict) -> str:
+    """Render the checklist prose block; ``""`` when the mode is ``off``.
+
+    The output is inserted into ``release.md`` before the unknown-placeholder
+    check, so it must never contain the placeholder opener ``{{``.
+    """
+    mode = resolved.get("mode", "off")
+    if mode == "off":
+        return ""
+    items = resolved.get("items") or []
+    lines: list[str] = [
+        f"### Release checklist (mode: `{mode}`)",
+        "",
+        "**Step 0 stays hard in every mode.** Run the pre-release gates first. "
+        "A non-zero gate exit stops the release with `STATUS: failed` — in "
+        "`off`, `advisory` and `strict`. The checklist never softens the gates.",
+        "",
+    ]
+    lines.extend(_render_mode_semantics(mode))
+    lines.extend(["", "Item classes:"])
+    lines.append(
+        "- `precondition` — evaluated before any mutation: `tests-green`, "
+        "`dod-met`, `changelog-updated`, `readme-current`."
+    )
+    lines.append(
+        "- `step` — confirmed only after execution: `version-bumped`, "
+        "`build-created`, `git-tag-push`."
+    )
+    if items:
+        lines.extend(["", "Project items:", _ITEM_TABLE_HEAD[0], _ITEM_TABLE_HEAD[1]])
+        lines.extend(_render_item_row(item) for item in items)
+    else:
+        lines.extend(["", "Project items: none."])
+    lines.extend(["", *_STATIC_BLOCK_SECTIONS])
+    return "\n".join(lines)
+
+
+def _render_mode_semantics(mode: str) -> list[str]:
+    lines = [
+        "",
+        "Mode semantics:",
+        "- `advisory`: every item is evaluated and reported. A non-pass "
+        "precondition needs an explicit approval before any mutation; a "
+        "failing step leaves the run `partial` and needs a fresh approval "
+        "before tag/push.",
+    ]
+    if mode == "strict":
+        lines.append(
+            "- `strict`: every required item must be `pass`. A failing "
+            "required precondition means `STATUS: failed` with no mutation, "
+            "no tag and no push; a failing required step means no tag/push."
+        )
+        lines.append("")
+        lines.append(
+            "Boundary: `strict` is a Prompt-/Konventions-Boundary (convention "
+            "boundary), not a hook and not a security guarantee."
+        )
+    else:
+        lines.append("")
+        lines.append(
+            "Boundary: `advisory` is a Prompt-Konvention (prompt convention), "
+            "not a hook and not a security guarantee."
+        )
+    return lines
+
+
+def _cell(value: object) -> str:
+    """Escape a value for a single markdown table cell."""
+    return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _render_item_row(item: dict) -> str:
+    check = item.get("check", "agent")
+    verification = _cell(item.get("verification", ""))
+    if check == "script" and item.get("script"):
+        verification = f"{verification} (`{_cell(item['script'])}`)"
+    return (
+        f"| {_cell(item.get('id', ''))} "
+        f"| {_cell(item.get('phase', 'precondition'))} "
+        f"| {_cell(check)} "
+        f"| {'true' if item.get('required', True) else 'false'} "
+        f"| {_cell(item.get('task', ''))} "
+        f"| {verification} "
+        f"| {_cell(item.get('applies-when', '-'))} |"
+    )
+
+
+_STATIC_BLOCK_SECTIONS: tuple[str, ...] = (
+    "Script rules (`check: script`):",
+    "- Exit 0 = pass; any non-zero exit = fail.",
+    "- A missing or non-executable script is a fail, never `n/a`.",
+    "- Scripts must be side-effect free: they also run under "
+    "`MODE: check-only` and must not mutate files, tags or remotes.",
+    "",
+    "Procedure (do not reorder):",
+    "1. Step 0: run the release gates (hard in every mode).",
+    "2. Evaluate preconditions — default preconditions first, then the "
+    "project preconditions. This happens before any mutation.",
+    "3. Decide: in `strict` a failing required precondition means "
+    "`STATUS: failed` and the run ends. Any non-pass item that needs "
+    "approval stops the run before the first mutation with `STATUS: partial` "
+    "and an `APPROVAL_REQUEST`, unless the task already contains a matching "
+    "`APPROVED:` line.",
+    "4. Mutations and steps in this order: version bump (confirm "
+    "`version-bumped`), CHANGELOG edit, build (confirm `build-created`), "
+    "project steps, then tag and push through the `git` agent (confirm "
+    "`git-tag-push`). A failing step: `strict` with a required item means "
+    "`STATUS: failed`; `advisory` means `STATUS: partial`.",
+    "5. Emit the result table and decide.",
+    "",
+    "Approval protocol:",
+    "- Stop before the first mutation and return `STATUS: partial` with "
+    "`APPROVAL_REQUEST: release <version>; actions=bump,changelog,build,tag,push; "
+    "accept=<ids of the non-pass items>`.",
+    "- The orchestrator asks the user and re-dispatches with "
+    "`APPROVED: <action/ids>` in the task. The approval covers only the named "
+    "action and ids; another non-pass item or a failing step needs a new "
+    "`APPROVAL_REQUEST` (for example "
+    "`APPROVAL_REQUEST: continue-after-step-fail <ids>` before tag/push).",
+    "- On a re-dispatch, evaluate the preconditions again; if the result "
+    "differs from the approved ids, the approval gate applies again.",
+    "",
+    "`n/a` rules:",
+    "- In `advisory`, `n/a` needs a concrete single line `reason`; an empty "
+    "reason scores the item as `fail`.",
+    "- In `strict`, `n/a` is only allowed when the item has `applies-when` "
+    "and the condition does not apply, or when the item is `dod-met` or "
+    "`readme-current`. Those two need a single line `reason` that is not "
+    "empty.",
+    "- Every other default item (including `tests-green` and "
+    "`changelog-updated`) is never `n/a` in `strict`.",
+    "",
+    "Result contract (prepend these lines to the return, before `STATUS`):",
+    "```",
+    "CHECKLIST_MODE: off|advisory|strict",
+    "CHECKLIST:",
+    "| id | phase | check | result | reason (1 line) |",
+    "|----|-------|-------|--------|-----------------|",
+    "| tests-green | precondition | script | pass | exit 0 |",
+    "| version-bumped | step | agent | n/a (nicht ausgeführt) | dry-check |",
+    "CHECKLIST_SUMMARY: pass=<n> fail=<n> n/a=<n> not_run=<n> required_failed=<n>",
+    "APPROVAL_REQUEST: <action/ids>  # only for STATUS: partial because of an "
+    "approval, otherwise omit",
+    "```",
+    "",
+    "`result` is one of `pass`, `fail`, `n/a` or `n/a (nicht ausgeführt)`. "
+    "`reason` is mandatory for `n/a` (single line, not empty); a missing "
+    "reason scores as `fail`. `not_run` counts `n/a (nicht ausgeführt)` and "
+    "never contributes to `required_failed`.",
+    "`STATUS` mapping: in `strict`, `required_failed > 0` means `failed`; in "
+    "`advisory`, `fail > 0` or an open approval means `partial` (with "
+    "`APPROVAL_REQUEST`), otherwise `done`. A gate error in Step 0 means "
+    "`STATUS: failed` in every mode.",
+    "",
+    "Dry-check (`MODE: check-only`):",
+    "- Allowed: Step 0, reading or running every precondition (script items "
+    "must be side-effect free), the result table.",
+    "- Every `phase: step` item (default `version-bumped`, `build-created`, "
+    "`git-tag-push` and project steps) is `n/a (nicht ausgeführt)` and has no "
+    "effect on `strict`.",
+    "- Forbidden: tag, push, build, version bump, CHANGELOG or file edits, "
+    "commit, `gh release`.",
+    "- A dry-check never emits `APPROVAL_REQUEST` (no mutation). Result: "
+    "`done` (release-ready), `partial` (`advisory` with a failing "
+    "precondition) or `failed` (gate error or `strict` with a failing "
+    "required precondition).",
+    "",
+    "R-S4: never change the checklist mode yourself in any mode; only the "
+    "project configuration changes it.",
+)
+
+
+# --- Variables -------------------------------------------------------------
+
+
+def build_release_checklist_variables(config: dict) -> dict[str, str]:
+    """Build the three ``RELEASE_CHECKLIST_*`` template variables."""
+    resolved = resolve_release_checklist(config)
+    mode = resolved["mode"]
+    return {
+        "RELEASE_CHECKLIST_MODE": mode,
+        "RELEASE_CHECKLIST_ENABLED": "true" if mode != "off" else "false",
+        "RELEASE_CHECKLIST_BLOCK": render_release_checklist_block(resolved),
+    }

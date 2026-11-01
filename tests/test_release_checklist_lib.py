@@ -86,3 +86,80 @@ def test_load_config_normalizes_unquoted_off(tmp_path):                     # AC
     p = tmp_path / "project.yaml"
     p.write_text("project: {name: x, prefix: x}\nrelease-checklist:\n  mode: off\n", encoding="utf-8")
     assert load_config(p)["release-checklist"]["mode"] == "off"
+
+
+# --- Task 2: resolver, renderer, variables ---------------------------------
+
+REQUIRED_PHRASES = (                       # AC-REL-6..9, 11, 21-25 (Template-Text-Asserts)
+    "CHECKLIST_MODE", "CHECKLIST_SUMMARY", "not_run", "required_failed", "APPROVAL_REQUEST", "APPROVED:",
+    "MODE: check-only", "n/a (nicht ausgeführt)", "Exit 0 = pass", "side-effect free",
+    "Step 0", "STATUS: failed", "dod-met", "readme-current", "tests-green", "changelog-updated",
+    "version-bumped", "build-created", "git-tag-push", "| phase |",
+)
+
+
+def _res(mode, items=()):
+    return rc.resolve_release_checklist({"release-checklist": {"mode": mode, "items": list(items)}})
+
+
+def test_resolve_defaults():
+    r = _res("advisory", [_item()])
+    assert r["mode"] == "advisory"
+    assert r["items"][0]["check"] == "agent" and r["items"][0]["phase"] == "precondition" and r["items"][0]["required"] is True
+
+
+def test_resolve_absent_null_empty_is_off():                                # R1
+    for cfg in ({}, {"release-checklist": None}, {"release-checklist": {}}):
+        assert rc.resolve_release_checklist(cfg) == {"mode": "off", "items": []}
+    assert rc.resolve_release_checklist({"release-checklist": {"mode": False}})["mode"] == "off"
+
+
+def test_resolve_broken_structure_never_raises():                           # R2
+    for cfg in ({"release-checklist": "x"}, {"release-checklist": {"items": "x"}},
+                {"release-checklist": {"mode": "strict", "items": ["x"]}}, {"release-checklist": {"mode": True}}):
+        assert rc.resolve_release_checklist(cfg) == {"mode": "off", "items": []}
+
+
+def test_render_empty_when_off():
+    assert rc.render_release_checklist_block(_res("off", [_item()])) == ""
+
+
+def test_render_modes_contain_contract():
+    for mode in ("advisory", "strict"):
+        text = rc.render_release_checklist_block(_res(mode, [_item(id="docker-pushed", phase="step", required=False)]))
+        for phrase in REQUIRED_PHRASES: assert phrase in text, (mode, phrase)
+        assert "docker-pushed" in text
+        assert "non-blocking" not in text and "not blocking" not in text   # AC-REL-22
+    assert "Prompt-/Konventions-Boundary" in rc.render_release_checklist_block(_res("strict"))   # AC-REL-7
+
+
+def test_render_script_item_row():
+    text = rc.render_release_checklist_block(_res("strict", [_item(id="sv", check="script", script="python3 scripts/sync.py --validate")]))
+    assert "`python3 scripts/sync.py --validate`" in text                   # AC-REL-9
+
+
+def test_reserved_items_flags_and_template_rowcount():                      # AC-REL-21, b10
+    flags = {i: f for i, _, f in rc.RESERVED_DEFAULT_ITEMS}
+    assert {i for i, f in flags.items() if f} == {"dod-met", "readme-current"}
+    assert {p for _, p, _ in rc.RESERVED_DEFAULT_ITEMS} == {"precondition", "step"}
+    tpl = (REPO_ROOT / "agents" / "1-generic" / "release.md").read_text(encoding="utf-8")
+    head = tpl.split("## 1. Pre-release checklist", 1)[1].split("{{RELEASE_CUSTOM_CHECKLIST_BLOCK}}", 1)[0]
+    rows = [l for l in head.splitlines() if l.startswith("| ") and not l.startswith(("| Check", "|--"))]
+    assert len(rows) == len(rc.RESERVED_DEFAULT_ITEMS)
+
+
+def test_strict_block_na_rules():                                           # AC-REL-8, AC-REL-25
+    text = rc.render_release_checklist_block(_res("strict"))
+    assert "`reason`" in text and "applies-when" in text
+    assert "single line" in text      # einzeilige Begründung
+
+
+def test_build_variables():
+    off = rc.build_release_checklist_variables({})
+    assert off == {"RELEASE_CHECKLIST_MODE": "off", "RELEASE_CHECKLIST_ENABLED": "false", "RELEASE_CHECKLIST_BLOCK": ""}
+    on = rc.build_release_checklist_variables({"release-checklist": {"mode": "strict"}})
+    assert on["RELEASE_CHECKLIST_ENABLED"] == "true" and on["RELEASE_CHECKLIST_BLOCK"]
+
+
+def test_module_size_limit():                                               # AC-REL-19
+    assert len((REPO_ROOT / "scripts" / "lib" / "release_checklist.py").read_text(encoding="utf-8").splitlines()) <= 600
