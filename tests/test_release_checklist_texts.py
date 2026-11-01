@@ -29,3 +29,13 @@ def test_commands_documented():
     for p in ("docs/api/slash-commands.md", "README.md"):
         s = (REPO_ROOT / p).read_text(encoding="utf-8")
         assert "/release-check" in s and "/set-release-checklist" in s
+
+
+def test_manager_recipe():                                                  # AC-REL-16
+    t = (REPO_ROOT / "agents/1-generic/agent-meta-manager.md").read_text(encoding="utf-8")
+    assert 'version: "1.26.0"' in t and "### 14d." in t and "release-checklist" in t
+    sec3 = t.split("## 3. Confirmation required", 1)[1].split("## 4.", 1)[0]
+    assert "release-checklist.mode" in sec3 and "strict" in sec3
+    assert "gates stay hard in every mode" in t.lower()
+    assert "weicher" not in t and "softer" not in t.lower()                 # U8: kein "Gates werden weicher"
+    assert "quote" in t.lower()
