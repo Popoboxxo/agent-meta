@@ -21,6 +21,8 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+HTML = (REPO_ROOT / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
+HELP_REF = (REPO_ROOT / "docs" / "api" / "admin-ui-reference.md").read_text(encoding="utf-8")
 _ADMIN_SERVER_PATH = REPO_ROOT / "scripts" / "admin-server.py"
 # `lib.*` imports inside admin-server resolve through the real scripts dir.
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -101,3 +103,37 @@ def test_parity_with_direct_yaml_fragment(tmp_path):                        # AC
     _put(h, payload)
     manual = yaml.safe_load(yaml.safe_dump({"release-checklist": payload}))
     assert yaml.safe_load((tmp_path / ".meta-config" / "project.yaml").read_text(encoding="utf-8")) == manual
+
+
+# --------------------------------------------------------------------------- #
+# Task 8 — Admin UI section, router and help                                 #
+# --------------------------------------------------------------------------- #
+
+ROUTE = "/project/release-checklist"
+VIEW = "viewProjectReleaseChecklist"
+HELP = "project_instance-release_checklist"
+
+
+def test_view_route_nav_routemap_help():                                    # AC-REL-14
+    assert f"async function {VIEW}(" in HTML and HTML.count(VIEW) >= 2
+    assert re.search(r'router\.register\(\s*"' + re.escape(ROUTE) + r'"\s*,\s*' + VIEW + r'\s*\)', HTML)
+    assert f'route: "{ROUTE}"' in HTML
+    assert f'"project/release-checklist": "{HELP}"' in HTML
+    assert f"<!-- help-id: {HELP} -->" in HELP_REF
+
+
+def test_saved_via_partial_update_and_fields():
+    assert 'saveProjectSection("release-checklist"' in HTML
+    for token in ('"off"', '"advisory"', '"strict"', "precondition", "applies-when",
+                  "must be side-effect free", "Prompt convention only", "gates stay hard in every mode"):
+        assert token in HTML
+
+
+def test_script_field_only_for_script_check_and_no_execution():
+    assert "item-script" in HTML and "/api/exec" not in HTML
+
+
+def test_help_mappings_checker_clean():
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    from lib.consistency.docs import check_ui_help_mappings
+    assert [f.message for f in check_ui_help_mappings(REPO_ROOT) if HELP in f.message] == []
