@@ -288,3 +288,139 @@ def resolve_test_environments(
             "notes": entry.get("notes") or "",
         }
     return resolved
+
+
+_TABLE_HEADER = (
+    "| Name | kind | URL / source | access | remote-access | notes |",
+    "|---|---|---|---|---|---|",
+)
+_DISTINCTION = (
+    "- `environments:` defines environment variables; `test-environments:` "
+    "defines targets. `token-env` only references an `environments:` entry."
+)
+_CONVENTION = (
+    "Access approval is a prompt convention (convention boundary), not a "
+    "technical barrier."
+)
+_KIND_RULES = {
+    "local": "- **local:** local tests and dev stack only; no remote access.",
+    "remote": "- **remote:** the remote environment is the test target; access "
+    "only as allowed by remote-access and access.",
+    "both": "- **both:** test locally first, then the remote environment only "
+    "after approval as required by its remote-access.",
+}
+_ACCESS_RULES = {
+    "read": "- **access read:** read/query only (status, logs, config check); "
+    "never write or deploy.",
+    "deploy": "- **access deploy:** may also roll out or change things, only "
+    "together with remote-access ask or allow (deny always wins).",
+}
+_REMOTE_ACCESS_RULES = {
+    "deny": "- **remote-access deny:** never contact the environment (ssh, "
+    "scp, curl, `docker -H`, deploy); if the task needs it, report it to "
+    "main_chat.",
+    "allow": "- **remote-access allow:** access is permitted within the access "
+    "level; still report every deploy in your result.",
+    "ask": "- **remote-access ask:** stop BEFORE the first remote access (ssh, "
+    "scp, curl, `docker -H`, deploy). Return `STATUS: partial` with "
+    "`APPROVAL_REQUEST: env=<name>; action=<read|deploy: action>`. The "
+    "orchestrator obtains the user's approval and re-dispatches with "
+    "`APPROVED: env=<name>; action=<action>` in the task. The approval "
+    "applies only to the named environment and action; every further action "
+    "needs a new APPROVAL_REQUEST. Record the approval in your report.",
+}
+_TARGET_RULE = (
+    "- If the target or its URL is unclear, return `STATUS: partial` with "
+    "`APPROVAL_REQUEST: target?` and ask main_chat."
+)
+
+
+def _cell(value: Any) -> str:
+    """Sanitise one table cell: newlines become spaces, ``|`` is escaped (RF4)."""
+    text = str(value)
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    return text.replace("|", "\\|")
+
+
+def _url_cell(env: Dict[str, Any]) -> str:
+    url = env.get("url")
+    if url:
+        source = env.get("url_source") or ""
+        if source and source != "config":
+            return f"{url} (from {source})"
+        return str(url)
+    if env.get("kind") in _REMOTE_KINDS:
+        return "URL not configured"
+    return "\u2014"
+
+
+def _secret_hint(name: str, token: str) -> str:
+    return (
+        f"- **Token for `{name}`:** env var `${{{token}}}`; the value comes "
+        "from the shell environment, provided via `source .meta-config/env.sh` "
+        f"(from the `environments:` entry `{token}` with `secret: true`, "
+        "masked). Never print, log or write the value, and never read it from "
+        f"files; use `${{{token}}}` in the shell only."
+    )
+
+
+def render_test_environment_block(resolved: dict) -> str:
+    """Render the role-agnostic Markdown block (IC-4, spec §10.4).
+
+    ``{}`` renders as ``""``. Environments are sorted by name; the block has
+    no trailing newline and contains no role-specific logic (b12/C2).
+    """
+    if not resolved:
+        return ""
+    names = sorted(resolved)
+    lines = ["## Test environments", "", _DISTINCTION, ""]
+    lines.extend(_TABLE_HEADER)
+    for name in names:
+        env = resolved[name]
+        kind = env.get("kind", DEFAULTS["kind"])
+        is_local = kind == "local"
+        cells = [
+            name,
+            kind,
+            _url_cell(env),
+            "\u2014" if is_local else env.get("access", DEFAULTS["access"]),
+            "\u2014" if is_local else env.get("remote-access", DEFAULTS["remote-access"]),
+            env.get("notes") or "\u2014",
+        ]
+        lines.append("| " + " | ".join(_cell(cell) for cell in cells) + " |")
+    lines.extend(["", _CONVENTION, ""])
+
+    kinds = {resolved[name].get("kind", DEFAULTS["kind"]) for name in names}
+    for kind in KINDS:
+        if kind in kinds:
+            lines.append(_KIND_RULES[kind])
+
+    remote_envs = [
+        resolved[name]
+        for name in names
+        if resolved[name].get("kind", DEFAULTS["kind"]) in _REMOTE_KINDS
+    ]
+    accesses = {env.get("access", DEFAULTS["access"]) for env in remote_envs}
+    for level in ACCESS_LEVELS:
+        if level in accesses:
+            lines.append(_ACCESS_RULES[level])
+    remote_accesses = {
+        env.get("remote-access", DEFAULTS["remote-access"]) for env in remote_envs
+    }
+    for mode in REMOTE_ACCESS:
+        if mode in remote_accesses:
+            lines.append(_REMOTE_ACCESS_RULES[mode])
+
+    if len(names) > 1 or any(not env.get("url") for env in remote_envs):
+        lines.append(_TARGET_RULE)
+
+    secrets = [
+        (name, resolved[name]["token-env"])
+        for name in names
+        if resolved[name].get("token-env")
+    ]
+    if secrets:
+        lines.append("")
+        lines.extend(_secret_hint(name, token) for name, token in secrets)
+
+    return "\n".join(lines)
