@@ -11,7 +11,7 @@ Valid modes: `off` (default), `advisory`, `strict`.
 - `advisory` — mandatory items are reported but do not stop the release.
 - `strict` — a failed mandatory item stops the release. This is a prompt convention only, gates stay hard in every mode.
 
-Read `.meta-config/project.yaml`, confirm the change with the user, then update `release-checklist.mode` (create the block if it is missing). Quote the value, e.g. `mode: "off"` — an unquoted `off` is read as a boolean and the loader rejects it with "quote the value".
+Read `.meta-config/project.yaml`, confirm the change with the user, then update `release-checklist.mode` (create the block if it is missing). Quote the value, e.g. `mode: "off"` — YAML 1.1 parses an unquoted `off` as a boolean, which the loader normalizes back to `"off"`; only an unquoted `on`/`true` is rejected with "quote the value".
 
 For `strict`, explicitly confirm the behaviour change ("prompt convention only, gates stay hard") before writing.
 
