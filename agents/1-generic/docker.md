@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.9.1"
+version: "1.10.0"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
@@ -117,6 +117,10 @@ NOTES: [diagnostic results, recommendations]
 **Language:** code comments → English; diagnostic reports → user language.
 </constraints>
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+Deploy to a remote environment only if its access is deploy and the approval protocol above is satisfied.
+{{/if}}
 {{OUTPUT_GUARD_BLOCK}}
 
 Beispiel — Container synchron abwarten (`docker wait`):

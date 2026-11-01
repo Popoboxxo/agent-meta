@@ -1,6 +1,6 @@
 ---
 name: template-e2e-tester
-version: "1.6.1"
+version: "1.7.0"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
@@ -143,6 +143,10 @@ On failed tests or audit violations: return structured findings (affected flow, 
 **Language:** test descriptions and findings reports → {{CODE_LANGUAGE}}.
 </constraints>
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+Run tests locally before touching any remote environment.
+{{/if}}
 {{OUTPUT_GUARD_BLOCK}}
 
 Beispiel — Container synchron abwarten (`docker wait`):

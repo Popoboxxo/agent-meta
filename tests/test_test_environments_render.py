@@ -31,6 +31,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +64,57 @@ OVERRIDE_COVERAGE = {
     "hacs": {"developer", "tester", "devops-engineer"},
     "agent-meta": {"developer"},
 }
+
+#: Task 8: the minor version bump each base template receives with the gate.
+BASE_VERSIONS = {
+    "tester": "2.9.0",
+    "e2e-tester": "1.7.0",
+    "developer": "4.9.0",
+    "docker": "1.10.0",
+    "devops-engineer": "1.8.0",
+    "test-executor": "1.3.0",
+}
+
+#: Static role line inside the gate, directly below {{TEST_ENVIRONMENT_BLOCK}}.
+ROLE_LINES = {
+    "tester": "Run tests locally before touching any remote environment.",
+    "e2e-tester": "Run tests locally before touching any remote environment.",
+    "developer": (
+        "Develop and test locally first; touch a remote environment only as "
+        "the rules above allow."
+    ),
+    "docker": (
+        "Deploy to a remote environment only if its access is deploy and the "
+        "approval protocol above is satisfied."
+    ),
+    "devops-engineer": (
+        "Deploy to a remote environment only if its access is deploy and the "
+        "approval protocol above is satisfied."
+    ),
+    "test-executor": (
+        "Read-only: run existing suites against environments only as the rules "
+        "above allow; never deploy."
+    ),
+}
+
+#: Spec §9.1 example: one remote (both) target with a secret token plus one local.
+CONFIG_YAML = """
+environments:
+  HA_DEV_TOKEN:
+    description: "Long-lived access token of the HA dev server"
+    secret: true
+test-environments:
+  ha-dev:
+    kind: both
+    url: "http://ha-dev.lan:8123"
+    token-env: HA_DEV_TOKEN
+    access: deploy
+    remote-access: ask
+    notes: "Integration erst nach lokalem Test auf den Dev-Server deployen."
+  sharkord-local:
+    kind: local
+    notes: "Docker-Compose-Stack: docker compose run --rm test"
+"""
 
 #: Drift-only frontmatter/provenance lines: they carry the template version, not
 #: rendered body content, so a minor template bump must not move the baseline
@@ -235,6 +287,59 @@ def test_matrix_exercises_every_override(tmp_path_factory):
                 current["%s/%s" % (label, s)] != current.get("base/%s" % s)
                 for s in stems
             ), (label, role)
+
+
+# ---------------------------------------------------------------------------
+# Task 8: gate block in the six base templates + configured render
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("role", sorted(BASE_VERSIONS))
+def test_template_has_gated_block_directly_after_constraints(role):
+    src = (REPO_ROOT / "agents" / "1-generic" / f"{role}.md").read_text(encoding="utf-8")
+    gate = (
+        "{{#if TEST_ENVIRONMENTS_SET}}\n{{TEST_ENVIRONMENT_BLOCK}}\n"
+        + ROLE_LINES[role]
+        + "\n{{/if}}\n"
+    )
+    assert f'version: "{BASE_VERSIONS[role]}"' in src and src.count(gate) == 1
+    end = src.index("</constraints>") + len("</constraints>")
+    assert src[end:src.index(gate)].strip() == ""
+    if "{{OUTPUT_GUARD_BLOCK}}" in src:
+        assert src.index(gate) < src.index("{{OUTPUT_GUARD_BLOCK}}")
+
+
+@pytest.fixture(scope="module")
+def configured(tmp_path_factory):
+    return _role_texts(_sync_project(tmp_path_factory.mktemp("cfg"), extra_yaml=CONFIG_YAML))
+
+
+def test_configured_render_has_block_table_and_role_line(configured):  # AC-ENV-7
+    assert {_role_of(s) for s in configured} == set(BASE_VERSIONS)
+    for stem, text in configured.items():
+        assert "## Test environments" in text
+        assert "| ha-dev | both | http://ha-dev.lan:8123 | deploy | ask |" in text
+        assert ROLE_LINES[_role_of(stem)] in text
+        assert text.index("</constraints>") < text.index("## Test environments")
+
+
+def test_approval_protocol_in_all_six_roles(configured):  # AC-ENV-8, AC-ENV-20
+    for text in configured.values():
+        assert "APPROVAL_REQUEST: env=<name>; action=<read|deploy: action>" in text
+        assert "APPROVED: env=<name>; action=<action>" in text
+        assert "convention boundary" in text
+        block = text.split("## Test environments", 1)[1].split("\n## ", 1)[0]
+        assert "{{" not in block
+
+
+def test_settings_json_identical_and_no_secrets_file(tmp_path_factory):  # AC-ENV-11, AC-ENV-1
+    unset = _sync_project(tmp_path_factory.mktemp("u"))
+    cfg = _sync_project(tmp_path_factory.mktemp("c"), extra_yaml=CONFIG_YAML)
+    assert (unset / ".claude/settings.json").read_bytes() == (
+        cfg / ".claude/settings.json"
+    ).read_bytes()
+    assert not (unset / ".meta-config/secrets.local.yaml").exists()
+    assert not (cfg / ".meta-config/secrets.local.yaml").exists()
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

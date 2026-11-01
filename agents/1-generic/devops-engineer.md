@@ -1,6 +1,6 @@
 ---
 name: template-devops-engineer
-version: "1.7.1"
+version: "1.8.0"
 description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, security best practices, staging validation, MTTG (commit-to-security-feedback) tracking, and environment classification."
 hint: "Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks."
 reference_standards:
@@ -191,6 +191,10 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 **Language:** code comments, commit messages, infrastructure descriptions → English.
 </constraints>
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+Deploy to a remote environment only if its access is deploy and the approval protocol above is satisfied.
+{{/if}}
 {{OUTPUT_GUARD_BLOCK}}
 
 Beispiel — Container synchron abwarten (`docker wait`):

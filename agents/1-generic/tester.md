@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.8.0"
+version: "2.9.0"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. For integration tests → se-test-engineer."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
@@ -133,6 +133,10 @@ NEXT: [recommended next step]
 **Language:** test descriptions → {{CODE_LANGUAGE}}.
 </constraints>
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+Run tests locally before touching any remote environment.
+{{/if}}
 {{OUTPUT_GUARD_BLOCK}}
 
 Beispiel — Container synchron abwarten (`docker wait`):
