@@ -362,3 +362,32 @@ variables:
   GH_ASSETS: ""
   BUILD_SYSTEM_NOTES: ""
   VERSION_DIST_BEHAVIOUR: ""
+
+# ------------------------------------------------------------------------------
+# 11. Test-Umgebungen / Test environments
+# ------------------------------------------------------------------------------
+# Optionaler Block: deklariert Test-/Deploy-Ziele. Nicht zu verwechseln mit
+# `environments:` (Env-Var-Definitionen) — `token-env` referenziert nur einen
+# Eintrag von dort mit `secret: true`, nie den Wert selbst.
+# Optional block: declares test/deploy targets. Not to be confused with
+# `environments:` (env-var definitions); `token-env` only names an entry there
+# with `secret: true`, never the value itself.
+
+# --- test-environments (example) ---
+# # Beispiel / Example — kopieren und anpassen, dann `python3 scripts/sync.py --validate`.
+# environments:
+#   HA_DEV_TOKEN:
+#     description: "Long-lived access token of the HA dev server"
+#     secret: true
+# test-environments:
+#   ha-dev:
+#     kind: both                   # local | remote | both (Default: local) — quoten
+#     url: "http://ha-dev.lan:8123"
+#     token-env: HA_DEV_TOKEN      # nur der Name, nie der Wert
+#     access: deploy               # read | deploy (Default: read)
+#     remote-access: ask           # deny | ask | allow (Default: ask)
+#     notes: "Integration erst lokal testen, dann auf den Dev-Server deployen."
+#   sharkord-local:
+#     kind: local
+#     notes: "Docker-Compose-Stack: docker compose run --rm test"
+# --- end test-environments ---
