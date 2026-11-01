@@ -139,3 +139,96 @@ def test_module_budget_and_constraints():  # AC-ENV-18, AC-ENV-11
         "logging",
         "urllib",
     }
+
+
+# ---------------------------------------------------------------------------
+# Part B (Task 4): token-env reference resolution and the config-load abort
+# ---------------------------------------------------------------------------
+
+from lib.config import load_config  # noqa: E402
+from lib.test_environments import (  # noqa: E402
+    collect_test_environment_errors,
+    validate_test_environments,
+)
+
+ENVS = {"HA_DEV_TOKEN": {"description": "t", "secret": True}}
+
+
+def test_token_env_valid_reference():
+    assert check_test_environments(
+        _cfg({"a": {"kind": "remote", "token-env": "HA_DEV_TOKEN"}}, environments=ENVS)
+    ) == ([], [])
+
+
+@pytest.mark.parametrize("val", ["lower", "1ABC", "has space", "secret-value-123", "ghp_x/y", 5])
+def test_token_env_must_be_a_name(val):
+    assert "expected env var NAME, not a value" in check_test_environments(
+        _cfg({"a": {"token-env": val}}, environments=ENVS)
+    )[0][0]
+
+
+def test_token_env_not_defined():
+    assert "environments entry 'HA_DEV_TOKEN' not defined" in check_test_environments(
+        _cfg({"a": {"token-env": "HA_DEV_TOKEN"}})
+    )[0][0]
+
+
+@pytest.mark.parametrize("envs", [None, [], "x"])  # RF3
+def test_environments_not_a_mapping_gives_not_defined_error(envs):
+    assert "not defined" in check_test_environments(
+        _cfg({"a": {"token-env": "HA_DEV_TOKEN"}}, environments=envs)
+    )[0][0]
+
+
+@pytest.mark.parametrize("secret", [False, "true", "yes", 1, None])  # RF3
+def test_token_env_requires_secret_true(secret):
+    envs = {"HA_DEV_TOKEN": {"description": "t", "secret": secret}}
+    assert "must have secret: true" in check_test_environments(
+        _cfg({"a": {"token-env": "HA_DEV_TOKEN"}}, environments=envs)
+    )[0][0]
+
+
+def test_referenced_entry_with_default_warns():  # CA12, NZ3
+    envs = {"HA_DEV_TOKEN": {"secret": True, "default": "abc"}}
+    errors, warnings = check_test_environments(
+        _cfg({"a": {"token-env": "HA_DEV_TOKEN"}}, environments=envs)
+    )
+    assert errors == [] and len(warnings) == 1 and "default" in warnings[0]
+    assert "HA_DEV_TOKEN" in warnings[0]
+
+
+def test_referenced_entry_with_empty_default_does_not_warn():
+    envs = {"HA_DEV_TOKEN": {"secret": True, "default": ""}}
+    assert check_test_environments(
+        _cfg({"a": {"token-env": "HA_DEV_TOKEN"}}, environments=envs)
+    ) == ([], [])
+
+
+def test_collect_returns_errors_only_and_never_exits():
+    assert collect_test_environment_errors(_cfg({"a": {"kind": "x"}})) != []
+    assert collect_test_environment_errors({}) == []
+
+
+def test_validate_exits_with_path_message(tmp_path, capsys):  # AC-ENV-2
+    with pytest.raises(SystemExit) as exc:
+        validate_test_environments(_cfg({"a": {"kind": "x"}}), tmp_path / "project.yaml")
+    err = capsys.readouterr().err
+    assert exc.value.code == 1 and "ERROR:" in err and "test-environments.a.kind" in err
+    assert str(tmp_path / "project.yaml") in err
+
+
+def test_validate_prints_warnings_without_exit(tmp_path, capsys):
+    validate_test_environments(_cfg({"a": {"kind": "local", "url": "http://x"}}), tmp_path / "project.yaml")
+    assert "WARN:" in capsys.readouterr().err
+
+
+def test_load_config_aborts_on_invalid_block(tmp_path):
+    p = tmp_path / ".meta-config" / "project.yaml"
+    p.parent.mkdir()
+    p.write_text(
+        'agent-meta-version: "2.0.0-beta.5"\nai-providers:\n- Claude\ndod-preset: rapid-prototyping\n'
+        "test-environments:\n  a:\n    kind: remote\n    remote-access: off\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        load_config(p)

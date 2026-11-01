@@ -109,9 +109,47 @@ def check_test_environments(config: dict) -> Tuple[List[str], List[str]]:
             elif "{{" in notes or "}}" in notes:
                 errors.append(f"{prefix}.notes: placeholder syntax not allowed")
 
+        _check_token_env(config, prefix, entry, errors, warnings)
         warnings.extend(_warn_ineffective_settings(prefix, entry))
 
     return errors, warnings
+
+
+def _check_token_env(
+    config: dict,
+    prefix: str,
+    entry: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Rule 3: ``token-env`` names an ``environments`` entry with ``secret: true``.
+
+    Only the boolean ``True`` counts as secret (RF3); a string ``"true"`` or
+    ``1`` is rejected. A missing/non-mapping ``environments`` block reports
+    "not defined" instead of crashing.
+    """
+    if "token-env" not in entry:
+        return
+    token = entry["token-env"]
+    path = f"{prefix}.token-env"
+    if not isinstance(token, str) or not TOKEN_ENV_RE.match(token):
+        errors.append(f"{path}: expected env var NAME, not a value (got {token!r})")
+        return
+
+    environments = config.get("environments")
+    if not isinstance(environments, dict) or token not in environments:
+        errors.append(f"{path}: environments entry '{token}' not defined")
+        return
+    definition = environments[token]
+    if not isinstance(definition, dict) or definition.get("secret") is not True:
+        errors.append(f"{path}: environments entry '{token}' must have secret: true")
+        return
+    default = definition.get("default")
+    if str(default or "").strip():
+        warnings.append(
+            f"environments entry '{token}' has a non-empty default "
+            f"(secret value in project.yaml)"
+        )
 
 
 def _warn_ineffective_settings(prefix: str, entry: Dict[str, Any]) -> List[str]:
@@ -136,3 +174,24 @@ def _warn_ineffective_settings(prefix: str, entry: Dict[str, Any]) -> List[str]:
             f"{prefix}: access: deploy conflicts with remote-access: deny (deny wins)"
         )
     return warnings
+
+
+def collect_test_environment_errors(config: dict) -> List[str]:
+    """Non-exiting entry point, reused by the admin-server section guard."""
+    errors, _ = check_test_environments(config)
+    return errors
+
+
+def validate_test_environments(config: dict, config_path: Path) -> None:
+    """Hard-fail the config load on invalid ``test-environments`` entries.
+
+    Errors are printed as ``ERROR: <config_path>: <message>`` and terminate
+    with exit code 1; warnings are printed as ``WARN: ...`` without exiting.
+    """
+    errors, warnings = check_test_environments(config)
+    for warning in warnings:
+        print(f"WARN: {config_path}: {warning}", file=sys.stderr)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {config_path}: {error}", file=sys.stderr)
+        sys.exit(1)
