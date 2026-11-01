@@ -127,6 +127,9 @@ verhalten sich exakt wie bisher.
 | `88-release-checklist-off` | Claude | strict (default) | `release-checklist.mode: "off"` is a byte-identical no-op (SPEC-RELEASE-CHECKLIST-2026-10-31, AC-REL-1): `release.md` carries neither `CHECKLIST_MODE` nor `RELEASE_CHECKLIST`, and a second sync with the same config minus the block is `cmp`-identical |
 | `89-release-checklist-advisory` | Claude | strict (default) | `mode: "advisory"` renders the checklist contract — `CHECKLIST_MODE`, `APPROVAL_REQUEST`, `APPROVED:`, `n/a (nicht ausgeführt)` — plus the agent, script (`python3 scripts/sync.py --validate`) and step (`applies-when`) items, with no `{{` residue (AC-REL-6/9/11/21-23) |
 | `90-release-checklist-strict` | Claude | strict (default) | `mode: "strict"` renders the `Prompt-/Konventions-Boundary` wording, maps `required_failed` to `STATUS: failed` and lists the project item (AC-REL-7/8/24/25) |
+| `91-test-env-local` | Claude | strict (default) | A `local` only `test-environments` target renders the `## Test environments` table into all six gated roles, but never the remote approval protocol (SPEC-TEST-ENVIRONMENTS-2026-10-31, AC-ENV-16/7) |
+| `92-test-env-remote-ask` | Claude | strict (default) | A remote HA dev target with `remote-access: ask` renders the `APPROVAL_REQUEST`/`APPROVED` protocol and the `${HA_DEV_TOKEN}` name reference into all six roles; `env.sh` carries `[SECRET]`, `settings.json` gains no ssh/curl permission pattern (AC-ENV-6/8/11/16) |
+| `93-test-env-unset` | Claude | strict (default) | An unconfigured `test-environments` block stays byte-clean: no block, no `TEST_ENVIRONMENT`/`{{TEST_ENV` residue, zero `APPROVAL_REQUEST` in the six gated roles (AC-ENV-1/16) |
 
 ## Bewusste Auslassungen
 

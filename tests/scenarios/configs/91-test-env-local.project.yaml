@@ -1,0 +1,39 @@
+agent-meta-version: "2.0.0-beta.6"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms:
+- sharkord
+roles:
+- tester
+- e2e-tester
+- developer
+- docker
+- devops-engineer
+- test-executor
+project:
+  name: scenario-test-env-local
+  prefix: s91
+  short: test-env-local
+  description: A local-only test environment renders the target table without any remote approval protocol (SPEC-TEST-ENVIRONMENTS-2026-10-31, AC-ENV-16).
+# AC-ENV-16: a local-only target renders the table and the local rule, but
+# never the remote approval protocol (no ask/allow/deny text).
+test-environments:
+  sharkord-local:
+    kind: local
+    notes: "docker compose run --rm test"
+variables:
+  PROJECT_GOAL: Verify a local-only test environment renders the target table and no remote approval protocol.
+  PROJECT_LANGUAGES: Python
+  DOCS_LANGUAGE: Englisch
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-test-env-local
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
