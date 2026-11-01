@@ -11,6 +11,23 @@ Der Loop wiederholt sich bis:
 - Maximale Iterationszahl erreicht ist
 - Loop als "blocked" eskaliert wird
 
+Ablauf eines Pairs. Die Verdicts entsprechen dem generischen Critic (`code-reviewer`: `APPROVED`, `CHANGES_REQUESTED`, `BLOCKED`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> Generator
+    Generator --> Critic : Output
+    Critic --> Akzeptiert : APPROVED
+    Critic --> Blockiert : BLOCKED
+    Critic --> Iteration : CHANGES_REQUESTED
+    Iteration --> Generator : Iteration unter max_iterations
+    Iteration --> Ende : max_iterations erreicht
+    Blockiert --> Eskalation : on_blocked
+    Akzeptiert --> [*]
+    Eskalation --> [*]
+    Ende --> [*]
+```
+
 ## Konfiguration
 
 ### Zentrale Definition: `config/role-defaults.yaml`
@@ -32,6 +49,21 @@ reflection-pairs:
     dev-review-loop:
       max_iterations: 5  # Projekt-spezifische Anpassung
 ```
+
+## Verfügbare Pairs (8)
+
+Quelle: `reflection_pairs` in `config/role-defaults.yaml`. `on_blocked` leer = Default-Eskalation.
+
+| Pair-ID | Generator | Critic | Max Iterationen | on_blocked |
+|---------|-----------|--------|-----------------|------------|
+| `dev-review-loop` | developer | code-reviewer | 3 | escalate_to_principal-developer |
+| `se-requirements-loop` | se-requirements | se-critic | 3 | - |
+| `se-architect-loop` | se-architect | se-critic | 3 | - |
+| `se-test-loop` | se-test-engineer | se-testreviewer | 3 | - |
+| `se-dev-review-loop` | se-developer | code-reviewer | 3 | escalate_to_orchestrator |
+| `concept-specify-loop` | concept-specifier | concept-reviewer | 3 | escalate_to_orchestrator |
+| `task-req-review-loop` | developer | validator | 2 | escalate_to_orchestrator |
+| `task-quality-review-loop` | developer | code-reviewer | 2 | escalate_to_orchestrator |
 
 ## Workflow-Notation
 
