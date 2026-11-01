@@ -30,6 +30,12 @@ trace:
 > diesem Dokument gesetzt. Jeder Punkt startet frühestens an seinem eigenen Gate
 > (Spec-Approval durch den User / User-Entscheid / eigener Plan). Ausführung ohne
 > freigegebene Spec verstößt gegen `spec-plan-workflow` (Spec/Plan-Gate).
+>
+> **Nachtrag 2026-10-31 (Pause-Punkt):** Der laufende Stand — P1 done, sechs Phasen
+> offen — steht in `docs/plans/2026-10-31-wave-4-status.md`. Die Fließtext-Ist-Stände
+> unten (Spec-Kopf, Erledigt/Offen je Item) sind der Stand vom 2026-10-30 und bleiben
+> als Verlauf stehen; die State-Zellen der Übersicht und die State-Zeilen der
+> Item-Köpfe tragen den Stand vom 2026-10-31.
 
 **Goal:** Alle in dieser Session offen gebliebenen Punkte (Welle 4 / #945 plus drei
 Folge-Issues) in einem nachvollziehbaren Fortsetzungs-Strang festhalten — je Punkt
@@ -56,19 +62,19 @@ Spec-Status weiterhin **Entwurf**).
 
 | ID | Quelle | State | Größe | Gate | Ownende Rolle | Nächste konkrete Aktion |
 |---|---|---|---|---|---|---|
-| **I1** | Issue #945 (`tests,ci`, OPEN) + `SPEC-test-hygiene-945` | **BLOCKED-BY-APPROVAL** | XL (P1 L 14 · P2a XL 32 · P2b XL 31 · P3 M 5 · P4 M 3 · P5 S 2 · P6 M 3 Dateien) | User setzt `Status: APPROVED` in der Spec | `planner` (Item-Plan), danach `developer`/`senior-developer`/`devops-engineer`/`tester` | User-Approval einholen; danach Item-Plan aus Rev. 3 ableiten |
-| **I2** | Housekeeping zu I1 (kein Issue) | **READY** | S | keine (Doku-only), aber PR-Review | `concept-specifier` (Rev. 3.1), `git` (Rebase/Push/PR) | Rev. 3.1 schreiben, Branch auf `main` rebasen, PR aufmachen |
-| **I3** | Issue #1050 (`bug,hooks`, OPEN) | **READY** | M | Spec → Approval → Plan | `concept-specifier` | Spec für #1050 schreiben (Fix-Sketch steht im Issue) |
-| **I4** | Issue #1051 (`enhancement,hooks`, OPEN) | **READY** | L | Spec → Approval → Plan | `concept-specifier` | Spec für #1051 schreiben (größte Verhaltensänderung der drei) |
+| **I1** | Issue #945 (`tests,ci`, OPEN) + `SPEC-test-hygiene-945` | **P1 DONE — 6 Phasen offen** | XL (P1 L 14 · P2a XL 32 · P2b XL 31 · P3 M 5 · P4 M 3 · P5 S 2 · P6 M 3 Dateien) | Spec `APPROVED (2026-10-31)`; P1 PR #1103 gemergt | `planner` (P2a-Plan), danach `developer`/`senior-developer`/`devops-engineer`/`tester` | P2a-Plan ableiten (32 Dateien, XL) — Reihenfolge in `docs/plans/2026-10-31-wave-4-status.md` |
+| **I2** | Housekeeping zu I1 (kein Issue) | **DONE** | S | keins | — | erledigt (PR #1100, Merge `ff334aa3`) |
+| **I3** | Issue #1050 (`bug,hooks`, CLOSED) | **DONE** | M | durchlaufen | — | erledigt (PR #1097, Merge `b578aa79`) |
+| **I4** | Issue #1051 (`enhancement,hooks`, CLOSED) | **DONE** | L | durchlaufen | — | erledigt (PR #1098, Merge `f541de75`) |
 | **I5** | Issue #971 (`bug`, OPEN) | **BLOCKED-BY-DECISION** | unbekannt | User liefert Akzeptanzkriterium | — | User fragen: welches Kriterium definiert „kein dangling lazy pointer“? |
 | **I6** | Issue #192 (`enhancement,deferred`, OPEN) | **NO ACTION** | — | — | — | Nichts. Offen lassen, nicht planen. |
-| **I7** | AC2-Residual aus I1 (kein Issue) — `timeout-minutes` für `.github/workflows/scorecard.yml:jobs.analysis` | **READY** | S (1 Datei, 2 Zeilen) | keins über PR-Review hinaus | `junior-developer` (Change), `git` (PR) | `timeout-minutes: 10` in `scorecard.yml:jobs.analysis` ergänzen (Wert in einem Satz begründen) — empfohlen: in Welle-4-Phase **P5** falten |
+| **I7** | AC2-Residual aus I1 (kein Issue) — `timeout-minutes` für `.github/workflows/scorecard.yml:jobs.analysis` | **DONE** | S (1 Datei, 2 Zeilen) | keins | — | erledigt (PR #1088, Merge `a1c58800`; AC2 9/9) |
 
 ---
 
 ## I1 — Welle 4 / Issue #945 (Test-Hygiene)
 
-**Trace:** `SPEC-test-hygiene-945`, #945 · **State: BLOCKED-BY-APPROVAL** · Größe XL.
+**Trace:** `SPEC-test-hygiene-945`, #945 · **State: IN ARBEIT — P1 DONE (2026-10-31), P2a–P6 offen** · Größe XL.
 
 ### Erledigt
 
@@ -151,7 +157,7 @@ neu `.github/workflows/browser-test.yml`, neu `tests/requirements-browser.txt`,
 
 ## I2 — Pre-Approval-Housekeeping für I1 (zuerst erledigen)
 
-**State: READY** · Größe S · Gate: keins (Doku-only), nur PR-Review. Rolle:
+**State: DONE (2026-10-31)** · Größe S · Gemergt als PR #1100 (Merge `ff334aa3`). Rolle:
 `concept-specifier` (Text), `git` (Rebase/Push/PR).
 
 ### Erledigt
@@ -196,7 +202,7 @@ Rebase auf `ec359896` → Push → PR → Merge nach CI.
 
 ## I3 — Issue #1050 (`}`-Lücke im Fork-Bomb-Scan)
 
-**State: READY** (keine offene Entscheidung) · Größe M · Gate: Spec → Approval → Plan.
+**State: DONE (2026-10-31)** · Größe M · Gemergt als PR #1097 (Merge `b578aa79`), Issue CLOSED.
 Trace: #1050 (Reihenfolge-Anker: nach `SPEC-test-hygiene-945` unabhängig).
 
 ### Erledigt
@@ -236,8 +242,8 @@ Issue-Sketch; danach Approval durch den User.
 
 ## I4 — Issue #1051 (Submodule-Push-Ziele statt Pauschalblock)
 
-**State: READY** · Größe **L** (größte Verhaltensänderung der drei Issues) · Gate: Spec →
-Approval → Plan. Trace: #1051 (Residuum von #953).
+**State: DONE (2026-10-31)** · Größe **L** (größte Verhaltensänderung der drei Issues) ·
+Gemergt als PR #1098 (Merge `f541de75`), Issue CLOSED. Trace: #1051 (Residuum von #953).
 
 ### Erledigt
 
@@ -317,8 +323,8 @@ Nichts. Issue offen lassen, nicht planen, nicht schließen.
 
 ## I7 — AC2-Residual: `timeout-minutes` für `scorecard.yml:jobs.analysis`
 
-**State: READY** · Größe **S** (1 Datei, 2 Zeilen) · Gate: keins über PR-Review hinaus.
-Trace: `SPEC-test-hygiene-945` (AC2), #945. Rolle: `junior-developer` (Change), `git` (PR).
+**State: DONE (2026-10-31)** · Größe **S** (1 Datei, 2 Zeilen) · Gemergt als PR #1088
+(Merge `a1c58800`), AC2 9/9. Trace: `SPEC-test-hygiene-945` (AC2), #945.
 
 ### Erledigt
 
@@ -390,6 +396,11 @@ schließt — oder als eigenständiger Zwei-Zeilen-PR (`chore:`/`fix:`) liefern.
    Programm mit einem gemeinsamen Plan? Auswirkung: Anzahl der Review-/Approval-Schleifen
    und die Größe des ersten PR (P1 mit 14 Dateien ist reviewbar, P2a mit 32 nur schwer).
 5. **I3-vs-P2a-Vorrang** (Empfehlung: P2a zuerst, wenn Review-Kapazität da ist; sonst #1050).
+
+> **Stand 2026-10-31:** Punkt 1 ist erledigt (Spec `APPROVED (2026-10-31)`, Rev. 3.1).
+> Punkt 4 ist durch den Phase-für-Phase-Zuschnitt entschieden (P1 zuerst, dann P2a).
+> Punkt 5 ist gegenstandslos, weil #1050 und #1051 bereits gemergt sind. Offen bleiben
+> Punkt 2 (OQ-4, gehört zu P6) und Punkt 3 (#971, BLOCKED-BY-DECISION).
 
 ## Known Constraints (Umgebung, aus dieser Session)
 
