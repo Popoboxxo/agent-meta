@@ -6,10 +6,17 @@ The UI part of this module is added in Task 11 of
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+HTML = (REPO_ROOT / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
+HELP_REF = (REPO_ROOT / "docs" / "api" / "admin-ui-reference.md").read_text(
+    encoding="utf-8"
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -110,3 +117,67 @@ def test_unrelated_section_not_blocked_by_preexisting_invalid_config(tmp_path): 
     h = _handler(tmp_path)
     h.config_manager.write("project", {"test-environments": {"a": {"kind": "x"}}})
     _post(h, "git", {"auto_commit": False})
+
+
+# --------------------------------------------------------------------------- #
+# UI part (Task 11)                                                           #
+# --------------------------------------------------------------------------- #
+
+
+def _view_body() -> str:
+    """Return the body of ``viewProjectTestEnvironments`` up to the next view."""
+    return HTML.split("async function viewProjectTestEnvironments(", 1)[1].split(
+        "\nasync function ", 1
+    )[0]
+
+
+def test_view_defined_routed_and_in_nav():  # AC-ENV-12
+    assert "async function viewProjectTestEnvironments(" in HTML
+    assert re.search(
+        r'router\.register\(\s*"/project/test-environments"\s*,\s*'
+        r"viewProjectTestEnvironments\s*\)",
+        HTML,
+    )
+    assert 'route: "/project/test-environments"' in HTML
+
+
+def test_saved_via_partial_update_with_string_enums():
+    body = _view_body()
+    assert 'saveProjectSection("test-environments"' in body
+    for enum in (
+        '["local", "remote", "both"]',
+        '["read", "deploy"]',
+        '["deny", "ask", "allow"]',
+    ):
+        assert enum in body
+
+
+def test_no_secret_value_input():  # Z7, AZ2
+    body = _view_body()
+    assert not re.search(r'type:\s*"password"', body)
+    assert "TOKEN_ENV_RE" in body and "^[A-Z][A-Z0-9_]*$" in body
+    assert "nie hier eintragen" in body
+
+
+def test_remote_activation_requires_confirmation():
+    assert "confirmDestructive(" in _view_body()
+
+
+def test_cross_hints_between_environments_views():  # AC-ENV-17
+    assert "Environment Variables" in _view_body() and "secret" in _view_body().lower()
+    env_view = HTML.split("async function viewProjectEnvironments(", 1)[1].split(
+        "\nasync function ", 1
+    )[0]
+    assert "Test Environments" in env_view
+
+
+def test_routemap_and_help_block_and_checker():
+    assert '"project/test-environments": "project_instance-test_environments"' in HTML
+    assert "<!-- help-id: project_instance-test_environments -->" in HELP_REF
+    from lib.consistency.docs import check_ui_help_mappings
+
+    assert [
+        f.message
+        for f in check_ui_help_mappings(REPO_ROOT)
+        if "test_environments" in f.message
+    ] == []
