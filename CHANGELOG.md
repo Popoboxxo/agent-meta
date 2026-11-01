@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### Added
+- **Structured release checklist (`release-checklist`, #1089)**: new opt-in block with
+  `mode: off|advisory|strict` (default `off`) and project items that are either `check: agent` or
+  `check: script`, each with `phase` (`precondition`/`step`), `required` and `applies-when`. A
+  missing block or `mode: off` leaves every generated `release.md` byte-identical; an unquoted
+  YAML `off` is normalized to `"off"`, while `on`/`true` fails with "quote the value".
+- **Checklist schema, normalizer and validator (`config/project-config.schema.json`,
+  `scripts/lib/release_checklist.py`, #1089)**: the schema is the structural authority (enums,
+  `check: script` requires `script`, `additionalProperties: false`); the Python validator enforces
+  unique and non-reserved ids, unknown keys, `phase`, and the `script`/`agent` rules, and is also
+  exposed as a non-exiting error collector for the admin server. The reserved default ids live in
+  `RESERVED_DEFAULT_ITEMS`, with `na_allowed_with_reason` true only for `dod-met` and
+  `readme-current`.
+- **Resolver, renderer and placeholders (`RELEASE_CHECKLIST_MODE`, `RELEASE_CHECKLIST_ENABLED`,
+  `RELEASE_CHECKLIST_BLOCK`, #1089)**: the rendered prose block documents the phase classes, the
+  script rules (exit 0 = pass, side-effect free), the approval protocol
+  (`APPROVAL_REQUEST`/`APPROVED`, stop before the first mutation), the `CHECKLIST*` result
+  contract with `not_run`, and the `MODE: check-only` dry run. `strict` is documented as a
+  Prompt-/Konventions-Boundary, not a hook or a security guarantee — the pre-release gates stay
+  hard in every mode. The three variables are registered in `config.py`, the placeholder set,
+  the `standalone.py` fallbacks, the conditional-block whitelist and the sync-concept doc.
+- **Release template support (`release.md` 1.13.0, `hacs-release.md`, `sharkord-release.md`,
+  #1089)**: the base template renders the block after the existing custom-checklist rows, and
+  both platform overrides adopt the new base version — the Sharkord standalone override gets an
+  explicit copy because it does not extend the base.
+- **Commands `/release-check` and `/set-release-checklist` (#1089)**: `/release-check` dispatches
+  the `release` agent with `MODE: check-only` and forbids every side effect (bump, build, edit,
+  commit, tag, push, `gh release`); `/set-release-checklist` changes the mode through
+  `project.yaml` and re-runs the sync/validation.
+- **`agent-meta-manager` recipe 14d (#1089)**: version 1.26.0 gains the "Structured release
+  checklist" recipe (read the block, ask for the mode, add items, quote the value, sync,
+  validate) and a §3 confirmation row in which enabling `strict` is a behavior change — with no
+  wording that the gates become softer.
+- **Admin server and UI for the release checklist (#1089)**: `"release-checklist"` joins
+  `PROJECT_WRITABLE_SECTIONS`, a new section guard reuses the non-exiting validator and rejects
+  invalid payloads (bad mode, `true`, unknown keys, duplicate ids) with HTTP 400 without writing,
+  and the Admin UI gains a "Release Checklist" section (mode select, item table/modal, script
+  field only for `check: script`, same YAML fragment as the CLI/manager path). The UI never runs
+  a script.
+- **Release-checklist scenarios 88-90 (#1089)**: `off` (byte-identical render), `advisory`
+  (mode prose, approval request, `n/a (nicht ausgeführt)`, all item ids) and `strict` (a failing
+  required precondition yields `STATUS: failed`, Prompt-/Konventions-Boundary).
+
 ### Changed
 - **Submodule push targets are checked instead of blocking `--recurse-submodules` (#1051)**:
   `dod-push-check.sh` resolves, for `--recurse-submodules=on-demand|only`, each

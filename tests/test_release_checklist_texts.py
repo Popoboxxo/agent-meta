@@ -3,8 +3,11 @@
 These are static content contracts: the commands are prompts, not code, so the
 only observable behaviour is their own wording and the documentation rows that
 advertise them. Covers AC-REL-10 (``/release-check`` is a check-only dry run
-that delegates to the ``release`` agent and forbids every side effect) and the
-two command entries in ``docs/api/slash-commands.md`` and ``README.md``.
+that delegates to the ``release`` agent and forbids every side effect), AC-REL-16
+(the manager recipe) and AC-REL-20 (the ``docs/RELEASE_GATES.md`` checklist-mode
+section, the ``[Unreleased]`` changelog entry and the commented example in
+``howto/configs/project.yaml.example``), plus the two command entries in
+``docs/api/slash-commands.md`` and ``README.md``.
 """
 
 from pathlib import Path
@@ -39,3 +42,16 @@ def test_manager_recipe():                                                  # AC
     assert "gates stay hard in every mode" in t.lower()
     assert "weicher" not in t and "softer" not in t.lower()                 # U8: kein "Gates werden weicher"
     assert "quote" in t.lower()
+
+
+def test_release_gates_doc():                                               # AC-REL-20
+    t = (REPO_ROOT / "docs/RELEASE_GATES.md").read_text(encoding="utf-8")
+    sec = t.split("## Checklist-Modus", 1)[1]
+    for phrase in ("off", "advisory", "strict", "Gates bleiben in jedem Modus hart", "seiteneffektfrei",
+                   "Prompt-/Konventions-Boundary", "--release-check", "Hook", "access: read"):
+        assert phrase in sec, phrase
+
+def test_changelog_and_example():
+    cl = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("## [2.0.0-beta.5]", 1)[0]
+    assert "release-checklist" in cl and "advisory" in cl and "strict" in cl and "Prompt" in cl
+    assert "release-checklist:" in (REPO_ROOT / "howto/configs/project.yaml.example").read_text(encoding="utf-8")
