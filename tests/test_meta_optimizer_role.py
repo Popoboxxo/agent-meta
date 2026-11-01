@@ -786,9 +786,9 @@ def test_manager_optimizer_section_states_that_the_manager_is_the_only_applier()
     assert _ONLY_APPLIER_RE.search(sec), sec
 
 
-def test_manager_version_bumped_to_1_26_0():
+def test_manager_version_bumped_to_1_27_0():
     fm = parse_frontmatter_file(_MANAGER_TEMPLATE)
-    assert str(fm["version"]) == "1.26.0"
+    assert str(fm["version"]) == "1.27.0"
 
 
 
