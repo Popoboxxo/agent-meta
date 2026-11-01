@@ -2353,6 +2353,10 @@ def _build_convention_variables(
         if _blocks:
             variables.update(_blocks)
 
+    from .release_checklist import build_release_checklist_variables
+
+    variables.update(build_release_checklist_variables(config))
+
 
 def build_variables(
     config: dict, agent_meta_root: Path, project_root: Path | None = None,

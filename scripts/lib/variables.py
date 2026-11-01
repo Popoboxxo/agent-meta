@@ -444,6 +444,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
+    conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})
     # IC-03 / IC-17: per-role activity flags (ROLE_<UPPER_SNAKE>_ACTIVE);
     # built from the ActiveSet by build_variables (IC-18 no. 18)
