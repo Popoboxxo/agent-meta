@@ -324,6 +324,8 @@ def load_config(config_path: Path) -> dict:
     _normalize_null_blocks(config)
     _normalize_auto_commit_mode(config)
     _normalize_subagent_permissions_mode(config)
+    from .release_checklist import normalize_release_checklist_mode
+    normalize_release_checklist_mode(config)
     _validate_config(config, config_path)
     return config
 
@@ -394,6 +396,8 @@ def _validate_config(config: dict, config_path: Path) -> None:
     _validate_providers(config, config_path)
     _validate_repo_containment(config, config_path)
     _validate_subagent_permissions(config, config_path)
+    from .release_checklist import validate_release_checklist
+    validate_release_checklist(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
         # Explicit, correctly-worded pointer: jsonschema ENABLES this check
@@ -2348,6 +2352,10 @@ def _build_convention_variables(
         _blocks = render_convention_block(_domain, _domain_spec, _active_roles, _conv_log)
         if _blocks:
             variables.update(_blocks)
+
+    from .release_checklist import build_release_checklist_variables
+
+    variables.update(build_release_checklist_variables(config))
 
 
 def build_variables(

@@ -1630,6 +1630,7 @@ function buildSidebar() {
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
         { route: "/project/auto-commit",          label: "Auto-Commit",          icon: "⏱" },
+        { route: "/project/release-checklist",     label: "Release Checklist",    icon: "☑" },
 
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
         { route: "/project/debug-mode", label: "Debug Mode", icon: "🐞" },
@@ -7763,6 +7764,249 @@ async function viewProjectAutoCommit() {
   return wrap;
 }
 
+/* --------------------------- Release Checklist --------------------------- */
+async function viewProjectReleaseChecklist() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Release Checklist"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Optional release checklist for the generated release templates. The release agent evaluates a " +
+    "prose block rendered from this section — Prompt convention only, no hook; gates stay hard in " +
+    "every mode (pre-release-check.sh, step 0). mode off = zero behaviour change, advisory reports " +
+    "findings without blocking, strict requires every required item to pass. Script items run as " +
+    "plain shell commands (exit 0 = pass), must be side-effect free because they also run in " +
+    "check-only mode — and this UI never executes them.",
+  ]));
+
+  const data = await loadProject();
+  const rc = (data["release-checklist"] && typeof data["release-checklist"] === "object")
+    ? clone(data["release-checklist"]) : {};
+  const items = Array.isArray(rc.items) ? clone(rc.items) : [];
+  let mode = typeof rc.mode === "string" ? rc.mode : "off";
+
+  const status = el("p", {
+    id: "release-checklist-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const setError = (msg) => {
+    toast(msg, "error");
+    status.textContent = msg;
+    status.style.color = "var(--accent-red)";
+  };
+
+  // ── Mode ─────────────────────────────────────────────────────────────────
+  const modePanel = el("div", { class: "panel" });
+  modePanel.appendChild(el("h2", {}, ["Mode"]));
+  modePanel.appendChild(dropdownField(
+    "Mode",
+    ["off", "advisory", "strict"],
+    mode,
+    v => { mode = v; },
+    {
+      off: "off — no generated output changes (default)",
+      advisory: "advisory — report findings, never block",
+      strict: "strict — require every required item to pass",
+    },
+    "Prompt convention only, no hook; gates stay hard in every mode. " +
+    "Keep the value quoted in project.yaml — an unquoted off is a YAML boolean."
+  ));
+  wrap.appendChild(modePanel);
+
+  // ── Items ────────────────────────────────────────────────────────────────
+  const itemsPanel = el("div", { class: "panel" });
+  itemsPanel.appendChild(el("h2", {}, ["Items"]));
+  itemsPanel.appendChild(el("p", { class: "muted" }, [
+    "Custom items extend the built-in defaults (tests-green, dod-met, changelog-updated, " +
+    "readme-current, version-bumped, build-created, git-tag-push). Those ids are reserved and " +
+    "cannot be redefined here.",
+  ]));
+
+  const table = el("table", { class: "data", style: "margin-top:var(--space-2);" });
+  table.appendChild(el("thead", {}, [el("tr", {}, [
+    el("th", {}, ["ID"]),
+    el("th", {}, ["Task"]),
+    el("th", {}, ["Verification"]),
+    el("th", {}, ["Check"]),
+    el("th", {}, ["Phase"]),
+    el("th", {}, ["Required"]),
+    el("th", {}, ["Actions"]),
+  ])]));
+  const tbody = el("tbody");
+  table.appendChild(tbody);
+  itemsPanel.appendChild(table);
+
+  const renderItems = () => {
+    tbody.replaceChildren();
+    if (items.length === 0) {
+      tbody.appendChild(el("tr", {}, [
+        el("td", { colspan: "7", class: "empty" }, ["No custom items — the default items apply."]),
+      ]));
+    }
+    items.forEach((item, index) => {
+      tbody.appendChild(el("tr", {}, [
+        el("td", {}, [el("code", {}, [item.id || ""])]),
+        el("td", {}, [item.task || ""]),
+        el("td", {}, [item.verification || ""]),
+        el("td", {}, [item.check === "script" ? `script: ${item.script || ""}` : "agent"]),
+        el("td", {}, [item.phase || "precondition"]),
+        el("td", {}, [item.required === false ? "no" : "yes"]),
+        el("td", {}, [
+          el("button", { class: "btn btn-sm", onclick: () => openItemModal(index) }, ["Edit"]),
+          el("button", {
+            class: "btn btn-danger btn-sm",
+            onclick: () => confirmDestructive(
+              `Delete checklist item “${item.id || "?"}”?`,
+              () => { items.splice(index, 1); renderItems(); }),
+          }, ["Delete"]),
+        ]),
+      ]));
+    });
+  };
+
+  const openItemModal = (index) => {
+    const isEdit = index >= 0;
+    const draft = isEdit
+      ? clone(items[index])
+      : { id: "", task: "", verification: "", check: "agent", phase: "precondition", required: true };
+
+    const idInput = textInputEl("item-id", draft.id || "", "my-check", v => { draft.id = v; });
+    const taskInput = textInputEl("item-task", draft.task || "", "What has to be done", v => { draft.task = v; });
+    const verificationInput = textInputEl("item-verification", draft.verification || "", "How it is verified", v => { draft.verification = v; });
+    const scriptInput = textInputEl("item-script", draft.script || "", "python3 scripts/check.py", v => { draft.script = v; });
+    const appliesInput = textInputEl("item-applies-when", draft["applies-when"] || "", "e.g. hacs", v => { draft["applies-when"] = v; });
+
+    const scriptField = a11yField({
+      id: "item-script", label: "Script",
+      help: "Command line, exit 0 = pass. Scripts must be side-effect free (they also run in " +
+        "check-only mode); the Admin UI never executes them.",
+      control: scriptInput,
+    });
+    const syncScriptVisibility = () => {
+      scriptField.style.display = draft.check === "script" ? "" : "none";
+    };
+
+    const requiredCb = el("input", { type: "checkbox", id: "item-required" });
+    requiredCb.checked = draft.required !== false;
+    requiredCb.addEventListener("change", () => { draft.required = requiredCb.checked; });
+
+    const body = el("div", {}, [
+      a11yField({
+        id: "item-id", label: "ID",
+        help: "Lowercase slug (^[a-z0-9][a-z0-9-]*$), unique within the checklist.",
+        control: idInput,
+      }),
+      a11yField({
+        id: "item-task", label: "Task",
+        help: "What has to be done for this checklist item.",
+        control: taskInput,
+      }),
+      a11yField({
+        id: "item-verification", label: "Verification",
+        help: "How the release agent verifies the item passed.",
+        control: verificationInput,
+      }),
+      dropdownField(
+        "Check",
+        ["agent", "script"],
+        draft.check || "agent",
+        v => { draft.check = v; syncScriptVisibility(); },
+        {
+          agent: "agent — the release agent judges it",
+          script: "script — run the command, exit 0 = pass",
+        },
+        "Scripts must be side-effect free (they also run in check-only mode)."
+      ),
+      scriptField,
+      dropdownField(
+        "Phase",
+        ["precondition", "step"],
+        draft.phase || "precondition",
+        v => { draft.phase = v; },
+        {
+          precondition: "precondition — checked before the release",
+          step: "step — confirmed while working through it",
+        },
+        "precondition items gate the release start; step items are confirmed after execution."
+      ),
+      a11yField({
+        id: "item-applies-when", label: "Applies when",
+        help: "Optional free-text condition describing when the item is relevant (e.g. a target platform).",
+        control: appliesInput,
+      }),
+      a11yField({
+        id: "item-required", label: "Required",
+        help: "A required item must pass in strict mode.",
+        control: requiredCb,
+      }),
+    ]);
+
+    const saveItemBtn = el("button", { class: "btn btn-primary", onclick: () => {
+      const id = idInput.value.trim();
+      const task = taskInput.value.trim();
+      const verification = verificationInput.value.trim();
+      if (!id || !task || !verification) {
+        setError("An item needs an id, a task and a verification.");
+        return;
+      }
+      draft.id = id;
+      draft.task = task;
+      draft.verification = verification;
+      if (draft.check === "script") {
+        const script = scriptInput.value.trim();
+        if (!script || script.includes("\n") || script.includes("\r")) {
+          setError("check “script” requires a single-line script.");
+          scriptInput.focus();
+          return;
+        }
+        draft.script = script;
+      } else {
+        delete draft.script;
+      }
+      const applies = appliesInput.value.trim();
+      if (applies) draft["applies-when"] = applies;
+      else delete draft["applies-when"];
+      draft.phase = draft.phase || "precondition";
+      draft.required = requiredCb.checked;
+      if (isEdit) items[index] = draft;
+      else items.push(draft);
+      renderItems();
+      hideModal();
+    } }, ["Save item"]);
+
+    syncScriptVisibility();
+    showModal(
+      isEdit ? "Edit checklist item" : "Add checklist item",
+      body,
+      [saveItemBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]
+    );
+  };
+
+  itemsPanel.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => openItemModal(-1) }, ["Add item"]),
+  ]));
+  wrap.appendChild(itemsPanel);
+  renderItems();
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      for (const item of items) {
+        if (item.check === "script" && !(item.script || "").trim()) {
+          setError(`Item “${item.id || "?"}”: check “script” requires a script.`);
+          return;
+        }
+      }
+      // mode is always sent as a string; items only when non-empty, so an
+      // untouched section keeps project.yaml clean.
+      const out = { mode };
+      if (items.length > 0) out.items = items;
+      try { await saveProjectSection("release-checklist", out, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------------- Prompt Modes ----------------------------- */
 
 
@@ -10855,6 +11099,7 @@ async function init() {
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
   router.register("/project/auto-commit",          viewProjectAutoCommit);
+  router.register("/project/release-checklist",    viewProjectReleaseChecklist);
 
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/debug-mode",      viewProjectDebugMode);
@@ -10970,6 +11215,7 @@ init();
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",
+    "project/release-checklist": "project_instance-release_checklist",
 
     "project/viz-admin": "project_instance-viz_admin",
     "project/model-overrides": "project_instance-model_overrides",

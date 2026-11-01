@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.12.2"
+version: "1.13.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 reference_standards:
   - "SemVer 2.0.0"
@@ -63,6 +63,9 @@ Check before every release:
 | README/CODEBASE_OVERVIEW | Current |
 | git commit + tag + push | `git` agent |
 {{RELEASE_CUSTOM_CHECKLIST_BLOCK}}
+{{#if RELEASE_CHECKLIST_ENABLED}}
+{{RELEASE_CHECKLIST_BLOCK}}
+{{/if}}
 ## 2. Versioning
 
 {{RELEASE_VERSIONING_BLOCK}}

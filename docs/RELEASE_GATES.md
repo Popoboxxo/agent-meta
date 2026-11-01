@@ -529,3 +529,129 @@ Die Einträge erscheinen als zusätzliche Zeilen direkt unter der Basis-Checklis
 (Platzhalter `{{RELEASE_CUSTOM_CHECKLIST_BLOCK}}` in `release.md`). Ist die Liste leer/nicht
 gesetzt, rendert der Block zu einem leeren String — die generierte `release.md` bleibt
 byte-identisch zu Projekten ohne diese Config.
+
+## Checklist-Modus
+
+Der Block `release-checklist:` in `.meta-config/project.yaml` steuert, **wie** der `release`-Agent
+die Pre-Release-Checkliste auswertet. Er ist strikt getrennt von `release-gates:` (siehe oben):
+`release-gates:` bestimmt, **welche** Gates Schritt 0 ausführt, `release-checklist:` nur die
+Bewertung der Checklistenpunkte. Ohne Block (oder mit `mode: "off"`) bleibt die generierte
+`release.md` byte-identisch zu heute — abgesehen von den Template-Frontmatter-Zeilen
+`version`, `generated-from` und `based-on`.
+
+**Autorität für Struktur und Feldtypen ist das JSON-Schema**
+[`config/project-config.schema.json`](../config/project-config.schema.json) unter
+`properties."release-checklist"`; dieser Abschnitt beschreibt nur die Semantik.
+
+### Modi
+
+| Modus | Wirkung |
+|---|---|
+| `off` (Default) | Wie bisher. Projekt-Items werden nicht gerendert, der Block fehlt in `release.md`. |
+| `advisory` | Jeder Punkt wird bewertet (`pass`/`fail`/`n/a`) und berichtet; ein `fail` einer Vorbedingung verlangt eine ausdrückliche Freigabe. |
+| `strict` | Jeder Pflichtpunkt (`required: true`) muss `pass` sein; ein Pflicht-`fail` einer Vorbedingung ⇒ `STATUS: failed`, keine Mutation, kein Tag, kein Push. |
+
+**Gates bleiben in jedem Modus hart**: ein Exit≠0 aus Schritt 0 (`pre-release-check.sh`) beendet
+den Lauf in `off`, `advisory` und `strict` mit `STATUS: failed`. Der Modus macht Gates nie
+weicher.
+
+**`strict` ist eine Prompt-/Konventions-Boundary** (Convention boundary), kein Hook und keine
+Sicherheitsgarantie: der Agent hält sich an den gerenderten Text, es gibt keine technische
+Blockade. Ein harter Durchsetzungs-Hook ist Folge-Option F1 (siehe unten).
+
+### Beispiel (`.meta-config/project.yaml`)
+
+```yaml
+release-checklist:
+  mode: "advisory"          # off | advisory | strict   (Default: off) — Wert quoten!
+  items:
+    - id: changelog-unreleased
+      task: "CHANGELOG [Unreleased] hat Einträge"
+      verification: "Abschnitt [Unreleased] nicht leer"
+      check: agent          # agent | script   (Default: agent)
+      phase: precondition   # precondition | step   (Default: precondition)
+      required: true        # Default: true; nur strict wertet aus
+    - id: schema-valid
+      task: "Konfiguration validiert"
+      verification: "python3 scripts/sync.py --validate"
+      check: script
+      script: "python3 scripts/sync.py --validate"   # nur bei check: script; Exit 0 = pass
+      required: true
+    - id: docker-image-pushed
+      task: "Docker-Image gepusht"
+      verification: "docker manifest inspect <image>:<version>"
+      check: agent
+      phase: step           # wird erst NACH Ausführung des Release-Schritts bestätigt
+      required: false
+      applies-when: "Projekt liefert ein Docker-Image aus"   # Freitext, vom Agenten ausgewertet
+```
+
+Der Modus **muss gequotet** werden: unquotierte `off`/`on` sind YAML-Booleans. Ein unquotiertes
+`off` wird beim Config-Load als `"off"` normalisiert, `on` (`true`) bricht mit „quote the value"
+ab.
+
+### Phasen-Klassen
+
+- **Vorbedingung** (`phase: precondition`, Default) — wird **vor** jeder Mutation bewertet:
+  `tests-green`, `dod-met`, `changelog-updated`, `readme-current` sowie alle Projekt-Items mit
+  Default-Phase.
+- **Schritt** (`phase: step`) — wird erst **nach** seiner Ausführung bestätigt und ist im
+  Dry-Check `n/a (nicht ausgeführt)`: `version-bumped`, `build-created`, `git-tag-push` sowie
+  Projekt-Items mit `phase: step`.
+
+`n/a` in `strict` ist nur für Items mit `applies-when` (Bedingung trifft nicht zu) und für die
+Default-Punkte `dod-met`/`readme-current` mit einzeiliger Begründung zulässig; alle übrigen
+Default-Punkte sind dort nie `n/a`.
+
+### Skript-Items
+
+`check: script` führt die Kommandozeile aus `project.yaml` aus: Exit 0 = `pass`, jeder andere
+Exit = `fail`, ein fehlendes/nicht ausführbares Skript ebenfalls `fail` (nie stilles `n/a`).
+
+**Skript-Items müssen seiteneffektfrei sein.** Sie laufen auch im Dry-Check und dürfen deshalb
+keine Dateien, Tags oder Remotes verändern. Es gibt keine Allowlist und keine Pfadprüfung —
+dieselbe Vertrauensstufe wie `TEST_COMMANDS`/`BUILD_COMMANDS`; eine Allowlist ist Folge-Option F4.
+Das Skript-Output wird nicht in die Ergebnistabelle kopiert (nur Exit-Code plus Einzeiler).
+
+### Freigabeprotokoll
+
+Muss trotz eines Nicht-Pass fortgefahren werden (oder verlangt der Modus eine Freigabe), stoppt
+der Agent **vor der ersten Mutation** und liefert `STATUS: partial` mit:
+
+```
+APPROVAL_REQUEST: release <version>; actions=bump,changelog,build,tag,push; accept=<ids der Nicht-Pass-Punkte>
+```
+
+Der Orchestrator holt das Okay beim Nutzer ein und dispatcht mit `APPROVED: <Aktion/IDs>` erneut.
+Die Freigabe gilt nur für die genannte Aktion und die genannten IDs; weitere Nicht-Pass-Punkte
+oder ein fehlschlagender Schritt erzeugen eine neue `APPROVAL_REQUEST`. Die vollständige
+Ergebnistabelle (`CHECKLIST`, `CHECKLIST_SUMMARY`) steht im generierten `release.md`.
+
+### Dry-Check (`/release-check`)
+
+`/release-check` schickt den `release`-Agenten mit `MODE: check-only` los: alle Punkte werden
+bewertet und als Tabelle gemeldet, aber **nichts wird verändert** — kein Version-Bump, kein Build,
+kein Datei- oder CHANGELOG-Edit, kein Commit, kein Tag, kein Push, kein `gh release`. Ein
+Dry-Check erzeugt nie eine `APPROVAL_REQUEST`. Der Befehl funktioniert auch bei `mode: "off"`
+(dann mit dem Default-Umfang und ohne Projekt-Items).
+
+Ein Dry-Check gegen eine Test-Umgebung führt nur Aktionen mit `access: read` aus (Anforderung aus
+Spec 2, AC-ENV-19).
+
+### Generierte Artefakte
+
+`release.md` und die Overrides erhalten bei `mode != off` einen zusätzlichen Prosa-Block über den
+Platzhalter `{{%RELEASE_CHECKLIST_BLOCK%}}` (escaped dargestellt, damit die Doku selbst nicht
+substituiert wird). Bei `off` entfernt der `RELEASE_CHECKLIST_ENABLED`-Gate-Block den gesamten
+Abschnitt samt Zeilenumbruch, sodass die Datei byte-identisch bleibt.
+
+### Folge-Optionen (nicht Teil dieses Features)
+
+- **F1 — harter Durchsetzungs-Hook für `strict`** (z. B. ein Push-Check im Stil von
+  `dod-push-check.sh`): echte Blockade statt Prompt-Konvention, pro Provider zu registrieren.
+  Entscheidung liegt beim Nutzer.
+- **F2 — `sync.py --release-check`**: nur der mechanische Teil (Gates plus
+  Skript-Vorbedingungen) ohne Agenten; Hook-Pfad pro Provider aufgelöst.
+- **F3 — Schema↔UI-Coverage-Test**, **F4 — Allowlist/Checksumme für Skript-Items** (falls
+  Skript-Injection relevant wird).
+

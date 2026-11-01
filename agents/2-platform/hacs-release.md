@@ -1,7 +1,7 @@
 ---
 name: release
-version: "1.1.0"
-based-on: "1-generic/release.md@1.12.2"
+version: "1.1.1"
+based-on: "1-generic/release.md@1.13.0"
 description: "HACS Integration Release — Versioning, Release-Naming (Tag-Format, Pre-Release, Immutabilität), Tag↔manifest-Sync, VERSION nur mit Migrator, GitHub Release."
 hint: "Versioning, changelog, Build-Artifact und GitHub Release für HACS-Integrationen"
 prompt_mode: modern

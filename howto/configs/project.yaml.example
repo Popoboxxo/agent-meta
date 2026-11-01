@@ -90,6 +90,27 @@ dod:
 #     dockerfile: Dockerfile          # gate-spezifischer Key, wird vom Gate-Skript gelesen
 #   my-custom-gate: false             # projekteigenes Gate: hooks/*/release-gates/my-custom-gate.sh
 
+# Release-Checkliste: strukturierte Punkte für den release-Agenten (opt-in, Default off).
+# Unabhängig von 'release-gates': Gates (Schritt 0) bleiben in JEDEM Modus hart, der Modus
+# steuert nur die Bewertung der Checklistenpunkte. Ohne diesen Block bleibt release.md
+# byte-identisch. Schema (Autorität für Felder/Enum): config/project-config.schema.json
+# / Structured release checklist, opt-in; the mode only affects item evaluation, never the
+# hard pre-release gates. Script items must be side-effect free (they also run in check-only).
+# release-checklist:
+#   mode: "advisory"                # off | advisory | strict — quoten (unquoted off/on = YAML-Bool)
+#   items:
+#     - id: changelog-unreleased
+#       task: "CHANGELOG [Unreleased] hat Einträge"
+#       verification: "Abschnitt [Unreleased] nicht leer"
+#       check: agent                # agent | script (Default: agent)
+#       phase: precondition         # precondition | step (Default: precondition)
+#       required: true              # Default: true; nur strict wertet aus
+#     - id: schema-valid
+#       task: "Konfiguration validiert"
+#       verification: "python3 scripts/sync.py --validate"
+#       check: script
+#       script: "python3 scripts/sync.py --validate"   # Exit 0 = pass; MUSS seiteneffektfrei sein
+
 # ------------------------------------------------------------------------------
 # 4. Agenten-Rollenauswahl / Agent Role Whitelist
 # ------------------------------------------------------------------------------

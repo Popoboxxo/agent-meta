@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.25.0
+version: 1.26.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,8 +15,8 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.25.0
-model: claude-haiku-4-5-20251001
+generated-from: 1-generic/agent-meta-manager.md@1.26.0
+model: claude-haiku-5-5
 ---
 
 > **Extension:** If `.claude/3-project/am-agent-meta-manager-ext.md` exists → read and apply immediately.
@@ -69,6 +69,7 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 | Change DoD preset | Project-wide quality requirements |
 | Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
 | Enable `auto_commit.mode` (`suggest`/`auto`/`custom`) | Changes commit behavior — `auto`/`custom` let agents commit without any confirmation step at all |
+| Enable `release-checklist.mode` → `strict` | Behavior change: mandatory items stop the release (prompt convention only, no hook) |
 | Run `sync.py` | Overwrites generated files |
 | Fill values in `project.yaml` | Wrong values corrupt the project |
 | Upgrade to major version | Breaking changes |
@@ -417,6 +418,47 @@ conventions:
 
 Re-sync (`sync.py`) is required after any `conventions:` change — the release
 agent template only picks up the new blocks on regeneration.
+
+### 14d. Structured release checklist (opt-in)
+
+Extends the release agent with project-specific, machine-readable checklist
+items (`mode: off | advisory | strict`, default `off`). At `off` the generated
+`release.md` is byte-identical to today's output. The block is additive to the
+prose items from 14c and is validated by `config/project-config.schema.json`.
+
+Recipe:
+1. Read the current block in `.meta-config/project.yaml` (it is optional — absent, empty or `mode: "off"` means disabled).
+2. Ask the user for the desired mode (`off` | `advisory` | `strict`) — `strict` requires confirmation (see §3).
+3. Collect the items: each needs `id`, `task`, `verification`; optional `check` (`agent`|`script`, default `agent`), `script` (only for `check: script`, exit 0 = pass, must be side-effect free), `phase` (`precondition`|`step`), `required` and `applies-when`.
+4. Edit `project.yaml` — write the mode **quoted** (`mode: "off"`; an unquoted `off` is parsed as YAML boolean `false`), mirroring the schema's example:
+
+```yaml
+release-checklist:
+  mode: advisory            # off | advisory | strict   (Default: off)
+  items:
+    - id: changelog-unreleased
+      task: "CHANGELOG [Unreleased] hat Einträge"
+      verification: "Abschnitt [Unreleased] nicht leer"
+      check: agent          # agent | script   (Default: agent)
+      phase: precondition   # precondition | step   (Default: precondition)
+      required: true        # Default: true; nur strict wertet aus
+    - id: schema-valid
+      task: "Konfiguration validiert"
+      verification: "python3 scripts/sync.py --validate"
+      check: script
+      script: "python3 scripts/sync.py --validate"   # nur bei check: script; Exit 0 = pass; MUSS seiteneffektfrei sein
+      required: true
+    - id: docker-image-pushed
+      task: "Docker-Image gepusht"
+      verification: "docker manifest inspect <image>:<version>"
+      check: agent
+      phase: step           # wird erst NACH Ausführung des Release-Schritts bestätigt
+      required: false
+      applies-when: "Projekt liefert ein Docker-Image aus"   # Freitext, vom Agenten ausgewertet
+```
+
+5. Re-sync and validate: `python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate`; then explain any `[WARN]` from `sync.log`.
+6. Explain the semantics: `strict` is a **prompt convention only** — there is no hook and no runtime enforcement, so gates stay hard in every mode (`pre-release-check.sh` step 0 aborts with `STATUS: failed` regardless of the checklist mode). Point to `config/project-config.schema.json` as the authority (§15) and to `/set-release-checklist` for the guided variant.
 
 ## 15. Which options exist — schema is the authority, not memory
 

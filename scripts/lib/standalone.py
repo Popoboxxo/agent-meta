@@ -105,6 +105,10 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # referenced inside {{#if SUBAGENT_PERMISSIONS_ENABLED}} — an empty string
     # is the correct standalone fallback (no policy outside a project install).
     "SUBAGENT_PERMISSIONS_BLOCK": "",
+    # RELEASE_CHECKLIST_BLOCK: the structured release checklist is project
+    # config only — the {{#if RELEASE_CHECKLIST_ENABLED}} gate stays closed
+    # standalone, so an empty string is the correct fallback.
+    "RELEASE_CHECKLIST_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -143,6 +147,10 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "SUBAGENT_PERMISSIONS_WARN": "false",
     "SUBAGENT_PERMISSIONS_OFF": "false",
     "SUBAGENT_PERMISSIONS_ENABLED": "false",
+    # Release checklist is project config only: standalone has none, so the
+    # gate stays closed and RELEASE_CHECKLIST_BLOCK is empty in
+    # _ORCHESTRATION_FALLBACKS.
+    "RELEASE_CHECKLIST_ENABLED": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no
     # project-specific config").

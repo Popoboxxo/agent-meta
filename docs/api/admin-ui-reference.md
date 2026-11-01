@@ -184,6 +184,12 @@ Repository and branch conventions surfaced in the `git` section of `project.yaml
 <!-- author: Agent Meta Admin -->
 Controls the opt-in tiered commit authority for write-capable agents (issue #694). `off` (default) keeps today's behaviour where only the dedicated `git` role commits. `suggest` has agents propose a commit message in their own report but never run git. `auto` lets agents commit directly when any selected trigger (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`, `custom`) fires — any one is enough (OR). `custom` hands the entire decision to `custom_script` and ignores the built-in triggers. `file_count_threshold` (default 5) is only read for the `file-count-threshold` trigger. `secret_scan` (default true) runs the project's secret scan against the staged diff before any auto/custom commit. A `custom` mode, or `custom` among the triggers, requires `custom_script`.
 
+### Release Checklist
+<!-- help-id: project_instance-release_checklist -->
+<!-- last-updated: 2026-11-01 -->
+<!-- author: Agent Meta Admin -->
+Configures the optional `release-checklist` section of `project.yaml`. `mode` is one of `off`, `advisory` or `strict` (framework default: `off` — zero behaviour change, generated release output stays byte-identical). `advisory` reports findings in the release agent's report without blocking; `strict` requires every required item to pass before the release proceeds. This is a **Prompt convention only, no hook**: the built-in gates (`pre-release-check.sh`, step 0) stay hard in every mode, so `strict` is never a security boundary. `items` extends the built-in defaults; each item has an `id` (lowercase slug `^[a-z0-9][a-z0-9-]*$`, unique, reserved default ids cannot be redefined), a `task`, a `verification`, an optional `check` (`agent` = the release agent judges it, default; `script` = run the command, exit 0 = pass), a `script` (single line, required only for `check: script`), an optional `phase` (`precondition` = evaluated before the release, `step` = confirmed after its execution), an optional `required` boolean and an optional free-text `applies-when`. Script items must be side-effect free because they also run in check-only mode (`MODE: check-only`); the Admin UI stores the command but never executes it. Keep `mode` quoted in YAML — an unquoted `off`/`on` parses as a boolean (`off` normalises to `"off"`, `on` is rejected with a "quote the value" error).
+
 ### Viz & Admin
 <!-- help-id: project_instance-viz_admin -->
 <!-- last-updated: 2026-07-19 -->

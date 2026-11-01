@@ -1651,6 +1651,90 @@
       },
       "additionalProperties": false
     },
+    "release-checklist": {
+      "type": "object",
+      "description": "Structured release checklist. Absent block or mode 'off' = zero behavior change. Script items MUST be side-effect free (they also run in check-only mode). Not to be confused with 'release-gates'.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "advisory",
+            "off"
+          ],
+          "description": "Quote the value: unquoted off/on are YAML booleans."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "task",
+              "verification"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "task": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification": {
+                "type": "string",
+                "minLength": 1
+              },
+              "check": {
+                "type": "string",
+                "enum": [
+                  "agent",
+                  "script"
+                ]
+              },
+              "script": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Command line, exit 0 = pass. Must be side-effect free."
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "precondition",
+                  "step"
+                ],
+                "description": "precondition = evaluated before the release; step = confirmed after its execution."
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "applies-when": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false,
+            "if": {
+              "properties": {
+                "check": {
+                  "const": "script"
+                }
+              },
+              "required": [
+                "check"
+              ]
+            },
+            "then": {
+              "required": [
+                "script"
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "git": {
       "type": "object",
       "description": "Repository and branch conventions surfaced in the Admin UI 'Git' section. Values are the canonical source for the generated {{GIT_PLATFORM}}/{{GIT_REMOTE_URL}}/{{GIT_MAIN_BRANCH}} variables. Backward compatible: an explicit variables.GIT_* entry in project.yaml still wins over this section. branch-prefixes are stored/displayed but not yet consumed (follow-up: branch-guard wiring, see design doc).",

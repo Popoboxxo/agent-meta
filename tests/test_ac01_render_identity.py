@@ -589,6 +589,52 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
   (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Structured release checklist (issue #1089, ``feat/release-checklist``, 2026-11-01):
+  the feature adds the provider command renders ``release-check`` and
+  ``set-release-checklist`` (two new commands × the seven command-writing
+  providers = 14 new files), bumps the release templates
+  (``release.md`` 1.13.0, ``hacs-release.md`` 1.1.1, ``sharkord-release.md``
+  1.3.3; the checklist block itself is inert in the default matrix config) and
+  ``agent-meta-manager`` to 1.26.0 (recipe 14d plus the §3 row). **31 of 1085
+  hashes moved; 14 added (1085 -> 1099 render entries)**: 9 release agent
+  renders, 9 manager renders, the 7 command ``.agent-meta-managed`` indexes and
+  the 6 ``generated-file-hashes.json`` that gain the new command keys (Claude,
+  Copilot, Gemini, Mammouth, Opencode, ZCode; Continue renders the commands but
+  carries no ``.meta-config/generated-file-hashes.json`` in the baseline, and
+  Codex/KimiCode have no command surface). No rule artifact, ``AGENTS.md`` or
+  ``context-hashes.json`` changed. The 31 changed entries were patched per entry
+  and the 14 added entries inserted at their sorted position -- not via
+  ``--write`` -- after independently recomputing each digest from the rendered
+  bytes with the harness's own ``_hash_file``. Because ``hashes.json`` is the
+  only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``d4771400…`` -> ``c49564db…``).
+  ``slimming-golden`` was re-derived for the two touched goldens
+  (``agent-meta-manager.md`` 1.26.0 + recipe 14d, ``release.md`` 1.13.0; both
+  through the real sync path, documented in the slimming diff manifest §19) and
+  its AC-T4 digest moved (``6b0c5724…`` -> ``5cbe9ea4…``); ``compact-golden``
+  stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Review follow-up on issue #1089 (``feat/release-checklist``, 2026-11-01): the
+  ``/set-release-checklist`` command now states the YAML bool rule correctly -
+  an unquoted ``off`` is parsed as a boolean by YAML 1.1 and the loader
+  normalizes it back to ``"off"``; only an unquoted ``on``/``true`` is rejected
+  with "quote the value". The command is a rendered source, so exactly **7 of
+  1099 hashes moved; 0 added/removed** - the ``set-release-checklist`` render of
+  the seven command-writing providers (``Claude/.claude/commands``,
+  ``Continue/.continue/prompts``, ``Copilot/.github/prompts``,
+  ``Gemini/.gemini/commands``, ``Mammouth/.mammouth/commands``,
+  ``Opencode/.opencode/commands``, ``ZCode/.zcode/commands``). No other artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden content changed. The manifest
+  was patched **per entry** (7 single-line replacements, 1094 of the 1101 lines
+  untouched) - not via ``--write`` - after independently recomputing each digest
+  from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``c49564db…`` -> ``f74d3088…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``5cbe9ea4…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

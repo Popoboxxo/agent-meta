@@ -465,6 +465,15 @@ Override single fields with a `conventions:` block. Two opt-in extras:
 `conventions.release.github_release.enabled: true` (auto GitHub release, default off) and
 `conventions.release.custom_checklist` (project-specific pre-release rows).
 
+**Structured release checklist** (`release-checklist:` in `.meta-config/project.yaml`) —
+opt-in `off`/`advisory`/`strict` mode with per-item `check` (`agent`/`script`), `phase`
+(`precondition`/`step`), `required` and `applies-when`. `strict` is a prompt/convention boundary
+only — the pre-release gates stay hard in every mode — and script items must be side-effect free
+because they also run in a dry run. Run it read-only with `/release-check`. Without the block
+`release.md` stays byte-identical apart from the template `version`/`generated-from`/`based-on`
+frontmatter lines. See
+[`docs/RELEASE_GATES.md`](docs/RELEASE_GATES.md#checklist-modus).
+
 ### Auto-commit
 
 Opt-in commit authority for write-capable roles. Default `off`: every commit goes through the `git` role.
@@ -604,11 +613,12 @@ Roles: `knowledge-curator` (schema), `knowledge-ingestor` (ingest), `knowledge-q
 
 ## Slash commands
 
-22 commands in `commands/1-generic/`. Descriptions: [docs/api/slash-commands.md](docs/api/slash-commands.md).
+24 commands in `commands/1-generic/`. Descriptions: [docs/api/slash-commands.md](docs/api/slash-commands.md).
 
 `/add-mcp-server`, `/add-project-role`, `/add-provider`, `/admin`, `/analysis`, `/analyze-logs`,
 `/checkpoint`, `/commit`, `/consistency-check`, `/diagnose`, `/doc-now`, `/feedback`, `/merge`,
-`/open-docs`, `/pipelines`, `/report-bug`, `/set-preset`, `/test-orchestration`, `/update-extensions`,
+`/open-docs`, `/pipelines`, `/release-check`, `/report-bug`, `/set-preset`,
+`/set-release-checklist`, `/test-orchestration`, `/update-extensions`,
 `/update-meta`, `/upgrade-meta`, `/what-is`
 
 ## Documentation
