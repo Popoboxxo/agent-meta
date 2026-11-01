@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlsplit
 
+from . import platform
+from .io import load_yaml_file
+from .log import SyncLog
+
 KINDS = ("local", "remote", "both")
 ACCESS_LEVELS = ("read", "deploy")
 REMOTE_ACCESS = ("deny", "ask", "allow")
@@ -26,6 +30,12 @@ TOKEN_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 _BLOCK_KEY = "test-environments"
 _ENTRY_KEYS = ("kind", "url", "token-env", "access", "remote-access", "notes")
+_REMOTE_KINDS = ("remote", "both")
+#: Fallback precedence for URL-less remote targets (spec §10.2, HACS > HA).
+FALLBACK_PLATFORM_KEYS = (
+    "platform.hacs.dev_instance_url",
+    "platform.homeassistant.ha_url",
+)
 _ENUM_FIELDS = (
     ("kind", KINDS),
     ("access", ACCESS_LEVELS),
@@ -195,3 +205,86 @@ def validate_test_environments(config: dict, config_path: Path) -> None:
         for error in errors:
             print(f"ERROR: {config_path}: {error}", file=sys.stderr)
         sys.exit(1)
+
+
+def load_project_platform_vars(project_root: Path) -> dict:
+    """Return the *project-layer* platform variables as flat ``platform.*`` keys.
+
+    Only ``.claude/platform-config.yaml`` is read — never the merged defaults,
+    so a default like ``homeassistant.ha_url`` can never trigger a fallback on
+    its own (spec §10.2). A missing, unreadable or malformed file yields ``{}``.
+    """
+    path = project_root / platform.CLAUDE_PLATFORM_CONFIG
+    data = load_yaml_file(path, on_error="default", default={})
+    if not isinstance(data, dict):
+        return {}
+    return {
+        key: value
+        for key, value in platform._flatten_yaml_dict(data).items()
+        if key.startswith("platform.")
+    }
+
+
+def _fallback_url(block: dict, project_vars: dict) -> Tuple[Any, str]:
+    """Pick the platform fallback URL for exactly one URL-less remote target.
+
+    Conditions (all required): exactly one ``kind`` in {remote, both} entry
+    without ``url``, a non-empty project-layer platform value, and the
+    precedence ``hacs.dev_instance_url`` > ``homeassistant.ha_url``.
+    """
+    urlless = [
+        name
+        for name, entry in block.items()
+        if isinstance(entry, dict)
+        and entry.get("kind") in _REMOTE_KINDS
+        and not entry.get("url")
+    ]
+    if len(urlless) != 1:
+        return None, ""
+    for key in FALLBACK_PLATFORM_KEYS:
+        value = project_vars.get(key)
+        if isinstance(value, str) and value.strip():
+            return value, key
+    return None, ""
+
+
+def resolve_test_environments(
+    config: dict, platform_project_vars: "Dict[str, Any] | None"
+) -> "Dict[str, Dict[str, Any]]":
+    """Resolve every ``test-environments`` entry with defaults and URL.
+
+    Returns one dict per environment with the keys ``kind``, ``url`` (or
+    ``None``), ``url_source`` (``"config"``, a ``platform.*`` key or ``""``),
+    ``token-env``, ``access``, ``remote-access`` and ``notes``. Broken input
+    never raises or exits: it yields ``{}`` plus one warning (IC-3).
+    """
+    errors, _ = check_test_environments(config)
+    if errors:
+        SyncLog().warning(
+            "test-environments: invalid block ignored for resolution: "
+            + "; ".join(errors)
+        )
+        return {}
+    block = config.get(_BLOCK_KEY)
+    if not isinstance(block, dict):
+        return {}
+
+    project_vars = platform_project_vars or {}
+    fallback_url, fallback_source = _fallback_url(block, project_vars)
+    resolved: Dict[str, Dict[str, Any]] = {}
+    for name, entry in sorted(block.items(), key=lambda kv: str(kv[0])):
+        kind = entry.get("kind", DEFAULTS["kind"])
+        url = entry.get("url")
+        url_source = "config" if url else ""
+        if not url and kind in _REMOTE_KINDS and fallback_url is not None:
+            url, url_source = fallback_url, fallback_source
+        resolved[name] = {
+            "kind": kind,
+            "url": url,
+            "url_source": url_source,
+            "token-env": entry.get("token-env"),
+            "access": entry.get("access", DEFAULTS["access"]),
+            "remote-access": entry.get("remote-access", DEFAULTS["remote-access"]),
+            "notes": entry.get("notes") or "",
+        }
+    return resolved
