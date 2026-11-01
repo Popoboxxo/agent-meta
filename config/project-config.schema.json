@@ -2636,6 +2636,57 @@
       },
       "additionalProperties": false
     },
+    "test-environments": {
+      "type": "object",
+      "description": "Test/dev targets per project. NOT to be confused with 'environments' (env-var definitions); token-env must reference an 'environments' entry with secret: true.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "remote",
+              "both"
+            ],
+            "description": "Quote the value. Default: local."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "token-env": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "Name of an 'environments' entry with secret: true. Never a value."
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "read",
+              "deploy"
+            ],
+            "description": "Default: read."
+          },
+          "remote-access": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "ask",
+              "allow"
+            ],
+            "description": "Default: ask."
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "repo_containment": {
       "type": "object",
       "description": "Repo-Containment ('Gefängnis-Modus'): confines agent WRITE access to the project root. Default enabled: true. The optional tmp-sink additionally sanctions a framework-provisioned scratch directory (default .tmp/) as the single exception outside an otherwise root-confined policy.",
