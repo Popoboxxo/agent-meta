@@ -38,6 +38,7 @@ Unified entry-point:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import hmac
 import logging
@@ -246,6 +247,9 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     # The whitelist is mode-independent -- both super_admin and project_admin
     # may write these sections (they are project-instance settings).
     "subagent_permissions", "git", "auto_commit",
+    # Feature: release checklist (Admin UI). Guarded by
+    # _guard_release_checklist_write so a bad payload never reaches disk.
+    "release-checklist",
     # Written internally by the fixed-section endpoints
     # (_write_submodule_protection).
     "submodule-protection",
@@ -5196,8 +5200,46 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             existing = {}
         self._guard_model_block_write(section, data, existing)
         self._guard_context_profile_write(section, data)
+        data = self._guard_release_checklist_write(section, data)
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write("project", existing))
+
+    def _guard_release_checklist_write(self, section: str, data: Any) -> Any:
+        """Normalise/validate a ``release-checklist`` write before it is stored.
+
+        Two YAML-1.1 footguns and one hard config error are handled here so an
+        Admin-UI save gets the same guarantee as a hand-edited ``project.yaml``:
+
+        1. ``mode: false`` (an unquoted ``off`` parsed as a boolean) is
+           normalised to the string ``"off"`` — the safe side, identical to the
+           sync-side normalizer.
+        2. ``mode: true`` (an unquoted ``on``) is genuine user intent that the
+           validator cannot resolve; it is rejected with the "quote the value"
+           hint instead of being silently downgraded.
+        3. Every payload that would abort the next ``sync.py`` run is rejected
+           with ``ValueError`` (mapped to HTTP 400) *before* any disk write.
+
+        The caller's payload is never mutated: the guard works on a deep copy
+        and returns the normalised copy. Other sections pass through
+        unchanged.
+        """
+        if section != "release-checklist":
+            return data
+
+        from lib.release_checklist import (  # noqa: PLC0415 - lazy lib import
+            collect_release_checklist_errors,
+            normalize_release_checklist_mode,
+        )
+
+        payload = copy.deepcopy(data)
+        wrapper = {"release-checklist": payload}
+        normalize_release_checklist_mode(wrapper)
+        errors = collect_release_checklist_errors(wrapper)
+        if errors:
+            raise ValueError(
+                "invalid 'release-checklist': " + "; ".join(errors)
+            )
+        return wrapper["release-checklist"]
 
     def _guard_model_block_write(self, section: str, data: Any, existing: dict) -> None:
         """Reject section writes that would break the next ``sync.py`` run.
