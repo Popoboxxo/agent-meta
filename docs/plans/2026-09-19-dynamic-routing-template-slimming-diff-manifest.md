@@ -1958,3 +1958,41 @@ und Meta-Tokens bleiben unangetastet (dokumentierte inverse Ports des Gates).
 `pytest tests/test_compact_matrix.py -q` → **121 passed**;
 `pytest tests/test_ac01_render_identity.py -q` → **5 passed** (kein AC-01-Drift, keine
 AC-01-Rebaseline); `scripts/sync.py --validate` rc `0`.
+
+---
+
+## 19. Re-Baseline der Golden-Baseline für 2 Rollen (Structured Release Checklist, Issue #1089)
+
+> **Anlass:** Die Release-Checklist-Feature (`feat/release-checklist`, Plan
+> `docs/plans/2026-10-31-release-checklist-plan.md`, Task 11) hebt
+> `agents/1-generic/agent-meta-manager.md` auf `1.26.0` (Rezept 14d, §3-Zeile) und
+> `agents/1-generic/release.md` auf `1.13.0`. Das Gate meldet die Drift als „diff not
+> attributable to declared normalizations".
+
+**Geändert (2 Fixtures):** `agent-meta-manager.md` (+45/−3: Frontmatter-Version,
+`generated-from`-Pin, `model`-Zeile, eine §3-Tabellenzeile und der neue Abschnitt 14d) und
+`release.md` (+3/−3: nur Frontmatter-Version, `generated-from`-Pin, `model`-Zeile — der
+Checklist-Block ist im Default-Projekt inaktiv und rendert nicht). Die übrigen 56 Goldens
+bleiben unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58.
+
+**Ursache:** Feature-Drift der Rollen-Templates, kein migrierter Block. `_NORMALIZATIONS`,
+`_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht
+betroffen — nach dem Update läuft die deklarierte Normalisierung unverändert über die
+goldene Baseline.
+
+**Herkunft:** Beide Fixtures wurden über den echten Sync-Pfad erzeugt
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`)
+und dabei mit den dokumentierten inversen Ports des Gates eingefroren: die release-volatilen
+Meta-Tokens `2.0.0-beta.6`/`2026-10-31` wurden auf die eingefrorenen Werte
+`1.2.0-beta.2`/`2026-09-13` zurückportiert (`_GOLDEN_META_VERSION`/`_GOLDEN_META_DATE`), und
+der `{{AUTO_COMMIT_BLOCK}}`-Tail wurde entfernt, weil die Golden-Baseline mit
+`auto_commit.mode: off` eingefroren wurde (`_strip_auto_commit_tail`). Keine Handpflege der
+Rollen-Inhalte.
+
+**Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
+`pytest tests/test_compact_matrix.py -q` → **121 passed**, rc `0`;
+`pytest tests/test_ac01_render_identity.py -q` → **5 passed**, rc `0`;
+`pytest tests/test_opencode_v2_surface.py -q` → **130 passed**, rc `0`;
+`pytest tests/test_standalone_export_in_sync.py tests/test_context_budgets.py -q` → **13 passed**,
+rc `0`; `scripts/sync.py --validate` rc `0`; `scripts/sync.py --render-standalone --check` rc `0`;
+`scripts/sync.py --check` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`.

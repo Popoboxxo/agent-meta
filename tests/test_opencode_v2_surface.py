@@ -5321,9 +5321,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # re-pinned — 11 hashes (2 `hook_common.sh` renders, 3 branch-guard rule
 # renders, 6 `AGENTS.md`); `slimming-golden`/`compact-golden` unchanged.
 # Log: `tests/test_ac01_render_identity.py`.
+# Issue #1089 (structured release checklist, `feat/release-checklist`):
+# `ac01-baseline` re-pinned — 45 entries (31 changed + 14 added command
+# renders; new `release-check`/`set-release-checklist` commands, release
+# template versions, manager 1.26.0). `slimming-golden` re-derived for the two
+# touched goldens (`agent-meta-manager.md`, `release.md`; manifest §19);
+# `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "d47714008902ee94c2bdad7bffcd5e26faecdb0c04fe5d5d0cf4a721a033c511",
-    "slimming-golden": "6b0c5724b8270ae81157ead67bef029c2cf62ba02d710b8806f539f643d35598",
+    "ac01-baseline": "c49564dbd660c49d78cbfb88563aeb314f2593bc2bf52af3a81a720ea416da52",
+    "slimming-golden": "5cbe9ea49ae39c406dcc816860c2c6eeaa3f48841eb9ec8358eb7c5a9cae7413",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 
