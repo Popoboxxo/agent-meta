@@ -342,6 +342,77 @@ def test_settings_json_identical_and_no_secrets_file(tmp_path_factory):  # AC-EN
     assert not (cfg / ".meta-config/secrets.local.yaml").exists()
 
 
+# ---------------------------------------------------------------------------
+# Task 9: the seven platform overrides follow the new base versions
+# ---------------------------------------------------------------------------
+
+#: Override file -> (own version, based-on pin) after Task 9 (AC-ENV-10).
+OVERRIDES = {
+    "homeassistant-developer.md": ("2.1.3", "1-generic/developer.md@4.9.0"),
+    "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
+    "hacs-developer.md": ("1.3.2", "1-generic/developer.md@4.9.0"),
+    "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
+    "hacs-tester.md": ("1.0.5", "1-generic/tester.md@2.9.0"),
+    "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),
+    "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),
+}
+
+
+@pytest.mark.parametrize("fname", sorted(OVERRIDES))
+def test_override_version_and_based_on(fname):  # AC-ENV-10
+    head = (
+        REPO_ROOT / "agents" / "2-platform" / fname
+    ).read_text(encoding="utf-8").split("---", 2)[1]
+    ver, based = OVERRIDES[fname]
+    assert f'version: "{ver}"' in head and f'based-on: "{based}"' in head
+
+
+def test_extends_overrides_do_not_duplicate_the_block():
+    for fname in OVERRIDES:
+        if fname != "sharkord-docker.md":
+            assert "TEST_ENVIRONMENT_BLOCK" not in (
+                REPO_ROOT / "agents" / "2-platform" / fname
+            ).read_text(encoding="utf-8")
+
+
+def test_sharkord_docker_has_manual_gate_before_sprache():
+    src = (
+        REPO_ROOT / "agents" / "2-platform" / "sharkord-docker.md"
+    ).read_text(encoding="utf-8")
+    gate = (
+        "{{#if TEST_ENVIRONMENTS_SET}}\n{{TEST_ENVIRONMENT_BLOCK}}\n"
+        "Deploy auf eine Remote-Umgebung nur bei `access: deploy` und erfülltem Freigabeprotokoll.\n"
+        "{{/if}}\n"
+    )
+    assert src.count(gate) == 1
+    assert src.index("## Don'ts") < src.index(gate) < src.index("## Sprache")
+
+
+@pytest.mark.parametrize("label", ["homeassistant", "sharkord", "hacs", "agent-meta"])
+def test_override_render_with_block_resolves_anchors(label, tmp_path_factory):
+    project = _sync_project(
+        tmp_path_factory.mktemp(label), platforms=(label,), extra_yaml=CONFIG_YAML
+    )
+    log_file = project / "sync.log"
+    log = (
+        log_file.read_text(encoding="utf-8", errors="replace").lower()
+        if log_file.exists()
+        else ""
+    )
+    assert "anchor" not in log or "not found" not in log  # no composition-patch warning
+    texts = _role_texts(project)
+    for role in OVERRIDE_COVERAGE[label]:
+        stems = [s for s in texts if _role_of(s) == role]
+        assert stems, (label, role)
+        for s in stems:
+            text = texts[s]
+            assert "## Test environments" in text
+            if "</constraints>" in text:  # extends overrides: block after the tag anchors
+                assert text.rindex("</constraints>") < text.index("## Test environments")
+            else:  # sharkord-docker (standalone)
+                assert text.index("## Test environments") < text.index("## Sprache")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
