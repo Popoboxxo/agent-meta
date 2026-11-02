@@ -30,6 +30,12 @@ from .io import run_git_check_ignore
 from .providers import resolve_providers
 from .tmp_paths import TmpPaths, resolve_tmp_paths
 
+# Markers of the agent-meta managed .gitignore block. Defined here (not in
+# context.py) so the shadowing detector can tell rules it wrote itself from
+# pre-existing project rules (#1072). context.py imports them.
+GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
+GITIGNORE_BLOCK_END = "# --- end agent-meta managed ---"
+
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
 _CLAUDE_LOCAL_ENTRIES_FALLBACK: list[str] = [
@@ -393,6 +399,29 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
     return entries
 
 
+def _line_in_managed_block(gitignore_text: str, lineno: int) -> bool:
+    """Return True when the 1-based ``lineno`` lies inside the managed block (#1072).
+
+    A rule between the BEGIN and END markers was written by the syncer itself;
+    a match on it is expected behavior, not silent shadowing. The marker lines
+    themselves are not rules and report False.
+    """
+    if lineno < 1:
+        return False
+    inside = False
+    for index, line in enumerate(gitignore_text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped == GITIGNORE_BLOCK_BEGIN:
+            inside = True
+            continue
+        if stripped == GITIGNORE_BLOCK_END:
+            inside = False
+            continue
+        if index == lineno:
+            return inside
+    return False
+
+
 def detect_shadowed_provider_roots(
     project_root: Path,
     providers: list[str],
@@ -400,15 +429,16 @@ def detect_shadowed_provider_roots(
     ignore_provider_dirs: bool,
 ) -> list[str]:
     """Return one warning per provider whose ENTIRE generated output is
-    swallowed by a pre-existing .gitignore rule the managed block did not
-    write itself (issue #713).
+    swallowed by a pre-existing .gitignore rule outside the managed block
+    (issue #713, refined by #1072).
 
     Only meaningful when ``ignore-provider-dirs`` is False (the default):
     in that mode the managed block never adds a whole-``agents_dir`` entry
     on its own, so any ``git check-ignore`` match on a probe path under
-    ``agents_dir`` can only come from an unrelated, pre-existing rule that
-    predates our managed block -- exactly the silent-shadowing scenario
-    reported (`git ls-files` shows nothing, no warning anywhere). When the
+    ``agents_dir`` can only come from an unrelated, pre-existing rule outside
+    the managed block -- exactly the silent-shadowing scenario reported
+    (`git ls-files` shows nothing, no warning anywhere). Rules inside the
+    managed block were written by the syncer itself and never warn; when the
     toggle is True the managed block DOES add that whole-root entry itself,
     so a match there is expected and not reported.
     """
@@ -427,6 +457,13 @@ def detect_shadowed_provider_roots(
             continue  # not ignored at all -- fine
         # `git check-ignore -v` output: "<source>:<line>:<pattern>\t<path>"
         source_rule = result.stdout.strip().split("\t", 1)[0]
+        src, ln, _pat = (source_rule.split(":", 2) + ["", ""])[:3]
+        if src == ".gitignore" and ln.isdigit():
+            gitignore_path = project_root / ".gitignore"
+            if gitignore_path.is_file() and _line_in_managed_block(
+                gitignore_path.read_text(encoding="utf-8"), int(ln)
+            ):
+                continue  # rule written by the syncer itself -- not shadowing
         warnings.append(
             f"gitignore-shadowing: provider '{provider}' output under "
             f"'{agents_dir}/' is silently ignored by a pre-existing rule "

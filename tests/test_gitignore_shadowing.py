@@ -9,7 +9,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from lib.gitignore import detect_shadowed_provider_roots
+from lib.gitignore import (
+    GITIGNORE_BLOCK_BEGIN,
+    GITIGNORE_BLOCK_END,
+    detect_shadowed_provider_roots,
+)
 
 _PROVIDER_CONFIG = {"Claude": {"agents_dir": ".claude/agents"}}
 
@@ -64,3 +68,27 @@ def test_no_warning_without_a_git_repo(tmp_path):
     )
 
     assert warnings == []
+
+
+def test_no_warning_when_rule_inside_managed_block(tmp_path):
+    # #1072: a matching rule that lives INSIDE the agent-meta managed block
+    # was written by the syncer itself -- that is not silent shadowing.
+    _init_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text(
+        f"{GITIGNORE_BLOCK_BEGIN}\n.claude/\n{GITIGNORE_BLOCK_END}\n", encoding="utf-8")
+
+    assert detect_shadowed_provider_roots(
+        tmp_path, ["Claude"], _PROVIDER_CONFIG, ignore_provider_dirs=False) == []
+
+
+def test_warning_when_rule_outside_block_even_if_block_exists(tmp_path):
+    # #1072: presence of a managed block must not suppress warnings for
+    # unrelated rules that still shadow the provider output.
+    _init_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text(
+        f".claude/\n{GITIGNORE_BLOCK_BEGIN}\nsync.log\n{GITIGNORE_BLOCK_END}\n", encoding="utf-8")
+
+    warnings = detect_shadowed_provider_roots(
+        tmp_path, ["Claude"], _PROVIDER_CONFIG, ignore_provider_dirs=False)
+
+    assert len(warnings) == 1 and ".gitignore:1:.claude/" in warnings[0]

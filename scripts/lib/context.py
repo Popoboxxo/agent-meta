@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
+from .gitignore import GITIGNORE_BLOCK_BEGIN, GITIGNORE_BLOCK_END
 from .io import (
     SyncError,
     content_hash,
@@ -324,9 +325,6 @@ def _regenerate_static_context(
         config=config, provider_config=provider_config, dry_run=dry_run,
     )
     _record_static_hash(project_root, rel_label, norm_new, dry_run)
-GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
-GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
-
 # sync_claude_md_managed was removed because it is dead code.
 
 
