@@ -1103,11 +1103,12 @@ def test_1033_block_message_lists_protected_branches_once(
 
 def test_949_push_guard_helpers_live_in_the_shared_lib():
     """The flag/short-cluster walk and the protected-branch set are defined
-    once (in lib/hook_common.sh) and used by both consumers — the hook must
+    once (in lib/hook_common.sh) and used by the consumers — the hook must
     not carry a second copy again."""
     src = _HOOK_PATH.read_text(encoding="utf-8")
     assert "def walk_push_args" not in src          # implementation is in the lib
-    assert src.count("walk_push_args(") == 2        # tag-only + destination
+    # tag-only + destination + the config recursion check (#1041)
+    assert src.count("walk_push_args(") == 3
     assert "hook_push_arg_parser_py" in src
     assert "hook_protected_branches" in src
     assert "for k, ch in enumerate(a[1:], 1):" not in src  # old short walk
@@ -1356,6 +1357,84 @@ def test_1051_several_submodules_stay_within_classifier_budget(tmp_path):
     elapsed = time.monotonic() - start
     assert result.returncode == 0, result.stderr
     assert elapsed < 20, f"classifier took {elapsed:.1f}s (budget 20 s)"
+
+
+# --- issue #1041: push.recurseSubmodules via config, -c and the environment -
+#
+# The flag check only saw --recurse-submodules on the command line. The same
+# recursion can come from push.recurseSubmodules in the effective config, from
+# `git -c`, from --config-env or from GIT_CONFIG_*; all of them push the
+# submodules too. The explicit CLI flag wins over the config (git's parse
+# order), and check/no never recurse.
+
+def _with_submodule(repo):
+    (repo / ".gitmodules").write_text(
+        '[submodule "s"]\n\tpath = s\n\turl = ../s\n', encoding="utf-8")
+
+
+@pytest.mark.parametrize("command", [
+    "git -c push.recurseSubmodules=on-demand push origin feat/x",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.recurseSubmodules "
+    "GIT_CONFIG_VALUE_0=on-demand git push origin feat/x",
+    # --config-env names the environment variable, not the value: the hook
+    # cannot see the environment, so a recursing value must stay blocked.
+    "FOO=on-demand git --config-env=push.recurseSubmodules=FOO push origin feat/x",
+])
+def test_1041_override_forms_are_blocked(repo_on_feature_branch, command):
+    _with_submodule(repo_on_feature_branch)
+    r = _run_hook(repo_on_feature_branch, command)
+    assert r.returncode == 2, r.stdout
+    assert "submodule" in r.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git -c push.recurseSubmodules=no push origin feat/x",
+    "git -c push.recurseSubmodules=check push origin feat/x",
+    "git -c push.recurseSubmodules=false push origin feat/x",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.recurseSubmodules "
+    "GIT_CONFIG_VALUE_0=no git push origin feat/x",
+])
+def test_1041_non_recursing_overrides_stay_inert(repo_on_feature_branch, command):
+    """A value-agnostic match on the key over-blocked: `-c ...=no`/`check`
+    (and the GIT_CONFIG_* pair) do not recurse and must stay inert even
+    when the repository declares submodules."""
+    _with_submodule(repo_on_feature_branch)
+    r = _run_hook(repo_on_feature_branch, command)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_1041_tag_only_push_without_submodules_stays_allowed(repo_on_feature_branch):
+    """A repo that does NOT declare submodules keeps the tag-only shortcut
+    even when push.recurseSubmodules is configured: the config-recursion
+    clause of the tag-only exemption needs the same submodule gate as the
+    destination check. Before the fix, `git push --tags origin` exited 2 in
+    such a repo (push.default=matching) where the base hook exited 0."""
+    _git(repo_on_feature_branch, "config", "push.recurseSubmodules", "on-demand")
+    _git(repo_on_feature_branch, "config", "push.default", "matching")
+    r = _run_hook(repo_on_feature_branch, "git push --tags origin")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("command", ["git push origin feat/x", "git push --tags origin"])
+def test_1041_repo_config_is_blocked(repo_on_feature_branch, command):
+    _with_submodule(repo_on_feature_branch)
+    _git(repo_on_feature_branch, "config", "push.recurseSubmodules", "on-demand")
+    r = _run_hook(repo_on_feature_branch, command)
+    assert r.returncode == 2, r.stdout
+
+
+def test_1041_cli_flag_overrides_config_and_inert_values(repo_on_feature_branch):   # R2
+    _with_submodule(repo_on_feature_branch)
+    for value in ("check", "no"):
+        _git(repo_on_feature_branch, "config", "push.recurseSubmodules", value)
+        assert _run_hook(repo_on_feature_branch, "git push origin feat/x").returncode == 0
+    _git(repo_on_feature_branch, "config", "push.recurseSubmodules", "on-demand")
+    assert _run_hook(repo_on_feature_branch, "git push --recurse-submodules=no origin feat/x").returncode == 0
+
+
+def test_1041_no_submodules_means_no_block(repo_on_feature_branch):
+    _git(repo_on_feature_branch, "config", "push.recurseSubmodules", "on-demand")
+    assert _run_hook(repo_on_feature_branch, "git push origin feat/x").returncode == 0
 
 
 # --- issue #954: security re-review checks that were never run -------------

@@ -658,6 +658,43 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is
   NOT extended.
 
+- Issues #1078/#1041 (hook fixes; ``hook_common.sh`` 1.7.0 -> 1.8.0, ``dod-push-check.sh``
+  2.2.0 -> 2.3.0, 2026-11-02, ``fix/hooks-guards``): ``hook_known_tool_name`` gains the 17
+  current built-ins (``ToolSearch``, ``TaskCreate``, ``TaskUpdate``, ``TaskList``, ``TaskGet``,
+  ``Monitor``, ``ScheduleWakeup``, ``CronCreate``, ``CronDelete``, ``CronList``, ``EnterPlanMode``,
+  ``PushNotification``, ``RemoteTrigger``, ``SendUserFile``, ``Artifact``, ``ArtifactComments``,
+  ``ArtifactData``; ``EnterWorktree``/``ExitWorktree`` stay blocked on purpose) and
+  ``dod-push-check.sh`` honours ``push.recurseSubmodules`` from the config/``-c``/``GIT_CONFIG_*``
+  value. Exactly **3 of 1099 hashes moved; 0 added/removed**: the two ``hook_common.sh`` renders
+  (``Claude/.claude/hooks/lib/hook_common.sh`` ``bcdf8b16…`` -> ``3564b211…``,
+  ``Gemini/.agents/hooks/lib/hook_common.sh`` ``bcdf8b16…`` -> ``3564b211…``; one identical
+  render for both providers, the lib carries no ``{{AGENT_META_PROVIDER}}``) and the only
+  ``dod-push-check.sh`` render (``Claude/.claude/hooks/dod-push-check.sh`` ``e7458463…`` ->
+  ``cdfd0131…``). No rule, agent or command artifact, ``AGENTS.md``, ``context-hashes.json``
+  or golden content changed. The manifest was patched **per entry** (3 single-line replacements,
+  1098 of the 1101 lines untouched) -- not via ``--write`` -- after independently recomputing
+  each digest from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from the
+  fixture bytes: ``ea59522c…`` -> ``647b75a4…``); ``slimming-golden`` and ``compact-golden``
+  were re-verified as unchanged (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+- Issue #1041 (PR A review follow-up; ``dod-push-check.sh`` 2.3.0 -> 2.4.0, 2026-11-02,
+  ``fix/hooks-guards``): the tag-only exemption is gated on the repository declaring
+  submodules (same predicate as the destination check) and the ``push.recurseSubmodules``
+  override value is parsed for ``-c``/``GIT_CONFIG_VALUE_n`` (``--config-env`` stays
+  value-blind). Exactly **1 of 1101 hashes moved; 0 added/removed**: the only
+  ``dod-push-check.sh`` render (``Claude/.claude/hooks/dod-push-check.sh`` ``cdfd0131…``
+  -> ``89759e26…``). No rule, agent or command artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched **per entry**
+  (1 single-line replacement, 1100 of the 1101 lines untouched) -- not via ``--write`` --
+  after independently recomputing the digest from the rendered file bytes with the
+  harness's own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``647b75a4…`` -> ``90f1f74a…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

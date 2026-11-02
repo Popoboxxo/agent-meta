@@ -98,6 +98,29 @@
   `f(){ { :; }; f|f& };f` are detected instead of passing the destructive gate; a
   body that exhausts the window still fails closed. The matching known-gap entry
   (item 5) is removed from `rules/1-generic/branch-guard.md`.
+- **Guard allow-list knows the current tool names (#1078, behavior change)**:
+  `hook_known_tool_name` in `hooks/1-generic/lib/hook_common.sh` (1.8.0) adds the
+  17 built-ins that postdate the closed list — `ToolSearch`, `TaskCreate`,
+  `TaskUpdate`, `TaskList`, `TaskGet`, `Monitor`, `ScheduleWakeup`, `CronCreate`,
+  `CronDelete`, `CronList`, `EnterPlanMode`, `PushNotification`, `RemoteTrigger`,
+  `SendUserFile`, `Artifact`, `ArtifactComments`, `ArtifactData` — so the
+  task/cron/plan-mode/notification/artifact surface no longer fails closed and
+  blocks normal operation. `EnterWorktree`/`ExitWorktree` stay blocked on purpose
+  (no-worktree isolation).
+- **`dod-push-check` honours `push.recurseSubmodules` from the effective config
+  (#1041, behavior change)**: `hooks/1-generic/dod-push-check.sh` (2.4.0) resolves
+  the value from config, `-c`/`--config-env` and `GIT_CONFIG_*` like the explicit
+  flag: `on-demand`/`only` blocks when the repository declares submodules, using the
+  same per-submodule destination check as #1051. The value is parsed where the
+  command line carries it (`-c`/`--config`, `GIT_CONFIG_VALUE_n`), so the inert
+  values `check`/`no`/`false` stay inert even when `.gitmodules` exists;
+  `--config-env` names the variable and not the value, so it stays value-blind and
+  is conservatively treated as recursing. The tag-only shortcut is skipped only
+  when the config recurses **and** the same submodule gate as the destination
+  check applies, so a release tag push in a repo without `.gitmodules` stays
+  allowed. An explicit `--recurse-submodules`/`--no-recurse-submodules` still wins
+  over the config. The config of a foreign repository (`-C`/`GIT_DIR`) remains a
+  documented gap.
 
 ## [2.0.0-beta.6] - 2026-10-31
 

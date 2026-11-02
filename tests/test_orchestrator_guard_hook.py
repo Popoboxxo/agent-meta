@@ -2258,3 +2258,12 @@ def test_header_names_the_exact_residual_gaps():
     assert "never hide the command list" not in header, (
         "F-DOC-1: the disproven 'never hide' claim is still in the header"
     )
+
+
+def test_toolsearch_is_allowed_and_unknown_tool_still_blocked():
+    """Issue #1078: ToolSearch is a legitimate built-in and must pass the
+    shared allow-list (exit 0); an unknown name must still fail closed."""
+    ok = _run_hook({"tool_name": "ToolSearch", "tool_input": {"query": "x"}})
+    assert ok.returncode == 0, ok.stderr
+    bad = _run_hook({"tool_name": "Bogus", "tool_input": {}})
+    assert bad.returncode == 2
