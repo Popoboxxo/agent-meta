@@ -422,27 +422,36 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
     return entries
 
 
+def _managed_block_intervals(gitignore_text: str) -> list[tuple[int, int]]:
+    """Return the balanced (BEGIN, END) line intervals of the managed block.
+
+    Only properly terminated blocks count. An unterminated BEGIN (a broken or
+    hand-truncated block) is discarded instead of leaving the rest of the file
+    "inside" — otherwise a single missing END marker would suppress every
+    following shadowing warning.
+    """
+    intervals: list[tuple[int, int]] = []
+    pending: list[int] = []
+    for index, line in enumerate(gitignore_text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped == GITIGNORE_BLOCK_BEGIN:
+            pending.append(index)
+        elif stripped == GITIGNORE_BLOCK_END and pending:
+            intervals.append((pending.pop(), index))
+    return intervals
+
+
 def _line_in_managed_block(gitignore_text: str, lineno: int) -> bool:
     """Return True when the 1-based ``lineno`` lies inside the managed block (#1072).
 
     A rule between the BEGIN and END markers was written by the syncer itself;
     a match on it is expected behavior, not silent shadowing. The marker lines
-    themselves are not rules and report False.
+    themselves are not rules and report False. Only balanced blocks count, so an
+    unterminated BEGIN leaves the rest of the file outside.
     """
     if lineno < 1:
         return False
-    inside = False
-    for index, line in enumerate(gitignore_text.splitlines(), start=1):
-        stripped = line.strip()
-        if stripped == GITIGNORE_BLOCK_BEGIN:
-            inside = True
-            continue
-        if stripped == GITIGNORE_BLOCK_END:
-            inside = False
-            continue
-        if index == lineno:
-            return inside
-    return False
+    return any(begin < lineno < end for begin, end in _managed_block_intervals(gitignore_text))
 
 
 def detect_shadowed_provider_roots(
@@ -468,6 +477,17 @@ def detect_shadowed_provider_roots(
     warnings: list[str] = []
     if ignore_provider_dirs or not (project_root / ".git").is_dir():
         return warnings
+    # Read the managed-marked file once for the whole provider loop instead of
+    # re-reading and re-splitting it per provider. On an unreadable/invalid
+    # file fall back to the empty text: every rule then counts as outside the
+    # block, which keeps the warning (the safe direction) instead of crashing.
+    gitignore_text = ""
+    gitignore_path = project_root / ".gitignore"
+    if gitignore_path.is_file():
+        try:
+            gitignore_text = gitignore_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            gitignore_text = ""
     for provider in providers:
         agents_dir = provider_config.get(provider, {}).get("agents_dir")
         if not agents_dir:
@@ -482,10 +502,7 @@ def detect_shadowed_provider_roots(
         source_rule = result.stdout.strip().split("\t", 1)[0]
         src, ln, _pat = (source_rule.split(":", 2) + ["", ""])[:3]
         if src == ".gitignore" and ln.isdigit():
-            gitignore_path = project_root / ".gitignore"
-            if gitignore_path.is_file() and _line_in_managed_block(
-                gitignore_path.read_text(encoding="utf-8"), int(ln)
-            ):
+            if _line_in_managed_block(gitignore_text, int(ln)):
                 continue  # rule written by the syncer itself -- not shadowing
         warnings.append(
             f"gitignore-shadowing: provider '{provider}' output under "
