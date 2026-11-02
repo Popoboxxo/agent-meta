@@ -135,8 +135,8 @@ prüfbar. Inhaltliche Abdeckung je Szenario: `tests/scenarios/registry.md`.
 
 | Workflow / Job | Was läuft | Parallelität |
 |----------------|-----------|--------------|
-| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12 | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
-| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 30 min | `-n 0` |
+| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12, Timeout 45 min | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
+| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 45 min | `-n 0` |
 | `orchestration-test.yml` → `compat-311` | TOML-Boundary + Code-Hygiene-Dateien sowie zwei subprozess-lastige Sync-Module (`test_provider_matrix_sync.py`, `test_sync_validation_gate.py`) auf Python 3.11 | `-n 0` |
 | `validate.yml` → `scenarios` | `tests/scenarios/run.sh` in 4 Shards | kein pytest |
 | `validate.yml` → `validate` | Sync-Output erzeugen, Drift-Gate, `--validate`, Frontmatter-Lint | kein pytest |

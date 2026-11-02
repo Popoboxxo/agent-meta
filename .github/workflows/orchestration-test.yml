@@ -28,6 +28,15 @@ name: Orchestration Tests
 #     subprocesses cannot stack up inside one job.
 #   - `compat-311`: cheap targeted TOML-boundary + code-hygiene job.
 #
+# Timeout budget (`timeout-minutes` is only a backstop; the per-subprocess
+# timeouts in tests/timeouts.py are the real guard):
+#   - `test` and `subprocess-shard`: 45. Both reached ~30 m 20 s at 97-99 % on
+#     a loaded 3.12 runner (runs 41381909910 / 41491331808 / PR #1112), so the
+#     old 30 min cancelled healthy runs. The shard job proved 45 works; the
+#     `test` job hit the same wall at 97 % of shard 3/3 and gets the same room.
+#   - `compat-311`: 30 (targeted files only).
+#   - `changes` and `orchestration-gate`: 5.
+#
 # Why the heavy-fixture placement is explicit instead of duration-based:
 #   no `.test_durations` baseline is committed, so `--splitting-algorithm
 #   least_duration` would have nothing to learn from on a cold runner. The 17
@@ -166,7 +175,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Same backstop as `subprocess-shard`: a loaded 3.12 shard reached 30 m 19 s
+    # at 97 % (run 41491331808) and was cancelled by the old 30 min ceiling.
+    # Duration, not failure -- see the timeout budget in the header comment.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -319,9 +331,11 @@ jobs:
     runs-on: ubuntu-latest
     # 451 tests in total, but strictly serial per job. The timeout is only a
     # backstop -- the per-subprocess timeouts in tests/timeouts.py are the real
-    # guard -- and three-way module-disjoint splitting keeps every group
-    # comfortably below it (the serial whole measured 1864 s on 3.9).
-    timeout-minutes: 30
+    # guard -- and three-way module-disjoint splitting keeps every group below
+    # it. The serial whole measured 1864 s on 3.9; on a loaded 3.12 runner a
+    # group reached 30 m 29 s at 99 % (runs 41491331808 / 41381909910, the last
+    # test passed and the job was cancelled by this backstop), so it is 45 min.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -375,8 +389,9 @@ jobs:
   # `-n 0` on purpose: two of the nine files below (test_provider_matrix_sync,
   # test_sync_validation_gate) launch sync.py repeatedly, including the
   # repo-wide `--validate` suite. Serial keeps their subprocesses from
-  # competing for the assumed 2 cores. This job is new; its 30 min ceiling matches
-  # the shard job because serial execution loses worker overlap.
+  # competing for the assumed 2 cores. Its 30 min ceiling is unchanged: it runs
+  # only the targeted files, while the serial subprocess shard needs the larger
+  # backstop documented above.
   compat-311:
     needs: changes
     if: needs.changes.outputs.run_tests == 'true'
