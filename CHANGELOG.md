@@ -96,7 +96,10 @@
   the `({{GIT_REMOTE_URL}})` suffix behind `GIT_REMOTE_URL_SET`, so a project without a
   remote URL renders `**Git platform:** <platform>` instead of
   `**Git platform:** <platform> ()`. The no-remote and remote renders are both covered
-  by `tests/test_git_section_variables.py`.
+  by `tests/test_git_section_variables.py`. Follow-up (`git.md` 2.1.2): the derivation
+  now requires a non-blank string, so a whitespace-only value (`remote-url: '   '`) and
+  a non-string YAML value (list/dict) also count as absent and render neither `(   )`
+  nor a Python repr.
 - **Gitignore shadowing warning skips managed-block rules (#1072)**:
   `scripts/lib/gitignore.py` no longer reports a provider directory as shadowed when
   the matching rule lives *inside* the agent-meta managed block — the sync itself

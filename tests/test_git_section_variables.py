@@ -104,7 +104,7 @@ def test_git_agent_shows_url_when_set(tmp_path):
 
 def test_template_line_is_the_gated_form():
     text = (_REPO_ROOT / "agents" / "1-generic" / "git.md").read_text(encoding="utf-8")
-    assert _LINE in text and 'version: "2.1.1"' in text
+    assert _LINE in text and 'version: "2.1.2"' in text
 
 
 def test_git_agent_keeps_blank_line_after_platform(tmp_path):
@@ -112,4 +112,37 @@ def test_git_agent_keeps_blank_line_after_platform(tmp_path):
     text = strip_inactive_conditional_blocks(_LINE + "\n\n**Main branch:** main\n", variables)
     assert substitute(text, variables, "git.md", SyncLog()) == (
         "**Git platform:** GitLab\n\n**Main branch:** main\n"
+    )
+
+
+def test_whitespace_only_remote_url_counts_as_absent(tmp_path):
+    """Issue #1093 residual: ``remote-url: '   '`` must not render ``(   )``."""
+    variables = _vars(tmp_path, "git:\n  platform: GitLab\n  remote-url: '   '\n")
+    assert variables["GIT_REMOTE_URL_SET"] == "false"
+    assert _render_line(tmp_path, "git:\n  platform: GitLab\n  remote-url: '   '\n") == (
+        "**Git platform:** GitLab"
+    )
+
+
+def test_non_string_remote_url_counts_as_absent(tmp_path):
+    """Issue #1093 residual: a YAML list must not render a Python repr.
+
+    The schema warning for a non-string ``git.remote-url`` may still fire;
+    only the rendered clause and the derived flag are asserted here.
+    """
+    body = "git:\n  platform: GitLab\n  remote-url:\n    - a\n    - b\n"
+    variables = _vars(tmp_path, body)
+    assert variables["GIT_REMOTE_URL_SET"] == "false"
+    assert _render_line(tmp_path, body) == "**Git platform:** GitLab"
+
+
+def test_git_agent_keeps_blank_line_after_remote_url(tmp_path):
+    """The active remote-URL branch must also preserve the following blank line."""
+    variables = _vars(
+        tmp_path,
+        "git:\n  platform: GitHub\n  remote-url: https://github.com/o/r\n",
+    )
+    text = strip_inactive_conditional_blocks(_LINE + "\n\n**Main branch:** main\n", variables)
+    assert substitute(text, variables, "git.md", SyncLog()) == (
+        "**Git platform:** GitHub (https://github.com/o/r)\n\n**Main branch:** main\n"
     )

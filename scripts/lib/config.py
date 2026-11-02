@@ -1452,7 +1452,18 @@ def _build_core_variables(
         "DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START",
         "GIT_REMOTE_URL",
     ):
-        variables[f"{_optional_var}_SET"] = "true" if variables.get(_optional_var) else "false"
+        _optional_value = variables.get(_optional_var)
+        if _optional_var == "GIT_REMOTE_URL":
+            # Issue #1093 residual: the git agent interpolates the URL inside
+            # literal parentheses, so a non-string YAML value (list/dict) or a
+            # whitespace-only string must count as absent — otherwise it
+            # renders a Python repr or ``(   )``. Scoped to GIT_REMOTE_URL on
+            # purpose: the sibling paths are never wrapped, so their plain
+            # truthiness semantics stay unchanged.
+            _is_set = isinstance(_optional_value, str) and bool(_optional_value.strip())
+        else:
+            _is_set = bool(_optional_value)
+        variables[f"{_optional_var}_SET"] = "true" if _is_set else "false"
         variables.setdefault(_optional_var, "")
     # REQ category placeholders: guarantee substitution so generated context
     # files never keep a literal {{REQ_CATEGORIES_LIST}} / {{REQ_CATEGORIES}}.

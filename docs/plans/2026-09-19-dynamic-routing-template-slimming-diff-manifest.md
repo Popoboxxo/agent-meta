@@ -2038,3 +2038,33 @@ tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` →
 rc `0` (5 AC-01, 130 Opencode, 9 Slimming, 121 Compact); `scripts/sync.py --validate` rc `0`;
 `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 63 von 1099 Hashes
 geändert, 0 added/removed, per Entry gepatcht (kein `--write`).
+
+---
+
+## 21. Re-Baseline der Golden-Baseline für `git` (Issue #1093-Rest, Blank-Remote-URL)
+
+> **Anlass:** Der Follow-up zu Issue #1093 (`fix/git-remote-url-set-hardening`) härte die
+> Ableitung von `GIT_REMOTE_URL_SET` in `scripts/lib/config.py`: nur ein nicht-leerer
+> String gilt als gesetzt. Das Template `agents/1-generic/git.md` bleibt byte-identisch,
+> erhält aber den Patch-Bump `2.1.1 → 2.1.2`, weil sich die Guard-Semantik des gerenderten
+> Agenten ändert. Das Gate meldet die Drift als „diff not attributable to declared
+> normalizations".
+
+**Geändert (1 Fixture):** `git.md` (+2/−2: ausschließlich Frontmatter-`version:` und
+`generated-from:`-Pin). Die übrigen 57 Goldens bleiben unverändert; `_GOLDEN_ROLE_COUNT`
+bleibt 58. `compact-golden` wurde nicht angefasst.
+
+**Ursache:** Reiner Versions-Pin der Rolle, kein migrierter Block und keine Body-Änderung —
+der Rot-Lauf wies exakt die zwei Frontmatter-Zeilen aus, alles andere blieb byte-identisch.
+`_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die
+B2a/B2b-Klassifikation sind nicht betroffen. Die `model:`-Pins bleiben auf ihren
+eingefrorenen Werten (`_GOLDEN_MODEL_MAP`).
+
+**Herkunft:** Frontmatter-only neu gepinnt; keine Handpflege des Rollen-Bodys, keine
+Neuerzeugung des Goldens nötig, weil der Template-Body unverändert ist.
+
+**Verifikation:** `pytest tests/test_git_section_variables.py
+tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py
+tests/test_opencode_v2_surface.py -q` → **alle passed**, rc `0`; `scripts/sync.py
+--validate` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest:
+9 von 1099 Hashes geändert, 0 added/removed, per Entry gepatcht (kein `--write`).

@@ -735,6 +735,29 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   re-verified as unchanged (``44148ea7…``), while ``slimming-golden`` was re-pinned
   frontmatter-only for the ``git.md`` version pin (2.1.0 -> 2.1.1, its digest
   ``a9990f4c…`` -> ``3bd5c31c…``). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1093 residual (whitespace-only / non-string remote URL; ``git.md`` 2.1.2,
+  ``fix/git-remote-url-set-hardening``, 2026-11-02): ``GIT_REMOTE_URL_SET`` now requires a
+  non-blank string, so ``remote-url: '   '`` and a non-string YAML value (list/dict) count
+  as absent and no longer render ``(   )`` or a Python repr. The template is unchanged, but
+  the patch version bump is a rendered source change: exactly **9 of 1099 hashes moved; 0
+  added/removed** -- the ``git`` agent render of every provider (``Claude/.claude/agents/git.md``
+  ``f101f48e…`` -> ``3088c609…``, ``Codex/.codex/agents/git.toml`` ``285b15db…`` ->
+  ``57ac1397…``, ``Continue/.continue/agents/git.md`` ``05a10b66…`` -> ``815fee5e…``,
+  ``Copilot/.github/agents/git.agent.md`` ``9cd41292…`` -> ``9e7ea1a8…``,
+  ``Gemini/.gemini/agents/git.md`` ``61d1a2e4…`` -> ``a26c4d04…``,
+  ``KimiCode/.kimi-code/agents/git.md`` ``dd69344f…`` -> ``faaeb937…``,
+  ``Mammouth/.mammouth/agents/git.md`` ``36dbcfe7…`` -> ``d2faeca5…``,
+  ``Opencode/.opencode/agents/git.md`` ``872577e8…`` -> ``7461efb3…``,
+  ``ZCode/.zcode/agents/git.md`` ``d55d9509…`` -> ``3786a820…``). No rule, command or
+  other agent artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed.
+  The manifest was patched **per entry** (9 single-line replacements) -- not via
+  ``--write`` -- after independently recomputing each digest from the rendered file bytes
+  with the harness's own ``_hash_file``. Because ``hashes.json`` is the only
+  ``ac01-baseline`` file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows
+  the rebaselined tree (``5232fe62…`` -> ``74290aad…``); ``compact-golden`` was
+  re-verified as unchanged (``44148ea7…``), while ``slimming-golden`` was re-pinned
+  frontmatter-only for the ``git.md`` version pin (2.1.1 -> 2.1.2, its digest
+  ``3bd5c31c…`` -> ``8857b666…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
