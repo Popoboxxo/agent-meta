@@ -56,6 +56,12 @@ import pytest
 
 from tests.timeouts import SCRIPT_TIMEOUT
 
+#: Wall-clock hang guard for the scan-timing test below. This is NOT a
+#: performance assertion (see tests/timeouts.py): a loaded CI runner must stay
+#: green, while a genuinely quadratic/wedged scan still blows past it before
+#: SCRIPT_TIMEOUT (60 s) kills the subprocess.
+_HANG_GUARD_SECONDS = 40.0
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard-impl.sh"
@@ -1705,14 +1711,20 @@ _SENTINEL = "#agent-meta:agent=git\n"
 
 def test_fork_bomb_scan_does_not_hang_on_a_300kb_command(tmp_path):
     """(a) The old regex was quadratic (20 KB ~ 5 s -> hook timeout = allow).
-    The pure-Python 100 ms bound is pinned in test_hook_common_lib.py; here we
-    prove the whole hook still returns promptly for a 300 KB command."""
+    The pure-Python equivalent is pinned in test_hook_common_lib.py; here we
+    prove the whole hook still returns promptly for a 300 KB command.
+
+    The bound is a HANG GUARD, not a performance assertion (see
+    tests/timeouts.py): a loaded runner stays green, a quadratic scan does not.
+    """
     command = "echo " + "a" * 300_000
     started = time.perf_counter()
     result = _run_with(_bash_payload(command), tmp_path)
     elapsed = time.perf_counter() - started
     assert result.returncode == 0, result.stderr
-    assert elapsed < 5.0, f"300 KB command took {elapsed:.1f}s (quadratic scan?)"
+    assert elapsed < _HANG_GUARD_SECONDS, (
+        f"300 KB command took {elapsed:.1f}s (hang guard "
+        f"{_HANG_GUARD_SECONDS:.0f}s, quadratic scan?)")
 
 
 def test_fork_bomb_window_block_names_scan_limits(tmp_path):
