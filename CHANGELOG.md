@@ -91,6 +91,12 @@
   `access: read` actions).
 
 ### Fixed
+- **`git` agent renders no empty remote-URL parentheses (#1093)**:
+  `agents/1-generic/git.md` (2.1.1) keeps the platform name unconditional and puts only
+  the `({{GIT_REMOTE_URL}})` suffix behind `GIT_REMOTE_URL_SET`, so a project without a
+  remote URL renders `**Git platform:** <platform>` instead of
+  `**Git platform:** <platform> ()`. The no-remote and remote renders are both covered
+  by `tests/test_git_section_variables.py`.
 - **Gitignore shadowing warning skips managed-block rules (#1072)**:
   `scripts/lib/gitignore.py` no longer reports a provider directory as shadowed when
   the matching rule lives *inside* the agent-meta managed block — the sync itself

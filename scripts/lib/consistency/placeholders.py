@@ -37,7 +37,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Provider-specific paths/files (injected per provider in sync_agents_for_provider)
     "CONTEXT_FILE", "SKILLS_DIR", "PENDING_TASKS_FILE", "FILE_BASED_AGENTS",
     # Git / platform
-    "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_MAIN_BRANCH",
+    "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_REMOTE_URL_SET", "GIT_MAIN_BRANCH",
     # Requirements
     "REQ_CATEGORIES", "REQ_CATEGORIES_LIST",
     # Knowledge Domain

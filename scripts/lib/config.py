@@ -1448,7 +1448,10 @@ def _build_core_variables(
     # render a misleading trailing-slash path instead of omitting the clause.
     # A derived <VAR>_SET boolean lets templates wrap the whole clause in
     # {{#if <VAR>_SET}}...{{/if}} (see strip_inactive_conditional_blocks).
-    for _optional_var in ("DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START"):
+    for _optional_var in (
+        "DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START",
+        "GIT_REMOTE_URL",
+    ):
         variables[f"{_optional_var}_SET"] = "true" if variables.get(_optional_var) else "false"
         variables.setdefault(_optional_var, "")
     # REQ category placeholders: guarantee substitution so generated context

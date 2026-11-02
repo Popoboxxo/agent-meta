@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.1.0"
+version: "2.1.1"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -120,7 +120,7 @@ Report the candidates (local + remote) to the user.
 <context>
 **Project context:** {{PROJECT_CONTEXT}}
 
-**Git platform:** {{GIT_PLATFORM}} ({{GIT_REMOTE_URL}})
+{{#if GIT_REMOTE_URL_SET}}**Git platform:** {{GIT_PLATFORM}} ({{GIT_REMOTE_URL}}){{else}}**Git platform:** {{GIT_PLATFORM}}{{/if}}
 
 **Main branch:** {{GIT_MAIN_BRANCH}}
 

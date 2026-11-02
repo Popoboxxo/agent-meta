@@ -178,6 +178,15 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   pins stay at their frozen values (ported by ``_GOLDEN_MODEL_MAP``), the
   declared normalization regions and ``_GOLDEN_ROLE_COUNT`` (58) are unchanged,
   and ``compact-golden`` was not touched. Diff manifest §20.
+* Issue #1093 (``git`` agent keeps the platform name, drops empty remote-URL
+  parentheses; ``git.md`` 2.1.0 -> 2.1.1): the red run's drift for ``git`` was
+  exactly the two frontmatter pins (``version:`` / ``generated-from: …@2.1.1``);
+  the rendered body is byte-identical because this repository's own render has a
+  remote URL set. The golden was re-pinned **frontmatter only**. The frozen meta
+  tokens, the ``model:`` pin, the declared normalization regions and
+  ``_GOLDEN_ROLE_COUNT`` (58) are unchanged; ``compact-golden`` was not touched.
+  AC-01 hashes rebaselined separately (see the rebaseline log in
+  ``tests/test_ac01_render_identity.py``).
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
