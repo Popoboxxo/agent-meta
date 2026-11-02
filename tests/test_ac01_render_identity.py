@@ -693,7 +693,23 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
   tree (recomputed from the fixture bytes: ``647b75a4…`` -> ``90f1f74a…``);
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
-  (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+   (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issues #1072/#1073 (gitignore managed block, 2026-11-02, ``fix/gitignore-managed-block``):
+  #1072 stops the shadowing warning for provider directories that a rule *inside* the managed
+  block already matches (rules outside the block still warn), and #1073 writes
+  ``.meta-config/platform-defaults.resolved.yaml`` into the managed block unconditionally in
+  both managed branches (fresh block and merge). Both change only the rendered managed block
+  of every provider, so exactly **9 of 1099 hashes moved; 0 added/removed** -- one
+  ``<Provider>/.gitignore`` per provider (Claude, Codex, Continue, Copilot, Gemini, KimiCode,
+  Mammouth, Opencode, ZCode). No rule, agent or command artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched **per entry**
+  (9 single-line replacements, 1092 of the 1101 lines untouched) -- not via ``--write`` --
+  after independently recomputing each digest from the rendered file bytes with the harness's
+  own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4
+  digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``90f1f74a…`` -> ``afe5c7cc…``); ``slimming-golden`` and
+  ``compact-golden`` were re-verified as unchanged (``a9990f4c…``/``44148ea7…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
