@@ -80,6 +80,7 @@ from lib.gitignore import (
     collect_provider_roots,
     compute_base_gitignore_entries,
     filter_redundant_provider_entries,
+    framework_baseline_entries,
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
@@ -1565,7 +1566,7 @@ def _sync_stage_gitignore(
         # still be ignored (generated env scripts may hold secret defaults,
         # sync.log / backups are machine-local, viz + skill entries) -- these
         # used to be emitted only on the dedicated-context path.
-        framework_baseline = ["sync.log", "*.sync-backup-*"]
+        framework_baseline = framework_baseline_entries()
         skill_gitignore_entries = _collect_skill_gitignore_entries(
             config, ext_config, provider_config)
         ensure_gitignore_entries(

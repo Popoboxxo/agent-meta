@@ -5345,8 +5345,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `ac01-baseline` re-pinned — 1 hash (the `dod-push-check.sh` render);
 # `slimming-golden`/`compact-golden` unchanged. Log:
 # `tests/test_ac01_render_identity.py`.
+# Issues #1072/#1073 (gitignore managed block): `ac01-baseline` re-pinned — 9 hashes
+# (the `<Provider>/.gitignore` render of every provider); `slimming-golden`/
+# `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "90f1f74a5f57b097de2c023bba641f83a070e6cec79b89064b9efa5341f8fc6b",
+    "ac01-baseline": "afe5c7ccd19e8f985ff0ec6141aa86bfc3cf0c0ce91879555545aa1073fa4d23",
     "slimming-golden": "a9990f4cc4cac4a54d2b4d9ac326f45a9adfa073eb87f71a6bd40fa8034c8de5",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }

@@ -91,6 +91,17 @@
   `access: read` actions).
 
 ### Fixed
+- **Gitignore shadowing warning skips managed-block rules (#1072)**:
+  `scripts/lib/gitignore.py` no longer reports a provider directory as shadowed when
+  the matching rule lives *inside* the agent-meta managed block — the sync itself
+  maintains that block, so the warning fired on every provider directory with a
+  managed rule. Rules outside the managed block still produce the warning.
+- **Resolved platform-defaults snapshot is always ignored (#1073)**:
+  `.meta-config/platform-defaults.resolved.yaml` is written into the managed block of
+  every generated `.gitignore`, in both the exact and additive paths, so
+  the local platform-resolution snapshot no longer shows up as an untracked file.
+  Files already tracked in existing projects (including this repo) stay tracked —
+  git ignores do not untrack them; use `git rm --cached` if that is desired.
 - **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:
   `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh` now counts brace nesting
   (including `${...}`) inside the existing 512-character window instead of cutting
