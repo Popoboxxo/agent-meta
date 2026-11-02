@@ -5348,9 +5348,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issues #1072/#1073 (gitignore managed block): `ac01-baseline` re-pinned — 9 hashes
 # (the `<Provider>/.gitignore` render of every provider); `slimming-golden`/
 # `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1093 (conditional remote-URL parens): `ac01-baseline` re-pinned — 9 hashes
+# (the `git` agent render of every provider); `slimming-golden` re-pinned for the
+# `git.md` version pin (2.1.0 -> 2.1.1, frontmatter only); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "afe5c7ccd19e8f985ff0ec6141aa86bfc3cf0c0ce91879555545aa1073fa4d23",
-    "slimming-golden": "a9990f4cc4cac4a54d2b4d9ac326f45a9adfa073eb87f71a6bd40fa8034c8de5",
+    "ac01-baseline": "5232fe625fbcc61b08a082cc94abe113b306ceb77003f3afd8d14034a33b6abb",
+    "slimming-golden": "3bd5c31cf265884271b4505c1c2564d15b68802d1bf18395ca31c261c8079f14",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 

@@ -710,6 +710,31 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   from the fixture bytes: ``90f1f74a…`` -> ``afe5c7cc…``); ``slimming-golden`` and
   ``compact-golden`` were re-verified as unchanged (``a9990f4c…``/``44148ea7…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1093 (empty remote-URL parens in the git template; ``git.md`` 2.1.1,
+  ``fix/git-template-empty-remote-url``, 2026-11-02): the line now keeps the platform name
+  unconditional and moves only the ``({{GIT_REMOTE_URL}})`` suffix behind the
+  ``GIT_REMOTE_URL_SET`` conditional, so a project without a remote renders
+  ``**Git platform:** <platform>`` instead of ``**Git platform:** <platform> ()``. The
+  template is a rendered source, so exactly **9 of 1099 hashes moved; 0 added/removed** --
+  the ``git`` agent render of every provider (``Claude/.claude/agents/git.md``
+  ``bbd5bf7c…`` -> ``f101f48e…``, ``Codex/.codex/agents/git.toml`` ``a08e8baf…`` ->
+  ``285b15db…``, ``Continue/.continue/agents/git.md`` ``2e0f98b5…`` -> ``05a10b66…``,
+  ``Copilot/.github/agents/git.agent.md`` ``630385ff…`` -> ``9cd41292…``,
+  ``Gemini/.gemini/agents/git.md`` ``9392e6c0…`` -> ``61d1a2e4…``,
+  ``KimiCode/.kimi-code/agents/git.md`` ``c05ae33a…`` -> ``dd69344f…``,
+  ``Mammouth/.mammouth/agents/git.md`` ``b00e2706…`` -> ``36dbcfe7…``,
+  ``Opencode/.opencode/agents/git.md`` ``95f07030…`` -> ``872577e8…``,
+  ``ZCode/.zcode/agents/git.md`` ``3e741e14…`` -> ``d55d9509…``). No rule, command or
+  other agent artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed.
+  The manifest was patched **per entry** (9 single-line replacements, 1092 of the 1101
+  lines untouched) -- not via ``--write`` -- after independently recomputing each digest
+  from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from the
+  fixture bytes: ``afe5c7cc…`` -> ``5232fe62…``); ``compact-golden`` was
+  re-verified as unchanged (``44148ea7…``), while ``slimming-golden`` was re-pinned
+  frontmatter-only for the ``git.md`` version pin (2.1.0 -> 2.1.1, its digest
+  ``a9990f4c…`` -> ``3bd5c31c…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
