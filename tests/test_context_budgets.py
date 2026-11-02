@@ -244,16 +244,39 @@ TOLERANCE_MAX_BYTES = 4096
 #   * orchestrator, all nine: unchanged (Claude 90,241, Codex 89,856, Continue 74,393,
 #     Copilot 74,269, Gemini 90,263, KimiCode 76,322, Mammouth 74,694, Opencode 89,928,
 #     ZCode 74,965).
+# RE-PIN (2026-11-02, manager §18 "Test environments" recipe): measured on this tree
+# with `measure_artifacts`, not derived arithmetically. The manager's new unconditional
+# recipe text (~2.5 KB) lands in every agent file, i.e. in every provider's
+# `harness-roster` and `always-loaded`: +4,599..+4,601 B per roster provider. The same
+# tree also carries a pre-existing +1 B of `rules/1-generic/branch-guard.md` (net +1 B
+# at 0068d18f vs the 2cd8b160 pin) that enters the `rules` artifacts and everything
+# embedding them. Complete list of non-zero deltas (old pin -> measured Ist):
+#   * harness-roster, six roster providers: Claude 680,904 -> 685,503 (+4,599),
+#     Codex 673,918 -> 678,518 (+4,600), KimiCode 667,138 -> 671,737 (+4,599),
+#     Mammouth 662,398 -> 666,997 (+4,599), Opencode 676,754 -> 681,353 (+4,599),
+#     ZCode 664,112 -> 668,711 (+4,599).
+#   * always-loaded: the six roster providers above +4,600/+4,601 (Claude 701,065 ->
+#     705,665, Codex 698,147 -> 702,748, KimiCode 691,381 -> 695,981, Mammouth
+#     686,638 -> 691,238, Opencode 701,058 -> 705,658, ZCode 689,254 -> 693,854);
+#     Continue 20,880 -> 20,881, Copilot 31,205 -> 31,206, Gemini 32,872 -> 32,873
+#     (+1 each, rules/entry artifact only).
+#   * entry-file, six AGENTS.md providers: +1 each (Codex 24,229 -> 24,230, KimiCode
+#     24,243 -> 24,244, Mammouth 24,240 -> 24,241, Opencode 24,304 -> 24,305, ZCode
+#     25,142 -> 25,143; Gemini is counted in always-loaded above, same +1). Claude
+#     2,511, Continue 358 and Copilot 10,887 are unchanged.
+#   * rules: Claude 17,650 -> 17,651, Continue 20,522 -> 20,523, Copilot 20,318 ->
+#     20,319 (+1 each).
+#   * orchestrator, all nine: unchanged.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 701065, "entry-file": 2511, "harness-roster": 680904, "orchestrator": 90241, "rules": 17650},
-    "Codex": {"always-loaded": 698147, "entry-file": 24229, "harness-roster": 673918, "orchestrator": 89856},
-    "Continue": {"always-loaded": 20880, "entry-file": 358, "orchestrator": 74393, "rules": 20522},
-    "Copilot": {"always-loaded": 31205, "entry-file": 10887, "orchestrator": 74269, "rules": 20318},
-    "Gemini": {"always-loaded": 32872, "entry-file": 32872, "orchestrator": 90263},
-    "KimiCode": {"always-loaded": 691381, "entry-file": 24243, "harness-roster": 667138, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 686638, "entry-file": 24240, "harness-roster": 662398, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 701058, "entry-file": 24304, "harness-roster": 676754, "orchestrator": 89928},
-    "ZCode": {"always-loaded": 689254, "entry-file": 25142, "harness-roster": 664112, "orchestrator": 74965},
+    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 90241, "rules": 17651},
+    "Codex": {"always-loaded": 702748, "entry-file": 24230, "harness-roster": 678518, "orchestrator": 89856},
+    "Continue": {"always-loaded": 20881, "entry-file": 358, "orchestrator": 74393, "rules": 20523},
+    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 74269, "rules": 20319},
+    "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 90263},
+    "KimiCode": {"always-loaded": 695981, "entry-file": 24244, "harness-roster": 671737, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 691238, "entry-file": 24241, "harness-roster": 666997, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 705658, "entry-file": 24305, "harness-roster": 681353, "orchestrator": 89928},
+    "ZCode": {"always-loaded": 693854, "entry-file": 25143, "harness-roster": 668711, "orchestrator": 74965},
 }
 
 
@@ -478,16 +501,36 @@ def test_ac07_missing_ceiling_is_a_violation():
 # 622,715 -> 622,721 = same pre-existing pin drift as in the `full` table, not an item-5
 # effect). entry-file, orchestrator and the shared multi-provider AGENTS.md (12,193 B) are
 # unchanged.
+# RE-PIN (2026-11-02, manager §18 "Test environments" recipe): measured with
+# `render_into_work_dir(..., profile="compact")` + `measure_artifacts`, not derived
+# arithmetically. Same cause as the `full` re-pin: the manager recipe enters every agent
+# file (+4,605/+4,606 B per roster provider). This re-pin also absorbs the item-5 rule
+# growth that the wave-3 block above deliberately left inside the tolerance (+382 B on
+# Claude/Continue/Copilot `rules` and on their `always-loaded`), plus the +1 B
+# branch-guard drift of 0068d18f. Complete list of non-zero deltas (old pin -> Ist):
+#   * harness-roster, six roster providers: Claude 624,700 -> 629,305 (+4,605), Codex
+#     617,615 -> 622,221 (+4,606), KimiCode 625,745 -> 630,350 (+4,605), Mammouth
+#     621,046 -> 625,651 (+4,605), Opencode 620,524 -> 625,129 (+4,605), ZCode
+#     622,715 -> 627,320 (+4,605).
+#   * rules: Claude 17,650 -> 17,651 (+1), Continue 20,140 -> 20,523 (+383 = item-5
+#     +382 absorbed here +1), Copilot 19,936 -> 20,319 (+383, same).
+#   * always-loaded: Claude 644,429 -> 649,417 (+4,988 = roster +4,605 plus the
+#     previously unabsorbed +382 rules and +1), Codex 621,028 -> 625,634 (+4,606),
+#     KimiCode 629,168 -> 633,773 (+4,605), Mammouth 624,467 -> 629,072 (+4,605),
+#     Opencode 624,005 -> 628,610 (+4,605), ZCode 627,041 -> 631,646 (+4,605);
+#     Continue 20,498 -> 20,881 (+383), Copilot 30,823 -> 31,206 (+383).
+#   * entry-file, orchestrator and the shared multi-provider AGENTS.md (12,193 B,
+#     re-measured): unchanged on every provider.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 644429, "entry-file": 2461, "harness-roster": 624700, "orchestrator": 34031, "rules": 17650},
-    "Codex": {"always-loaded": 621028, "entry-file": 3413, "harness-roster": 617615, "orchestrator": 33547},
-    "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 34621, "rules": 20140},
-    "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 34495, "rules": 19936},
+    "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34031, "rules": 17651},
+    "Codex": {"always-loaded": 625634, "entry-file": 3413, "harness-roster": 622221, "orchestrator": 33547},
+    "Continue": {"always-loaded": 20881, "entry-file": 358, "orchestrator": 34621, "rules": 20523},
+    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 34495, "rules": 20319},
     "Gemini": {"always-loaded": 10948, "entry-file": 10948, "orchestrator": 35369},
-    "KimiCode": {"always-loaded": 629168, "entry-file": 3423, "harness-roster": 625745, "orchestrator": 34923},
-    "Mammouth": {"always-loaded": 624467, "entry-file": 3421, "harness-roster": 621046, "orchestrator": 33336},
-    "Opencode": {"always-loaded": 624005, "entry-file": 3481, "harness-roster": 620524, "orchestrator": 33692},
-    "ZCode": {"always-loaded": 627041, "entry-file": 4326, "harness-roster": 622715, "orchestrator": 33562},
+    "KimiCode": {"always-loaded": 633773, "entry-file": 3423, "harness-roster": 630350, "orchestrator": 34923},
+    "Mammouth": {"always-loaded": 629072, "entry-file": 3421, "harness-roster": 625651, "orchestrator": 33336},
+    "Opencode": {"always-loaded": 628610, "entry-file": 3481, "harness-roster": 625129, "orchestrator": 33692},
+    "ZCode": {"always-loaded": 631646, "entry-file": 4326, "harness-roster": 627320, "orchestrator": 33562},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
