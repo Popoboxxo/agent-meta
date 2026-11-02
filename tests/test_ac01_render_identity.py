@@ -679,6 +679,21 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   fixture bytes: ``ea59522c…`` -> ``647b75a4…``); ``slimming-golden`` and ``compact-golden``
   were re-verified as unchanged (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
   extended.
+- Issue #1041 (PR A review follow-up; ``dod-push-check.sh`` 2.3.0 -> 2.4.0, 2026-11-02,
+  ``fix/hooks-guards``): the tag-only exemption is gated on the repository declaring
+  submodules (same predicate as the destination check) and the ``push.recurseSubmodules``
+  override value is parsed for ``-c``/``GIT_CONFIG_VALUE_n`` (``--config-env`` stays
+  value-blind). Exactly **1 of 1101 hashes moved; 0 added/removed**: the only
+  ``dod-push-check.sh`` render (``Claude/.claude/hooks/dod-push-check.sh`` ``cdfd0131…``
+  -> ``89759e26…``). No rule, agent or command artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched **per entry**
+  (1 single-line replacement, 1100 of the 1101 lines untouched) -- not via ``--write`` --
+  after independently recomputing the digest from the rendered file bytes with the
+  harness's own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``647b75a4…`` -> ``90f1f74a…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

@@ -1376,12 +1376,43 @@ def _with_submodule(repo):
     "git -c push.recurseSubmodules=on-demand push origin feat/x",
     "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.recurseSubmodules "
     "GIT_CONFIG_VALUE_0=on-demand git push origin feat/x",
+    # --config-env names the environment variable, not the value: the hook
+    # cannot see the environment, so a recursing value must stay blocked.
+    "FOO=on-demand git --config-env=push.recurseSubmodules=FOO push origin feat/x",
 ])
 def test_1041_override_forms_are_blocked(repo_on_feature_branch, command):
     _with_submodule(repo_on_feature_branch)
     r = _run_hook(repo_on_feature_branch, command)
     assert r.returncode == 2, r.stdout
     assert "submodule" in r.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git -c push.recurseSubmodules=no push origin feat/x",
+    "git -c push.recurseSubmodules=check push origin feat/x",
+    "git -c push.recurseSubmodules=false push origin feat/x",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.recurseSubmodules "
+    "GIT_CONFIG_VALUE_0=no git push origin feat/x",
+])
+def test_1041_non_recursing_overrides_stay_inert(repo_on_feature_branch, command):
+    """A value-agnostic match on the key over-blocked: `-c ...=no`/`check`
+    (and the GIT_CONFIG_* pair) do not recurse and must stay inert even
+    when the repository declares submodules."""
+    _with_submodule(repo_on_feature_branch)
+    r = _run_hook(repo_on_feature_branch, command)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_1041_tag_only_push_without_submodules_stays_allowed(repo_on_feature_branch):
+    """A repo that does NOT declare submodules keeps the tag-only shortcut
+    even when push.recurseSubmodules is configured: the config-recursion
+    clause of the tag-only exemption needs the same submodule gate as the
+    destination check. Before the fix, `git push --tags origin` exited 2 in
+    such a repo (push.default=matching) where the base hook exited 0."""
+    _git(repo_on_feature_branch, "config", "push.recurseSubmodules", "on-demand")
+    _git(repo_on_feature_branch, "config", "push.default", "matching")
+    r = _run_hook(repo_on_feature_branch, "git push --tags origin")
+    assert r.returncode == 0, r.stdout + r.stderr
 
 
 @pytest.mark.parametrize("command", ["git push origin feat/x", "git push --tags origin"])
