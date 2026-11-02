@@ -106,6 +106,11 @@ def _legacy_base_entries(
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
         base.extend(custom_entries)
+    # Issue #1073: the resolved platform-defaults snapshot is a pure syncer
+    # artifact and always ignored, independent of the category toggles.
+    _snapshot = ".meta-config/platform-defaults.resolved.yaml"
+    if _snapshot not in base:
+        base.append(_snapshot)
     # IC-15 Nr. 26: tmp-sink entry is default ON even without a block.
     if ".tmp/" not in base:
         base.append(".tmp/")

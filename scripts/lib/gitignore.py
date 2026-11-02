@@ -36,6 +36,23 @@ from .tmp_paths import TmpPaths, resolve_tmp_paths
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END = "# --- end agent-meta managed ---"
 
+# Framework-generated artifacts that are pure snapshots without a CI contract
+# and therefore always ignored by the managed block (#1073). Kept in sync with
+# ``generated_file_drift.PLATFORM_DEFAULTS_RESOLVED_REL`` via a pin test
+# (importing it here would couple the writer to the drift scanner).
+FRAMEWORK_GENERATED_ENTRIES: tuple[str, ...] = (
+    ".meta-config/platform-defaults.resolved.yaml",
+)
+
+
+def framework_baseline_entries() -> list[str]:
+    """Return the framework-wide baseline entries for the additive path (#1073).
+
+    Used when no provider with a dedicated context file is active, so the
+    exact managed-block computation is skipped entirely.
+    """
+    return ["sync.log", "*.sync-backup-*", *FRAMEWORK_GENERATED_ENTRIES]
+
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
 _CLAUDE_LOCAL_ENTRIES_FALLBACK: list[str] = [
@@ -325,6 +342,12 @@ def compute_base_gitignore_entries(
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
         entries.extend(custom_entries)
+
+    # Unconditional (#1073): pure snapshot, no CI contract, independent of any
+    # category toggle or custom_entries.
+    for _entry in FRAMEWORK_GENERATED_ENTRIES:
+        if _entry not in entries:
+            entries.append(_entry)
 
     if _tmp_sink_gitignore_enabled(repo_containment_cfg):
         if tmp_paths is None:
