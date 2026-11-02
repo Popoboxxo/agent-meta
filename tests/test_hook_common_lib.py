@@ -349,6 +349,19 @@ def test_hook_known_tool_name_accepts_known_tools(name):
 
 
 @pytest.mark.parametrize("name", [
+    "ToolSearch", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "Monitor",
+    "ScheduleWakeup", "CronCreate", "CronDelete", "CronList", "EnterPlanMode",
+    "PushNotification", "RemoteTrigger", "SendUserFile", "Artifact",
+    "ArtifactComments", "ArtifactData",
+])
+def test_hook_known_tool_name_accepts_1078_builtins(name):
+    """Issue #1078: the allow-list had fallen behind the current built-ins, so
+    ToolSearch and the task/cron/artifact surface failed closed and blocked
+    normal operation. EnterWorktree/ExitWorktree stay rejected below."""
+    assert _known(name) == "known"
+
+
+@pytest.mark.parametrize("name", [
     "",            # missing tool_name (or unparseable payload)
     "garbage",     # what a broken python3 shim used to return as tool_name
     "bash",        # raw provider-native spelling, not the hook contract
