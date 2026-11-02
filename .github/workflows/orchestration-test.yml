@@ -319,9 +319,11 @@ jobs:
     runs-on: ubuntu-latest
     # 451 tests in total, but strictly serial per job. The timeout is only a
     # backstop -- the per-subprocess timeouts in tests/timeouts.py are the real
-    # guard -- and three-way module-disjoint splitting keeps every group
-    # comfortably below it (the serial whole measured 1864 s on 3.9).
-    timeout-minutes: 30
+    # guard -- and three-way module-disjoint splitting keeps every group below
+    # it. The serial whole measured 1864 s on 3.9; on a loaded 3.12 runner a
+    # group reached 30 m 29 s at 99 % (runs 41491331808 / 41381909910, the last
+    # test passed and the job was cancelled by this backstop), so it is 45 min.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -375,8 +377,9 @@ jobs:
   # `-n 0` on purpose: two of the nine files below (test_provider_matrix_sync,
   # test_sync_validation_gate) launch sync.py repeatedly, including the
   # repo-wide `--validate` suite. Serial keeps their subprocesses from
-  # competing for the assumed 2 cores. This job is new; its 30 min ceiling matches
-  # the shard job because serial execution loses worker overlap.
+  # competing for the assumed 2 cores. Its 30 min ceiling is unchanged: it runs
+  # only the targeted files, while the serial subprocess shard needs the larger
+  # backstop documented above.
   compat-311:
     needs: changes
     if: needs.changes.outputs.run_tests == 'true'
