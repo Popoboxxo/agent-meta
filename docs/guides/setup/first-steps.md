@@ -92,7 +92,8 @@ cp .agent-meta/howto/configs/project.yaml.example .meta-config/project.yaml
 ### Git
 
 - **`variables.GIT_PLATFORM`** — `GitHub`, `GitLab`, `Gitea` oder `Codeberg`
-- **`variables.GIT_REMOTE_URL`** — Remote-URL des Repositories
+- **`variables.GIT_REMOTE_URL`** — Remote-URL des Repositories (leer: die URL-Klammer im `git`-Agenten entfällt)
+- **`variables.GIT_REMOTE_URL_SET`** — abgeleitet (`true`/`false`), steuert die Klammer um die Remote-URL; nicht manuell setzen
 - **`variables.GIT_MAIN_BRANCH`** — Haupt-Branch (Standard: `main`)
 
 ### Commands

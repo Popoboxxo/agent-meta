@@ -110,7 +110,7 @@ Report the candidates (local + remote) to the user.
 <context>
 **Project context:** (not provided — ask the user for a short project description if you need it)
 
-**Git platform:** [GIT_PLATFORM — not available outside a full agent-meta install] ([GIT_REMOTE_URL — not available outside a full agent-meta install])
+**Git platform:** [GIT_PLATFORM — not available outside a full agent-meta install]
 
 **Main branch:** [GIT_MAIN_BRANCH — not available outside a full agent-meta install]
 
