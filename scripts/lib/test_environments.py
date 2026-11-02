@@ -51,6 +51,24 @@ def _bool_text(value: bool) -> str:
     return "true" if value else "false"
 
 
+def _url_problem(url: str) -> str:
+    """Return the validation message for ``url``, or ``""`` when acceptable.
+
+    ``urlsplit`` raises ``ValueError`` for malformed IPv6 brackets (e.g.
+    ``http://[::1``), so it must be guarded here rather than at every call
+    site: the validator may never crash the config load (issue #1089).
+    """
+    if "{{" in url or "}}" in url:
+        return "placeholder syntax not allowed"
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "invalid url"
+    if "@" in parts.netloc:
+        return "url must not contain userinfo"
+    return ""
+
+
 def check_test_environments(config: dict) -> Tuple[List[str], List[str]]:
     """Return ``(errors, warnings)`` for the ``test-environments`` block.
 
@@ -107,10 +125,10 @@ def check_test_environments(config: dict) -> Tuple[List[str], List[str]]:
             url = entry["url"]
             if not isinstance(url, str) or not url.strip():
                 errors.append(f"{prefix}.url: url must be a non-empty string")
-            elif "{{" in url or "}}" in url:
-                errors.append(f"{prefix}.url: placeholder syntax not allowed")
-            elif "@" in urlsplit(url).netloc:
-                errors.append(f"{prefix}.url: url must not contain userinfo")
+            else:
+                problem = _url_problem(url)
+                if problem:
+                    errors.append(f"{prefix}.url: {problem}")
 
         if "notes" in entry:
             notes = entry["notes"]
@@ -243,8 +261,15 @@ def _fallback_url(block: dict, project_vars: dict) -> Tuple[Any, str]:
         return None, ""
     for key in FALLBACK_PLATFORM_KEYS:
         value = project_vars.get(key)
-        if isinstance(value, str) and value.strip():
-            return value, key
+        if not isinstance(value, str) or not value.strip():
+            continue
+        problem = _url_problem(value)
+        if problem:
+            SyncLog().warning(
+                f"test-environments: ignoring fallback {key}: {problem}"
+            )
+            continue
+        return value, key
     return None, ""
 
 

@@ -145,6 +145,7 @@ On failed tests or audit violations: return structured findings (affected flow, 
 
 {{#if TEST_ENVIRONMENTS_SET}}
 {{TEST_ENVIRONMENT_BLOCK}}
+
 Run tests locally before touching any remote environment.
 {{/if}}
 {{OUTPUT_GUARD_BLOCK}}

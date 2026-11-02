@@ -127,6 +127,9 @@ _VOLATILE_LINE_RE = re.compile(
 _GENERATED_FROM_VERSION_RE = re.compile(
     r"^(generated-from:[^\n@]*)@[^\n]*$", re.MULTILINE
 )
+#: The YAML frontmatter block: leading ``---`` up to the closing ``---``. The
+#: volatile-line stripping is scoped to exactly this span (Advisory 1).
+_FRONTMATTER_RE = re.compile(r"\A---\n.*?\n---\n?", re.DOTALL)
 
 
 def _project_yaml(platforms: Sequence[str], extra_yaml: str) -> str:
@@ -210,10 +213,18 @@ def _role_texts(project: Path) -> Dict[str, str]:
 
 
 def _normalized_hash(text: str) -> str:
-    """Hash the body contract: LF, no version/provenance lines, sha256."""
+    """Hash the body contract: LF, version/provenance lines stripped.
+
+    The volatile frontmatter keys are stripped **only inside the YAML
+    frontmatter block** — a future body line starting with one of those
+    prefixes must never be silently ignored.
+    """
     normalized = text.replace("\r\n", "\n")
-    normalized = _VOLATILE_LINE_RE.sub("", normalized)
-    normalized = _GENERATED_FROM_VERSION_RE.sub(r"\1", normalized)
+    match = _FRONTMATTER_RE.match(normalized)
+    if match:
+        frontmatter = _VOLATILE_LINE_RE.sub("", match.group(0))
+        frontmatter = _GENERATED_FROM_VERSION_RE.sub(r"\1", frontmatter)
+        normalized = frontmatter + normalized[match.end():]
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
@@ -298,7 +309,7 @@ def test_matrix_exercises_every_override(tmp_path_factory):
 def test_template_has_gated_block_directly_after_constraints(role):
     src = (REPO_ROOT / "agents" / "1-generic" / f"{role}.md").read_text(encoding="utf-8")
     gate = (
-        "{{#if TEST_ENVIRONMENTS_SET}}\n{{TEST_ENVIRONMENT_BLOCK}}\n"
+        "{{#if TEST_ENVIRONMENTS_SET}}\n{{TEST_ENVIRONMENT_BLOCK}}\n\n"
         + ROLE_LINES[role]
         + "\n{{/if}}\n"
     )
@@ -321,6 +332,20 @@ def test_configured_render_has_block_table_and_role_line(configured):  # AC-ENV-
         assert "| ha-dev | both | http://ha-dev.lan:8123 | deploy | ask |" in text
         assert ROLE_LINES[_role_of(stem)] in text
         assert text.index("</constraints>") < text.index("## Test environments")
+
+
+def test_configured_render_separates_block_and_role_line(configured):
+    """The static role line must not lazy-continue the block's last bullet."""
+    for stem, text in configured.items():
+        role_line = ROLE_LINES[_role_of(stem)]
+        before = text[: text.index(role_line)]
+        assert before.endswith("\n\n"), stem
+
+
+def test_volatile_strip_is_scoped_to_frontmatter():
+    text = '---\nversion: "1.0.0"\nname: x\n---\nbody\nversion: kept\n'
+    without_body_line = text.replace("version: kept\n", "")
+    assert _normalized_hash(text) != _normalized_hash(without_body_line)
 
 
 def test_approval_protocol_in_all_six_roles(configured):  # AC-ENV-8, AC-ENV-20

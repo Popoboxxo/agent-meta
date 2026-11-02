@@ -3549,6 +3549,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ValueError as exc:
+            self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except FileNotFoundError as exc:
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
         except ConnectionError:
@@ -5579,6 +5581,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise FileNotFoundError(f"environment variable '{name}' not found")
         del envs[name]
         project_config["environments"] = envs
+        # Deleting an env var that a surviving ``test-environments.token-env``
+        # still references would persist a broken reference and abort the next
+        # sync (issue #1089). Validate the resulting document before the write
+        # so the request fails with HTTP 400 and the file stays untouched.
+        self._guard_test_environments_config(project_config)
         result = self.__class__.config_manager.write("project", project_config)
         return {"ok": True, "deleted": name, "result": result}
 

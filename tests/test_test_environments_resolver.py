@@ -13,6 +13,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -44,6 +46,29 @@ def test_invalid_or_odd_input_yields_empty_and_never_raises():
     assert resolve_test_environments(_cfg({"a": {"kind": "x"}}), {}) == {}
     assert resolve_test_environments({"test-environments": ["x"]}, {}) == {}
     assert resolve_test_environments({}, None) == {}
+
+
+@pytest.mark.parametrize("url", ["http://[::1", "http://ho[st", "http://[x]"])
+def test_malformed_config_url_yields_empty_and_never_raises(url):
+    assert resolve_test_environments(
+        _cfg({"a": {"kind": "remote", "url": url}}), {}
+    ) == {}
+
+
+@pytest.mark.parametrize(
+    "bad_url", ["http://{{HOST}}:8123", "http://user:pass@dev:8123"]
+)
+def test_invalid_fallback_url_is_not_used(bad_url):
+    r = resolve_test_environments(_cfg({"ha": {"kind": "remote"}}), {HACS: bad_url})
+    assert (r["ha"]["url"], r["ha"]["url_source"]) == (None, "")
+
+
+def test_invalid_hacs_fallback_falls_through_to_valid_ha():
+    r = resolve_test_environments(
+        _cfg({"ha": {"kind": "remote"}}),
+        {HACS: "http://user:pass@dev:8123", HA: "http://ha:8123"},
+    )
+    assert (r["ha"]["url"], r["ha"]["url_source"]) == ("http://ha:8123", HA)
 
 
 def test_fallback_prefers_hacs_over_ha():  # AC-ENV-4

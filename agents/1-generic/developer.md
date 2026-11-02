@@ -148,6 +148,7 @@ Delegation:
 
 {{#if TEST_ENVIRONMENTS_SET}}
 {{TEST_ENVIRONMENT_BLOCK}}
+
 Develop and test locally first; touch a remote environment only as the rules above allow.
 {{/if}}
 {{OUTPUT_GUARD_BLOCK}}

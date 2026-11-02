@@ -119,6 +119,40 @@ def test_unrelated_section_not_blocked_by_preexisting_invalid_config(tmp_path): 
     _post(h, "git", {"auto_commit": False})
 
 
+def _delete(handler, name: str) -> dict:
+    """Drive the DELETE route and capture the response (status + body)."""
+    response: dict = {}
+    handler._send_json = lambda body, status=200, extra_headers=None: response.update(
+        body=body, status=status
+    )
+    handler._check_token = lambda: None
+    handler._check_origin = lambda: None
+    handler.path = f"/api/environments/{name}"
+    handler.do_DELETE()
+    return response
+
+
+def test_delete_referenced_environment_is_400_and_file_unchanged(tmp_path):
+    h = _handler(tmp_path)
+    original = {"environments": ENVS, "test-environments": VALID}
+    h.config_manager.write("project", original)
+    response = _delete(h, "HA_DEV_TOKEN")
+    assert response["status"] == 400
+    assert "environments entry 'HA_DEV_TOKEN' not defined" in response["body"]["detail"]
+    assert h.config_manager.read("project") == original
+
+
+def test_delete_unreferenced_environment_succeeds(tmp_path):
+    h = _handler(tmp_path)
+    envs = {**ENVS, "OTHER": {"description": "x"}}
+    h.config_manager.write("project", {"environments": envs, "test-environments": VALID})
+    response = _delete(h, "OTHER")
+    assert response["status"] == 200 and response["body"]["deleted"] == "OTHER"
+    written = h.config_manager.read("project")
+    assert "OTHER" not in written["environments"]
+    assert "HA_DEV_TOKEN" in written["environments"]
+
+
 # --------------------------------------------------------------------------- #
 # UI part (Task 11)                                                           #
 # --------------------------------------------------------------------------- #

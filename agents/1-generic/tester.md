@@ -135,6 +135,7 @@ NEXT: [recommended next step]
 
 {{#if TEST_ENVIRONMENTS_SET}}
 {{TEST_ENVIRONMENT_BLOCK}}
+
 Run tests locally before touching any remote environment.
 {{/if}}
 {{OUTPUT_GUARD_BLOCK}}

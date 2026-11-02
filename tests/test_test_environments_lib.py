@@ -87,6 +87,14 @@ def test_url_empty_or_non_string_is_error(url):
     assert "url must be a non-empty string" in check_test_environments(_cfg({"a": {"url": url}}))[0][0]
 
 
+@pytest.mark.parametrize("url", ["http://[::1", "http://ho[st", "http://[x]"])
+def test_malformed_url_is_error_not_crash(url):
+    errors, _ = check_test_environments(
+        _cfg({"a": {"kind": "remote", "url": url}})
+    )
+    assert errors == ["test-environments.a.url: invalid url"]
+
+
 @pytest.mark.parametrize(
     "key,val", [("url", "http://h/{{X}}"), ("notes", "see {{TOKEN}}"), ("notes", "a }} b")]
 )
@@ -232,3 +240,19 @@ def test_load_config_aborts_on_invalid_block(tmp_path):
     )
     with pytest.raises(SystemExit):
         load_config(p)
+
+
+def test_load_config_aborts_cleanly_on_malformed_url(tmp_path, capsys):
+    p = tmp_path / ".meta-config" / "project.yaml"
+    p.parent.mkdir()
+    p.write_text(
+        'agent-meta-version: "2.0.0-beta.5"\nai-providers:\n- Claude\ndod-preset: rapid-prototyping\n'
+        'test-environments:\n  a:\n    kind: remote\n    url: "http://[::1"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit) as exc:
+        load_config(p)
+    err = capsys.readouterr().err
+    assert exc.value.code == 1
+    assert "ERROR:" in err and "test-environments.a.url: invalid url" in err
+    assert str(p) in err

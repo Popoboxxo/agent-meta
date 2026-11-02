@@ -193,6 +193,7 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 
 {{#if TEST_ENVIRONMENTS_SET}}
 {{TEST_ENVIRONMENT_BLOCK}}
+
 Deploy to a remote environment only if its access is deploy and the approval protocol above is satisfied.
 {{/if}}
 {{OUTPUT_GUARD_BLOCK}}

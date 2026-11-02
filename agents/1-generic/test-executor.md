@@ -125,5 +125,6 @@ STATUS/RESULT/ARTIFACTS are mandatory on every completion — even on green runs
 </constraints>
 {{#if TEST_ENVIRONMENTS_SET}}
 {{TEST_ENVIRONMENT_BLOCK}}
+
 Read-only: run existing suites against environments only as the rules above allow; never deploy.
 {{/if}}
