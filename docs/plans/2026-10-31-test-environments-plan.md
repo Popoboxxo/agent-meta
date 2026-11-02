@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Test Environments Implementation Plan
 
-> Status: geplant
+> Status: DONE (2026-11-01) — branch `feat/test-environments`, PR opened after this commit. Review verdict: CHANGES_REQUESTED with 2 blocking findings (malformed-URL `ValueError` crash; unguarded `DELETE /api/environments` breaking a `token-env` reference), both fixed in `72be0e53` (3 of 5 advisories also fixed; 2 remain notes).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox syntax (`- [ ]`) for tracking.
 
@@ -112,6 +112,8 @@ Beim Erstellen des Plans per Lesen/Grep geprüft (Pfad/Zeile):
 - Create: `docs/guides/features/test-environments.md`; Modify: `docs/guides/features/sync-concept.md`, `howto/configs/project.yaml.example`, `CHANGELOG.md`, `docs/RELEASE_GATES.md`
 - Modify (Rebaseline): `tests/fixtures/ac01-baseline/hashes.json`, `tests/test_ac01_render_identity.py` (Log), `tests/test_opencode_v2_surface.py` (Digests), `tests/fixtures/slimming-golden/agent-meta-manager.md`, `tests/test_template_slimming_equivalence.py` (Log)
 
+> **Nachtrag:** Zwei Pfade liegen außerhalb der per-Task-Listen: `tests/test_meta_optimizer_role.py` (Manager-Pin 1.27.0, von der Version-Bump-Konvention verlangt) und der Nachtrag §20 im `docs/plans/2026-09-19-dynamic-routing-template-slimming-diff-manifest.md` (reine Frontmatter-Änderungen der sechs `slimming-golden`-Dateien).
+
 ---
 
 ### Task 0: Feature-Branch anlegen
@@ -122,9 +124,9 @@ Beim Erstellen des Plans per Lesen/Grep geprüft (Pfad/Zeile):
 
 **Interfaces:** Produces: Branch `feat/test-environments` ab `main`-Stand nach Plan 1. Consumes: sauberer Stand von `main`.
 
-- [ ] **Step 1: Stand prüfen.** `git status --short` zeigt nur die bereits vorhandenen Hash-Dateien (`.meta-config/context-hashes.json`, `.meta-config/generated-file-hashes.json`) oder nichts; `git log -1 --oneline` zeigt den Merge von Plan 1 (Release-Checkliste) oder dokumentiert dessen Fehlen (dann STOP: Plan 2 läuft nach Plan 1, Spec R8).
-- [ ] **Step 2: Branch anlegen.** `git switch -c feat/test-environments` (kein Commit in diesem Task).
-- [ ] **Step 3: Verifizieren.** `git branch --show-current` => `feat/test-environments`; `grep -n '^version' agents/1-generic/agent-meta-manager.md` => `version: "1.26.0"` (Vorbedingung für Task 12).
+- [x] **Step 1: Stand prüfen.** `git status --short` zeigt nur die bereits vorhandenen Hash-Dateien (`.meta-config/context-hashes.json`, `.meta-config/generated-file-hashes.json`) oder nichts; `git log -1 --oneline` zeigt den Merge von Plan 1 (Release-Checkliste) oder dokumentiert dessen Fehlen (dann STOP: Plan 2 läuft nach Plan 1, Spec R8).
+- [x] **Step 2: Branch anlegen.** `git switch -c feat/test-environments` (kein Commit in diesem Task).
+- [x] **Step 3: Verifizieren.** `git branch --show-current` => `feat/test-environments`; `grep -n '^version' agents/1-generic/agent-meta-manager.md` => `version: "1.26.0"` (Vorbedingung für Task 12).
 
 ---
 
@@ -146,7 +148,7 @@ Beim Erstellen des Plans per Lesen/Grep geprüft (Pfad/Zeile):
 CLI `python3 tests/test_test_environments_render.py --capture-baseline`.
 Consumes: `scripts/sync.py --config <yaml> --init` (wie `tests/test_ac01_render_identity.py::_run_sync`).
 
-- [ ] **Step 1: Failing Test schreiben.** `_sync_project` schreibt `.meta-config/project.yaml` aus: `agent-meta-version: "2.0.0-beta.5"`, `ai-providers: [Claude]`, `dod-preset: rapid-prototyping`, optional `platforms:`, `roles:` = die sechs Rollen, `project: {name: te, prefix: te, short: te}`, `variables: {PROJECT_NAME: te, AGENT_META_REPO: example/agent-meta}`, danach `extra_yaml` (Top-Level-Keys ab Spalte 0), `git init -q`, `python3 scripts/sync.py --config … --init` (rc 0 asserten). Tests:
+- [x] **Step 1: Failing Test schreiben.** `_sync_project` schreibt `.meta-config/project.yaml` aus: `agent-meta-version: "2.0.0-beta.5"`, `ai-providers: [Claude]`, `dod-preset: rapid-prototyping`, optional `platforms:`, `roles:` = die sechs Rollen, `project: {name: te, prefix: te, short: te}`, `variables: {PROJECT_NAME: te, AGENT_META_REPO: example/agent-meta}`, danach `extra_yaml` (Top-Level-Keys ab Spalte 0), `git init -q`, `python3 scripts/sync.py --config … --init` (rc 0 asserten). Tests:
   ```python
   BASELINE = Path(__file__).parent / "fixtures" / "test-env-baseline" / "hashes.json"
   OVERRIDE_COVERAGE = {"homeassistant": {"developer"}, "sharkord": {"developer", "docker"},
@@ -164,10 +166,10 @@ Consumes: `scripts/sync.py --config <yaml> --init` (wie `tests/test_ac01_render_
               assert stems, (label, role)
               assert any(current[f"{label}/{s}"] != current.get(f"base/{s}") for s in stems), (label, role)
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py::test_unset_render_matches_baseline --basetemp={{PYTEST_BASETEMP}}` => FAIL (`FileNotFoundError` auf `hashes.json`).
-- [ ] **Step 3: Baseline auf unveränderten Templates erfassen.** Vorbedingung: `git diff --quiet HEAD -- agents/1-generic/tester.md agents/1-generic/e2e-tester.md agents/1-generic/developer.md agents/1-generic/docker.md agents/1-generic/devops-engineer.md agents/1-generic/test-executor.md agents/2-platform` endet mit rc 0. Dann `python3 tests/test_test_environments_render.py --capture-baseline` (schreibt `tests/fixtures/test-env-baseline/hashes.json`, sortierte Keys, Scratch-Verzeichnis unter `{{PYTEST_BASETEMP}}`).
-- [ ] **Step 4: Run, erwartet PASS.** Beide Tests aus Step 1 mit `--basetemp={{PYTEST_BASETEMP}}`. Schlägt `test_matrix_exercises_every_override` fehl, ist eine Plattform-Variante wirkungslos (Dateinamen/`platforms:` prüfen) — vor dem Commit beheben.
-- [ ] **Step 5: Commit.** `git add tests/test_test_environments_render.py tests/fixtures/test-env-baseline/hashes.json` und `git commit -m "test: add test-environments render baseline harness"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py::test_unset_render_matches_baseline --basetemp={{PYTEST_BASETEMP}}` => FAIL (`FileNotFoundError` auf `hashes.json`).
+- [x] **Step 3: Baseline auf unveränderten Templates erfassen.** Vorbedingung: `git diff --quiet HEAD -- agents/1-generic/tester.md agents/1-generic/e2e-tester.md agents/1-generic/developer.md agents/1-generic/docker.md agents/1-generic/devops-engineer.md agents/1-generic/test-executor.md agents/2-platform` endet mit rc 0. Dann `python3 tests/test_test_environments_render.py --capture-baseline` (schreibt `tests/fixtures/test-env-baseline/hashes.json`, sortierte Keys, Scratch-Verzeichnis unter `{{PYTEST_BASETEMP}}`).
+- [x] **Step 4: Run, erwartet PASS.** Beide Tests aus Step 1 mit `--basetemp={{PYTEST_BASETEMP}}`. Schlägt `test_matrix_exercises_every_override` fehl, ist eine Plattform-Variante wirkungslos (Dateinamen/`platforms:` prüfen) — vor dem Commit beheben.
+- [x] **Step 5: Commit.** `git add tests/test_test_environments_render.py tests/fixtures/test-env-baseline/hashes.json` und `git commit -m "test: add test-environments render baseline harness"`.
 
 ---
 
@@ -181,7 +183,7 @@ Consumes: `scripts/sync.py --config <yaml> --init` (wie `tests/test_ac01_render_
 
 **Interfaces:** Produces: `properties."test-environments"` (Schema §9.2, kein `default`). Consumes: nichts.
 
-- [ ] **Step 1: Failing Tests schreiben** (Muster `tests/test_auto_commit_schema.py`, `_cfg(envs)` baut `{"project": {...}, "ai-providers": ["Claude"], "roles": [...], "test-environments": envs}`):
+- [x] **Step 1: Failing Tests schreiben** (Muster `tests/test_auto_commit_schema.py`, `_cfg(envs)` baut `{"project": {...}, "ai-providers": ["Claude"], "roles": [...], "test-environments": envs}`):
   ```python
   def test_schema_has_block_without_toplevel_default():
       prop = _schema()["properties"]["test-environments"]
@@ -211,10 +213,10 @@ Consumes: `scripts/sync.py --config <yaml> --init` (wie `tests/test_ac01_render_
       with pytest.raises(jsonschema.ValidationError):
           jsonschema.validate(_cfg({"Bad_Name": {}}), _schema())
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_schema.py --basetemp={{PYTEST_BASETEMP}}` => `KeyError: 'test-environments'`.
-- [ ] **Step 3: Schema ergänzen.** Objekt wörtlich aus Spec §9.2 (`type: object`, Description mit Satz „NOT to be confused with 'environments' (env-var definitions); token-env must reference an 'environments' entry with secret: true.“, `propertyNames.pattern`, `additionalProperties` mit `properties` `kind`/`url`/`token-env`/`access`/`remote-access`/`notes`, `additionalProperties: false`); `notes` = `{"type": "string"}`; kein `default` auf Top-Level.
-- [ ] **Step 4: Run, erwartet PASS.** Tests aus Step 1; danach `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (kein neuer Befund).
-- [ ] **Step 5: Commit.** `git add config/project-config.schema.json tests/test_test_environments_schema.py` und `git commit -m "feat: add test-environments schema block"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_schema.py --basetemp={{PYTEST_BASETEMP}}` => `KeyError: 'test-environments'`.
+- [x] **Step 3: Schema ergänzen.** Objekt wörtlich aus Spec §9.2 (`type: object`, Description mit Satz „NOT to be confused with 'environments' (env-var definitions); token-env must reference an 'environments' entry with secret: true.“, `propertyNames.pattern`, `additionalProperties` mit `properties` `kind`/`url`/`token-env`/`access`/`remote-access`/`notes`, `additionalProperties: false`); `notes` = `{"type": "string"}`; kein `default` auf Top-Level.
+- [x] **Step 4: Run, erwartet PASS.** Tests aus Step 1; danach `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (kein neuer Befund).
+- [x] **Step 5: Commit.** `git add config/project-config.schema.json tests/test_test_environments_schema.py` und `git commit -m "feat: add test-environments schema block"`.
 
 ---
 
@@ -233,7 +235,7 @@ Consumes: `scripts/sync.py --config <yaml> --init` (wie `tests/test_ac01_render_
 `check_test_environments(config: dict) -> tuple[list[str], list[str]]` (Rückgabe `(errors, warnings)`; Fehlerformat `test-environments.<name>.<key>: <Meldung>`, Block-Ebene `test-environments: <Meldung>`).
 Consumes: nur Stdlib.
 
-- [ ] **Step 1: Failing Tests schreiben** (`sys.path.insert(0, scripts)`; `SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"`; `_cfg(envs, **extra) = {"test-environments": envs, **extra}`):
+- [x] **Step 1: Failing Tests schreiben** (`sys.path.insert(0, scripts)`; `SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"`; `_cfg(envs, **extra) = {"test-environments": envs, **extra}`):
   ```python
   def test_absent_null_and_empty_block_are_unconfigured():                       # RF1
       for cfg in ({}, {"test-environments": None}, {"test-environments": {}}):
@@ -311,10 +313,10 @@ Consumes: nur Stdlib.
       assert text.count("\n") <= 600 and "provider ==" not in text and "provider==" not in text
       assert _root_imports(ast.parse(text)) <= {"__future__", "re", "pathlib", "typing", "sys", "logging", "urllib"}
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_lib.py --basetemp={{PYTEST_BASETEMP}}` => `ModuleNotFoundError: lib.test_environments`.
-- [ ] **Step 3: Implementieren** in `scripts/lib/test_environments.py` (Modul-Docstring mit Namensabgrenzung `environments` vs. `test-environments`): Konstanten wie oben; `check_test_environments(config)`. Regeln (Spec §9.4): fehlender/`None`/leerer Block = `([], [])`; Nicht-Mapping = Fehler `test-environments: expected a mapping, got <typname>`; Namen nicht-String oder nicht `NAME_RE` = `test-environments: invalid environment name <name!r> (expected ^[a-z0-9][a-z0-9-]*$)`; Eintrag kein Mapping; unbekannter Key = `<pfad>.<key>: unknown key`; Enum-Felder: `bool` zuerst prüfen (`… must be a quoted string, quote the value (got bool <v>)`), danach Enum (`invalid value <v!r> (allowed: …)`); `url`: nicht-leerer String sonst `url must be a non-empty string`, Userinfo per `urllib.parse.urlsplit(url).netloc` enthält `@` => `url must not contain userinfo`; `url`/`notes` mit `{{` oder `}}` => `placeholder syntax not allowed`; `notes` kein String => `notes must be a string`; Warnungen genau mit den Texten aus dem Test. Iteration über `sorted(names, key=str)`. Der `token-env`-Zweig kommt in Task 4.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2.
-- [ ] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_lib.py` und `git commit -m "feat: add test-environments structure validator"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_lib.py --basetemp={{PYTEST_BASETEMP}}` => `ModuleNotFoundError: lib.test_environments`.
+- [x] **Step 3: Implementieren** in `scripts/lib/test_environments.py` (Modul-Docstring mit Namensabgrenzung `environments` vs. `test-environments`): Konstanten wie oben; `check_test_environments(config)`. Regeln (Spec §9.4): fehlender/`None`/leerer Block = `([], [])`; Nicht-Mapping = Fehler `test-environments: expected a mapping, got <typname>`; Namen nicht-String oder nicht `NAME_RE` = `test-environments: invalid environment name <name!r> (expected ^[a-z0-9][a-z0-9-]*$)`; Eintrag kein Mapping; unbekannter Key = `<pfad>.<key>: unknown key`; Enum-Felder: `bool` zuerst prüfen (`… must be a quoted string, quote the value (got bool <v>)`), danach Enum (`invalid value <v!r> (allowed: …)`); `url`: nicht-leerer String sonst `url must be a non-empty string`, Userinfo per `urllib.parse.urlsplit(url).netloc` enthält `@` => `url must not contain userinfo`; `url`/`notes` mit `{{` oder `}}` => `placeholder syntax not allowed`; `notes` kein String => `notes must be a string`; Warnungen genau mit den Texten aus dem Test. Iteration über `sorted(names, key=str)`. Der `token-env`-Zweig kommt in Task 4.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2.
+- [x] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_lib.py` und `git commit -m "feat: add test-environments structure validator"`.
 
 ---
 
@@ -329,7 +331,7 @@ Consumes: nur Stdlib.
 
 **Interfaces:** Produces: `collect_test_environment_errors(config: dict) -> list[str]` (nur Fehler, nicht-exitend), `validate_test_environments(config: dict, config_path: Path) -> None` (druckt `ERROR: <config_path>: <Fehler>` auf stderr und `sys.exit(1)`; Warnungen als `WARN: <config_path>: <Text>` auf stderr, kein Exit). Consumes: `check_test_environments` (Task 3), `config["environments"]`.
 
-- [ ] **Step 1: Failing Tests ergänzen:**
+- [x] **Step 1: Failing Tests ergänzen:**
   ```python
   ENVS = {"HA_DEV_TOKEN": {"description": "t", "secret": True}}
 
@@ -382,10 +384,10 @@ Consumes: nur Stdlib.
       with pytest.raises(SystemExit):
           load_config(p)
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_lib.py --basetemp={{PYTEST_BASETEMP}}` => ImportError/AssertionError für die neuen Funktionen und Regeln.
-- [ ] **Step 3: Implementieren.** `token-env`-Regeln in `check_test_environments` (Spec §9.4 Regel 3): String + `TOKEN_ENV_RE` sonst `expected env var NAME, not a value`; `environments = config.get("environments")`; kein Mapping oder Name fehlt => `environments entry '<NAME>' not defined`; Eintrag kein Mapping oder `entry.get("secret") is not True` => `environments entry '<NAME>' must have secret: true`; nicht-leerer `default` (`str(default).strip()`) => Warnung `environments entry '<NAME>' has a non-empty default (secret value in project.yaml)`. `collect_test_environment_errors` = erste Komponente. `validate_test_environments` wie oben. In `scripts/lib/config.py`: Import `from .test_environments import validate_test_environments` und direkt nach `_validate_subagent_permissions(config, config_path)` (:396) die Zeile `validate_test_environments(config, config_path)`.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_conventions_migration_invariant.py --basetemp={{PYTEST_BASETEMP}}` (Config-Load unverändert grün).
-- [ ] **Step 5: Commit.** `git add scripts/lib/test_environments.py scripts/lib/config.py tests/test_test_environments_lib.py` und `git commit -m "feat: validate token-env references and hard-fail on errors"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_lib.py --basetemp={{PYTEST_BASETEMP}}` => ImportError/AssertionError für die neuen Funktionen und Regeln.
+- [x] **Step 3: Implementieren.** `token-env`-Regeln in `check_test_environments` (Spec §9.4 Regel 3): String + `TOKEN_ENV_RE` sonst `expected env var NAME, not a value`; `environments = config.get("environments")`; kein Mapping oder Name fehlt => `environments entry '<NAME>' not defined`; Eintrag kein Mapping oder `entry.get("secret") is not True` => `environments entry '<NAME>' must have secret: true`; nicht-leerer `default` (`str(default).strip()`) => Warnung `environments entry '<NAME>' has a non-empty default (secret value in project.yaml)`. `collect_test_environment_errors` = erste Komponente. `validate_test_environments` wie oben. In `scripts/lib/config.py`: Import `from .test_environments import validate_test_environments` und direkt nach `_validate_subagent_permissions(config, config_path)` (:396) die Zeile `validate_test_environments(config, config_path)`.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_conventions_migration_invariant.py --basetemp={{PYTEST_BASETEMP}}` (Config-Load unverändert grün).
+- [x] **Step 5: Commit.** `git add scripts/lib/test_environments.py scripts/lib/config.py tests/test_test_environments_lib.py` und `git commit -m "feat: validate token-env references and hard-fail on errors"`.
 
 ---
 
@@ -399,7 +401,7 @@ Consumes: nur Stdlib.
 
 **Interfaces:** Produces: `load_project_platform_vars(project_root: Path) -> dict` (flaches Dict `platform.<name>.<key>` nur aus `.claude/platform-config.yaml`; fehlend/kaputt => `{}`), `resolve_test_environments(config: dict, platform_project_vars: Optional[dict]) -> dict[str, dict]` (je Umgebung Schlüssel `kind`, `url` (str oder `None`), `url_source` (`"config"`, `"platform.hacs.dev_instance_url"`, `"platform.homeassistant.ha_url"` oder `""`), `token-env` (str oder `None`), `access`, `remote-access`, `notes` (`""` wenn leer); nie Exception/Exit, kaputte Config => `{}` plus `SyncLog().warning`). Consumes: `check_test_environments`, `platform._flatten_yaml_dict`, `platform.CLAUDE_PLATFORM_CONFIG`, `io.load_yaml_file(path, on_error="default", default={})`.
 
-- [ ] **Step 1: Failing Tests schreiben:**
+- [x] **Step 1: Failing Tests schreiben:**
   ```python
   HACS, HA = "platform.hacs.dev_instance_url", "platform.homeassistant.ha_url"
 
@@ -452,10 +454,10 @@ Consumes: nur Stdlib.
       (tmp_path / ".claude" / "platform-config.yaml").write_text("platform: [unclosed", encoding="utf-8")
       assert load_project_platform_vars(tmp_path) == {}
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_resolver.py --basetemp={{PYTEST_BASETEMP}}` => ImportError.
-- [ ] **Step 3: Implementieren** gemäß Spec §10.2: Fallback nur wenn (a) genau eine Umgebung mit `kind` in `("remote","both")` keine `url` hat, (b) ein Projekt-Plattformwert (nicht-leerer String) existiert, (c) Präzedenz `platform.hacs.dev_instance_url` > `platform.homeassistant.ha_url`. Konstante `FALLBACK_PLATFORM_KEYS = (HACS-Key, HA-Key)`. Kein Provider-Bezug.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2.
-- [ ] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_resolver.py` und `git commit -m "feat: resolve test environments with platform URL fallback"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_resolver.py --basetemp={{PYTEST_BASETEMP}}` => ImportError.
+- [x] **Step 3: Implementieren** gemäß Spec §10.2: Fallback nur wenn (a) genau eine Umgebung mit `kind` in `("remote","both")` keine `url` hat, (b) ein Projekt-Plattformwert (nicht-leerer String) existiert, (c) Präzedenz `platform.hacs.dev_instance_url` > `platform.homeassistant.ha_url`. Konstante `FALLBACK_PLATFORM_KEYS = (HACS-Key, HA-Key)`. Kein Provider-Bezug.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2.
+- [x] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_resolver.py` und `git commit -m "feat: resolve test environments with platform URL fallback"`.
 
 ---
 
@@ -479,7 +481,7 @@ Textbausteine (wörtlich in Tests und Implementierung):
 - Ziel unklar: bei mehr als einer Umgebung oder einer remote/both-Umgebung ohne URL `- If the target or its URL is unclear, return \`STATUS: partial\` with \`APPROVAL_REQUEST: target?\` and ask main_chat.`
 - Secrets, je Umgebung mit `token-env` NAME: ``- **Token for `<env>`:** env var `${NAME}`; the value comes from the shell environment, provided via `source .meta-config/env.sh` (from the `environments:` entry `NAME` with `secret: true`, masked). Never print, log or write the value, and never read it from files; use `${NAME}` in the shell only.``
 
-- [ ] **Step 1: Failing Tests schreiben** (Fixtures im Testmodul, Schema aus Task 5):
+- [x] **Step 1: Failing Tests schreiben** (Fixtures im Testmodul, Schema aus Task 5):
   ```python
   HA_ENV = {"ha-dev": {"kind": "both", "url": "http://ha-dev.lan:8123", "url_source": "config", "token-env": "HA_DEV_TOKEN",
                        "access": "deploy", "remote-access": "ask", "notes": "Integration erst lokal testen."}}
@@ -552,10 +554,10 @@ Textbausteine (wörtlich in Tests und Implementierung):
   def test_namensabgrenzung_sentence():                                            # AC-ENV-17
       assert "`environments:` defines environment variables" in render_test_environment_block(LOCAL_ENV)
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render_block.py --basetemp={{PYTEST_BASETEMP}}` => ImportError.
-- [ ] **Step 3: Implementieren** gemäß Textbausteinen (reine String-Funktion, keine Rollen-/Provider-Parameter, b12/C2).
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_test_environments_lib.py::test_module_budget_and_constraints --basetemp={{PYTEST_BASETEMP}}` (Modul weiterhin <= 600 Zeilen, AC-ENV-18).
-- [ ] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_render_block.py` und `git commit -m "feat: render test environment block with approval protocol"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render_block.py --basetemp={{PYTEST_BASETEMP}}` => ImportError.
+- [x] **Step 3: Implementieren** gemäß Textbausteinen (reine String-Funktion, keine Rollen-/Provider-Parameter, b12/C2).
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_test_environments_lib.py::test_module_budget_and_constraints --basetemp={{PYTEST_BASETEMP}}` (Modul weiterhin <= 600 Zeilen, AC-ENV-18).
+- [x] **Step 5: Commit.** `git add scripts/lib/test_environments.py tests/test_test_environments_render_block.py` und `git commit -m "feat: render test environment block with approval protocol"`.
 
 ---
 
@@ -573,7 +575,7 @@ Textbausteine (wörtlich in Tests und Implementierung):
 
 **Interfaces:** Produces: `build_test_environment_variables(config: dict, project_root: Optional[Path]) -> dict` (genau die Keys `TEST_ENVIRONMENT_BLOCK` (str) und `TEST_ENVIRONMENTS_SET` (`"true"`/`"false"`); nutzt `load_project_platform_vars` nur wenn `project_root` gesetzt). Consumes: `resolve_test_environments`, `render_test_environment_block`.
 
-- [ ] **Step 1: Failing Tests schreiben:**
+- [x] **Step 1: Failing Tests schreiben:**
   ```python
   def test_builder_unconfigured():
       assert build_test_environment_variables({}, None) == {"TEST_ENVIRONMENT_BLOCK": "", "TEST_ENVIRONMENTS_SET": "false"}
@@ -611,10 +613,10 @@ Textbausteine (wörtlich in Tests und Implementierung):
       assert strip_inactive_conditional_blocks(gate, {"TEST_ENVIRONMENTS_SET": "false"}) == "a\nb\n"
       assert strip_inactive_conditional_blocks(gate, {"TEST_ENVIRONMENTS_SET": "true"}) == "a\nX\nb\n"
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_consistency.py --basetemp={{PYTEST_BASETEMP}}` => ImportError bzw. `KeyError`.
-- [ ] **Step 3: Implementieren.** Builder wie oben; `config.py`: Import und in `build_variables` direkt nach `_build_convention_variables(...)` die Zeile `variables.update(build_test_environment_variables(config, project_root))`; `placeholders.py`: beide Namen in `_BUILTIN_VARS` (Kommentar „Test environments (build_test_environment_variables)“); `standalone.py`: `"TEST_ENVIRONMENTS_SET": "false"` in `_CONDITIONAL_FALSE_FLAGS`, `"TEST_ENVIRONMENT_BLOCK": ""` in `_ORCHESTRATION_FALLBACKS` (Kommentar: nur innerhalb des `{{#if}}`-Gates referenziert); `sync-concept.md`: zwei Tabellenzeilen mit escapten Beispielen `{{%TEST_ENVIRONMENT_BLOCK%}}` („Markdown-Block der deklarierten Test-Umgebungen aus `test-environments`, leer wenn nicht konfiguriert“) und `{{%TEST_ENVIRONMENTS_SET%}}` („`true`/`false`; steuert das Gate um den Block in den Rollen-Templates“).
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; danach `python3 -m pytest tests/test_conventions_migration_invariant.py --basetemp={{PYTEST_BASETEMP}}` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (keine ungelösten Platzhalter, AC-ENV-15).
-- [ ] **Step 5: Commit.** `git add scripts/lib/test_environments.py scripts/lib/config.py scripts/lib/consistency/placeholders.py scripts/lib/standalone.py docs/guides/features/sync-concept.md tests/test_test_environments_consistency.py` und `git commit -m "feat: register TEST_ENVIRONMENT_BLOCK placeholders"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_consistency.py --basetemp={{PYTEST_BASETEMP}}` => ImportError bzw. `KeyError`.
+- [x] **Step 3: Implementieren.** Builder wie oben; `config.py`: Import und in `build_variables` direkt nach `_build_convention_variables(...)` die Zeile `variables.update(build_test_environment_variables(config, project_root))`; `placeholders.py`: beide Namen in `_BUILTIN_VARS` (Kommentar „Test environments (build_test_environment_variables)“); `standalone.py`: `"TEST_ENVIRONMENTS_SET": "false"` in `_CONDITIONAL_FALSE_FLAGS`, `"TEST_ENVIRONMENT_BLOCK": ""` in `_ORCHESTRATION_FALLBACKS` (Kommentar: nur innerhalb des `{{#if}}`-Gates referenziert); `sync-concept.md`: zwei Tabellenzeilen mit escapten Beispielen `{{%TEST_ENVIRONMENT_BLOCK%}}` („Markdown-Block der deklarierten Test-Umgebungen aus `test-environments`, leer wenn nicht konfiguriert“) und `{{%TEST_ENVIRONMENTS_SET%}}` („`true`/`false`; steuert das Gate um den Block in den Rollen-Templates“).
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; danach `python3 -m pytest tests/test_conventions_migration_invariant.py --basetemp={{PYTEST_BASETEMP}}` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (keine ungelösten Platzhalter, AC-ENV-15).
+- [x] **Step 5: Commit.** `git add scripts/lib/test_environments.py scripts/lib/config.py scripts/lib/consistency/placeholders.py scripts/lib/standalone.py docs/guides/features/sync-concept.md tests/test_test_environments_consistency.py` und `git commit -m "feat: register TEST_ENVIRONMENT_BLOCK placeholders"`.
 
 ---
 
@@ -639,7 +641,7 @@ docker und devops-engineer: `Deploy to a remote environment only if its access i
 test-executor: `Read-only: run existing suites against environments only as the rules above allow; never deploy.`
 Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness (Task 1).
 
-- [ ] **Step 1: Failing Tests schreiben** in `tests/test_test_environments_render.py` (Konstanten `BASE_VERSIONS = {"tester": "2.9.0", "e2e-tester": "1.7.0", "developer": "4.9.0", "docker": "1.10.0", "devops-engineer": "1.8.0", "test-executor": "1.3.0"}`, `ROLE_LINES` wie oben, `CONFIG_YAML` = Spec §9.1: `environments:` mit `HA_DEV_TOKEN` (`description`, `secret: true`, ohne Wert) und `test-environments:` mit `ha-dev` (both, `http://ha-dev.lan:8123`, `token-env: HA_DEV_TOKEN`, deploy, ask, notes) und `sharkord-local` (local)):
+- [x] **Step 1: Failing Tests schreiben** in `tests/test_test_environments_render.py` (Konstanten `BASE_VERSIONS = {"tester": "2.9.0", "e2e-tester": "1.7.0", "developer": "4.9.0", "docker": "1.10.0", "devops-engineer": "1.8.0", "test-executor": "1.3.0"}`, `ROLE_LINES` wie oben, `CONFIG_YAML` = Spec §9.1: `environments:` mit `HA_DEV_TOKEN` (`description`, `secret: true`, ohne Wert) und `test-environments:` mit `ha-dev` (both, `http://ha-dev.lan:8123`, `token-env: HA_DEV_TOKEN`, deploy, ask, notes) und `sharkord-local` (local)):
   ```python
   @pytest.mark.parametrize("role", sorted(BASE_VERSIONS))
   def test_template_has_gated_block_directly_after_constraints(role):
@@ -688,10 +690,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
       assert "HA_DEV_TOKEN" in env_sh and "[SECRET]" in env_sh and CANARY not in env_sh
   ```
   (Importe der Helfer und `CONFIG_YAML` aus `test_test_environments_render` per `from test_test_environments_render import _sync_project, _role_texts, CONFIG_YAML`; pytest legt das Testverzeichnis in `sys.path`.)
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py tests/test_test_environments_secrets_via_render.py --basetemp={{PYTEST_BASETEMP}}` => Gate/Version fehlen; `test_unset_render_matches_baseline` bleibt grün.
-- [ ] **Step 3: Templates ändern.** Pro Template: `version` bumpen; direkt hinter der `</constraints>`-Zeile das Gate einfügen. Layout so, dass das Entfernen von `{{#if…}}…{{/if}}\n` exakt den Originaltext ergibt (OF-4, der Ausführende entscheidet anhand der Baseline): bei den fünf Templates mit `{{OUTPUT_GUARD_BLOCK}}` bleibt die Leerzeile nach `</constraints>`, das Gate folgt unmittelbar vor `{{OUTPUT_GUARD_BLOCK}}`; bei `test-executor` (Dateiende) steht das Gate ohne Leerzeile direkt unter `</constraints>`. `docker.md:84` (`{{#if DEV_STACK_START_SET}}`) bleibt unberührt.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2 (alle Tests inkl. Baseline); `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`. Erwartete, bis Task 15 bewusst offene Drift: `tests/test_ac01_render_identity.py` (Versions-Pins) — hier nicht ausführen.
-- [ ] **Step 5: Commit.** `git add agents/1-generic/tester.md agents/1-generic/e2e-tester.md agents/1-generic/developer.md agents/1-generic/docker.md agents/1-generic/devops-engineer.md agents/1-generic/test-executor.md tests/test_test_environments_render.py tests/test_test_environments_secrets_via_render.py` und `git commit -m "feat: add test environment block to six role templates"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py tests/test_test_environments_secrets_via_render.py --basetemp={{PYTEST_BASETEMP}}` => Gate/Version fehlen; `test_unset_render_matches_baseline` bleibt grün.
+- [x] **Step 3: Templates ändern.** Pro Template: `version` bumpen; direkt hinter der `</constraints>`-Zeile das Gate einfügen. Layout so, dass das Entfernen von `{{#if…}}…{{/if}}\n` exakt den Originaltext ergibt (OF-4, der Ausführende entscheidet anhand der Baseline): bei den fünf Templates mit `{{OUTPUT_GUARD_BLOCK}}` bleibt die Leerzeile nach `</constraints>`, das Gate folgt unmittelbar vor `{{OUTPUT_GUARD_BLOCK}}`; bei `test-executor` (Dateiende) steht das Gate ohne Leerzeile direkt unter `</constraints>`. `docker.md:84` (`{{#if DEV_STACK_START_SET}}`) bleibt unberührt.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2 (alle Tests inkl. Baseline); `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`. Erwartete, bis Task 15 bewusst offene Drift: `tests/test_ac01_render_identity.py` (Versions-Pins) — hier nicht ausführen.
+- [x] **Step 5: Commit.** `git add agents/1-generic/tester.md agents/1-generic/e2e-tester.md agents/1-generic/developer.md agents/1-generic/docker.md agents/1-generic/devops-engineer.md agents/1-generic/test-executor.md tests/test_test_environments_render.py tests/test_test_environments_secrets_via_render.py` und `git commit -m "feat: add test environment block to six role templates"`.
 
 ---
 
@@ -711,7 +713,7 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: extends-Overrides erben den Block (liegt außerhalb der Tag-Anker); `sharkord-docker` enthält das Gate vor `## Sprache`. Consumes: Basisversionen aus Task 8.
 
-- [ ] **Step 1: Failing Tests ergänzen:**
+- [x] **Step 1: Failing Tests ergänzen:**
   ```python
   OVERRIDES = {"homeassistant-developer.md": ("2.1.3", "1-generic/developer.md@4.9.0"), "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
                "hacs-developer.md": ("1.3.2", "1-generic/developer.md@4.9.0"), "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
@@ -752,10 +754,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
               else:                                                                # sharkord-docker (Standalone)
                   assert text.index("## Test environments") < text.index("## Sprache")
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py --basetemp={{PYTEST_BASETEMP}}` => alte Versionen/`based-on`, fehlender Block in `sharkord-docker`.
-- [ ] **Step 3: Overrides ändern.** Frontmatter `version`/`based-on` wie oben; `sharkord-docker.md`: Gate zwischen dem letzten `## Don'ts`-Listenpunkt und `## Sprache` einfügen, so dass das Entfernen des Gates samt Zeilenumbruch den Originaltext ergibt (Leerzeile vor dem Gate). Patch-Texte in den extends-Overrides bleiben unverändert (Block liegt nach `</constraints>`, nie innerhalb gepatchten Textes).
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2 (inkl. `test_unset_render_matches_baseline` für alle 5 Varianten); `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (Consistency: `based-on` aktuell, keine Anker-Warnung).
-- [ ] **Step 5: Commit.** `git add agents/2-platform/homeassistant-developer.md agents/2-platform/sharkord-developer.md agents/2-platform/hacs-developer.md agents/2-platform/agent-meta-developer.md agents/2-platform/hacs-tester.md agents/2-platform/hacs-devops-engineer.md agents/2-platform/sharkord-docker.md tests/test_test_environments_render.py` und `git commit -m "feat: align platform overrides with test environment block"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_render.py --basetemp={{PYTEST_BASETEMP}}` => alte Versionen/`based-on`, fehlender Block in `sharkord-docker`.
+- [x] **Step 3: Overrides ändern.** Frontmatter `version`/`based-on` wie oben; `sharkord-docker.md`: Gate zwischen dem letzten `## Don'ts`-Listenpunkt und `## Sprache` einfügen, so dass das Entfernen des Gates samt Zeilenumbruch den Originaltext ergibt (Leerzeile vor dem Gate). Patch-Texte in den extends-Overrides bleiben unverändert (Block liegt nach `</constraints>`, nie innerhalb gepatchten Textes).
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2 (inkl. `test_unset_render_matches_baseline` für alle 5 Varianten); `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (Consistency: `based-on` aktuell, keine Anker-Warnung).
+- [x] **Step 5: Commit.** `git add agents/2-platform/homeassistant-developer.md agents/2-platform/sharkord-developer.md agents/2-platform/hacs-developer.md agents/2-platform/agent-meta-developer.md agents/2-platform/hacs-tester.md agents/2-platform/hacs-devops-engineer.md agents/2-platform/sharkord-docker.md tests/test_test_environments_render.py` und `git commit -m "feat: align platform overrides with test environment block"`.
 
 ---
 
@@ -770,7 +772,7 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: `AdminRequestHandler._guard_test_environments_config(self, candidate: dict) -> None` (ruft `lib.test_environments.collect_test_environment_errors(candidate)`, `ValueError("invalid test-environments config: " + "; ".join(errors))` bei Fehlern), `AdminRequestHandler._guard_test_environments_write(self, section: str, data: Any, existing: dict) -> None` (greift nur für `section in ("test-environments", "environments")`, Kandidat = `{**existing, section: data}`); Testhelfer `_handler(root: Path)` (lädt `scripts/admin-server.py` per `importlib` wie `tests/test_admin_server.py:40-50`, setzt `AdminRequestHandler.root` und `config_manager = ConfigManager(root, mode="project_admin")`, `_send_json = lambda result: None`) und `_post(handler, section, data) -> None` (setzt `handler._read_body = lambda: {"section": section, "data": data}`, ruft `_write_project_section()`). Consumes: `collect_test_environment_errors` (Task 4).
 
-- [ ] **Step 1: Failing Tests schreiben:**
+- [x] **Step 1: Failing Tests schreiben:**
   ```python
   ENVS = {"HA_DEV_TOKEN": {"description": "t", "secret": True}}
   VALID = {"ha-dev": {"kind": "remote", "url": "http://ha-dev.lan:8123", "token-env": "HA_DEV_TOKEN", "access": "read", "remote-access": "ask"}}
@@ -820,10 +822,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
       _post(h, "git", {"auto_commit": False})
   ```
   (`admin_server` im Testmodul = Modul aus `_te_admin_helpers`, per `from _te_admin_helpers import admin_server, _handler, _post`.)
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_admin_ui_test_environments_section.py --basetemp={{PYTEST_BASETEMP}}` => `section not allowed: test-environments`.
-- [ ] **Step 3: Implementieren.** `"test-environments"` in `PROJECT_WRITABLE_SECTIONS` (neben `"environments"`); `_write_project_section`: nach `self._guard_model_block_write(...)` die Zeile `self._guard_test_environments_write(section, data, existing)`; `_route_put_config` (Projekt-Zweig, nach den `_guard_context_profile_write`-Aufrufen): wenn `"test-environments"` oder `"environments"` in `body`, `self._guard_test_environments_config(self._deep_merge(existing, body))`; Import von `collect_test_environment_errors` lazy innerhalb der Methode (Muster `from lib.yaml_roundtrip import …`). `None` für `test-environments` gilt als unkonfiguriert (Task 3).
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_admin_server.py --basetemp={{PYTEST_BASETEMP}}` (keine Regression).
-- [ ] **Step 5: Commit.** `git add scripts/admin-server.py tests/_te_admin_helpers.py tests/test_admin_ui_test_environments_section.py` und `git commit -m "feat: guard test-environments writes in admin server"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_admin_ui_test_environments_section.py --basetemp={{PYTEST_BASETEMP}}` => `section not allowed: test-environments`.
+- [x] **Step 3: Implementieren.** `"test-environments"` in `PROJECT_WRITABLE_SECTIONS` (neben `"environments"`); `_write_project_section`: nach `self._guard_model_block_write(...)` die Zeile `self._guard_test_environments_write(section, data, existing)`; `_route_put_config` (Projekt-Zweig, nach den `_guard_context_profile_write`-Aufrufen): wenn `"test-environments"` oder `"environments"` in `body`, `self._guard_test_environments_config(self._deep_merge(existing, body))`; Import von `collect_test_environment_errors` lazy innerhalb der Methode (Muster `from lib.yaml_roundtrip import …`). `None` für `test-environments` gilt als unkonfiguriert (Task 3).
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_admin_server.py --basetemp={{PYTEST_BASETEMP}}` (keine Regression).
+- [x] **Step 5: Commit.** `git add scripts/admin-server.py tests/_te_admin_helpers.py tests/test_admin_ui_test_environments_section.py` und `git commit -m "feat: guard test-environments writes in admin server"`.
 
 ---
 
@@ -838,7 +840,7 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: `async function viewProjectTestEnvironments()` (Tabelle + Modal, Muster `viewProjectEnvironments`), Nav `{ route: "/project/test-environments", label: "Test Environments", icon: "🧪" }`, `router.register("/project/test-environments", viewProjectTestEnvironments)`, `routeMap`-Eintrag `"project/test-environments": "project_instance-test_environments"`, Help-Block `<!-- help-id: project_instance-test_environments -->`. Consumes: `loadProject()`, `saveProjectSection(key, value, statusEl)` (:5958), `selectField(options, value, onChange)` (:1995), `confirmDestructive(message, onConfirm, opts)` (:845), Server-Guard (Task 10).
 
-- [ ] **Step 1: Failing Tests ergänzen** (Muster `tests/test_admin_ui_git_section.py`; `HTML`/`HELP_REF` werden wie dort eingelesen; `_view_body()` schneidet den Text von `async function viewProjectTestEnvironments(` bis zur nächsten `\nasync function ` heraus):
+- [x] **Step 1: Failing Tests ergänzen** (Muster `tests/test_admin_ui_git_section.py`; `HTML`/`HELP_REF` werden wie dort eingelesen; `_view_body()` schneidet den Text von `async function viewProjectTestEnvironments(` bis zur nächsten `\nasync function ` heraus):
   ```python
   def test_view_defined_routed_and_in_nav():                                       # AC-ENV-12
       assert "async function viewProjectTestEnvironments(" in HTML
@@ -871,10 +873,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
       from lib.consistency.docs import check_ui_help_mappings
       assert [f.message for f in check_ui_help_mappings(REPO_ROOT) if "test_environments" in f.message] == []
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_admin_ui_test_environments_section.py --basetemp={{PYTEST_BASETEMP}}` => View fehlt.
-- [ ] **Step 3: Implementieren.** View mit Feldern Name (Client-Regex `^[a-z0-9][a-z0-9-]*$`), `kind`/`access`/`remote-access` über `selectField` (immer Strings), `url`, `token-env` (nur NAME, Client-Regex `TOKEN_ENV_RE = /^[A-Z][A-Z0-9_]*$/`, Hinweistext „Name eines Eintrags aus ‚Umgebungsvariablen' mit secret=true; Wert kommt per `source .meta-config/env.sh` bzw. aus der Shell — nie hier eintragen“), `notes`; kein Passwort-/Token-Wertfeld; leere optionale Felder werden nicht gespeichert; Aktivieren von `remote`/`both`/`deploy`/`allow` (gegenüber dem Vorzustand) öffnet `confirmDestructive(message, onConfirm, {title: "Confirm remote access", confirmLabel: "Enable"})`; Einleitungstext mit Namensabgrenzung zu „Environment Variables“; in `viewProjectEnvironments` ein Gegenhinweis („Test targets are configured under Test Environments; `token-env` there must reference a variable here with Secret enabled.“). Help-Block in `docs/api/admin-ui-reference.md` im Format der Nachbarblöcke (`### Test Environments`, `help-id`, `last-updated`, `author: Agent Meta Admin`, deutscher Text inkl. Namensabgrenzung, Freigabeprotokoll und „kein `permissions`-Mechanismus“).
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_admin_ui_git_section.py --basetemp={{PYTEST_BASETEMP}}` (keine Regression der Nachbar-Routen).
-- [ ] **Step 5: Commit.** `git add docs/ui/admin-ui.html docs/api/admin-ui-reference.md tests/test_admin_ui_test_environments_section.py` und `git commit -m "feat: add test environments section to admin ui"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_admin_ui_test_environments_section.py --basetemp={{PYTEST_BASETEMP}}` => View fehlt.
+- [x] **Step 3: Implementieren.** View mit Feldern Name (Client-Regex `^[a-z0-9][a-z0-9-]*$`), `kind`/`access`/`remote-access` über `selectField` (immer Strings), `url`, `token-env` (nur NAME, Client-Regex `TOKEN_ENV_RE = /^[A-Z][A-Z0-9_]*$/`, Hinweistext „Name eines Eintrags aus ‚Umgebungsvariablen' mit secret=true; Wert kommt per `source .meta-config/env.sh` bzw. aus der Shell — nie hier eintragen“), `notes`; kein Passwort-/Token-Wertfeld; leere optionale Felder werden nicht gespeichert; Aktivieren von `remote`/`both`/`deploy`/`allow` (gegenüber dem Vorzustand) öffnet `confirmDestructive(message, onConfirm, {title: "Confirm remote access", confirmLabel: "Enable"})`; Einleitungstext mit Namensabgrenzung zu „Environment Variables“; in `viewProjectEnvironments` ein Gegenhinweis („Test targets are configured under Test Environments; `token-env` there must reference a variable here with Secret enabled.“). Help-Block in `docs/api/admin-ui-reference.md` im Format der Nachbarblöcke (`### Test Environments`, `help-id`, `last-updated`, `author: Agent Meta Admin`, deutscher Text inkl. Namensabgrenzung, Freigabeprotokoll und „kein `permissions`-Mechanismus“).
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; zusätzlich `python3 -m pytest tests/test_admin_ui_git_section.py --basetemp={{PYTEST_BASETEMP}}` (keine Regression der Nachbar-Routen).
+- [x] **Step 5: Commit.** `git add docs/ui/admin-ui.html docs/api/admin-ui-reference.md tests/test_admin_ui_test_environments_section.py` und `git commit -m "feat: add test environments section to admin ui"`.
 
 ---
 
@@ -888,7 +890,7 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: Rezeptabschnitt `## <nächste freie Nr.>. Test environments (test-environments)` (Stand dieses Plans nach §17 = Nr. 18; nach Plan 1 ggf. höher — Nummer = letzte `## N.`-Nummer + 1) mit einem yaml-Codeblock, der `environments:` und `test-environments:` zeigt; §3-Zeile ``| Enable remote test environments (`kind: remote\|both`, `remote-access: allow`, `access: deploy`) | Behavior change — agents may contact or deploy to a remote target |``. Consumes: `collect_test_environment_errors`, `tests/_te_admin_helpers.py` (Task 10) für den Paritätstest.
 
-- [ ] **Step 1: Failing Tests schreiben:**
+- [x] **Step 1: Failing Tests schreiben:**
   ```python
   SRC = (REPO_ROOT / "agents/1-generic/agent-meta-manager.md").read_text(encoding="utf-8")
   HEADING = re.search(r"(?m)^## \d+[a-z]?\. Test environments.*$", SRC)
@@ -917,10 +919,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
       persisted = h.config_manager.read("project")
       assert {k: persisted[k] for k in example} == example
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** Vorbedingung `grep -n '^version' agents/1-generic/agent-meta-manager.md` => `1.26.0` (sonst STOP, Plan 1 fehlt). `python3 -m pytest tests/test_test_environments_manager_recipe.py --basetemp={{PYTEST_BASETEMP}}` => FAIL.
-- [ ] **Step 3: Implementieren.** Rezept nach Spec §13: (1) Art erfragen („Ask which kind: local, remote or both“), (2) falls `token-env`: zuerst den `environments:`-Eintrag (`secret: true`, without a value, kein `default`) anlegen/prüfen, dann den Block in `.meta-config/project.yaml` schreiben, nur `token-env: NAME` („only the NAME“), (3) Hinweis „provide the value via the shell environment or `source .meta-config/env.sh` — never post the value in the chat“, (4) `python3 {{AGENT_META_REL_PATH}}scripts/sync.py` + `--validate`, (5) Remote-Aktivierung vorher bestätigen lassen (§3). Die Namensabgrenzung steht als Satz im Abschnitt und enthält wörtlich die beiden Teilstrings aus dem Test (jeweils mit Backticks um den Key). §3-Tabellenzeile nach der `auto_commit`-Zeile. `version: "1.27.0"`.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`. Erwartete, bis Task 15 offene Drift: Manager-Golden und AC-01-Hashes.
-- [ ] **Step 5: Commit.** `git add agents/1-generic/agent-meta-manager.md tests/test_test_environments_manager_recipe.py` und `git commit -m "feat: add test environments recipe to agent-meta-manager"`.
+- [x] **Step 2: Run, erwartet FAIL.** Vorbedingung `grep -n '^version' agents/1-generic/agent-meta-manager.md` => `1.26.0` (sonst STOP, Plan 1 fehlt). `python3 -m pytest tests/test_test_environments_manager_recipe.py --basetemp={{PYTEST_BASETEMP}}` => FAIL.
+- [x] **Step 3: Implementieren.** Rezept nach Spec §13: (1) Art erfragen („Ask which kind: local, remote or both“), (2) falls `token-env`: zuerst den `environments:`-Eintrag (`secret: true`, without a value, kein `default`) anlegen/prüfen, dann den Block in `.meta-config/project.yaml` schreiben, nur `token-env: NAME` („only the NAME“), (3) Hinweis „provide the value via the shell environment or `source .meta-config/env.sh` — never post the value in the chat“, (4) `python3 {{AGENT_META_REL_PATH}}scripts/sync.py` + `--validate`, (5) Remote-Aktivierung vorher bestätigen lassen (§3). Die Namensabgrenzung steht als Satz im Abschnitt und enthält wörtlich die beiden Teilstrings aus dem Test (jeweils mit Backticks um den Key). §3-Tabellenzeile nach der `auto_commit`-Zeile. `version: "1.27.0"`.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`. Erwartete, bis Task 15 offene Drift: Manager-Golden und AC-01-Hashes.
+- [x] **Step 5: Commit.** `git add agents/1-generic/agent-meta-manager.md tests/test_test_environments_manager_recipe.py` und `git commit -m "feat: add test environments recipe to agent-meta-manager"`.
 
 ---
 
@@ -936,14 +938,14 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: drei Szenarien (IDs 88-90; Vorbedingung: `ls tests/scenarios/configs | sort | tail -3` — sind 88+ belegt, die nächsten freien IDs nehmen und überall konsistent verwenden). Consumes: `tests/scenarios/run.sh <id-prefix>`, Assert-Vertrag (cwd = Temp-Projekt, `$1`/`REPO_ROOT`).
 
-- [ ] **Step 1: Failing Asserts gegen Configs ohne Block schreiben.** Alle drei Configs zunächst ohne `test-environments`-Key (Muster `04-platform-bundle.project.yaml`: `ai-providers: [Claude]`, `roles:` = die sechs Rollen, `project: {name: scenario-test-env, prefix: ten, short: test-env}`, passende `variables`). Asserts (Muster `04-platform-bundle.sh`, Dateien per Glob `.claude/agents/*developer.md` usw.):
+- [x] **Step 1: Failing Asserts gegen Configs ohne Block schreiben.** Alle drei Configs zunächst ohne `test-environments`-Key (Muster `04-platform-bundle.project.yaml`: `ai-providers: [Claude]`, `roles:` = die sechs Rollen, `project: {name: scenario-test-env, prefix: ten, short: test-env}`, passende `variables`). Asserts (Muster `04-platform-bundle.sh`, Dateien per Glob `.claude/agents/*developer.md` usw.):
   - 88: jede der sechs Rollen-Dateien enthält `## Test environments` und `| sharkord-local | local |`, enthält NICHT `APPROVAL_REQUEST: env=`.
   - 89: alle sechs enthalten `APPROVAL_REQUEST: env=<name>; action=<read|deploy: action>`, `APPROVED: env=<name>; action=<action>`, `` `${HA_DEV_TOKEN}` ``; `.meta-config/env.sh` existiert, enthält `HA_DEV_TOKEN` und `[SECRET]`; `.claude/settings.json` enthält kein `ssh`/`curl`-Permission-Muster (NZ8).
   - 90: keine der sechs Rollen-Dateien enthält `Test environments`, `TEST_ENVIRONMENT` oder `{{TEST_ENV`; `grep -c APPROVAL_REQUEST` über die sechs Dateien = 0.
-- [ ] **Step 2: Run, erwartet FAIL (88, 89).** `tests/scenarios/run.sh 88 89 90` => 88 und 89 FAIL (Block fehlt), 90 PASS.
-- [ ] **Step 3: Blöcke in die Configs eintragen.** 88: `test-environments: {sharkord-local: {kind: local, notes: "docker compose run --rm test"}}`, `platforms: [sharkord]`. 89: `platforms: [homeassistant]`, `environments: {HA_DEV_TOKEN: {description: "Long-lived access token of the HA dev server", secret: true}}`, `test-environments: {ha-dev: {kind: both, url: "http://ha-dev.lan:8123", token-env: HA_DEV_TOKEN, access: deploy, remote-access: ask, notes: "Integration erst lokal testen, dann auf den Dev-Server."}}`. 90: Config von 89 ohne beide Blöcke. `registry.md`: drei Zeilen `| 88 | \`88-test-env-local\` | … |` usw. mit Feature-Beschreibung (lokal-only rendert keine Freigabetexte; HA-Dev-Server mit `ask`-Protokoll und Secret-Referenz; unkonfiguriert byte-clean).
-- [ ] **Step 4: Run, erwartet PASS.** `tests/scenarios/run.sh 88 89 90` => dreimal PASS; danach `tests/scenarios/run.sh` (alle) ohne neuen FAIL.
-- [ ] **Step 5: Commit.** `git add tests/scenarios/configs tests/scenarios/asserts tests/scenarios/registry.md` und `git commit -m "test: add test-env scenarios"`.
+- [x] **Step 2: Run, erwartet FAIL (88, 89).** `tests/scenarios/run.sh 88 89 90` => 88 und 89 FAIL (Block fehlt), 90 PASS.
+- [x] **Step 3: Blöcke in die Configs eintragen.** 88: `test-environments: {sharkord-local: {kind: local, notes: "docker compose run --rm test"}}`, `platforms: [sharkord]`. 89: `platforms: [homeassistant]`, `environments: {HA_DEV_TOKEN: {description: "Long-lived access token of the HA dev server", secret: true}}`, `test-environments: {ha-dev: {kind: both, url: "http://ha-dev.lan:8123", token-env: HA_DEV_TOKEN, access: deploy, remote-access: ask, notes: "Integration erst lokal testen, dann auf den Dev-Server."}}`. 90: Config von 89 ohne beide Blöcke. `registry.md`: drei Zeilen `| 88 | \`88-test-env-local\` | … |` usw. mit Feature-Beschreibung (lokal-only rendert keine Freigabetexte; HA-Dev-Server mit `ask`-Protokoll und Secret-Referenz; unkonfiguriert byte-clean).
+- [x] **Step 4: Run, erwartet PASS.** `tests/scenarios/run.sh 88 89 90` => dreimal PASS; danach `tests/scenarios/run.sh` (alle) ohne neuen FAIL.
+- [x] **Step 5: Commit.** `git add tests/scenarios/configs tests/scenarios/asserts tests/scenarios/registry.md` und `git commit -m "test: add test-env scenarios"`.
 
 ---
 
@@ -960,7 +962,7 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: Kapitel mit Abschnitten Zweck, Namensabgrenzung `environments` vs. `test-environments`, Schema-Felder und Defaults, Referenzregel `token-env`, Fallback-URL (§10.2), Freigabeprotokoll, Hinweis „kein `permissions`-Mechanismus, siehe F6“, Convention-boundary-Hinweis (AZ3). RELEASE_GATES-Satz: „Ein Dry-Check (`MODE: check-only`) gegen eine Test-Umgebung führt ausschließlich `access: read`-Aktionen aus und beachtet `remote-access` sowie das Freigabeprotokoll (`test-environments`).“
 
-- [ ] **Step 1: Failing Tests schreiben:**
+- [x] **Step 1: Failing Tests schreiben:**
   ```python
   def test_chapter_documents_distinction_protocol_and_limits():                    # AC-ENV-17
       t = (REPO_ROOT / "docs/guides/features/test-environments.md").read_text(encoding="utf-8")
@@ -984,10 +986,10 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
       t = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("## [2.0.0-beta.5]", 1)[0]
       assert "test-environments" in t
   ```
-- [ ] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_docs.py --basetemp={{PYTEST_BASETEMP}}`.
-- [ ] **Step 3: Dokumente schreiben.** Kapitel deutsch, Beispiele aus Spec §9.1; Platzhalter-Beispiele nur escaped. CHANGELOG unter `[Unreleased]` / `### Added`: `test-environments` (Schema, Validator, Block, 6 Templates + 7 Overrides, Admin-UI, Manager 1.27.0, Szenarien 88-90). Beispiel-Config: kommentierter Block mit Namensabgrenzung zwischen den Markern.
-- [ ] **Step 4: Run, erwartet PASS.** Wie Step 2; `python3 scripts/sync.py --validate`.
-- [ ] **Step 5: Commit.** `git add docs/guides/features/test-environments.md howto/configs/project.yaml.example CHANGELOG.md docs/RELEASE_GATES.md tests/test_test_environments_docs.py` und `git commit -m "docs: document test environments and approval protocol"`.
+- [x] **Step 2: Run, erwartet FAIL.** `python3 -m pytest tests/test_test_environments_docs.py --basetemp={{PYTEST_BASETEMP}}`.
+- [x] **Step 3: Dokumente schreiben.** Kapitel deutsch, Beispiele aus Spec §9.1; Platzhalter-Beispiele nur escaped. CHANGELOG unter `[Unreleased]` / `### Added`: `test-environments` (Schema, Validator, Block, 6 Templates + 7 Overrides, Admin-UI, Manager 1.27.0, Szenarien 88-90). Beispiel-Config: kommentierter Block mit Namensabgrenzung zwischen den Markern.
+- [x] **Step 4: Run, erwartet PASS.** Wie Step 2; `python3 scripts/sync.py --validate`.
+- [x] **Step 5: Commit.** `git add docs/guides/features/test-environments.md howto/configs/project.yaml.example CHANGELOG.md docs/RELEASE_GATES.md tests/test_test_environments_docs.py` und `git commit -m "docs: document test environments and approval protocol"`.
 
 ---
 
@@ -1003,12 +1005,12 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: konsistente Baselines nach den Version-Bumps der sechs Templates und der Manager-Änderung. Consumes: `render_matrix_hashes`, `_hash_file` aus `tests/test_ac01_render_identity.py`; dokumentiertes Rebaseline-Verfahren (Docstring ab Zeile 48 von `tests/test_template_slimming_equivalence.py`, AC-01-Log).
 
-- [ ] **Step 1: Drift messen (Rot-Lauf).** `python3 -m pytest tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py tests/test_opencode_v2_surface.py --basetemp={{PYTEST_BASETEMP}}` => FAIL. Erwartete Drift-Menge: ausschließlich die Agent-Artefakte der sechs Rollen (nur `version:`-Zeile) und `agent-meta-manager` je Provider plus die zugehörigen `generated-file-hashes.json`-Pfadmengen; dazu das Manager-Golden und die Fixture-Digests. Jede weitere Datei in der Drift ist ein Befund und blockiert den Rebaseline.
-- [ ] **Step 2: Nur-Version-Beweis.** `python3 -m pytest tests/test_test_environments_render.py::test_unset_render_matches_baseline --basetemp={{PYTEST_BASETEMP}}` => PASS (die sechs Rollen unterscheiden sich unkonfiguriert nur in `version`/`based-on`).
-- [ ] **Step 3: AC-01-Manifest pro Eintrag patchen** (Präzedenz im Log: nicht per `--write`, sondern geänderte Einträge einzeln, Digests unabhängig mit `_hash_file` aus den gerenderten Bytes neu berechnet; Scratch-Verzeichnis unter `{{PYTEST_BASETEMP}}`). Log-Eintrag im Docstring: „Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): sechs Rollen-Templates minor-gebumpt (tester 2.9.0, e2e-tester 1.7.0, developer 4.9.0, docker 1.10.0, devops-engineer 1.8.0, test-executor 1.3.0), Gate-Block unkonfiguriert byte-neutral; `agent-meta-manager` 1.27.0 (Rezept). Geändert: N von M Hashes, 0 added/removed; `AC01_EXCEPTIONS` NOT extended.“ (N/M aus der Messung einsetzen).
-- [ ] **Step 4: Digests und Golden.** `tests/test_opencode_v2_surface.py`: den Fixture-Tree-Digest des `ac01-baseline` (Test um :2491, Wert aus der Fehlermeldung des Rot-Laufs, aus den Fixture-Bytes neu berechnet) ersetzen und den Kommentarblock ab :5246 um einen Satz ergänzen; `slimming-golden/agent-meta-manager.md` gemäß dokumentiertem Verfahren neu erzeugen (Diff vorher zeilenweise prüfen: nur Rezeptabschnitt, §3-Zeile, Version), Log in `test_template_slimming_equivalence.py` ergänzen. Die Goldens von `developer`, `tester`, `docker`, `devops-engineer`, `e2e-tester` und `test-executor` müssen unverändert bleiben — ändert sich eines, ist das Gate nicht byte-neutral (zurück zu Task 8).
-- [ ] **Step 5: Run, erwartet PASS.** Wie Step 1 (grün) und `python3 -m pytest tests/test_test_environments_render.py --basetemp={{PYTEST_BASETEMP}}`.
-- [ ] **Step 6: Commit.** `git add tests/fixtures/ac01-baseline/hashes.json tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py tests/fixtures/slimming-golden/agent-meta-manager.md tests/test_template_slimming_equivalence.py` und `git commit -m "test: rebaseline ac01 manifest and goldens for test environments"`.
+- [x] **Step 1: Drift messen (Rot-Lauf).** `python3 -m pytest tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py tests/test_opencode_v2_surface.py --basetemp={{PYTEST_BASETEMP}}` => FAIL. Erwartete Drift-Menge: ausschließlich die Agent-Artefakte der sechs Rollen (nur `version:`-Zeile) und `agent-meta-manager` je Provider plus die zugehörigen `generated-file-hashes.json`-Pfadmengen; dazu das Manager-Golden und die Fixture-Digests. Jede weitere Datei in der Drift ist ein Befund und blockiert den Rebaseline.
+- [x] **Step 2: Nur-Version-Beweis.** `python3 -m pytest tests/test_test_environments_render.py::test_unset_render_matches_baseline --basetemp={{PYTEST_BASETEMP}}` => PASS (die sechs Rollen unterscheiden sich unkonfiguriert nur in `version`/`based-on`).
+- [x] **Step 3: AC-01-Manifest pro Eintrag patchen** (Präzedenz im Log: nicht per `--write`, sondern geänderte Einträge einzeln, Digests unabhängig mit `_hash_file` aus den gerenderten Bytes neu berechnet; Scratch-Verzeichnis unter `{{PYTEST_BASETEMP}}`). Log-Eintrag im Docstring: „Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): sechs Rollen-Templates minor-gebumpt (tester 2.9.0, e2e-tester 1.7.0, developer 4.9.0, docker 1.10.0, devops-engineer 1.8.0, test-executor 1.3.0), Gate-Block unkonfiguriert byte-neutral; `agent-meta-manager` 1.27.0 (Rezept). Geändert: N von M Hashes, 0 added/removed; `AC01_EXCEPTIONS` NOT extended.“ (N/M aus der Messung einsetzen).
+- [x] **Step 4: Digests und Golden.** `tests/test_opencode_v2_surface.py`: den Fixture-Tree-Digest des `ac01-baseline` (Test um :2491, Wert aus der Fehlermeldung des Rot-Laufs, aus den Fixture-Bytes neu berechnet) ersetzen und den Kommentarblock ab :5246 um einen Satz ergänzen; `slimming-golden/agent-meta-manager.md` gemäß dokumentiertem Verfahren neu erzeugen (Diff vorher zeilenweise prüfen: nur Rezeptabschnitt, §3-Zeile, Version), Log in `test_template_slimming_equivalence.py` ergänzen. Die Goldens von `developer`, `tester`, `docker`, `devops-engineer`, `e2e-tester` und `test-executor` müssen unverändert bleiben — ändert sich eines, ist das Gate nicht byte-neutral (zurück zu Task 8).
+- [x] **Step 5: Run, erwartet PASS.** Wie Step 1 (grün) und `python3 -m pytest tests/test_test_environments_render.py --basetemp={{PYTEST_BASETEMP}}`.
+- [x] **Step 6: Commit.** `git add tests/fixtures/ac01-baseline/hashes.json tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py tests/fixtures/slimming-golden/agent-meta-manager.md tests/test_template_slimming_equivalence.py` und `git commit -m "test: rebaseline ac01 manifest and goldens for test environments"`.
 
 ---
 
@@ -1021,11 +1023,11 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Consumes: alle vorigen Tasks. Produces: regenerierte Repo-Artefakte (Change Checklist: „1-generic/<role>.md -> sync affected projects“).
 
-- [ ] **Step 1: Stand prüfen.** `git status --short` — die bereits vor dem Plan modifizierten Hash-Dateien (`.meta-config/context-hashes.json`, `.meta-config/generated-file-hashes.json`) sind erwartet; sonst nichts Unbekanntes.
-- [ ] **Step 2: Sync.** `python3 scripts/sync.py` (echt), danach `python3 scripts/sync.py --validate`; `git status --short` listet nur Artefakte der geänderten Rollen (`developer`, `tester`, `e2e-tester`, `docker`, `devops-engineer`, `test-executor`, `agent-meta-manager`, ggf. `agent-meta-developer`) und die Hash-Dateien.
-- [ ] **Step 3: Gesamtlauf.** `python3 -m pytest tests/ --basetemp={{PYTEST_BASETEMP}}` und `tests/scenarios/run.sh` => grün (keine neuen Fehlschläge gegenüber `main`).
-- [ ] **Step 4: Secret-Scan** der zu committenden Dateien (Projekt-Scan vor jedem Commit); Fund blockiert den Commit.
-- [ ] **Step 5: Commit.** `git add <die in Step 2 gelisteten Pfade>` und `git commit -m "chore: regenerate synced artifacts for test environments"`.
+- [x] **Step 1: Stand prüfen.** `git status --short` — die bereits vor dem Plan modifizierten Hash-Dateien (`.meta-config/context-hashes.json`, `.meta-config/generated-file-hashes.json`) sind erwartet; sonst nichts Unbekanntes.
+- [x] **Step 2: Sync.** `python3 scripts/sync.py` (echt), danach `python3 scripts/sync.py --validate`; `git status --short` listet nur Artefakte der geänderten Rollen (`developer`, `tester`, `e2e-tester`, `docker`, `devops-engineer`, `test-executor`, `agent-meta-manager`, ggf. `agent-meta-developer`) und die Hash-Dateien.
+- [x] **Step 3: Gesamtlauf.** `python3 -m pytest tests/ --basetemp={{PYTEST_BASETEMP}}` und `tests/scenarios/run.sh` => grün (keine neuen Fehlschläge gegenüber `main`).
+- [x] **Step 4: Secret-Scan** der zu committenden Dateien (Projekt-Scan vor jedem Commit); Fund blockiert den Commit.
+- [x] **Step 5: Commit.** `git add <die in Step 2 gelisteten Pfade>` und `git commit -m "chore: regenerate synced artifacts for test environments"`.
 
 ---
 
@@ -1038,11 +1040,11 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Produces: Review-Bericht mit Befundliste. Consumes: `git diff main...HEAD`, Spec, dieser Plan.
 
-- [ ] **Step 1: Unveränderlichkeits-Check.** `git diff --stat main...HEAD -- scripts/lib/env.py scripts/lib/mcp.py scripts/lib/hooks.py config/provider-capabilities.yaml scripts/lib/platform.py` ist leer (NZ2, NZ8, NZ9); `settings.json`-Änderungen im Diff nur als Folge des regulären Syncs, nie feature-bedingt (Szenario 89 deckt das ab).
-- [ ] **Step 2: Constraint-Check.** `scripts/lib/test_environments.py` <= 600 Zeilen und ohne `provider ==` (Test aus Task 3 grün); `config.py` wächst nur um Import + zwei Aufrufzeilen; Python-3.9-Syntax (kein `X | Y` zur Laufzeit) per `python3 -m pytest tests/test_test_environments_lib.py::test_module_budget_and_constraints --basetemp={{PYTEST_BASETEMP}}`.
-- [ ] **Step 3: Spec-Coverage-Check.** Jede Zeile der Tabelle „Spec Coverage“ unten gegen die genannten Tests prüfen; jede Review-Focus-Zeile RF1-RF5 hat ihren Test im genannten Task.
-- [ ] **Step 4: Sicherheits-Check.** Grep im Diff nach Token-ähnlichen Literalen, `type: "password"` in `docs/ui/admin-ui.html` (soll 0 Treffer in der neuen View haben), Klartext-URLs mit Userinfo; Freigabe-Texte sagen nirgends „Sperre“ ohne „prompt convention“ (AZ3).
-- [ ] **Step 5: Bericht.** Befunde mit Datei:Zeile, Schweregrad und Zuordnung zum Task; ohne Befund „keine offenen Befunde“. Befunde werden vor Task 18 durch die Rolle `developer` über den Orchestrator behoben und mit Conventional Commit nachgezogen.
+- [x] **Step 1: Unveränderlichkeits-Check.** `git diff --stat main...HEAD -- scripts/lib/env.py scripts/lib/mcp.py scripts/lib/hooks.py config/provider-capabilities.yaml scripts/lib/platform.py` ist leer (NZ2, NZ8, NZ9); `settings.json`-Änderungen im Diff nur als Folge des regulären Syncs, nie feature-bedingt (Szenario 89 deckt das ab).
+- [x] **Step 2: Constraint-Check.** `scripts/lib/test_environments.py` <= 600 Zeilen und ohne `provider ==` (Test aus Task 3 grün); `config.py` wächst nur um Import + zwei Aufrufzeilen; Python-3.9-Syntax (kein `X | Y` zur Laufzeit) per `python3 -m pytest tests/test_test_environments_lib.py::test_module_budget_and_constraints --basetemp={{PYTEST_BASETEMP}}`.
+- [x] **Step 3: Spec-Coverage-Check.** Jede Zeile der Tabelle „Spec Coverage“ unten gegen die genannten Tests prüfen; jede Review-Focus-Zeile RF1-RF5 hat ihren Test im genannten Task.
+- [x] **Step 4: Sicherheits-Check.** Grep im Diff nach Token-ähnlichen Literalen, `type: "password"` in `docs/ui/admin-ui.html` (soll 0 Treffer in der neuen View haben), Klartext-URLs mit Userinfo; Freigabe-Texte sagen nirgends „Sperre“ ohne „prompt convention“ (AZ3).
+- [x] **Step 5: Bericht.** Befunde mit Datei:Zeile, Schweregrad und Zuordnung zum Task; ohne Befund „keine offenen Befunde“. Befunde werden vor Task 18 durch die Rolle `developer` über den Orchestrator behoben und mit Conventional Commit nachgezogen.
 
 ---
 
@@ -1055,9 +1057,9 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 
 **Interfaces:** Consumes: Review-Bericht (Task 17). Produces: gepushter Branch und Draft-PR gegen `main`.
 
-- [ ] **Step 1: Historie prüfen.** `git log --oneline main..HEAD` zeigt die Commits der Tasks 1-16 (Conventional Commits, Subject <= 72 Zeichen, kein BOM); `git status --short` sauber.
-- [ ] **Step 2: PR-Text.** `.tmp/pr-test-environments.md`: Zusammenfassung (Feature, Opt-in, byte-identisch ohne Block), Liste der geänderten Bereiche, Test-Nachweise (`pytest tests/`, `tests/scenarios/run.sh`, `--validate`), Hinweise (Reihenfolge nach Plan 1, Manager 1.27.0, kein `permissions`-Mechanismus/F6, Folge-Optionen F1-F7), Abweichungsliste dieses Plans.
-- [ ] **Step 3: Push und Draft-PR.** `git push -u origin feat/test-environments`; `/home/hermes/.local/bin/gh pr create --draft --base main --title "feat: add test environments with remote approval protocol" --body-file .tmp/pr-test-environments.md` (gh liegt nicht im `$PATH`). Kein Merge, kein Tag.
+- [x] **Step 1: Historie prüfen.** `git log --oneline main..HEAD` zeigt die Commits der Tasks 1-16 (Conventional Commits, Subject <= 72 Zeichen, kein BOM); `git status --short` sauber.
+- [x] **Step 2: PR-Text.** `.tmp/pr-test-environments.md`: Zusammenfassung (Feature, Opt-in, byte-identisch ohne Block), Liste der geänderten Bereiche, Test-Nachweise (`pytest tests/`, `tests/scenarios/run.sh`, `--validate`), Hinweise (Reihenfolge nach Plan 1, Manager 1.27.0, kein `permissions`-Mechanismus/F6, Folge-Optionen F1-F7), Abweichungsliste dieses Plans.
+- [x] **Step 3: Push und Draft-PR.** `git push -u origin feat/test-environments`; `/home/hermes/.local/bin/gh pr create --draft --base main --title "feat: add test environments with remote approval protocol" --body-file .tmp/pr-test-environments.md` (gh liegt nicht im `$PATH`). Kein Merge, kein Tag.
 
 ---
 
@@ -1094,3 +1096,53 @@ Consumes: `{{TEST_ENVIRONMENT_BLOCK}}`/`TEST_ENVIRONMENTS_SET` (Task 7), Harness
 - Review Focus: RF1 (Task 3), RF2 (Task 3), RF3 (Task 4), RF4 (Task 3 + 6), RF5 (Task 10) — jeweils mit benanntem Test.
 - Proportion: Tasks 1-18 mit je einem eigenen Testzyklus; Template-/Override-Tasks sind parametrisiert statt pro Datei dupliziert; bekannte, bis Task 15 offene Drift (AC-01, Manager-Golden) ist an den betroffenen Tasks (8, 12) ausdrücklich vermerkt.
 - Offene Annahmen: Plan 1 ist gemergt (Manager 1.26.0, Szenario-IDs, RELEASE_GATES-Struktur); die Nummer des Manager-Rezeptabschnitts und die Szenario-IDs 88-90 werden zur Ausführungszeit gegen den dann aktuellen Stand geprüft; Dateinamen der gerenderten Agenten (`.claude/agents/*<role>.md`) bestätigt die Baseline in Task 1.
+
+---
+
+## Ausführungsnachweis (Ledger)
+
+Alle 19 Tasks (0–18) sind umgesetzt; Task 18 (Draft-PR) folgt unmittelbar nach diesem Commit. Ausführung auf `feat/test-environments`.
+
+### Task → Commit
+
+| Task | Commit | Inhalt |
+|---|---|---|
+| 0 | — | Branch `feat/test-environments` angelegt (kein Commit) |
+| 1 | `760f5108` | Render-Baseline-Harness |
+| 2 | `0a3dab62` | Schema-Key `test-environments` |
+| 3 | `043b24de` | Validator Teil A |
+| 4 | `59c812de` | Validator Teil B (`token-env`) |
+| 5 | `f0f28eae` | Resolver + Fallback-URL |
+| 6 | `e83e266c` | Renderer `render_test_environment_block` |
+| 7 | `abda4400` | Platzhalter-Registrierung |
+| 8 | `6da6f162` | Sechs Basis-Templates + Versionen |
+| 9 | `0af0b918` | Sieben Overrides |
+| 10 | `7f9d6395` | Admin-Server (Whitelist, Guard, PUT) |
+| 11 | `180c6c5b` | Admin-UI-Sektion + Help |
+| 12 | `2fa7e8c8` | Manager-Rezept (1.27.0) |
+| 13 | `e9900c14` | Szenarien 91–93 |
+| 14 | `a544d39a` | Doku, Beispiel-Config, CHANGELOG, RELEASE_GATES |
+| 15 | `e888590e` | Baselines/Goldens neu gepinnt |
+| 16 | `434e019a` | Real-Sync + Gesamtlauf |
+| 17 | Review → Fixes `72be0e53` | Self-Review, 2 blocking + 3 advisories behoben |
+| 18 | — | Draft-PR gegen `main` nach diesem Commit |
+
+### Nachweise
+
+- Validator/Resolver/Render/Consistency: 84+ Tests passed.
+- Render-Baseline: 26/24 (unverändert ohne Block).
+- Admin: 307 passed im kombinierten Lauf.
+- Szenarien: 94/94, inklusive der drei neuen.
+- AC-01 / Opencode / Slimming / Compact: 265 passed; `test-env-baseline` 30 Hashes unverändert.
+- `python3 scripts/sync.py --validate` und `--check`: rc 0.
+- `consistency-check`: PASS.
+- AC-01-Rebaseline: 63 Einträge per Eintrag ohne `--write` nachgezogen.
+
+### Abweichungen
+
+- Szenario-IDs sind **91–93**, nicht die im Plan genannten 88–90: Plan 1 (Release-Checkliste, bereits gemergt) hat 88–90 belegt; die `Abweichungen`-Regel dieses Plans erlaubt die nächsten freien IDs.
+- Task 14 wurde von einem `developer` statt von `documenter` ausgeführt, weil diese Rolle in dieser Runtime keine Shell hat und der Task Verifikation verlangt.
+- Die sechs `slimming-golden`-Dateien änderten sich **nur im Frontmatter** (version/based-on/generated-from), dokumentiert in Diff-Manifest §20 — der Plantext sagte „unverändert“, was nach einem Minor-Bump durch das B2-Gate unmöglich ist.
+- Die sechs Basis-Templates bekamen den Blank-Line-Fix aus Review-Advisory 2 **ohne** zweiten Version-Bump: beide Änderungen erscheinen in derselben noch unveröffentlichten Minor-Version.
+- `tests/test_meta_optimizer_role.py` trägt den Manager-Pin 1.27.0 (nicht in den Dateilisten des Plans, aber von der Version-Bump-Konvention verlangt).
+- Das Review fand 2 blocking Robustheitsdefekte (malformed-URL-`ValueError`-Crash; ungeschütztes `DELETE /api/environments`, das eine `token-env`-Referenz bricht), die kein Plan-Schritt vorwegnahm — beide mit Regressionstests in `72be0e53` behoben.
