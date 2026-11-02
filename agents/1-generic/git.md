@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.1.1"
+version: "2.1.2"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern

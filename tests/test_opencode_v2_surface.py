@@ -5352,9 +5352,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # (the `git` agent render of every provider); `slimming-golden` re-pinned for the
 # `git.md` version pin (2.1.0 -> 2.1.1, frontmatter only); `compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1093 residual (blank/non-string remote URL): `ac01-baseline` re-pinned — 9
+# hashes (the `git` agent render of every provider); `slimming-golden` re-pinned for
+# the `git.md` version pin (2.1.1 -> 2.1.2, frontmatter only); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "5232fe625fbcc61b08a082cc94abe113b306ceb77003f3afd8d14034a33b6abb",
-    "slimming-golden": "3bd5c31cf265884271b4505c1c2564d15b68802d1bf18395ca31c261c8079f14",
+    "ac01-baseline": "74290aada8345c25dc4d93b86af464bb42cab3bde05df0cef7856c8159406c3e",
+    "slimming-golden": "8857b666c88425b724989049d0dcf841dcf5a089b4a0e364fb07eea38d3ee74a",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 
