@@ -5336,8 +5336,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # × 9 providers); `slimming-golden` re-derived for the manager recipe and
 # re-pinned for the six role version pins (manifest §20); `compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issues #1078/#1041 (hook fixes: `lib/hook_common.sh` 1.8.0,
+# `dod-push-check.sh` 2.3.0): `ac01-baseline` re-pinned — 3 hashes (the two
+# `hook_common.sh` renders plus the only `dod-push-check.sh` render);
+# `slimming-golden`/`compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "ea59522c625bd8cf41a46a2b0ac3967ef500f728c6a74ae4d0363ab7c7685e64",
+    "ac01-baseline": "647b75a4f137fd6917c30cbf278e70d3ca03f6c91dfdc86400ace5ffee6a002d",
     "slimming-golden": "a9990f4cc4cac4a54d2b4d9ac326f45a9adfa073eb87f71a6bd40fa8034c8de5",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
