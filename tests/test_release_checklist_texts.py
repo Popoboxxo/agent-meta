@@ -36,7 +36,7 @@ def test_commands_documented():
 
 def test_manager_recipe():                                                  # AC-REL-16
     t = (REPO_ROOT / "agents/1-generic/agent-meta-manager.md").read_text(encoding="utf-8")
-    assert 'version: "1.26.0"' in t and "### 14d." in t and "release-checklist" in t
+    assert 'version: "1.27.0"' in t and "### 14d." in t and "release-checklist" in t
     sec3 = t.split("## 3. Confirmation required", 1)[1].split("## 4.", 1)[0]
     assert "release-checklist.mode" in sec3 and "strict" in sec3
     assert "gates stay hard in every mode" in t.lower()

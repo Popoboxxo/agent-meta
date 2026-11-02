@@ -1,0 +1,47 @@
+agent-meta-version: "2.0.0-beta.6"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms:
+- homeassistant
+roles:
+- tester
+- e2e-tester
+- developer
+- docker
+- devops-engineer
+- test-executor
+project:
+  name: scenario-test-env-remote-ask
+  prefix: s92
+  short: test-env-remote-ask
+  description: A remote HA dev target with remote-access ask renders the approval protocol and only references the secret env var by name (SPEC-TEST-ENVIRONMENTS-2026-10-31, AC-ENV-16).
+# AC-ENV-6/8/16: token-env names an environments entry with secret: true; the
+# value itself never lives in project.yaml and only reaches env.sh masked.
+environments:
+  HA_DEV_TOKEN:
+    description: Long-lived access token of the HA dev server
+    secret: true
+test-environments:
+  ha-dev:
+    kind: both
+    url: "http://ha-dev.lan:8123"
+    token-env: HA_DEV_TOKEN
+    access: deploy
+    remote-access: ask
+    notes: "Integration erst lokal testen, dann auf den Dev-Server."
+variables:
+  PROJECT_GOAL: Verify a remote target with remote-access ask renders the approval protocol and the secret reference.
+  PROJECT_LANGUAGES: Python
+  DOCS_LANGUAGE: Englisch
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-test-env-remote-ask
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

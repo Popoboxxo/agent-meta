@@ -63,6 +63,32 @@
   `repo_containment` guard (ADR-3); all 66 hook-subprocess sites pass `timeout=`; and
   the new static guard `tests/test_hook_test_isolation.py` enforces `cwd=`/`timeout=`
   through an AST scan.
+- **Test environments (`test-environments`, #1089)**: new optional project block that
+  declares local/remote test targets with `kind` (`local|remote|both`), optional `url`,
+  `token-env`, `access` (`read|deploy`) and `remote-access` (`deny|ask|allow`, default
+  `ask`). The block is distinct from `environments:` (env-var definitions): `token-env`
+  only names an `environments:` entry with `secret: true`, never a value.
+- **Validator, resolver and renderer (`scripts/lib/test_environments.py`, #1089)**: hard
+  config-load validation (names, enums, quoted values, unknown keys, URL userinfo, token
+  reference) plus a non-exiting collector for the admin server; the resolver applies the
+  documented defaults and the restricted platform fallback URL (`dev_instance_url` before
+  `ha_url`, project layer only). The rendered block and the `TEST_ENVIRONMENTS_SET` gate
+  are registered in `config.py`, the placeholder set, the `standalone.py` fallbacks and
+  the sync-concept table; unconfigured projects stay byte-identical.
+- **Six base templates and seven overrides (#1089)**: `tester`, `e2e-tester`, `developer`,
+  `docker`, `devops-engineer` and `test-executor` render the block after `</constraints>`
+  behind the gate; all platform overrides adopt the new base version and the standalone
+  `sharkord-docker` carries the block manually. Remote approval is documented as a prompt
+  convention (`APPROVAL_REQUEST`/`APPROVED`), not a `permissions` mechanism (follow-up F6).
+- **Admin server, Admin UI and manager recipe (#1089)**: `"test-environments"` joins
+  `PROJECT_WRITABLE_SECTIONS`, a new section guard rejects invalid payloads (including a
+  broken `token-env` reference) with HTTP 400 without writing; the UI section and
+  `agent-meta-manager` 1.27.0 write the same fragment and never accept a secret value.
+  Scenarios 91-93 cover local, remote-ask and unconfigured projects.
+- **Documentation (#1089)**: new guide `docs/guides/features/test-environments.md`, a
+  commented example block in `howto/configs/project.yaml.example`, and the AC-ENV-19
+  sentence in `docs/RELEASE_GATES.md` (a dry-check against a test environment only runs
+  `access: read` actions).
 
 ### Fixed
 - **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:

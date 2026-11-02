@@ -1643,6 +1643,7 @@ function buildSidebar() {
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
+        { route: "/project/test-environments", label: "Test Environments", icon: "🧪" },
         { route: "/project/plugins", label: "Verfügbare Plugins", icon: "🧭" },
         { route: "/project/plugin-overrides", label: "Plugin Overrides", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
@@ -8879,6 +8880,7 @@ async function viewProjectEnvironments() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Define environment variables that sync generates as platform scripts (.ps1/.sh). ",
     "Set defaults, mark as required, or flag secrets for masking in logs.",
+    "Test targets are configured under Test Environments; `token-env` there must reference a variable here with Secret enabled.",
   ]));
 
   const data = await loadProject();
@@ -9034,6 +9036,167 @@ async function viewProjectEnvironments() {
     } catch (err) {
       toast(`Failed to load scripts: ${err.message}`, "error");
     }
+  }
+
+  render();
+  return wrap;
+}
+
+/* ------------------------------ Test Environments ------------------------ */
+async function viewProjectTestEnvironments() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Test Environments"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Test targets for this project (local, remote or both). ",
+    "Not to be confused with Environment Variables: this section holds no values. ",
+    "A token-env entry only names a variable defined under Environment Variables with Secret enabled; ",
+    "the value itself comes from the shell or `source .meta-config/env.sh` — never enter it here.",
+  ]));
+
+  const data = await loadProject();
+  const block = (data["test-environments"] && typeof data["test-environments"] === "object")
+    ? data["test-environments"] : {};
+
+  const statusEl = el("span");
+  const topBar = el("div", { style: "display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center;" });
+  topBar.appendChild(el("button", { class: "btn", onclick: () => openTestEnvModal(null) }, ["+ Add Target"]));
+  topBar.appendChild(statusEl);
+  wrap.appendChild(topBar);
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  function render() {
+    tableWrap.replaceChildren();
+    const names = Object.keys(block).sort();
+    if (!names.length) {
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No test environments configured. Click '+ Add Target' to start."]));
+      return;
+    }
+    const table = el("table", { class: "data" });
+    const th = (t) => el("th", {}, [t]);
+    table.appendChild(el("thead", {}, [el("tr", {}, [
+      th("Name"), th("kind"), th("URL"), th("access"), th("remote-access"),
+      th("token-env"), th("notes"), th(""),
+    ])]));
+    const tbody = el("tbody");
+    for (const name of names) {
+      const cfg = block[name] || {};
+      const tr = el("tr", { style: "cursor:pointer;", onclick: () => openTestEnvModal(name) });
+      const editBtn = el("button", {
+        type: "button", class: "btn btn-sm", "aria-label": `Edit ${name}`,
+        style: "margin-right:var(--space-2);",
+        onclick: (ev) => { ev.stopPropagation(); openTestEnvModal(name); },
+      }, ["✎"]);
+      tr.appendChild(el("td", {}, [editBtn, el("code", {}, [name])]));
+      tr.appendChild(el("td", {}, [cfg["kind"] || "local"]));
+      tr.appendChild(el("td", { class: "mono" }, [cfg["url"] || "—"]));
+      tr.appendChild(el("td", {}, [cfg["access"] || "read"]));
+      tr.appendChild(el("td", {}, [cfg["remote-access"] || "ask"]));
+      tr.appendChild(el("td", { class: "mono" }, [cfg["token-env"] || "—"]));
+      tr.appendChild(el("td", {}, [cfg["notes"] || "—"]));
+      const delCell = el("td");
+      delCell.appendChild(el("button", {
+        class: "btn btn-sm btn-danger",
+        onclick: (ev) => { ev.stopPropagation(); deleteTestEnv(name); },
+      }, ["×"]));
+      tr.appendChild(delCell);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    statusEl.textContent = `${names.length} target(s).`;
+  }
+
+  function deleteTestEnv(name) {
+    confirmDestructive(`Delete test environment "${name}"?`, async () => {
+      delete block[name];
+      await saveProjectSection("test-environments", block, statusEl);
+      render();
+    });
+  }
+
+  function openTestEnvModal(name) {
+    const isNew = name == null;
+    const cfg = isNew ? {} : (clone(block[name]) || {});
+    const TOKEN_ENV_RE = /^[A-Z][A-Z0-9_]*$/;
+    const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+    let kind = cfg["kind"] || "local";
+    let access = cfg["access"] || "read";
+    let remoteAccess = cfg["remote-access"] || "ask";
+
+    const nameInput = el("input", { type: "text", placeholder: "ha-dev", value: isNew ? "" : name, class: "field" });
+    const urlInput = el("input", { type: "text", placeholder: "http://ha-dev.lan:8123", value: cfg["url"] || "", class: "field" });
+    const tokenInput = el("input", { type: "text", placeholder: "HA_DEV_TOKEN", value: cfg["token-env"] || "", class: "field" });
+    const notesInput = el("input", { type: "text", placeholder: "Integration erst lokal, dann remote.", value: cfg["notes"] || "", class: "field" });
+    const kindSel = selectField(["local", "remote", "both"], kind, (v) => { kind = v; });
+    const accessSel = selectField(["read", "deploy"], access, (v) => { access = v; });
+    const remoteSel = selectField(["deny", "ask", "allow"], remoteAccess, (v) => { remoteAccess = v; });
+
+    const field = (labelText, control, hint) => {
+      const box = el("div", { style: "display:flex;flex-direction:column;gap:var(--space-1);" });
+      box.appendChild(el("label", { style: "font-weight:600;" }, [labelText]));
+      box.appendChild(control);
+      if (hint) box.appendChild(el("span", { class: "muted", style: "font-size:0.85em;" }, [hint]));
+      return box;
+    };
+
+    const body = el("div", { style: "display:flex;flex-direction:column;gap:var(--space-3);" });
+    body.appendChild(field("Name", nameInput, "Lowercase, digits and hyphens (^[a-z0-9][a-z0-9-]*$)"));
+    body.appendChild(field("kind", kindSel, "local = dev stack only, remote = remote target, both = local first then remote"));
+    body.appendChild(field("URL", urlInput, "Optional; may fall back to the platform URL"));
+    body.appendChild(field("token-env", tokenInput, "Name of an Environment Variables entry with Secret enabled; the value comes from the shell or `source .meta-config/env.sh` — nie hier eintragen (never enter the value here)"));
+    body.appendChild(field("access", accessSel, "read = query only, deploy = may change the remote target"));
+    body.appendChild(field("remote-access", remoteSel, "deny = never contact, ask = approval per action, allow = within access level"));
+    body.appendChild(field("notes", notesInput, "Free text, shown in the generated agent block"));
+
+    const isRemoteKind = (k) => k === "remote" || k === "both";
+    const prevKind = cfg["kind"] || "local";
+    const prevAccess = cfg["access"] || "read";
+    const prevRemote = cfg["remote-access"] || "ask";
+
+    async function persist() {
+      const newName = nameInput.value.trim();
+      if (!NAME_RE.test(newName)) { toast("Name must match ^[a-z0-9][a-z0-9-]*$", "error"); return; }
+      const oldName = isNew ? null : name;
+      if (newName !== oldName && Object.prototype.hasOwnProperty.call(block, newName)) {
+        toast(`Test environment "${newName}" already exists.`, "error");
+        return;
+      }
+      const token = tokenInput.value.trim();
+      if (token && !TOKEN_ENV_RE.test(token)) {
+        toast("token-env must be the NAME of a variable (^[A-Z][A-Z0-9_]*$), never a value", "error");
+        return;
+      }
+      const entry = { kind, access, "remote-access": remoteAccess };
+      if (urlInput.value.trim()) entry["url"] = urlInput.value.trim();
+      if (token) entry["token-env"] = token;
+      if (notesInput.value.trim()) entry["notes"] = notesInput.value.trim();
+      if (oldName && oldName !== newName) delete block[oldName];
+      block[newName] = entry;
+      await saveProjectSection("test-environments", block, statusEl);
+      hideModal();
+      render();
+    }
+
+    const activatesRemote = (isRemoteKind(kind) && !isRemoteKind(prevKind))
+      || (access === "deploy" && prevAccess !== "deploy")
+      || (remoteAccess === "allow" && prevRemote !== "allow");
+
+    const saveBtn = el("button", { class: "btn btn-primary", onclick: () => {
+      if (activatesRemote) {
+        confirmDestructive(
+          "This enables remote access for the test environment. Agents may then contact or deploy to the remote target.",
+          persist,
+          { title: "Confirm remote access", confirmLabel: "Enable" });
+      } else {
+        persist();
+      }
+    } }, ["Save"]);
+
+    showModal(isNew ? "Add Test Environment" : `Edit: ${name}`, body,
+      [saveBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]);
   }
 
   render();
@@ -11111,6 +11274,7 @@ async function init() {
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/conventions-overrides", viewProjectConventionsOverrides);
   router.register("/project/environments",   viewProjectEnvironments);
+  router.register("/project/test-environments", viewProjectTestEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
   router.register("/project/gitignore",       viewProjectGitignore);
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
@@ -11216,6 +11380,7 @@ init();
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",
     "project/release-checklist": "project_instance-release_checklist",
+    "project/test-environments": "project_instance-test_environments",
 
     "project/viz-admin": "project_instance-viz_admin",
     "project/model-overrides": "project_instance-model_overrides",

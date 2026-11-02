@@ -1,6 +1,6 @@
 ---
 name: template-test-executor
-version: "1.2.2"
+version: "1.3.0"
 description: "Lightweight execution of existing test suites — pass/fail counts, exit codes, stdout excerpts. Test design stays with tester."
 hint: "Run existing test suites and report structured results — no test design, no code changes"
 prompt_mode: modern
@@ -123,3 +123,8 @@ STATUS/RESULT/ARTIFACTS are mandatory on every completion — even on green runs
 
 **Language:** findings and excerpts → {{CODE_LANGUAGE}}.
 </constraints>
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+
+Read-only: run existing suites against environments only as the rules above allow; never deploy.
+{{/if}}

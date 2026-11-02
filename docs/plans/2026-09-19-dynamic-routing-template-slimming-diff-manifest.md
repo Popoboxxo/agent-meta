@@ -1996,3 +1996,45 @@ Rollen-Inhalte.
 `pytest tests/test_standalone_export_in_sync.py tests/test_context_budgets.py -q` → **13 passed**,
 rc `0`; `scripts/sync.py --validate` rc `0`; `scripts/sync.py --render-standalone --check` rc `0`;
 `scripts/sync.py --check` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`.
+
+---
+
+## 20. Re-Baseline der Golden-Baseline für 7 Rollen (Test Environments, SPEC-TEST-ENVIRONMENTS-2026-10-31)
+
+> **Anlass:** Die Test-Environments-Feature (`feat/test-environments`, Plan
+> `docs/plans/2026-10-31-test-environments-plan.md`, Task 15) hebt sechs Rollen-Templates
+> minor (`tester` 2.9.0, `e2e-tester` 1.7.0, `developer` 4.9.0, `docker` 1.10.0,
+> `devops-engineer` 1.8.0, `test-executor` 1.3.0) und `agent-meta-manager` auf `1.27.0`
+> (Rezept „Test environments“ plus §3-Zeile). Das Gate meldet die Drift als „diff not
+> attributable to declared normalizations“.
+
+**Geändert (7 Fixtures):** `agent-meta-manager.md` (+46/−2: Frontmatter-Version,
+`generated-from`-Pin, eine §3-Tabellenzeile und der neue Abschnitt 18) sowie die sechs
+Rollen-Goldens `developer.md` (+3/−3), `tester.md`, `docker.md`, `devops-engineer.md`,
+`e2e-tester.md`, `test-executor.md` (je +2/−2: **nur** Frontmatter-`version:` und
+`generated-from:`; bei `developer` zusätzlich `based-on:`). Die übrigen 51 Goldens bleiben
+unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58.
+
+**Ursache:** Feature-Drift der Rollen-Templates, kein migrierter Block. Bei den sechs
+Rollen ist der Rot-Lauf ausschließlich die Frontmatter-Pins — die gerenderten Bodies sind
+byte-identisch, weil der Gate-Block ohne `test-environments`-Konfiguration nicht rendert
+(belegt durch `test_unset_render_matches_baseline`, dessen Baseline
+`tests/fixtures/test-env-baseline/hashes.json` unverändert bleibt). `_NORMALIZATIONS`,
+`_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht
+betroffen.
+
+**Herkunft:** `agent-meta-manager.md` wurde über den echten Sync-Pfad erzeugt
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`)
+und mit den dokumentierten inversen Ports eingefroren (Meta-Tokens `2.0.0-beta.6`/`2026-10-31`
+→ `1.2.0-beta.2`/`2026-09-13`, `{{AUTO_COMMIT_BLOCK}}`-Tail entfernt); der Diff gegen das
+vorherige Golden wurde zeilenweise geprüft (nur Version, §3-Zeile, Abschnitt 18). Die sechs
+Rollen-Goldens wurden **frontmatter-only** neu gepinnt — der Rot-Lauf wies genau die
+`version:`/`based-on:`/`generated-from:`-Zeilen aus, alles andere blieb byte-identisch. Die
+`model:`-Pins bleiben auf ihren eingefrorenen Werten (`_GOLDEN_MODEL_MAP`), `compact-golden`
+wurde nicht angefasst.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py
+tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → **265 passed**,
+rc `0` (5 AC-01, 130 Opencode, 9 Slimming, 121 Compact); `scripts/sync.py --validate` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 63 von 1099 Hashes
+geändert, 0 added/removed, per Entry gepatcht (kein `--write`).

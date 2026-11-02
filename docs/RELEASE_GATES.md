@@ -635,8 +635,7 @@ kein Datei- oder CHANGELOG-Edit, kein Commit, kein Tag, kein Push, kein `gh rele
 Dry-Check erzeugt nie eine `APPROVAL_REQUEST`. Der Befehl funktioniert auch bei `mode: "off"`
 (dann mit dem Default-Umfang und ohne Projekt-Items).
 
-Ein Dry-Check gegen eine Test-Umgebung führt nur Aktionen mit `access: read` aus (Anforderung aus
-Spec 2, AC-ENV-19).
+Ein Dry-Check (`MODE: check-only`) gegen eine Test-Umgebung führt ausschließlich `access: read`-Aktionen aus und beachtet `remote-access` sowie das Freigabeprotokoll (`test-environments`).
 
 ### Generierte Artefakte
 

@@ -5331,9 +5331,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `ac01-baseline` re-pinned — 7 hashes (the command render of the seven
 # command-writing providers); `slimming-golden`/`compact-golden` unchanged.
 # Log: `tests/test_ac01_render_identity.py`.
+# Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): `ac01-baseline`
+# re-pinned — 63 hashes (the six bumped base roles plus `agent-meta-manager`
+# × 9 providers); `slimming-golden` re-derived for the manager recipe and
+# re-pinned for the six role version pins (manifest §20); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "f74d3088b8d21af420125eca1483dfec42d4c04e52d496edac397ed4747ecafd",
-    "slimming-golden": "5cbe9ea49ae39c406dcc816860c2c6eeaa3f48841eb9ec8358eb7c5a9cae7413",
+    "ac01-baseline": "ea59522c625bd8cf41a46a2b0ac3967ef500f728c6a74ae4d0363ab7c7685e64",
+    "slimming-golden": "a9990f4cc4cac4a54d2b4d9ac326f45a9adfa073eb87f71a6bd40fa8034c8de5",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 

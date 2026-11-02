@@ -162,6 +162,22 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   In the same step the ``accessibility-specialist`` golden is rebaselined for the
   missing blank line before ``**Gate:**`` (template ``0.6.0 -> 0.6.1``: one blank
   line plus the two frontmatter pins). No other golden changed.
+* Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): seven goldens changed,
+  all for the same reason - a role-template version bump, not a migrated block.
+  ``agent-meta-manager.md`` was **re-derived from the real sync render**
+  (``AGENT_META_TEST_REPO=… sync.py --validate`` plus the documented inverse
+  ports: the frozen meta tokens, the ``{{PYTEST_BASETEMP}}`` token and the
+  stripped ``{{AUTO_COMMIT_BLOCK}}`` tail); its diff against the previous golden
+  is the two frontmatter pins, the new §3 table row and the new
+  ``## 18. Test environments`` recipe (43 lines), reviewed line by line. The six
+  base-role goldens (``developer`` via ``agent-meta-developer``, ``tester``,
+  ``docker``, ``devops-engineer``, ``e2e-tester``, ``test-executor``) were
+  re-pinned **frontmatter only** - the red run's drift was exactly the
+  ``version:``/``based-on:``/``generated-from:`` lines, so the rendered bodies
+  stayed byte-identical (the unset gate block renders nothing). The ``model:``
+  pins stay at their frozen values (ported by ``_GOLDEN_MODEL_MAP``), the
+  declared normalization regions and ``_GOLDEN_ROLE_COUNT`` (58) are unchanged,
+  and ``compact-golden`` was not touched. Diff manifest §20.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

@@ -241,6 +241,9 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "provider-isolation", "environments", "model-source-preference",
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
     "context_file", "context-profile", "plugins", "repo_containment",
+    # Test environments (issue #1089): validated by
+    # _guard_test_environments_write so a bad payload never reaches disk.
+    "test-environments",
     # WP3 (#730): newly exposed project.yaml sections.
     "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
     # Feature: subagent permissions + git repo settings + auto-commit (Admin UI).
@@ -3546,6 +3549,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ValueError as exc:
+            self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except FileNotFoundError as exc:
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
         except ConnectionError:
@@ -3942,6 +3947,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     "context-profile", body.get("context-profile"))
                 self._guard_context_profile_write(
                     "provider-overrides", body.get("provider-overrides"))
+                # RF5: the full-document save must not smuggle in a
+                # test-environments/environments combination that would abort
+                # the next sync — check the merge result before writing.
+                if "test-environments" in body or "environments" in body:
+                    self._guard_test_environments_config(
+                        self._deep_merge(existing, body))
             result = self.__class__.config_manager.write(
                 "project", self._deep_merge(existing, body))
         else:
@@ -5200,6 +5211,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             existing = {}
         self._guard_model_block_write(section, data, existing)
         self._guard_context_profile_write(section, data)
+        self._guard_test_environments_write(section, data, existing)
         data = self._guard_release_checklist_write(section, data)
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write("project", existing))
@@ -5325,6 +5337,45 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise ValueError(
                 "context-profile.invalid: " + ", ".join(invalid)
                 + f" (allowed: {', '.join(VALID_PROFILES)})")
+
+    def _guard_test_environments_config(self, candidate: dict) -> None:
+        """Reject a config that would break the next ``sync.py`` run (RF5).
+
+        ``test-environments`` is a hard config error on the sync side (see
+        ``lib.test_environments.validate_test_environments``). The Admin API
+        runs the same check *before* any disk write so a bad payload yields
+        HTTP 400 instead of being persisted and aborting the next sync.
+        ``None``/``{}`` count as "unconfigured" and pass. The shared entry
+        point is ``collect_test_environment_errors`` — the guard deliberately
+        reuses it rather than duplicating rules.
+        """
+        _ensure_scripts_on_path(self.__class__.root)
+        from lib.test_environments import (  # noqa: PLC0415 - lazy lib import
+            collect_test_environment_errors,
+        )
+
+        errors = collect_test_environment_errors(candidate)
+        if errors:
+            raise ValueError(
+                "invalid test-environments config: " + "; ".join(errors)
+            )
+
+    def _guard_test_environments_write(
+        self, section: str, data: Any, existing: dict
+    ) -> None:
+        """Validate ``test-environments``/``environments`` partial writes (RF5).
+
+        Writes to either section are checked against the *resulting* document,
+        not just the payload: deleting an ``environments`` entry that a
+        surviving ``test-environments.token-env`` still references must fail
+        with HTTP 400, and a ``test-environments: null`` write (delete the
+        section) must pass as "unconfigured". Every other section passes
+        through untouched, so a pre-existing invalid block cannot block
+        unrelated writes.
+        """
+        if section not in ("test-environments", "environments"):
+            return
+        self._guard_test_environments_config({**existing, section: data})
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
         """Reject a plugin-override write whose ``permitted-injections`` would
@@ -5530,6 +5581,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise FileNotFoundError(f"environment variable '{name}' not found")
         del envs[name]
         project_config["environments"] = envs
+        # Deleting an env var that a surviving ``test-environments.token-env``
+        # still references would persist a broken reference and abort the next
+        # sync (issue #1089). Validate the resulting document before the write
+        # so the request fails with HTTP 400 and the file stays untouched.
+        self._guard_test_environments_config(project_config)
         result = self.__class__.config_manager.write("project", project_config)
         return {"ok": True, "deleted": name, "result": result}
 
