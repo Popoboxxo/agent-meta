@@ -13,9 +13,15 @@ Output layout::
 
     <output>/
     ├── manifest.yaml              # role -> abstract tier, keywords, contracts
-    └── roles/<role>/
+    └── roles/<skill-name>/
         ├── SKILL.md               # Hermes skill frontmatter + usage instructions
         └── references/persona.md  # rendered via render_standalone_agent()
+
+The directory follows the skill name (issue #1094): ``<skill-name>`` is
+``agent-meta-<role>``, exactly the ``name:`` in that ``SKILL.md``. Hermes
+registers skills by name, so a mismatch between directory and frontmatter
+name made the pack invisible under the registered name; the ``agent-meta-``
+prefix keeps the namespace collision-free.
 
 Personas reuse :func:`scripts.lib.standalone.render_standalone_agent`, so they
 stay byte-consistent with the ``standalone/`` export (fully resolved, no
@@ -46,6 +52,11 @@ Design decisions (issue #527 open questions):
    name stay Hermes-specific per issue #527 — the consumer is the Hermes
    Agent framework. A generic rename can be introduced later as an alias
    without changing the manifest contract.
+4. Descriptions (issue #1094): the template frontmatter ``description`` wins
+   over ``config/role-defaults.yaml`` — it is the user-facing role
+   description and the only source for base templates without a
+   role-defaults entry. Role-defaults ``description``/``short_desc`` are
+   fallbacks, the role name is the last resort.
 
 Tier sources (abstract only):
 
@@ -60,7 +71,9 @@ Tier sources (abstract only):
   consulted: resolving tiers to provider model IDs would violate this
   export's no-model-IDs contract. Unknown or empty tier values fall back to
   ``balanced`` with a warning — a raw model ID must never leak into the
-  output.
+  output. A base template without any ``role-defaults`` entry is the
+  expected state, so it defaults to ``balanced`` silently (issue #1094);
+  only an existing entry with an empty/unknown ``model`` warns.
 
 The manifest and skill frontmatter are serialized by a small stdlib emitter
 (no PyYAML dependency) so output is byte-stable regardless of the
@@ -105,6 +118,11 @@ MANIFEST_NOTE = (
 # narrower than roles.py::_TIER_SEQUENCE: "ultra" collapses to "max".
 EXPORT_TIERS = ("nano", "fast", "balanced", "powerful", "max")
 DEFAULT_TIER = "balanced"
+
+# Skill directory name; equals the SKILL.md ``name:`` field (issue #1094).
+# Hermes registers skills by frontmatter name, so ``roles/<role>/`` would be
+# invisible under the registered name ``agent-meta-<role>``.
+_SKILL_DIR = "agent-meta-{role}"
 
 # Legacy Claude aliases — normalized exactly like roles.py does when no
 # provider context is available (roles.py::_resolve_tier_to_model fallback).
@@ -232,18 +250,19 @@ def resolve_abstract_tier(model_value: str) -> tuple[str, str | None]:
 def _role_description(role: str, entry: dict, agent_meta_root: Path) -> str:
     """Best-effort one-line description for a role.
 
-    Priority: role-defaults ``description`` -> ``short_desc`` -> template
-    frontmatter ``description`` (e.g. the provider-expert base template has
-    no role-defaults entry by design) -> role name.
+    Priority (issue #1094): template frontmatter ``description`` ->
+    role-defaults ``description`` -> ``short_desc`` -> role name. The
+    template wins because it is the user-facing role description; base
+    templates (e.g. provider experts) have no role-defaults entry at all.
     """
-    for source in (entry.get("description"), entry.get("short_desc")):
-        text = str(source or "").strip()
-        if text:
-            return text
     template = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
     if template.exists():
         fm = parse_frontmatter_text(template.read_text(encoding="utf-8"))
         text = str(fm.get("description", "") or "").strip()
+        if text:
+            return text
+    for source in (entry.get("description"), entry.get("short_desc")):
+        text = str(source or "").strip()
         if text:
             return text
     return role
@@ -257,13 +276,23 @@ def collect_role_meta(
     Everything is sourced from ``config/role-defaults.yaml`` (via
     ``load_roles_config``) with template-frontmatter fallbacks — nothing new
     to maintain per-role (issue #527).
+
+    A base template without a role-defaults entry is the expected state, so
+    it gets :data:`DEFAULT_TIER` without a warning (issue #1094). An existing
+    entry with an empty or unknown ``model`` still warns — that is a config
+    defect, not a missing entry.
     """
-    entry = roles_cfg.get("roles", {}).get(role, {})
+    roles_map = roles_cfg.get("roles") or {}
+    has_entry = isinstance(roles_map, dict) and role in roles_map
+    entry = roles_map.get(role, {}) if isinstance(roles_map, dict) else {}
     if not isinstance(entry, dict):
         entry = {}
     handoff = entry.get("handoff") or {}
     patterns = entry.get("routing_patterns") or {}
-    tier, warning = resolve_abstract_tier(str(entry.get("model", "") or ""))
+    if has_entry:
+        tier, warning = resolve_abstract_tier(str(entry.get("model", "") or ""))
+    else:
+        tier, warning = DEFAULT_TIER, None
     meta = {
         "tier": tier,
         "description": _role_description(role, entry, agent_meta_root),
@@ -287,7 +316,7 @@ def _render_skill_md(role: str, meta: dict, version: str) -> str:
 
     frontmatter = _emit_yaml(
         {
-            "name": f"agent-meta-{role}",
+            "name": _SKILL_DIR.format(role=role),
             "description": description,
             "version": version,
             "metadata": {
@@ -525,8 +554,9 @@ def export_skill_pack(
         persona = render_standalone_agent(role, agent_meta_root)
         skill_content = _render_skill_md(role, meta, version)
 
-        rel_skill = f"roles/{role}/SKILL.md"
-        rel_persona = f"roles/{role}/references/persona.md"
+        skill_dir = _SKILL_DIR.format(role=role)
+        rel_skill = f"roles/{skill_dir}/SKILL.md"
+        rel_persona = f"roles/{skill_dir}/references/persona.md"
         manifest_roles[role] = {
             "tier": meta["tier"],
             "description": meta["description"],
@@ -539,8 +569,10 @@ def export_skill_pack(
             "persona": rel_persona,
         }
         if not dry_run:
-            skill_path = output_dir / "roles" / role / "SKILL.md"
-            persona_path = output_dir / "roles" / role / "references" / "persona.md"
+            skill_path = output_dir / "roles" / skill_dir / "SKILL.md"
+            persona_path = (
+                output_dir / "roles" / skill_dir / "references" / "persona.md"
+            )
             skill_path.parent.mkdir(parents=True, exist_ok=True)
             skill_path.write_text(skill_content, encoding="utf-8")
             persona_path.parent.mkdir(parents=True, exist_ok=True)
