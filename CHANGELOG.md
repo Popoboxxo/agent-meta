@@ -91,6 +91,22 @@
   `access: read` actions).
 
 ### Fixed
+- **The pytest basetemp is allowed through the gitignored local settings (#1079,
+  option C/D20)**: the new provider key `settings-allow-dirs-key` names the list that
+  receives the external basetemp **additively** in `settings.local.json` (Claude:
+  `permissions.additionalDirectories`); the committed `settings.json` is never touched,
+  a provider without the key is a no-op, and ADR-03 still forbids an in-repo basetemp.
+  Because that basetemp carries the host temp path and username, the gitignored local
+  settings overlay is now excluded from the AC-01 render-identity key set on both
+  sides instead of being re-pinned — the manifest stays untouched, so no
+  machine-specific digest is baked into `hashes.json`.
+- **Antigravity hooks cwd semantics are documented and pinned (#1032)**: the
+  `_antigravity_adapter_command` docstring now records the static evidence — AGY runs
+  `command` through `sh -c` with the working directory set to the directory containing
+  `hooks.json`, and no documented environment variable exposes the project root, so the
+  relative command stays. No code change: two tests pin the contract (relative to the
+  `hooks.json` directory, and for a root-level `hooks.json`) and fail loudly if it ever
+  changes; runtime verification of the cwd remains open (#860).
 - **A schema-invalid `auto_commit` block is surfaced by `--validate` and fails safe in
   `sync` (#1091, deliberate asymmetry)**: `auto_commit_violations` in
   `scripts/lib/auto_commit.py` checks the block with stdlib only (unknown `mode` or
