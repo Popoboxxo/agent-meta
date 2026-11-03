@@ -68,6 +68,12 @@ providers:
     settings_file: .claude/settings.json
     settings_template: templates/configs/CLAUDE.settings-template.json
     settings_local_file: .claude/settings.local.json
+    # Additive allow-list inside the gitignored local settings (issue #1079):
+    # the pytest basetemp contains the username and OS temp path, so it must
+    # never land in the committed settings.json (ADR-03). A provider without
+    # this key gets no allow-list write. Claude only; format of other
+    # providers' allow-dir keys unverified — add when documented.
+    settings-allow-dirs-key: permissions.additionalDirectories
     settings_local_template: templates/configs/CLAUDE.settings-local-template.json
     isolation-dirs:
     - .claude/
