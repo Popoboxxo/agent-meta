@@ -96,3 +96,25 @@ def test_honcho_missing_secret_is_warning_not_error(tmp_path, monkeypatch):
     mh.check_mcp_health(tmp_path, tmp_path, {}, log, env={})
     assert log.errors == []
     assert len(log.warnings) == 1 and "mcp.secret-empty" in log.warnings[0]
+
+
+def test_malformed_connection_override_does_not_abort_the_check(tmp_path, monkeypatch):
+    """A string ``connection`` override has no ``.get`` — the advisory check
+    must skip it instead of raising AttributeError out of the sync (#1080)."""
+    monkeypatch.setattr(
+        mh, "load_mcp_registry", lambda *a, **k: {"broken": {"connection": "sse"}}
+    )
+    monkeypatch.setattr(mh, "resolve_active_mcp_servers", lambda *a, **k: ["broken"])
+    log = SyncLog()
+    mh.check_mcp_health(tmp_path, tmp_path, {}, log, env={})
+    assert log.errors == []
+    assert log.warnings == []
+
+
+def test_non_dict_registry_entry_does_not_abort_the_check(tmp_path, monkeypatch):
+    monkeypatch.setattr(mh, "load_mcp_registry", lambda *a, **k: {"broken": "sse"})
+    monkeypatch.setattr(mh, "resolve_active_mcp_servers", lambda *a, **k: ["broken"])
+    log = SyncLog()
+    mh.check_mcp_health(tmp_path, tmp_path, {}, log, env={})
+    assert log.errors == []
+    assert log.warnings == []

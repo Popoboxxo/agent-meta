@@ -166,27 +166,38 @@
   documented gap.
 - **Opencode entry point only names an emitted role (#1090, behavior change)**:
   the new `active_set.role_emitted_for_provider` predicate backs
-  `_opencode_entry_point`, so a fresh project no longer gets a `default_agent` when
-  the role is missing from the active set or is the orchestrator with
-  `orchestrator.mode: main-chat` (that agent is deliberately not emitted then, and
-  the gate-deny is already coupled to the entry point). The resolver is
-  provider-agnostic: the only provider input is
-  `orchestrator.provider-overrides.<provider>`, never a name comparison. A
-  **user-written** `default_agent` that names a role this sync does not generate is
-  never deleted — the user value wins and the sync emits one
-  `opencode.default-agent.dangling` WARN, restricted to `known_roles` so a foreign
-  agent name is not flagged. Covered by `tests/test_opencode_main_chat_entry_point.py`.
+  `_opencode_entry_point` **and** the settings-init surface, so a fresh project
+  no longer gets a `default_agent` when the role is not emitted **for that
+  provider** — either because it is missing from the active set or because the
+  orchestration mode for this provider is `main-chat` (including a
+  provider-scoped `orchestrator.provider-overrides.<provider>` override while
+  the global mode stays strict; the init stage no longer reads the global
+  `ORCH_MODE_MAIN_CHAT` variable). The resolver is provider-agnostic: the only
+  provider input is `orchestrator.provider-overrides.<provider>`, never a name
+  comparison. A managed `default_agent` left over from an earlier sync is
+  rolled back in the same run when the role is no longer emitted; a
+  **user-written** `default_agent` that names a role this sync does not generate
+  is never deleted — the user value wins and the sync emits one
+  `opencode.default-agent.dangling` WARN, restricted to `known_roles` so a
+  foreign agent name is not flagged. The gate-suspension hint names the
+  main-chat cause instead of asking for a role that is in fact active. Covered
+  by `tests/test_opencode_main_chat_entry_point.py`,
+  `tests/test_settings_depth_and_deny.py` and the v2 surface tests.
 - **MCP commands resolve `python3` and the sync reports MCP health (#1080)**:
   `config/plugin-catalog.yaml` names `python3` for the repo-owned viz-logger stdio
   servers, and `_resolve_stdio_command` in `scripts/lib/mcp_provider_config.py`
   falls back to the first interpreter that resolves on the host (`python`, then
-  `py`) so a host without the alias still starts the server; every other command is
-  passed through unchanged and an unresolvable one keeps its catalog name. The new
-  `scripts/lib/mcp_health.py` emits one advisory WARN per active server —
-  `mcp.secret-empty` (a required secret is set neither non-empty in
-  `secrets.local.yaml` nor in the environment) and `mcp.command-unresolved` (a
-  stdio command does not resolve after the fallback) — and never an error, so a
-  missing optional memory server such as honcho only warns. The ReqogniLoom agent
+  `py`) so a host without the alias still starts the server. The fallback is
+  applied **only to gitignored/local outputs** (`.mcp.json`, secrets files):
+  committed provider configs such as `opencode.json` keep the catalog value
+  verbatim, so they are byte-stable across hosts and `sync.py --check` does not
+  drift. Every other command is passed through unchanged and an unresolvable one
+  keeps its catalog name. The new `scripts/lib/mcp_health.py` emits one advisory
+  WARN per active server — `mcp.secret-empty` (a required secret is set neither
+  non-empty in `secrets.local.yaml` nor in the environment) and
+  `mcp.command-unresolved` (a stdio command does not resolve after the
+  fallback) — and never an error; a malformed catalog override (a non-dict
+  `connection`) is skipped instead of aborting the sync. The ReqogniLoom agent
   hint now documents the two parallel variable names (`REQOGNILOOM_MCP_URL` and
   `MCP_REQOGNILOOM_URL`) for the case where the external plugin and the catalog
   server are both enabled.

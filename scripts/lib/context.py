@@ -881,7 +881,8 @@ def _sync_managed_block_context(
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if not has_dedicated:
         _init_provider_settings_json(
-            project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+            project_root, pc, agent_meta_root, variables, log, dry_run,
+            provider=provider, config=config,
         )
 
 
@@ -1019,7 +1020,8 @@ def _sync_opencode_context(
     if pc.get("personal_agents_file", True):
         init_opencode_personal(agent_meta_root, project_root, log, dry_run)
     _init_provider_settings_json(
-        project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+        project_root, pc, agent_meta_root, variables, log, dry_run,
+        provider=provider, config=config,
     )
 
 
@@ -1711,6 +1713,29 @@ def apply_settings_surface_shape(
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
 
 
+def _project_config_for_init(project_root: Path) -> dict:
+    """Re-read the canonical project config for the settings-init stage (#1090).
+
+    ``sync_pipeline`` calls :func:`init_settings_json` without the already
+    resolved config, so the per-provider orchestrator mode (needed to decide
+    whether the primary role is emitted) would otherwise be unavailable and the
+    init stage would fall back to the global variable. Fail-soft: a missing or
+    unreadable project file yields ``{}`` (historical behaviour).
+    """
+    from .config import load_config
+
+    for name in ("project.yaml", "project.json"):
+        path = project_root / ".meta-config" / name
+        if not path.exists():
+            continue
+        try:
+            loaded = load_config(path)
+        except SystemExit:
+            return {}
+        return loaded if isinstance(loaded, dict) else {}
+    return {}
+
+
 def _init_provider_settings_json(
     project_root: Path,
     pc: dict,
@@ -1719,8 +1744,19 @@ def _init_provider_settings_json(
     log: SyncLog,
     dry_run: bool,
     provider: str | None = None,
+    config: dict | None = None,
+    active_set=None,
 ) -> None:
-    """Create provider settings skeleton once if it does not exist yet."""
+    """Create provider settings skeleton once if it does not exist yet.
+
+    ``config``/``active_set`` feed the #1090/D16 entry-point invariant: the
+    init surface must omit ``default_agent`` exactly when
+    ``active_set.role_emitted_for_provider`` says the primary role is not
+    emitted for *this* provider (active-set allowlist or a provider-scoped
+    ``orchestrator.mode: main-chat``). ``config=None`` re-reads the canonical
+    project config; ``active_set=None`` is fail-open only for the allowlist
+    (the provider mode is still resolved).
+    """
 
     settings_file = pc.get("settings_file")
     if not settings_file:
@@ -1761,13 +1797,31 @@ def _init_provider_settings_json(
         except Exception:
             capabilities = None
     # #1090/D16: a fresh project must not get an entry point that this sync
-    # will not emit. In main-chat mode the orchestrator agent is absent, so the
-    # init surface omits ``default_agent`` (the resolver below is the same
-    # data-driven mode variable the renderer uses).
-    emit_default_agent = not (
-        pc.get("primary-role") == "orchestrator"
-        and variables.get("ORCH_MODE_MAIN_CHAT") == "true"
-    )
+    # will not emit. Single source: ``active_set.role_emitted_for_provider``
+    # resolves the active-set allowlist AND the effective orchestrator mode for
+    # this provider (provider override first) — never a global variable, which
+    # ignores provider-scoped modes and is passed before they exist.
+    primary_role = pc.get("primary-role")
+    emit_default_agent = True
+    if isinstance(primary_role, str) and primary_role:
+        if config is None:
+            config = _project_config_for_init(project_root)
+        if active_set is None and config:
+            # Function-local import: ``active_set`` -> ``roles``/``variables``
+            # and must not become a top-level context import.
+            from .active_set import compute_active_set
+
+            try:
+                active_set = compute_active_set(
+                    config, agent_meta_root, project_root, warn_sink=[]
+                )
+            except Exception:  # noqa: BLE001 - settings init is fail-soft
+                active_set = None
+        from .active_set import role_emitted_for_provider
+
+        emit_default_agent = role_emitted_for_provider(
+            primary_role, active_set, config, provider
+        )
     content = apply_settings_surface_shape(
         content, pc, capabilities, emit_default_agent=emit_default_agent
     )
@@ -2811,15 +2865,42 @@ def init_settings_json(
     providers: list[str] | None = None,
     provider_config: dict | None = None,
     variables: dict | None = None,
+    config: dict | None = None,
+    active_set=None,
 ):
     """Create provider settings files if they do not exist yet.
 
     Iterates over all active providers (or every configured provider if no
     explicit list is given) and initializes the committed settings file once.
     The hooks section for Claude is managed separately by sync_hooks().
+
+    ``config``/``active_set`` feed the #1090/D16 entry-point invariant. The
+    sync stage passes neither, so the canonical project config is re-read once
+    here; that keeps provider-scoped ``orchestrator.mode: main-chat`` visible
+    instead of falling back to the global mode variable.
     """
     pc = provider_config or {}
     active = providers if providers is not None else list(pc.keys())
+    # The active set is only needed while a settings file is still to be
+    # created and could carry an entry point; do not pay for it on every sync.
+    needs_entry_point_check = any(
+        pc[provider].get("settings_file")
+        and pc[provider].get("primary-role")
+        and not safe_path(project_root, pc[provider]["settings_file"]).exists()
+        for provider in active
+        if provider in pc
+    )
+    if config is None and needs_entry_point_check:
+        config = _project_config_for_init(project_root)
+    if active_set is None and config and needs_entry_point_check:
+        from .active_set import compute_active_set
+
+        try:
+            active_set = compute_active_set(
+                config, agent_meta_root, project_root, warn_sink=[]
+            )
+        except Exception:  # noqa: BLE001 - settings init is fail-soft
+            active_set = None
     for provider in active:
         _init_provider_settings_json(
             project_root,
@@ -2829,6 +2910,8 @@ def init_settings_json(
             log,
             dry_run,
             provider=provider,
+            config=config,
+            active_set=active_set,
         )
 
 

@@ -62,6 +62,10 @@ def check_mcp_health(
 
     for name in active:
         server = registry.get(name) or {}
+        if not isinstance(server, dict):
+            # A malformed catalog override must never abort the sync from an
+            # advisory check (the loop runs outside the try above).
+            continue
         required = [str(item) for item in (server.get("secrets") or []) if item]
         missing = [item for item in required if not _is_set(item, secrets, env_vars)]
         if missing:
@@ -71,6 +75,10 @@ def check_mcp_health(
                 "— server will not connect"
             )
         connection = server.get("connection") or {}
+        if not isinstance(connection, dict):
+            # ``connection: "sse"`` (a string override) has no ``.get``; skip
+            # the command check instead of raising AttributeError (#1080).
+            continue
         if connection.get("type") == "stdio":
             command = str(connection.get("command") or "")
             if shutil.which(_resolve_stdio_command(command)) is None:

@@ -820,12 +820,19 @@ def _sync_opencode_runtime_gate(
     # naming a role this sync does not generate is only warned about — the
     # user value always wins, it is never deleted. Known roles only, so a
     # foreign agent name (another tool's) is not flagged.
+    #
+    # The state is read *before* the warning: a value that is still managed
+    # (``current == state_value``) is rolled back by this same run, so telling
+    # the user to "remove the key" would be wrong.
+    da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
+    state_value = da_state.get("value") if isinstance(da_state, dict) else None
     if not rollback_only and entry is None and active_set is not None:
         from .active_set import role_emitted_for_provider
 
         current = existing.get(_DEFAULT_AGENT_JSON_KEY)
         if (
             isinstance(current, str)
+            and current != state_value
             and current in getattr(active_set, "known_roles", ())
             and not role_emitted_for_provider(current, active_set, config, provider)
         ):
@@ -843,15 +850,34 @@ def _sync_opencode_runtime_gate(
     # by the rollback branch below (``entries`` empty), and the user is told
     # how to restore the entry point.
     if entries and entry is None:
-        log.warning(
-            "runtime gate (permission.edit/bash deny) NOT written for "
-            f"provider '{provider}': no explicit and generated primary-role — "
-            "the gate would lock every agent; declare primary-role in "
-            "config/ai-providers.yaml and keep that role in the active set"
-        )
-        entries = {}
+        gate_role = providers.explicit_primary_role(provider_config, provider)
+        mode_hides = False
+        if gate_role is not None and config is not None:
+            from .active_set import role_emitted_for_provider
 
-    da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
+            role_is_active = (
+                active_set is None
+                or gate_role in getattr(active_set, "roles", ())
+            )
+            mode_hides = role_is_active and not role_emitted_for_provider(
+                gate_role, active_set, config, provider
+            )
+        if mode_hides:
+            log.warning(
+                "runtime gate (permission.edit/bash deny) NOT written for "
+                f"provider '{provider}': orchestrator.mode 'main-chat' does not "
+                f"emit the primary role '{gate_role}', so the gate would lock "
+                "every agent; set orchestrator.mode: strict (or remove the "
+                "provider override) to activate the gate"
+            )
+        else:
+            log.warning(
+                "runtime gate (permission.edit/bash deny) NOT written for "
+                f"provider '{provider}': no explicit and generated primary-role — "
+                "the gate would lock every agent; declare primary-role in "
+                "config/ai-providers.yaml and keep that role in the active set"
+            )
+        entries = {}
 
     # D1a: deny and entry point are ONE invariant. Even with an explicit and
     # generated primary role the written document can end up WITHOUT a valid
