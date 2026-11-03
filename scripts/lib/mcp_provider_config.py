@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
 from .io import (
@@ -153,6 +154,29 @@ def _v2_oauth(conn: dict, secrets: dict | None) -> dict | None:
     return {key: rendered[key] for key in _V2_OAUTH_KEYS if key in rendered}
 
 
+# Host-local interpreter resolution at sync time (#1080/D17): the catalog names
+# ``python3`` (absent on some hosts is ``python``). ``.mcp.json`` is gitignored
+# per host, so resolving here is safe; revisit with #814 (invocation/cwd).
+_INTERPRETER_FALLBACKS: dict[str, tuple[str, ...]] = {"python3": ("python", "py")}
+
+
+def _resolve_stdio_command(cmd: str) -> str:
+    """Return *cmd* as-is if it resolves, else the first resolving fallback.
+
+    Only the catalog's interpreter aliases have fallbacks; any other command is
+    returned unchanged (no guessing). When nothing resolves the original name is
+    kept, so the health check can report ``mcp.command-unresolved``.
+    """
+    if not cmd:
+        return cmd
+    if shutil.which(cmd):
+        return cmd
+    for fallback in _INTERPRETER_FALLBACKS.get(cmd, ()):
+        if shutil.which(fallback):
+            return fallback
+    return cmd
+
+
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
     """Convert a registry connection block to a provider-config dict.
 
@@ -218,7 +242,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
                 entry["headers"] = rendered
 
     elif orig_type == "stdio":
-        cmd = conn.get("command", "")
+        cmd = _resolve_stdio_command(conn.get("command", ""))
         args = list(conn.get("args", []))
         env = conn.get("env", {})
 

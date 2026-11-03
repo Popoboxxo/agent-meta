@@ -1056,3 +1056,41 @@ def test_sync_mcp_artifacts_warn_on_undeclared_connection_var(tmp_path):
     assert any(
         "MCP_UNDEFINED_URL" in w and "secrets:" in w for w in log.warnings
     ), log.warnings
+
+
+# --- #1080 / D17: python3 for repo-owned stdio servers + interpreter fallback
+
+
+def test_catalog_stdio_commands_use_python3():
+    from scripts.lib.registry_query import load_mcp_registry
+
+    repo_root = Path(__file__).resolve().parents[1]
+    for name, server in load_mcp_registry(repo_root).items():
+        conn = server.get("connection") or {}
+        if conn.get("type") == "stdio":
+            assert conn.get("command") != "python", name
+
+
+def _entry():
+    return {"type": "stdio", "command": "python3", "args": ["a.py"]}
+
+
+def test_stdio_command_falls_back_when_python3_missing(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: "/x/python" if c == "python" else None)
+    assert mpc._build_connection_entry(_entry(), None)["command"] == "python"
+
+
+def test_stdio_command_unchanged_when_python3_present(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: "/x/" + c)
+    assert mpc._build_connection_entry(_entry(), None)["command"] == "python3"
+
+
+def test_stdio_command_unchanged_when_nothing_resolves(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: None)
+    assert mpc._build_connection_entry(_entry(), None)["command"] == "python3"
