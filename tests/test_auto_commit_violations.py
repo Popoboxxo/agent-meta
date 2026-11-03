@@ -65,6 +65,64 @@ def test_resolve_fail_safe_on_violation():
     assert out["mode"] == "off" and out["eligible_roles"] == [] and out["triggers"] == []
 
 
+# --------------------------------------------------------------------------- #
+# Validator/schema parity (advisory findings on PR #1118)                     #
+# --------------------------------------------------------------------------- #
+
+
+def test_duplicate_triggers_is_violation():
+    # schema: triggers.uniqueItems = true
+    v = auto_commit_violations(
+        {"auto_commit": {"mode": "auto", "triggers": ["per-edit", "per-edit"]}})
+    assert any("duplicate" in m and "per-edit" in m for m in v)
+
+
+def test_non_bool_secret_scan_is_violation():
+    v = auto_commit_violations(
+        {"auto_commit": {"mode": "auto", "triggers": ["task-boundary"],
+                         "secret_scan": "yes"}})
+    assert any("secret_scan" in m and "boolean" in m for m in v)
+
+
+def test_non_string_custom_script_is_violation():
+    v = auto_commit_violations(
+        {"auto_commit": {"mode": "auto", "triggers": ["task-boundary"],
+                         "custom_script": 5}})
+    assert any("custom_script" in m and "string" in m for m in v)
+
+
+def test_integral_float_threshold_accepted():
+    # JSON Schema calls 5.0 an integer; the stdlib validator must agree.
+    cfg = {"auto_commit": {"mode": "auto", "triggers": ["file-count-threshold"],
+                           "file_count_threshold": 5.0}}
+    assert auto_commit_violations(cfg) == []
+    out = resolve_auto_commit_config(cfg, ["developer"], REPO_ROOT)
+    assert out["file_count_threshold"] == 5
+    assert isinstance(out["file_count_threshold"], int)
+
+
+def test_non_integral_float_threshold_rejected():
+    v = auto_commit_violations(
+        {"auto_commit": {"mode": "auto", "triggers": ["file-count-threshold"],
+                         "file_count_threshold": 5.5}})
+    assert any("file_count_threshold" in m for m in v)
+
+
+def test_enum_constants_match_schema():
+    # advisory 3: a schema addition must not silently become a hard
+    # --validate failure because the stdlib constants were not updated.
+    import json
+
+    from lib.auto_commit import _KEYS, _MODES, _TRIGGERS
+
+    schema = json.loads(
+        (REPO_ROOT / "config" / "project-config.schema.json").read_text(encoding="utf-8"))
+    ac = schema["properties"]["auto_commit"]
+    assert list(_MODES) == ac["properties"]["mode"]["enum"]
+    assert list(_TRIGGERS) == ac["properties"]["triggers"]["items"]["enum"]
+    assert set(_KEYS) == set(ac["properties"])
+
+
 def test_valid_config_unchanged():
     cfg = {"auto_commit": {"mode": "auto", "triggers": ["task-boundary"]}}
     out = resolve_auto_commit_config(cfg, ["developer", "git"], REPO_ROOT)
@@ -76,10 +134,10 @@ def test_valid_config_unchanged():
 # --------------------------------------------------------------------------- #
 
 
-def _project(tmp_path, ac):
+def _project(tmp_path, ac, provider="Claude"):
     (tmp_path / ".meta-config").mkdir()
     (tmp_path / ".meta-config" / "project.yaml").write_text(
-        "project:\n  name: t\n  prefix: t\nai-providers: [Claude]\n"
+        f"project:\n  name: t\n  prefix: t\nai-providers: [{provider}]\n"
         "roles: [orchestrator, developer, git]\n" + ac, encoding="utf-8")
     return tmp_path
 
@@ -115,3 +173,38 @@ def test_sync_rc0_but_allowlist_fail_safe(tmp_path):
 def test_validate_rc0_on_valid_config(tmp_path):
     p = _project(tmp_path, "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n")
     assert _sync(p, "--validate").returncode == 0
+
+
+# --------------------------------------------------------------------------- #
+# Render path: the fail-safe must reach the generated prose (blocking finding) #
+# --------------------------------------------------------------------------- #
+
+
+def test_invalid_config_renders_disabled_commit_authority_on_hookless_provider(tmp_path):
+    # Opencode has has_hooks: false, so orchestrator-guard-impl.sh never
+    # enforces anything -- the rendered agent prose is the only place the
+    # #1091 fail-safe can reach. It must say "off", not "mode: auto enabled".
+    p = _project(
+        tmp_path,
+        "auto_commit:\n  mode: auto\n  triggers: [custom]\n",
+        provider="Opencode",
+    )
+    r = _sync(p)
+    assert r.returncode == 0, r.stderr
+    rendered = (p / ".opencode" / "agents" / "developer.md").read_text(encoding="utf-8")
+    assert "Commit authority (issue #694): off" in rendered
+    assert "disabled (fail-safe)" in rendered
+    assert "`auto_commit.mode: auto` enabled" not in rendered
+
+
+def test_valid_config_still_renders_enabled_commit_authority(tmp_path):
+    p = _project(
+        tmp_path,
+        "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n",
+        provider="Opencode",
+    )
+    r = _sync(p)
+    assert r.returncode == 0, r.stderr
+    rendered = (p / ".opencode" / "agents" / "developer.md").read_text(encoding="utf-8")
+    assert "`auto_commit.mode: auto` enabled" in rendered
+    assert "Commit authority (issue #694): off" not in rendered

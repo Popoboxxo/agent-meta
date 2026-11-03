@@ -94,12 +94,18 @@
 - **A schema-invalid `auto_commit` block is surfaced by `--validate` and fails safe in
   `sync` (#1091, deliberate asymmetry)**: `auto_commit_violations` in
   `scripts/lib/auto_commit.py` checks the block with stdlib only (unknown `mode` or
-  trigger values, triggers without `mode: auto`, a missing `custom_script`, unknown keys,
-  a non-integer `file_count_threshold`). `sync.py --validate` reports each violation as
-  an `[ERROR]` and exits 1 so CI catches the drift; a plain `sync.py` stays rc 0 and
-  resolves the block to the fail-safe allowlist (`mode: off`, `eligible_roles: []`) with
-  a WARN — existing projects keep syncing, but commit authority is fully disabled with
-  no time-based grace. A valid or absent block is unchanged.
+  trigger values, duplicate triggers, triggers without `mode: auto`, a missing or
+  non-string `custom_script`, unknown keys, a non-boolean `secret_scan`, a
+  non-integer `file_count_threshold`; an integral float such as `5.0` is accepted, as
+  the JSON schema does). **behavior change:** `sync.py --validate` reports each
+  violation as an `[ERROR]` and exits 1 so CI catches the drift; a plain `sync.py`
+  stays rc 0 and resolves the block to the fail-safe allowlist (`mode: off`,
+  `eligible_roles: []`) with a WARN — existing projects keep syncing, but commit
+  authority is fully disabled with no time-based grace. The fail-safe now also reaches
+  the render path: the generated agent prose explicitly says commit authority is off
+  (instead of the previous enabled wording), including on hookless providers
+  (`has_hooks: false`) where no guard hook enforces the allowlist. A valid or absent
+  block is unchanged.
 - **Admin server reads framework `config/` through a symlinked `.agent-meta` (#1095)**:
   `ConfigManager.resolve_path` in `scripts/admin-server.py` now accepts a fallback
   target outside the project root only when it lies in the framework link's `config/`

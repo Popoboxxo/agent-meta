@@ -100,9 +100,20 @@ def _apply_role_auto_commit_overrides(
     wins: AUTO_COMMIT_ENABLED is forced to "false" and the block emptied, so
     the output stays byte-identical to a sync without an auto_commit key.
     """
-    from .auto_commit import render_auto_commit_block, role_commit_authority
+    from .auto_commit import (
+        INVALID_CONFIG_MARKER,
+        render_auto_commit_block,
+        role_commit_authority,
+    )
 
     resolved = variables.get("_AUTO_COMMIT_RESOLVED") or {"mode": "off"}
+    if resolved.get(INVALID_CONFIG_MARKER):
+        # Issue #1091 fail-safe: the invalid block resolves to "off", but the
+        # explicit disabled notice must still render -- on hookless providers
+        # it is the only enforcement path.
+        merged_vars["AUTO_COMMIT_ENABLED"] = "true"
+        merged_vars["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(resolved)
+        return
     if resolved.get("mode", "off") == "off":
         merged_vars["AUTO_COMMIT_ENABLED"] = "false"
         merged_vars["AUTO_COMMIT_BLOCK"] = ""

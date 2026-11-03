@@ -2750,6 +2750,25 @@ def test_write_via_symlink_blocked(tmp_path):
         encoding="utf-8") == "roles:\n  x: 1\n"
 
 
+def test_write_via_in_root_symlink_blocked(tmp_path):
+    # D15: the vendored framework config must stay read-only even when the
+    # ``.agent-meta`` symlink points at a checkout INSIDE the project root
+    # (containment alone would let this save through).
+    fw = tmp_path / "vendor" / "fw"
+    (fw / "config").mkdir(parents=True)
+    yaml_text = "roles:\n  x: 1\n"
+    (fw / "config" / "role-defaults.yaml").write_text(yaml_text, encoding="utf-8")
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / ".agent-meta").symlink_to(fw, target_is_directory=True)
+
+    mgr = admin_server.ConfigManager(root, mode="super_admin")
+    assert mgr.read("role-defaults") == {"roles": {"x": 1}}  # reading stays fine
+    with pytest.raises(admin_server.SecurityError, match="read-only"):
+        mgr.write("role-defaults", {"roles": {"y": 2}})
+    assert (fw / "config" / "role-defaults.yaml").read_text(encoding="utf-8") == yaml_text
+
+
 def test_dotdot_traversal_still_blocked(tmp_path):
     mgr = admin_server.ConfigManager(_symlinked_root(tmp_path), mode="project_admin")
     with pytest.raises(admin_server.SecurityError):
