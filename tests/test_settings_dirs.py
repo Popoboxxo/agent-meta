@@ -115,6 +115,97 @@ def test_outside_project_dirs_filters_inside_paths(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# BLOCKING 1 — the write must stay inside the project (symlinks)
+# ---------------------------------------------------------------------------
+
+def test_symlinked_settings_dir_cannot_write_outside_project(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".claude").symlink_to(outside, target_is_directory=True)
+
+    log = SyncLog()
+    status = sync_allowed_directories(project, PC, [BASETEMP], log, False)
+
+    assert status == "warned"
+    assert not (outside / "settings.local.json").exists()
+    assert len(log.warnings) == 1
+
+
+def test_symlinked_settings_file_inside_project_is_followed(tmp_path):
+    project = tmp_path / "project"
+    (project / ".claude").mkdir(parents=True)
+    real = project / "real-settings.json"
+    real.write_text("{}\n", encoding="utf-8")
+    link = project / _SETTINGS_LOCAL
+    link.symlink_to(real)
+
+    status = sync_allowed_directories(project, PC, [BASETEMP], SyncLog(), False)
+
+    assert status == "written"
+    assert link.is_symlink()
+    assert json.loads(real.read_text(encoding="utf-8")) == {
+        "permissions": {"additionalDirectories": [BASETEMP]},
+    }
+
+
+def test_symlinked_settings_file_outside_project_is_rejected(tmp_path):
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}\n", encoding="utf-8")
+    project = tmp_path / "project"
+    (project / ".claude").mkdir(parents=True)
+    (project / _SETTINGS_LOCAL).symlink_to(outside)
+
+    status = sync_allowed_directories(project, PC, [BASETEMP], SyncLog(), False)
+
+    assert status == "warned"
+    assert outside.read_text(encoding="utf-8") == "{}\n"
+
+
+# ---------------------------------------------------------------------------
+# BLOCKING 2 — --check must not report an absent gitignored target (#752)
+# ---------------------------------------------------------------------------
+
+def _git_repo_with_ignored_settings(root: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / ".gitignore").write_text(
+        ".claude/settings.local.json\n", encoding="utf-8",
+    )
+
+
+def test_check_skips_absent_gitignored_target(tmp_path):
+    _git_repo_with_ignored_settings(tmp_path)
+    log = SyncLog()
+
+    status = sync_allowed_directories(tmp_path, PC, [BASETEMP], log, True)
+
+    assert status == "skipped"
+    assert log.actions == []
+    assert not (tmp_path / _SETTINGS_LOCAL).exists()
+
+
+# ---------------------------------------------------------------------------
+# ADVISORY 1 — a non-dict intermediate node is never overwritten
+# ---------------------------------------------------------------------------
+
+def test_non_dict_intermediate_node_is_preserved(tmp_path):
+    p = tmp_path / _SETTINGS_LOCAL
+    p.parent.mkdir()
+    original = json.dumps({"permissions": "user-string"})
+    p.write_text(original, encoding="utf-8")
+    log = SyncLog()
+
+    status = sync_allowed_directories(tmp_path, PC, [BASETEMP], log, False)
+
+    assert status == "warned"
+    assert p.read_text(encoding="utf-8") == original
+    assert len(log.warnings) == 1
+
+
+# ---------------------------------------------------------------------------
 # G4 — provider key, resolved basetemp, gitignored target
 # ---------------------------------------------------------------------------
 

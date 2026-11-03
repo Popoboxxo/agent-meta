@@ -135,7 +135,11 @@ from lib.rules import (
     sync_speech_mode,
 )
 from lib.runtime_gate import sync_runtime_gate_plugins
-from lib.settings_dirs import basetemp_dirs, sync_allowed_directories
+from lib.settings_dirs import (
+    STATUS_WRITTEN,
+    basetemp_dirs,
+    sync_allowed_directories,
+)
 from lib.skill_channel import sweep_orphan_skill_channel_rules
 from lib.skills import (
     check_pinned_commits,
@@ -1351,15 +1355,16 @@ def _sync_stage_per_provider(
             # committed settings.json. Providers without the key are a no-op.
             allowed_dirs = basetemp_dirs(project_root, config)
             if allowed_dirs:
-                sync_allowed_directories(
+                status = sync_allowed_directories(
                     project_root, pc, allowed_dirs, log, args.dry_run,
                 )
-                for directory in allowed_dirs:
-                    log.note(
-                        "settings-dirs",
-                        f"pytest basetemp {directory} allowed via "
-                        f"{pc.get('settings_local_file')}",
-                    )
+                if status == STATUS_WRITTEN:
+                    for directory in allowed_dirs:
+                        log.note(
+                            "settings-dirs",
+                            f"pytest basetemp {directory} allowed via "
+                            f"{pc.get('settings_local_file')}",
+                        )
 
         # IC-13: dispatch the two runtime-gate writers independent of the hook
         # branch and of the provider-isolation >=2 guard. Both key off config

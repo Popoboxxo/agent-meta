@@ -96,6 +96,7 @@
   receives the external basetemp **additively** in `settings.local.json` (Claude:
   `permissions.additionalDirectories`); the committed `settings.json` is never touched,
   a provider without the key is a no-op, and ADR-03 still forbids an in-repo basetemp.
+  The effect on the Claude Code permission dialog is unverified.
   Because that basetemp carries the host temp path and username, the gitignored local
   settings overlay is now excluded from the AC-01 render-identity key set on both
   sides instead of being re-pinned — the manifest stays untouched, so no
