@@ -3477,8 +3477,8 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
     entry_point_calls = []
     real_entry_point = isolation._opencode_entry_point
 
-    def _spy(provider, provider_config, active_set):
-        role = real_entry_point(provider, provider_config, active_set)
+    def _spy(provider, provider_config, active_set, config=None):
+        role = real_entry_point(provider, provider_config, active_set, config)
         entry_point_calls.append(role)
         return role
 

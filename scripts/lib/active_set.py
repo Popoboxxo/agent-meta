@@ -180,6 +180,43 @@ def compute_active_set(
     )
 
 
+def role_emitted_for_provider(
+    role: str,
+    active_set: Optional[ActiveSet],
+    config: Optional[Mapping],
+    provider: str,
+) -> bool:
+    """Whether *role* is emitted for *provider* by this sync (#1090/D16).
+
+    Single source for the entry-point invariant: a provider-scoped
+    ``default_agent`` must name a role the sync actually generates. Two
+    independent reasons can make a role absent:
+
+    * the active set does not contain it (``active_set is None`` keeps the
+      historical fail-open: no information ⇒ assume emitted), or
+    * it is the orchestrator and the effective mode for *provider* is
+      ``main-chat`` — the orchestrator agent is deliberately not emitted then.
+      The mode precedence is the one resolver
+      (``variables._resolve_orch_mode``): provider override first, then the
+      global ``orchestrator.mode``/legacy booleans.
+
+    Deliberately provider-agnostic: the only provider input is the data key
+    ``orchestrator.provider-overrides.<provider>``, never a name comparison.
+    """
+    if active_set is not None and role not in active_set.roles:
+        return False
+    if role != "orchestrator":
+        return True
+    orch_cfg = (config or {}).get("orchestrator") if isinstance(config, Mapping) else None
+    if not isinstance(orch_cfg, Mapping):
+        orch_cfg = {}
+    overrides = orch_cfg.get("provider-overrides") or {}
+    override = overrides.get(provider) if isinstance(overrides, Mapping) else None
+    if not isinstance(override, dict):
+        override = None
+    return _resolve_orch_mode(dict(orch_cfg), override, validate=False) != "main-chat"
+
+
 def active_set_variables(active: ActiveSet) -> dict:
     """Template variables derived from the ActiveSet (all values are strings)."""
     # PROJECT_SPECIFIC_AGENTS stays owned by config.build_variables.

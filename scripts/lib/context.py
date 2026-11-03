@@ -1651,7 +1651,11 @@ def sync_context_for_provider(
 
 
 def apply_settings_surface_shape(
-    content: str, pc: dict, capabilities: dict | None = None
+    content: str,
+    pc: dict,
+    capabilities: dict | None = None,
+    *,
+    emit_default_agent: bool = True,
 ) -> str:
     """Apply the resolved settings-surface shape to a settings template body.
 
@@ -1663,6 +1667,12 @@ def apply_settings_surface_shape(
     ``subagent_depth``) and ``default_agent`` is emitted from the
     ``primary-role`` data key (OQ-4/AC-5). Every other format returns
     ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+
+    ``emit_default_agent=False`` (#1090/D16) suppresses that one key: the init
+    writer sets it when the primary role is not emitted for the provider
+    (``orchestrator.mode: main-chat``), so a fresh project never gets a
+    dangling entry point. Default ``True`` keeps the historical call sites
+    unchanged.
 
     **Single ownership (spec Amendment B2):** this initial-template transform
     does NOT write ``experimental.subagent_depth``. That path is owned solely by
@@ -1696,7 +1706,7 @@ def apply_settings_surface_shape(
     # managed-merge writer (Amendment B2, single ownership).
     document.pop("subagent_depth", None)
     primary_role = pc.get("primary-role")
-    if isinstance(primary_role, str) and primary_role:
+    if emit_default_agent and isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
 
@@ -1750,7 +1760,17 @@ def _init_provider_settings_json(
             ).get(provider)
         except Exception:
             capabilities = None
-    content = apply_settings_surface_shape(content, pc, capabilities)
+    # #1090/D16: a fresh project must not get an entry point that this sync
+    # will not emit. In main-chat mode the orchestrator agent is absent, so the
+    # init surface omits ``default_agent`` (the resolver below is the same
+    # data-driven mode variable the renderer uses).
+    emit_default_agent = not (
+        pc.get("primary-role") == "orchestrator"
+        and variables.get("ORCH_MODE_MAIN_CHAT") == "true"
+    )
+    content = apply_settings_surface_shape(
+        content, pc, capabilities, emit_default_agent=emit_default_agent
+    )
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)

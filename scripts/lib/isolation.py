@@ -550,21 +550,33 @@ def _opencode_entry_point(
     provider: str,
     provider_config: dict,
     active_set,
+    config: dict | None = None,
 ) -> str | None:
-    """Primary role of *provider* if explicit AND generated, else ``None``.
+    """Primary role of *provider* if explicit AND emitted, else ``None``.
 
     ``provider_config`` must be the resolved provider registry
     (``{provider: {...}}``), never a single provider entry — the lookup is
     keyed by ``provider`` (``providers.explicit_primary_role``).
 
     Explicit: ``providers.explicit_primary_role`` (IC-1 — no code default, so
-    a provider without ``primary-role`` never emits an entry point). Generated:
+    a provider without ``primary-role`` never emits an entry point). Emitted:
     ``active_set is None`` (no active-set information ⇒ fail-open) or the role
-    is a member of ``active_set.roles``.
+    is a member of ``active_set.roles``. With *config* the full #1090/D16
+    predicate ``active_set.role_emitted_for_provider`` additionally checks the
+    orchestrator mode for this provider (main-chat does not emit the role).
+    ``config=None`` keeps the historical behaviour for callers without config.
     """
     role = providers.explicit_primary_role(provider_config, provider)
     if role is None:
         return None
+    if config is not None:
+        # Function-local: keeps the module import surface unchanged (and no
+        # cycle — ``active_set`` does not import ``isolation``).
+        from .active_set import role_emitted_for_provider
+
+        if not role_emitted_for_provider(role, active_set, config, provider):
+            return None
+        return role
     if active_set is not None and role not in active_set.roles:
         return None
     return role
@@ -801,8 +813,28 @@ def _sync_opencode_runtime_gate(
     entry = (
         None
         if rollback_only
-        else _opencode_entry_point(provider, provider_config, active_set)
+        else _opencode_entry_point(provider, provider_config, active_set, config)
     )
+
+    # #1090/D16: the reverse of the #1006 invariant. A USER ``default_agent``
+    # naming a role this sync does not generate is only warned about — the
+    # user value always wins, it is never deleted. Known roles only, so a
+    # foreign agent name (another tool's) is not flagged.
+    if not rollback_only and entry is None and active_set is not None:
+        from .active_set import role_emitted_for_provider
+
+        current = existing.get(_DEFAULT_AGENT_JSON_KEY)
+        if (
+            isinstance(current, str)
+            and current in getattr(active_set, "known_roles", ())
+            and not role_emitted_for_provider(current, active_set, config, provider)
+        ):
+            log.warning(
+                f"opencode.default-agent.dangling: default_agent '{current}' "
+                f"names role '{current}' which this sync does not generate "
+                "(orchestrator.mode main-chat?) — remove the key or set "
+                "orchestrator.mode: strict"
+            )
 
     # Gate-deny coupled to the entry point (#1006/IC-6 step 2): without an
     # explicit and generated primary role the deny would lock EVERY agent —
@@ -1296,7 +1328,7 @@ def _opencode_v2_gate_permissions(
     if not _resolve_effective_strict(orch, provider, agent_meta_root):
         return []
 
-    if _opencode_entry_point(provider, provider_config, active_set) is None:
+    if _opencode_entry_point(provider, provider_config, active_set, config) is None:
         return []
 
     return [
@@ -1666,7 +1698,7 @@ def reconcile_opencode_surface_gate(
     # Spec-A writer (QA-C-01). The tier is pure data (IC-03 resolver), never a
     # provider literal.
     entry = (
-        _opencode_entry_point(provider, provider_config, active_set)
+        _opencode_entry_point(provider, provider_config, active_set, config)
         if is_v2_surface
         else None
     )
