@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+import pytest
 import yaml
 
 # --------------------------------------------------------------------------- #
@@ -2701,3 +2702,55 @@ class TestCheckOriginBindHost(unittest.TestCase):
         with self.assertRaises(admin_server.SecurityError):
             self._check(origin="http://evil.example:7420", host="172.20.5.120:7420",
                         bind_host="172.20.5.120")
+
+
+# --------------------------------------------------------------------------- #
+# #1095: ``.agent-meta`` as a symlink (framework defaults stay readable)      #
+# --------------------------------------------------------------------------- #
+
+
+def _symlinked_root(tmp_path, config_is_link=False):
+    """Build a project root whose ``.agent-meta`` is a symlink to a framework
+    checkout. With ``config_is_link=True`` the framework's ``config`` directory
+    is itself a symlink pointing OUTSIDE the framework tree (R5)."""
+    fw = tmp_path / "fw"
+    if config_is_link:
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "role-defaults.yaml").write_text("secret: 1\n", encoding="utf-8")
+        fw.mkdir()
+        (fw / "config").symlink_to(outside, target_is_directory=True)
+    else:
+        (fw / "config").mkdir(parents=True)
+        (fw / "config" / "role-defaults.yaml").write_text("roles:\n  x: 1\n", encoding="utf-8")
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / ".agent-meta").symlink_to(fw, target_is_directory=True)
+    return root
+
+
+def test_symlinked_agent_meta_framework_defaults_readable(tmp_path):
+    mgr = admin_server.ConfigManager(_symlinked_root(tmp_path), mode="project_admin")
+    assert mgr.read("role-defaults") == {"roles": {"x": 1}}
+
+
+def test_symlink_target_outside_config_still_blocked(tmp_path):
+    mgr = admin_server.ConfigManager(
+        _symlinked_root(tmp_path, config_is_link=True), mode="project_admin")
+    with pytest.raises(admin_server.SecurityError):
+        mgr.read("role-defaults")
+
+
+def test_write_via_symlink_blocked(tmp_path):
+    root = _symlinked_root(tmp_path)
+    mgr = admin_server.ConfigManager(root, mode="super_admin")
+    with pytest.raises(admin_server.SecurityError, match="read-only"):
+        mgr.write("role-defaults", {"roles": {"y": 2}})
+    assert (tmp_path / "fw" / "config" / "role-defaults.yaml").read_text(
+        encoding="utf-8") == "roles:\n  x: 1\n"
+
+
+def test_dotdot_traversal_still_blocked(tmp_path):
+    mgr = admin_server.ConfigManager(_symlinked_root(tmp_path), mode="project_admin")
+    with pytest.raises(admin_server.SecurityError):
+        mgr.resolve_path("../etc")

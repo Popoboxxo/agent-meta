@@ -1082,6 +1082,13 @@ class ConfigManager:
         (``_build_agent_hierarchy``, ``_find_schema_path``). Otherwise the
         primary path is returned (the file may not exist yet).
 
+        Issue #1095: ``.agent-meta`` is frequently a symlink to a framework
+        checkout, so the fallback target resolves outside ``root``. Only the
+        framework link's ``config/`` subtree is allowed to escape; the
+        containment check keeps blocking everything else (including a
+        framework ``config`` that is itself a symlink pointing elsewhere).
+        Writes through the framework symlink are rejected in :py:meth:`write`.
+
         Deliberately mode-agnostic: ``_allowed_keys()`` always returns both
         ``PROJECT_FILES`` and ``SUPER_ADMIN_FILES`` so project_admin mode can
         still *view* framework defaults (e.g. ``role-defaults``). The write
@@ -1108,20 +1115,35 @@ class ConfigManager:
         # submodule layout (``.agent-meta/config/``) if the primary path does
         # not exist there. Project-admin files (.meta-config/...) never get a
         # fallback (they are always at the project root).
+        used_fallback = False
         if rel.startswith("config/") and not primary.exists():
             fallback = (self.root / ".agent-meta" / rel).resolve()
             if fallback.exists():
                 target = fallback
+                used_fallback = True
             else:
                 target = primary
         else:
             target = primary
 
-        # Ensure the resolved path stays within the project root.
+        # Ensure the resolved path stays within the project root. Issue #1095:
+        # ``.agent-meta`` may be a symlink to a framework checkout, so the
+        # fallback target resolves outside ``root``. That is allowed only for
+        # the ``config/`` subtree of the framework link; ``config`` itself is
+        # deliberately NOT resolved, so a framework ``config`` that is itself a
+        # symlink pointing elsewhere stays blocked (containment unchanged).
         try:
             target.relative_to(self.root)
-        except ValueError as exc:  # pragma: no cover - defence in depth
-            raise SecurityError(f"resolved path escapes root: {target}") from exc
+        except ValueError as exc:
+            fw_config = (self.root / ".agent-meta").resolve() / "config"
+            try:
+                inside_fw_config = (
+                    used_fallback and target.relative_to(fw_config) is not None
+                )
+            except ValueError:
+                inside_fw_config = False
+            if not inside_fw_config:
+                raise SecurityError(f"resolved path escapes root: {target}") from exc
         return target
 
     # ------------------------------------------------------------------ #
@@ -1158,6 +1180,13 @@ class ConfigManager:
         if not isinstance(data, (dict, list)):
             raise ValueError("Invalid payload type: expected object")  # noqa: TRY004
         path = self.resolve_path(key)
+        # Issue #1095: reading framework defaults through a symlinked
+        # ``.agent-meta`` is fine, writing through it is not -- the framework
+        # checkout must never be mutated by an admin-UI save.
+        try:
+            path.relative_to(self.root)
+        except ValueError as exc:
+            raise SecurityError("framework symlink is read-only via Admin UI") from exc
         path.parent.mkdir(parents=True, exist_ok=True)
 
         # Preserve block-literal (`|`) style for multi-line string values so an
