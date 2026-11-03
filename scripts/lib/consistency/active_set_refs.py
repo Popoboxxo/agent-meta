@@ -8,6 +8,11 @@ checks stay WARN/INFO. The scan covers per provider the agents, the rules
 no ``rules_dir``), the commands (``commands_dir``), the pipeline-details files
 and the context file.
 
+Frontmatter mentions (``active-set.dangling-mention-frontmatter``, WARNING,
+issue #1083) are reported separately from body mentions (INFO): an inactive
+role named in the generated frontmatter ``description`` reaches routing and
+display before any body text, so it is not a pure prose reference.
+
 Dispatch patterns are derived from ``config/delegation-syntax.yaml`` (per active
 provider, nothing hardcoded) plus the shared ``dispatch_phrases`` of
 ``config/active-set-references.yaml``. When no pattern can be derived for a
@@ -44,6 +49,7 @@ MANAGED_INDEX = ".agent-meta-managed"
 
 CHECK_DANGLING_DISPATCH = "active-set.dangling-dispatch"
 CHECK_DANGLING_MENTION = "active-set.dangling-mention"
+CHECK_DANGLING_MENTION_FM = "active-set.dangling-mention-frontmatter"
 CHECK_GATE_DROPPED = "active-set.gate-dropped"
 CHECK_UNKNOWN_ROLE = "active-set.unknown-role"
 CHECK_UNRESOLVED = "active-set.unresolved-placeholder"
@@ -147,6 +153,16 @@ def _read_lines(path: Path) -> list:
         return path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError):
         return []
+
+
+def _frontmatter_end(lines: list) -> int:
+    """1-based line number of the closing ``---``; ``0`` without a frontmatter."""
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for i, line in enumerate(lines[1:], start=2):
+        if line.strip() == "---":
+            return i
+    return 0
 
 
 def _rel(path: Path, project_root: Path) -> str:
@@ -260,10 +276,22 @@ def _collect(project_root, providers, active_set, kind: str) -> list:
             rel = _rel(path, project_root)
             if kind == "mention" and any(fnmatch.fnmatch(rel, g) for g in mention_allow):
                 continue
+            lines = _read_lines(path)
+            fm_end = _frontmatter_end(lines) if kind == "mention" else 0
             per_role: dict = {}
-            for lineno, dispatch, mentions in _line_hits(_read_lines(path), pats, dangling):
+            per_frontmatter: dict = {}
+            for lineno, dispatch, mentions in _line_hits(lines, pats, dangling):
                 for role in (dispatch if kind == "dispatch" else mentions):
-                    per_role.setdefault(role, []).append(lineno)
+                    if 0 < lineno <= fm_end:
+                        per_frontmatter.setdefault(role, []).append(lineno)
+                    else:
+                        per_role.setdefault(role, []).append(lineno)
+            for role, linenos in sorted(per_frontmatter.items()):
+                findings.append(Finding(
+                    Severity.WARNING, CHECK_DANGLING_MENTION_FM, rel,
+                    f"mention of inactive role '{role}' in frontmatter ({len(linenos)}x, "
+                    f"first line {linenos[0]})",
+                    "Name the role conditionally or neutrally in the description"))
             for role, linenos in sorted(per_role.items()):
                 if kind == "dispatch":
                     findings.append(Finding(

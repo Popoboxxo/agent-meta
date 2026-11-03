@@ -1,4 +1,5 @@
 """IC-19 active-set reference checks (Task 0b.3, AC-43)."""
+import re
 import sys
 from pathlib import Path
 
@@ -46,13 +47,17 @@ def test_p10_dangling_dispatch_covers_ac43_roles(synced):
 def test_p10_dangling_mention_is_info(synced):
     project, active = synced("p10")
     findings = asr.check_dangling_mention(project, _PROVIDERS, {}, active)
-    assert findings and all(f.severity == Severity.INFO for f in findings)
-    assert all(f.check == "active-set.dangling-mention" for f in findings)
-    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
+    # #1083: body mentions stay INFO, frontmatter mentions are WARNING.
+    body = [f for f in findings if f.check == "active-set.dangling-mention"]
+    frontmatter = [f for f in findings
+                   if f.check == "active-set.dangling-mention-frontmatter"]
+    assert body and all(f.severity == Severity.INFO for f in body)
+    assert all(f.severity == Severity.WARNING for f in frontmatter)
+    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in body}
     # Prose references (boundary lists, "Delegation (reference only)") are mentions.
     assert {("code-reviewer.md", "validator"), ("release.md", "validator"),
-            ("developer.md", "validator"), ("tester.md", "se-validator")} <= pairs
-    assert all("(" in f.message and "x," in f.message for f in findings)  # count + first line
+            ("developer.md", "validator"), ("tester.md", "se-test-engineer")} <= pairs
+    assert all("(" in f.message and "x," in f.message for f in body)  # count + first line
 
 
 def test_p20_gate_dropped_reports_senior_developer(synced):
@@ -303,6 +308,44 @@ def test_1071_active_principal_row_still_rendered(tmp_path_factory):
     project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
     text = (project / ".claude" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
     assert "| `principal-developer` |" in text
+
+
+# --- #1083: dangling role mentions in frontmatter are a WARNING --------------
+
+def test_1083_frontmatter_mention_is_warning_body_is_info(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "see se-test-engineer"\n---\n'
+                              "body mentions se-test-engineer\n")
+    found = asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+    by_check = {f.check: f for f in found}
+    assert set(by_check) == {"active-set.dangling-mention-frontmatter",
+                             "active-set.dangling-mention"}
+    assert by_check["active-set.dangling-mention-frontmatter"].severity == Severity.WARNING
+    assert by_check["active-set.dangling-mention"].severity == Severity.INFO
+
+
+def test_1083_no_frontmatter_only_info(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "body mentions se-test-engineer\n")
+    found = asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+    assert [f.severity for f in found] == [Severity.INFO]
+
+
+def test_1083_frontmatter_dispatch_phrase_stays_error(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "x"\n---\n'
+                              'background(agent="validator", prompt="x")\n')
+    assert [f.severity for f in asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)] == [
+        Severity.ERROR]
+
+
+def test_1083_templates_description_names_no_inactive_role():
+    # Frontmatter conditionals are parser-risky (decision D7): the descriptions
+    # name the sibling role neutrally instead of using a conditional block.
+    for name in ("tester", "data-engineer"):
+        text = (_ROOT / "agents" / "1-generic" / f"{name}.md").read_text(encoding="utf-8")
+        desc = re.search(r'^description: "(.*)"$', text, re.M).group(1)
+        assert "se-test-engineer" not in desc and "database-engineer" not in desc
 
 
 # `pt` is deliberately NOT part of this parametrization: the shared pipeline block
