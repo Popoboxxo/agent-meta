@@ -91,6 +91,23 @@
   `access: read` actions).
 
 ### Fixed
+- **A schema-invalid `auto_commit` block is surfaced by `--validate` and fails safe in
+  `sync` (#1091, deliberate asymmetry)**: `auto_commit_violations` in
+  `scripts/lib/auto_commit.py` checks the block with stdlib only (unknown `mode` or
+  trigger values, triggers without `mode: auto`, a missing `custom_script`, unknown keys,
+  a non-integer `file_count_threshold`). `sync.py --validate` reports each violation as
+  an `[ERROR]` and exits 1 so CI catches the drift; a plain `sync.py` stays rc 0 and
+  resolves the block to the fail-safe allowlist (`mode: off`, `eligible_roles: []`) with
+  a WARN — existing projects keep syncing, but commit authority is fully disabled with
+  no time-based grace. A valid or absent block is unchanged.
+- **Admin server reads framework `config/` through a symlinked `.agent-meta` (#1095)**:
+  `ConfigManager.resolve_path` in `scripts/admin-server.py` now accepts a fallback
+  target outside the project root only when it lies in the framework link's `config/`
+  subtree — a framework `config` that is itself a symlink pointing elsewhere stays
+  blocked, as does every other path and the `..`-traversal. Writes stay forbidden:
+  `write()` re-checks containment and rejects a save through the framework symlink with
+  "framework symlink is read-only via Admin UI", so the subtree is readable but never
+  mutable. Covered by `tests/test_admin_server.py`.
 - **`git` agent renders no empty remote-URL parentheses (#1093)**:
   `agents/1-generic/git.md` (2.1.1) keeps the platform name unconditional and puts only
   the `({{GIT_REMOTE_URL}})` suffix behind `GIT_REMOTE_URL_SET`, so a project without a
