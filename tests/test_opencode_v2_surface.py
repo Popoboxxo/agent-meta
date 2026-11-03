@@ -1767,6 +1767,57 @@ def test_v2_gate_permissions_empty_without_entry_point(tmp_path):
     )
 
 
+def test_v2_gate_permissions_empty_under_provider_scoped_main_chat(tmp_path):
+    """#1090/D16: ``_opencode_entry_point(..., config)`` resolves the mode.
+
+    A provider-scoped ``main-chat`` hides the primary role for this provider
+    only, so the v2 builder must return no triples even though the role is in
+    the active set (``_GENERATED``) and the global mode is strict.
+    """
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    capabilities = load_provider_capabilities(framework)
+    config = {
+        "orchestrator": {
+            "mode": "strict",
+            "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+        }
+    }
+
+    entries = isolation._opencode_v2_gate_permissions(
+        config, "Opencode", framework, {"Opencode": _v2_pc()}, capabilities,
+        "observe", active_set=_GENERATED,
+    )
+
+    assert entries == [], "a main-chat provider has no entry point, so no deny triples"
+
+    # Positive control: the same config without the override still yields them.
+    assert isolation._opencode_v2_gate_permissions(
+        _gate_config(), "Opencode", framework, {"Opencode": _v2_pc()},
+        capabilities, "observe", active_set=_GENERATED,
+    ) == [_EDIT_DENY, _SHELL_DENY]
+
+
+def test_reconcile_removes_triples_under_provider_scoped_main_chat(tmp_path):
+    """The reconciler drops recorded triples when the provider mode hides the role."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v2_triples(project)
+    config = {
+        "orchestrator": {
+            "mode": "strict",
+            "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+        }
+    }
+    log = SyncLog()
+
+    _reconcile(project, config, {"Opencode": _v2_pc()}, framework, log=log)
+
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+    # On the ``permission`` tier Spec A owns the coupling warning (row 6), so
+    # the reconciler stays silent — it must simply not re-add the triples.
+
+
 def test_v2_runtime_gate_skips_permission_map_step(tmp_path):
     """AC-C3 (Spec-A step 4 skipped): v2 gets ``default_agent`` only."""
     project = tmp_path / "project"
@@ -3477,8 +3528,8 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
     entry_point_calls = []
     real_entry_point = isolation._opencode_entry_point
 
-    def _spy(provider, provider_config, active_set):
-        role = real_entry_point(provider, provider_config, active_set)
+    def _spy(provider, provider_config, active_set, config=None):
+        role = real_entry_point(provider, provider_config, active_set, config)
         entry_point_calls.append(role)
         return role
 

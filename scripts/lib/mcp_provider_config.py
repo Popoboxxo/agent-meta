@@ -22,10 +22,12 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
 from .io import (
     SyncError,
+    _is_gitignored_target,
     _load_yaml_or_json,
     read_json_lenient,
     safe_path,
@@ -153,8 +155,47 @@ def _v2_oauth(conn: dict, secrets: dict | None) -> dict | None:
     return {key: rendered[key] for key in _V2_OAUTH_KEYS if key in rendered}
 
 
-def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
+# Host-local interpreter resolution at sync time (#1080/D17): the catalog names
+# ``python3`` (absent on some hosts is ``python``). Resolution is only allowed
+# for gitignored local outputs (``.mcp.json``, secrets files), because those are
+# per host; a *committed* config must keep the catalog value verbatim — otherwise
+# every host would rewrite the tracked file and ``sync.py --check`` would drift
+# across platforms. Revisit with #814 (invocation/cwd).
+_INTERPRETER_FALLBACKS: dict[str, tuple[str, ...]] = {"python3": ("python", "py")}
+
+
+def _resolve_stdio_command(cmd: str) -> str:
+    """Return *cmd* as-is if it resolves, else the first resolving fallback.
+
+    Only the catalog's interpreter aliases have fallbacks; any other command is
+    returned unchanged (no guessing). When nothing resolves the original name is
+    kept, so the health check can report ``mcp.command-unresolved``.
+
+    Callers must opt in (``resolve_interpreter=True``) and only do so for a
+    gitignored output; committed provider configs stay host-independent.
+    """
+    if not cmd:
+        return cmd
+    if shutil.which(cmd):
+        return cmd
+    for fallback in _INTERPRETER_FALLBACKS.get(cmd, ()):
+        if shutil.which(fallback):
+            return fallback
+    return cmd
+
+
+def _build_connection_entry(
+    conn: dict,
+    secrets: dict | None,
+    fmt: str | None = None,
+    *,
+    resolve_interpreter: bool = False,
+) -> dict:
     """Convert a registry connection block to a provider-config dict.
+
+    ``resolve_interpreter`` opt-in (#1080/D17): only a gitignored/local output
+    may substitute a host-local interpreter fallback; the default keeps the
+    catalog value verbatim so committed configs are byte-stable across hosts.
 
     The transport/header spelling is owned by the ``fmt`` value (never by a
     provider name — AC-14/AC-23):
@@ -218,7 +259,8 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
                 entry["headers"] = rendered
 
     elif orig_type == "stdio":
-        cmd = conn.get("command", "")
+        raw_cmd = conn.get("command", "")
+        cmd = _resolve_stdio_command(raw_cmd) if resolve_interpreter else raw_cmd
         args = list(conn.get("args", []))
         env = conn.get("env", {})
 
@@ -253,11 +295,15 @@ def _build_mcp_entries(
     secrets: dict | None,
     fmt: str | None = None,
     provider: str = "",
+    *,
+    resolve_interpreter: bool = False,
 ) -> dict:
     """Build a {server_name: config_dict} map for insertion into provider configs.
-    
+
     Respects per-server provider-skip: when a server lists the current provider
     in its provider-skip list, it is omitted (e.g. Honcho plugin for Opencode).
+    ``resolve_interpreter`` is forwarded to :func:`_build_connection_entry` and
+    must only be enabled for gitignored/local outputs (#1080/D17).
     """
     entries: dict = {}
     for server_name in active_servers:
@@ -270,7 +316,9 @@ def _build_mcp_entries(
         conn = server_def.get("connection")
         if not conn:
             continue
-        entries[server_name] = _build_connection_entry(conn, secrets, fmt)
+        entries[server_name] = _build_connection_entry(
+            conn, secrets, fmt, resolve_interpreter=resolve_interpreter
+        )
     return entries
 
 
@@ -747,8 +795,30 @@ def generate_provider_configs(
         secrets_data, _ = _load_yaml_or_json(secrets_path)
         secrets = secrets_data or {}
 
-    committed_entries = _build_mcp_entries(active_servers, registry, secrets=None, fmt=fmt, provider=provider)
-    local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets, fmt=fmt, provider=provider) if secrets else {}
+    committed_entries = _build_mcp_entries(
+        active_servers,
+        registry,
+        secrets=None,
+        fmt=fmt,
+        provider=provider,
+        resolve_interpreter=_is_gitignored_target(safe_path(project_root, committed_file)),
+    )
+    # Local/secrets outputs are gitignored by contract, so the host-local
+    # interpreter fallback is safe there (#1080/D17). The committed file above
+    # keeps the catalog value verbatim unless it is itself gitignored
+    # (same-file deployment such as Claude's .mcp.json).
+    local_entries = (
+        _build_mcp_entries(
+            active_servers,
+            registry,
+            secrets=secrets,
+            fmt=fmt,
+            provider=provider,
+            resolve_interpreter=True,
+        )
+        if secrets
+        else {}
+    )
 
     # --- Committed provider config ---
     committed_path = safe_path(project_root, committed_file)

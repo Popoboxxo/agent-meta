@@ -98,7 +98,7 @@ plugins:
       '
     connection:
       type: stdio
-      command: python
+      command: python3
       args:
       - scripts/viz-logger.py
       - --mcp
@@ -124,7 +124,7 @@ plugins:
       '
     connection:
       type: stdio
-      command: python
+      command: python3
       args:
       - scripts/viz-logger.py
       - --mcp
@@ -269,6 +269,8 @@ plugins:
       ai_derivation.*: Wann nutzen? Wenn du komplexe, abstrakte Requirements systematisch in technische Sub-Tasks aufschlüsseln musst.
 
       Schreibende Tools erfordern Editor- oder Admin-Rolle. Administrative/destruktive Namespaces (admin.*, user.*, etc.) sind aus Sicherheitsgründen hart blockiert.
+
+      Wenn das externe Plugin UND dieser Katalog-Server aktiv sind, beide Variablen (REQOGNILOOM_MCP_URL und MCP_REQOGNILOOM_URL) setzen oder eine Quelle deaktivieren.
       '
     connection:
       type: sse

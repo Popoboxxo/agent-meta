@@ -248,15 +248,17 @@ class TestExportSkillPackMiniRepo:
         summary = hermes_export.export_skill_pack(mini_meta, out)
         assert summary["dry_run"] is False
         assert summary["written"] == [
-            "roles/alpha/SKILL.md",
-            "roles/alpha/references/persona.md",
-            "roles/gamma/SKILL.md",
-            "roles/gamma/references/persona.md",
+            "roles/agent-meta-alpha/SKILL.md",
+            "roles/agent-meta-alpha/references/persona.md",
+            "roles/agent-meta-gamma/SKILL.md",
+            "roles/agent-meta-gamma/references/persona.md",
             "manifest.yaml",
         ]
         assert (out / "manifest.yaml").is_file()
-        assert (out / "roles" / "alpha" / "SKILL.md").is_file()
-        assert (out / "roles" / "alpha" / "references" / "persona.md").is_file()
+        assert (out / "roles" / "agent-meta-alpha" / "SKILL.md").is_file()
+        assert (
+            out / "roles" / "agent-meta-alpha" / "references" / "persona.md"
+        ).is_file()
 
     def test_excludes_deprecated_and_reserved(
         self, mini_meta: Path, tmp_path: Path
@@ -271,11 +273,13 @@ class TestExportSkillPackMiniRepo:
     ) -> None:
         out = tmp_path / "pack"
         hermes_export.export_skill_pack(mini_meta, out)
-        text = (out / "roles" / "alpha" / "SKILL.md").read_text(encoding="utf-8")
+        text = (out / "roles" / "agent-meta-alpha" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
         assert text.startswith("---\n")
         fm = yaml.safe_load(text.split("\n---\n", 1)[0].removeprefix("---\n"))
         assert fm["name"] == "agent-meta-alpha"
-        assert "Alpha role description." in fm["description"]
+        assert "Alpha test role." in fm["description"]
         assert "Triggers: Alpha, Test." in fm["description"]
         assert fm["version"] == "9.9.9-test"
         assert fm["metadata"]["agent-meta"]["role"] == "alpha"
@@ -298,14 +302,14 @@ class TestExportSkillPackMiniRepo:
         ]
         entry = manifest["roles"]["alpha"]
         assert entry["tier"] == "fast"
-        assert entry["description"] == "Alpha role description."
+        assert entry["description"] == "Alpha test role."
         assert entry["keywords"] == ["Alpha", "Test"]
         assert entry["output_contract"] == "dev-result-v1"
         assert entry["input_contracts"] == ["task-spec-v1"]
         assert entry["input_schema"] == "schemas/handoffs/task-spec.schema.json"
         assert entry["output_schema"] is None
-        assert entry["skill"] == "roles/alpha/SKILL.md"
-        assert entry["persona"] == "roles/alpha/references/persona.md"
+        assert entry["skill"] == "roles/agent-meta-alpha/SKILL.md"
+        assert entry["persona"] == "roles/agent-meta-alpha/references/persona.md"
 
     def test_manifest_paths_point_to_written_files(
         self, mini_meta: Path, tmp_path: Path
@@ -332,14 +336,49 @@ class TestExportSkillPackMiniRepo:
         hermes_export.export_skill_pack(mini_meta, out)
         assert _scan_model_ids(out) == []
 
-    def test_orphan_role_defaults_to_balanced_with_warning(
+    def test_template_only_role_has_no_tier_warning(
         self, mini_meta: Path, tmp_path: Path
     ) -> None:
-        # gamma has no role-defaults entry -> empty model value -> balanced.
+        # gamma is a base template without a role-defaults entry -> balanced,
+        # and that is expected (no warning). Only an existing entry with an
+        # empty/unknown model still warrants a warning.
         summary = hermes_export.export_skill_pack(mini_meta, tmp_path / "pack")
         assert summary["roles"]["gamma"]["tier"] == "balanced"
+        assert not any(
+            w.startswith("gamma:") for w in summary["warnings"]
+        )
+
+    def test_skill_dir_equals_frontmatter_name(
+        self, mini_meta: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "pack"
+        summary = hermes_export.export_skill_pack(mini_meta, out)
+        manifest = yaml.safe_load(summary["manifest"])
+        for role, entry in manifest["roles"].items():
+            text = (out / entry["skill"]).read_text(encoding="utf-8")
+            fm = yaml.safe_load(text.split("\n---\n", 1)[0].removeprefix("---\n"))
+            assert (
+                Path(entry["skill"]).parent.name
+                == fm["name"]
+                == f"agent-meta-{role}"
+            )
+
+    def test_description_prefers_template_frontmatter(
+        self, mini_meta: Path, tmp_path: Path
+    ) -> None:
+        summary = hermes_export.export_skill_pack(mini_meta, tmp_path / "pack")
+        assert summary["roles"]["alpha"]["description"] == "Alpha test role."
+
+    def test_entry_without_model_still_warns(self, tmp_path: Path) -> None:
+        root = _make_mini_meta(tmp_path)
+        _write_template(
+            root / "agents" / "1-generic" / "delta.md", "delta", "Delta test role."
+        )
+        with (root / "config" / "role-defaults.yaml").open("a", encoding="utf-8") as fh:
+            fh.write("  delta:\n    description: Delta.\n")
+        summary = hermes_export.export_skill_pack(root, tmp_path / "pack")
         assert any(
-            w.startswith("gamma: no abstract tier") for w in summary["warnings"]
+            w.startswith("delta: no abstract tier") for w in summary["warnings"]
         )
 
     def test_model_id_in_role_defaults_falls_back_with_warning(
@@ -402,7 +441,9 @@ class TestExportSkillPackMiniRepo:
             mini_meta, tmp_path / "pack", tier_overrides={"alpha": "max"}
         )
         assert summary["roles"]["alpha"]["tier"] == "max"
-        skill_text = (tmp_path / "pack" / "roles" / "alpha" / "SKILL.md").read_text(
+        skill_text = (
+            tmp_path / "pack" / "roles" / "agent-meta-alpha" / "SKILL.md"
+        ).read_text(
             encoding="utf-8"
         )
         assert 'tier: "max"' in skill_text
@@ -536,7 +577,7 @@ class TestCli:
         )
         assert code == 0
         assert (out / "manifest.yaml").is_file()
-        assert (out / "roles" / "alpha" / "SKILL.md").is_file()
+        assert (out / "roles" / "agent-meta-alpha" / "SKILL.md").is_file()
 
     def test_main_dry_run_writes_nothing(
         self, monkeypatch: pytest.MonkeyPatch, mini_meta: Path, tmp_path: Path
@@ -615,7 +656,7 @@ class TestRealRepoIntegration:
                 str(roles_cfg[role].get("model", ""))
             )
             assert entry["tier"] == expected
-            assert entry["skill"] == f"roles/{role}/SKILL.md"
+            assert entry["skill"] == f"roles/agent-meta-{role}/SKILL.md"
             skill_text = (out / entry["skill"]).read_text(encoding="utf-8")
             fm = yaml.safe_load(
                 skill_text.split("\n---\n", 1)[0].removeprefix("---\n")
@@ -632,7 +673,7 @@ class TestRealRepoIntegration:
         # excluded — see module docstring note).
         assert _MODEL_ID_RE.search(summary["manifest"]) is None
         for role in ("developer", "orchestrator"):
-            skill_text = (out / "roles" / role / "SKILL.md").read_text(
+            skill_text = (out / "roles" / f"agent-meta-{role}" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
             assert _MODEL_ID_RE.search(skill_text) is None

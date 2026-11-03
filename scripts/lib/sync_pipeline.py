@@ -97,6 +97,7 @@ from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
     sync_opencode_v2_managed_keys,
@@ -362,6 +363,8 @@ def _sync_stage_claude_base(
     env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
                      ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
     sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+    # #1080/D17: advisory MCP health — one WARN per unstartable active server.
+    check_mcp_health(agent_meta_root, project_root, config, log)
     return is_claude, gitignore_cfg, base_gitignore_entries, env_gitignore
 
 
