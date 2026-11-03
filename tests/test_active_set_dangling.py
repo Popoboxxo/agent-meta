@@ -348,6 +348,29 @@ def test_1083_templates_description_names_no_inactive_role():
         assert "se-test-engineer" not in desc and "database-engineer" not in desc
 
 
+# --- #1082: code spans/fences are documentation, not unresolved placeholders -
+
+def test_1082_placeholder_in_inline_code_and_fence_is_not_flagged(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "use `{{VAR}}` as example\n```\n{{FLAG_A}}\n```\n``{{X_Y}}``\n")
+    assert asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active) == []
+
+
+def test_1082_plain_and_mixed_placeholders_still_flagged(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "plain {{FOO}} text\nmixed `{{BAR}}` and {{BAZ}}\n")
+    found = asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active)
+    assert sorted(f.message.split()[2] for f in found) == ["{{BAZ}}", "{{FOO}}"]
+
+
+def test_1082_unclosed_fence_does_not_hide_the_rest(synced, tmp_path):
+    # A stray ``` must not blind the check for the whole file.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "text ``` stray\nplain {{FOO}}\n")
+    found = asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active)
+    assert [f.message.split()[2] for f in found] == ["{{FOO}}"]
+
+
 # `pt` is deliberately NOT part of this parametrization: the shared pipeline block
 # ("Review / Critic feedback") contains the English noun "feedback", which the
 # mention heuristic reports as a role mention. That false positive predates B1 and

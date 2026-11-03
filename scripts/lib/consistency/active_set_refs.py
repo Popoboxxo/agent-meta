@@ -165,6 +165,29 @@ def _frontmatter_end(lines: list) -> int:
     return 0
 
 
+def _non_code_lines(lines: list) -> list:
+    """Lines with fenced blocks blanked and inline code spans stripped.
+
+    Documentation examples such as ``{{VAR}}`` are escaped placeholders, not
+    unresolved variables (issue #1082): a fence line (````` ``` ````/``~~~``)
+    toggles the block state, everything inside it becomes ``""``, and inline
+    spans (`` `…` ``, `` ``…`` ``) are removed from the remaining lines. The
+    line count stays stable so a finding can still be traced to its line
+    number; ``variables.substitute`` already catches real unresolved
+    placeholders before rendering.
+    """
+    out = []
+    in_fence = False
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            out.append("")
+            continue
+        out.append("" if in_fence else re.sub(r"(`+)[^`\n]*?\1", "", line))
+    return out
+
+
 def _rel(path: Path, project_root: Path) -> str:
     return path.relative_to(project_root).as_posix()
 
@@ -319,6 +342,20 @@ def check_dangling_mention(project_root: Path, active_providers: Sequence[str],
     return _collect(Path(project_root), active_providers, active_set, "mention")
 
 
+def check_dangling_mention_frontmatter(project_root: Path, active_providers: Sequence[str],
+                                       capabilities: Mapping[str, Mapping],
+                                       active_set) -> list:
+    """Frontmatter-only subset of :func:`check_dangling_mention` (issue #1083).
+
+    Same scan, filtered to ``active-set.dangling-mention-frontmatter``: the
+    doctor registry resolves one check id to one ``check_<id>`` function, and
+    this WARNING is a distinct contract from the body-mention INFO.
+    """
+    return [f for f in check_dangling_mention(project_root, active_providers,
+                                              capabilities, active_set)
+            if f.check == CHECK_DANGLING_MENTION_FM]
+
+
 def check_gate_dropped(project_root: Path, active_providers: Sequence[str],
                        capabilities: Mapping[str, Mapping], active_set) -> list:
     return [Finding(
@@ -350,7 +387,7 @@ def check_unresolved_placeholder(project_root: Path, active_providers: Sequence[
     for provider in active_providers:
         for path in _scan_files(project_root, provider):
             counts: dict = {}
-            for line in _read_lines(path):
+            for line in _non_code_lines(_read_lines(path)):
                 for ph in _PLACEHOLDER_RE.findall(line):
                     if ph not in allow:
                         counts[ph] = counts.get(ph, 0) + 1
