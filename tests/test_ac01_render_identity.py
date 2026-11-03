@@ -9,6 +9,14 @@ produced on the pre-feature ``main`` state.
 Differences are only tolerated for paths matching ``AC01_EXCEPTIONS`` (the
 AC-01 exception list (i)-(v) of SPEC-CONTEXT-PROFILES-2026-10-11, kept as data).
 
+Host-local files are not part of the key set at all: ``settings.local.json`` is
+written into a gitignored path in every real project and may legitimately embed
+absolute host paths -- the machine-specific pytest basetemp in
+``permissions.additionalDirectories`` (#1079). Its content is therefore not part
+of the shipped render contract; pinning it would bake a username/temp path into
+this manifest and drift on every other machine. The exclusion applies on both
+sides (rendered key set and manifest), so a future rebaseline cannot re-pin it.
+
 Regenerate the manifest (only for a justified rebaseline; ``--write`` is only
 allowed on a clean, unmodified ``main`` state, rebaseline only with a documented
 reason, Spec AC-01):
@@ -759,6 +767,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   frontmatter-only for the ``git.md`` version pin (2.1.1 -> 2.1.2, its digest
   ``3bd5c31c…`` -> ``8857b666…``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1079 (host-local pytest basetemp; **no rebaseline**, 2026-11-03,
+  ``fix/test-basetemp-allowlist``): the new ``settings-allow-dirs-key`` writer adds the
+  resolved, machine-specific ``<temp>/<user>/pytest-agent-meta`` to
+  ``permissions.additionalDirectories`` of the gitignored
+  ``Claude/.claude/settings.local.json``, so exactly that one key drifted (1 of 1099).
+  The file is host-local by design (gitignored, never part of the shipped contract), so it
+  is excluded from the render-identity key set instead of being re-pinned: a rebaseline
+  would bake this machine's username/temp path into ``hashes.json`` and drift on every
+  other machine. ``hashes.json`` is NOT modified -- the three pre-existing
+  ``settings.local.json`` entries stay in the file but are ignored on both sides (a future
+  justified ``--write`` drops them). No other key embeds an absolute host path
+  (``sync.log`` was already skipped by ``_SKIP_RE``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
@@ -795,6 +816,19 @@ AC01_EXCEPTIONS = frozenset({
     r".*/meta-optimizer\.(md|toml|agent\.md)$",
     r".*/standalone/agents/meta-doctor\.md$",
 })
+
+# Host-local files: written into a gitignored path in every real project, so
+# their content is not part of the shipped render contract. Providers may put
+# machine-specific absolute paths into them (the pytest basetemp allow-list,
+# #1079), which a byte-identity baseline must never pin. Excluded on BOTH sides
+# (rendered key set and manifest) so a rebaseline cannot re-introduce them.
+_HOST_LOCAL_RE = re.compile(r"(^|/)settings\.local\.json$")
+
+
+def is_host_local(path: str) -> bool:
+    """True for gitignored, machine-specific files that never enter the key set."""
+    return bool(_HOST_LOCAL_RE.search(path))
+
 
 # Volatile, non-render artifacts: never part of the manifest.
 _SKIP_RE = re.compile(r"(^|/)(\.git)(/|$)|(^|/)sync\.log$|\.sync-backup-")
@@ -868,7 +902,7 @@ def render_matrix_hashes(fixture_root: Path) -> Dict[str, str]:
             if not f.is_file():
                 continue
             rel = f.relative_to(fixture_root).as_posix()
-            if _SKIP_RE.search(rel):
+            if _SKIP_RE.search(rel) or is_host_local(rel):
                 continue
             projects.append((rel, f))
     # Date captured once before and once after all syncs; both are normalized.
@@ -885,6 +919,8 @@ def diff_against_manifest(current: Dict[str, str], baseline: Dict[str, str]) -> 
     patterns = [re.compile(p) for p in AC01_EXCEPTIONS]
     drift = []
     for path in sorted(set(current) | set(baseline)):
+        if is_host_local(path):
+            continue
         if current.get(path) == baseline.get(path):
             continue
         if any(p.match(path) for p in patterns):
@@ -921,6 +957,32 @@ def test_ac01_detects_drift(rendered):
         assert diff_against_manifest(mutated, baseline) == [f"changed: {victim}"]
     finally:
         target.write_bytes(original)
+
+
+def test_ac01_render_key_set_excludes_host_local_settings(rendered):
+    """Host-local settings must never become a render-identity key (#1079)."""
+    _root, current = rendered
+    assert not [path for path in current if is_host_local(path)]
+    assert "Claude/.claude/settings.local.json" not in current
+
+
+def test_ac01_host_local_settings_are_ignored_on_both_sides():
+    assert is_host_local("Claude/.claude/settings.local.json")
+    assert is_host_local("Gemini/.gemini/settings.local.json")
+    assert is_host_local("Opencode/.opencode/settings.local.json")
+    # Narrow on purpose: only the gitignored local settings overlay is excluded.
+    assert not is_host_local("Claude/.claude/settings.json")
+    assert not is_host_local("Claude/.claude/settings.local.json.bak")
+
+    baseline = {
+        "Claude/.claude/settings.local.json": "host-a",
+        "Claude/.claude/settings.json": "committed",
+    }
+    current = {"Claude/.claude/settings.local.json": "host-b"}
+    # The host-local digest change is inert; the missing committed key still drifts.
+    assert diff_against_manifest(current, baseline) == [
+        "removed: Claude/.claude/settings.json"
+    ]
 
 
 def test_ac01_hash_ignores_model_id(tmp_path):
