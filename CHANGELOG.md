@@ -164,6 +164,43 @@
   allowed. An explicit `--recurse-submodules`/`--no-recurse-submodules` still wins
   over the config. The config of a foreign repository (`-C`/`GIT_DIR`) remains a
   documented gap.
+- **Opencode entry point only names an emitted role (#1090, behavior change)**:
+  the new `active_set.role_emitted_for_provider` predicate backs
+  `_opencode_entry_point`, so a fresh project no longer gets a `default_agent` when
+  the role is missing from the active set or is the orchestrator with
+  `orchestrator.mode: main-chat` (that agent is deliberately not emitted then, and
+  the gate-deny is already coupled to the entry point). The resolver is
+  provider-agnostic: the only provider input is
+  `orchestrator.provider-overrides.<provider>`, never a name comparison. A
+  **user-written** `default_agent` that names a role this sync does not generate is
+  never deleted — the user value wins and the sync emits one
+  `opencode.default-agent.dangling` WARN, restricted to `known_roles` so a foreign
+  agent name is not flagged. Covered by `tests/test_opencode_main_chat_entry_point.py`.
+- **MCP commands resolve `python3` and the sync reports MCP health (#1080)**:
+  `config/plugin-catalog.yaml` names `python3` for the repo-owned viz-logger stdio
+  servers, and `_resolve_stdio_command` in `scripts/lib/mcp_provider_config.py`
+  falls back to the first interpreter that resolves on the host (`python`, then
+  `py`) so a host without the alias still starts the server; every other command is
+  passed through unchanged and an unresolvable one keeps its catalog name. The new
+  `scripts/lib/mcp_health.py` emits one advisory WARN per active server —
+  `mcp.secret-empty` (a required secret is set neither non-empty in
+  `secrets.local.yaml` nor in the environment) and `mcp.command-unresolved` (a
+  stdio command does not resolve after the fallback) — and never an error, so a
+  missing optional memory server such as honcho only warns. The ReqogniLoom agent
+  hint now documents the two parallel variable names (`REQOGNILOOM_MCP_URL` and
+  `MCP_REQOGNILOOM_URL`) for the case where the external plugin and the catalog
+  server are both enabled.
+- **Hermes export matches the registered skill name, description and tier
+  (#1094)**: `scripts/hermes_export.py` writes each skill into
+  `roles/agent-meta-<role>/`, so the directory equals the `name:` in that `SKILL.md`
+  — Hermes registers skills by name, so the previous `roles/<role>/` path stayed
+  invisible under the registered name (the `agent-meta-` prefix keeps the namespace
+  collision-free). The template frontmatter `description` now wins over
+  `config/role-defaults.yaml` (role-defaults `description`/`short_desc` are the
+  fallbacks, the role name the last resort), because base templates such as the
+  provider experts have no role-defaults entry at all. A missing role-defaults
+  entry is the expected state and resolves to tier `balanced` without a warning;
+  only an existing entry with an empty or unknown `model` still warns.
 
 ## [2.0.0-beta.6] - 2026-10-31
 
