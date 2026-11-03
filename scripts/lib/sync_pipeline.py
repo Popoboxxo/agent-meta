@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 from lib.agent_sync import sync_agents_for_provider
-from lib.auto_commit import resolve_auto_commit_config
+from lib.auto_commit import auto_commit_violations, resolve_auto_commit_config
 from lib.commands import sync_commands_for_provider
 from lib.config import (
     _orch_mode_flags,
@@ -1673,6 +1673,13 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     commit authority. The allowlist comes from the sanctioned
     ``ActiveSet.raw_roles`` (``None`` == no ``roles:`` key -> empty list)."""
     active_roles = sorted(active_set.raw_roles) if active_set.raw_roles is not None else []
+    # Issue #1091: an invalid block must not break sync (existing projects
+    # keep syncing, rc=0), but commit authority is disabled fail-safe and the
+    # user is told loudly. No time-based grace.
+    for _violation in auto_commit_violations(config):
+        log.warn(
+            f"auto_commit is invalid ({_violation}); "
+            "commit authority disabled (mode: off)")
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
     resolved["eligible_roles"] = [
         role for role in resolved["eligible_roles"] if active_set.has(role)

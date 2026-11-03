@@ -1500,18 +1500,49 @@ def _build_core_variables(
     # eligibility itself is resolved again, per-provider, by Task 6's
     # sync-pipeline stage (this variable only needs mode-level content,
     # not the per-role allowlist).
-    from .auto_commit import render_auto_commit_block
+    from .auto_commit import (
+        INVALID_CONFIG_MARKER,
+        auto_commit_violations,
+        render_auto_commit_block,
+    )
 
     _auto_commit_cfg = config.get("auto_commit", {}) or {}
-    _auto_commit_resolved = {
-        "mode": _auto_commit_cfg.get("mode", "off"),
-        "triggers": _auto_commit_cfg.get("triggers", []),
-        "file_count_threshold": _auto_commit_cfg.get("file_count_threshold", 5),
-        "custom_script": _auto_commit_cfg.get("custom_script"),
-        "secret_scan": _auto_commit_cfg.get("secret_scan", True),
-    }
+    if auto_commit_violations(config):
+        # Issue #1091 (PR #1118 blocking finding): the same fail-safe as
+        # resolve_auto_commit_config -- an invalid block is treated as
+        # ``mode: off`` with an empty effective block. The marker makes
+        # render_auto_commit_block emit an explicit "off" notice instead of
+        # an empty section: on hookless providers (has_hooks: false) no guard
+        # hook enforces the allowlist, so the rendered prose is the only
+        # place the fail-safe can reach the agent.
+        _auto_commit_resolved = {
+            "mode": "off",
+            "triggers": [],
+            "file_count_threshold": 5,
+            "custom_script": None,
+            "secret_scan": True,
+            INVALID_CONFIG_MARKER: True,
+        }
+    else:
+        _threshold = _auto_commit_cfg.get("file_count_threshold", 5)
+        if isinstance(_threshold, float) and _threshold.is_integer():
+            # schema type: integer -- 5.0 is valid, render it as 5.
+            _threshold = int(_threshold)
+        _auto_commit_resolved = {
+            "mode": _auto_commit_cfg.get("mode", "off"),
+            "triggers": _auto_commit_cfg.get("triggers", []),
+            "file_count_threshold": _threshold,
+            "custom_script": _auto_commit_cfg.get("custom_script"),
+            "secret_scan": _auto_commit_cfg.get("secret_scan", True),
+        }
+    # ``AUTO_COMMIT_ENABLED`` gates the {{#if}} block. The fail-safe notice
+    # must render, so the gate stays "true" even though the effective mode is
+    # "off" -- the notice itself tells the agent not to commit.
     variables["AUTO_COMMIT_ENABLED"] = (
-        "true" if _auto_commit_resolved["mode"] != "off" else "false"
+        "true"
+        if _auto_commit_resolved["mode"] != "off"
+        or _auto_commit_resolved.get(INVALID_CONFIG_MARKER)
+        else "false"
     )
     # Global fallback rendered at the default "direct" authority, for paths
     # outside the per-role overlay (e.g. standalone/skill rendering). The

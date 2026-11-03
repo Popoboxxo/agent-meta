@@ -1427,6 +1427,15 @@ def _handle_validate(ctx: _SyncContext) -> None:
     if _unpaired_tags:
         consistency_errors += len(_unpaired_tags)
 
+    # Schema-invalid auto_commit block (issue #1091): sync stays rc=0 and
+    # disables commit authority fail-safe, but `--validate` must surface the
+    # misconfiguration as a hard error so CI catches it before it rots.
+    from lib.auto_commit import auto_commit_violations
+
+    for _ac_violation in auto_commit_violations(config):
+        log.warning(f"config-audit [ERROR] auto_commit: {_ac_violation}")
+        consistency_errors += 1
+
     # Tool-privilege / role-name mismatch (issue #575): warns only, does not
     # block validation -- a role claiming "read-only" in its persona but
     # carrying Write/Edit is a smell worth a human look, not a hard failure.

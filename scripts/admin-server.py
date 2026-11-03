@@ -1069,6 +1069,15 @@ class ConfigManager:
         # Always allow reading both so project_admin mode can view framework defaults
         return {**PROJECT_FILES, **SUPER_ADMIN_FILES}
 
+    @staticmethod
+    def _is_relative_to(path: Path, base: Path) -> bool:
+        """True if ``path`` lives under ``base`` (no ``None`` sentinel)."""
+        try:
+            path.relative_to(base)
+        except ValueError:
+            return False
+        return True
+
     def resolve_path(self, key: str) -> Path:
         """Translate a logical config key (e.g. ``role-defaults``) to its
         absolute path on disk.
@@ -1082,6 +1091,13 @@ class ConfigManager:
         (``_build_agent_hierarchy``, ``_find_schema_path``). Otherwise the
         primary path is returned (the file may not exist yet).
 
+        Issue #1095: ``.agent-meta`` is frequently a symlink to a framework
+        checkout, so the fallback target resolves outside ``root``. Only the
+        framework link's ``config/`` subtree is allowed to escape; the
+        containment check keeps blocking everything else (including a
+        framework ``config`` that is itself a symlink pointing elsewhere).
+        Writes through the framework symlink are rejected in :py:meth:`write`.
+
         Deliberately mode-agnostic: ``_allowed_keys()`` always returns both
         ``PROJECT_FILES`` and ``SUPER_ADMIN_FILES`` so project_admin mode can
         still *view* framework defaults (e.g. ``role-defaults``). The write
@@ -1092,6 +1108,16 @@ class ConfigManager:
             SecurityError: if ``key`` is unknown, or the resolved path would
                 escape ``root`` (path traversal protection). Does NOT raise
                 for mode restrictions -- see :py:meth:`write`.
+        """
+        return self._resolve_path_with_flag(key)[0]
+
+    def _resolve_path_with_flag(self, key: str) -> tuple[Path, bool]:
+        """Resolve ``key`` and report whether the framework fallback was used.
+
+        ``write`` needs the flag: a fallback target can still live *inside*
+        ``root`` (``.agent-meta`` symlinked to an in-root checkout), so
+        containment alone is not enough to keep the vendored framework config
+        read-only (D15, PR #1118 advisory 1).
         """
         if not isinstance(key, str) or not key:
             raise SecurityError("invalid config key")
@@ -1108,21 +1134,28 @@ class ConfigManager:
         # submodule layout (``.agent-meta/config/``) if the primary path does
         # not exist there. Project-admin files (.meta-config/...) never get a
         # fallback (they are always at the project root).
+        used_fallback = False
         if rel.startswith("config/") and not primary.exists():
             fallback = (self.root / ".agent-meta" / rel).resolve()
             if fallback.exists():
                 target = fallback
+                used_fallback = True
             else:
                 target = primary
         else:
             target = primary
 
-        # Ensure the resolved path stays within the project root.
-        try:
-            target.relative_to(self.root)
-        except ValueError as exc:  # pragma: no cover - defence in depth
-            raise SecurityError(f"resolved path escapes root: {target}") from exc
-        return target
+        # Ensure the resolved path stays within the project root. Issue #1095:
+        # ``.agent-meta`` may be a symlink to a framework checkout, so the
+        # fallback target resolves outside ``root``. That is allowed only for
+        # the ``config/`` subtree of the framework link; ``config`` itself is
+        # deliberately NOT resolved, so a framework ``config`` that is itself a
+        # symlink pointing elsewhere stays blocked (containment unchanged).
+        if not self._is_relative_to(target, self.root):
+            fw_config = (self.root / ".agent-meta").resolve() / "config"
+            if not (used_fallback and self._is_relative_to(target, fw_config)):
+                raise SecurityError(f"resolved path escapes root: {target}")
+        return target, used_fallback
 
     # ------------------------------------------------------------------ #
     # Read / write                                                       #
@@ -1157,7 +1190,15 @@ class ConfigManager:
         # A valid config document is always a mapping or a sequence.
         if not isinstance(data, (dict, list)):
             raise ValueError("Invalid payload type: expected object")  # noqa: TRY004
-        path = self.resolve_path(key)
+        path, used_fallback = self._resolve_path_with_flag(key)
+        # Issue #1095 / D15: reading framework defaults through a symlinked
+        # ``.agent-meta`` is fine, writing through it is not. The fallback flag
+        # matters even when the target is INSIDE ``root`` (a symlink to an
+        # in-root vendored checkout passes containment but must stay read-only
+        # -- PR #1118 advisory 1). A path that escapes ``root`` is rejected for
+        # the same reason.
+        if used_fallback or not self._is_relative_to(path, self.root):
+            raise SecurityError("framework symlink is read-only via Admin UI")
         path.parent.mkdir(parents=True, exist_ok=True)
 
         # Preserve block-literal (`|`) style for multi-line string values so an

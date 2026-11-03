@@ -59,6 +59,20 @@ _CONFIG_ERROR_LINE = (
     "config error instead of committing."
 )
 
+# Issue #1091 (PR #1118 blocking finding): an invalid ``auto_commit`` block
+# resolves to the fail-safe ``mode: off``. On providers without a verified
+# hook (``has_hooks: false``) no guard script ever enforces the allowlist, so
+# the rendered prose is the only place the fail-safe can reach the agent --
+# it must say "off" explicitly instead of disappearing silently.
+INVALID_CONFIG_MARKER = "_auto_commit_invalid"
+
+_DISABLED_LINE = (
+    "**Commit authority (issue #694): off** -- the project's `auto_commit` "
+    "block is invalid, so commit authority is disabled (fail-safe). Do NOT "
+    "run `git add`/`git commit`; report the misconfiguration to the user "
+    "instead."
+)
+
 
 def _template_path(role: str, agent_meta_root: Path, platform: str | None = None) -> Path | None:
     """Resolve a role's own generic template path.
@@ -139,6 +153,101 @@ def is_role_eligible(role: str, agent_meta_root: Path, platform: str | None = No
     return role_commit_authority(role, agent_meta_root, platform) == AUTHORITY_DIRECT
 
 
+_MODES = ("off", "suggest", "auto", "custom")
+_TRIGGERS = (
+    "task-boundary",
+    "per-edit",
+    "context-pressure",
+    "file-count-threshold",
+    "custom",
+)
+_KEYS = {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan"}
+
+
+def auto_commit_violations(config: dict) -> list[str]:
+    """Return schema violations of the ``auto_commit`` block (issue #1091).
+
+    Pure stdlib check -- the sync path must not depend on jsonschema being
+    installed. Every message is prefixed with ``auto_commit.`` so it is
+    greppable in both ``--validate`` and sync output. A missing block (or an
+    explicit ``null``) is valid and yields ``[]``.
+    """
+    ac_cfg = (config or {}).get("auto_commit")
+    if ac_cfg is None:
+        return []
+    if not isinstance(ac_cfg, dict):
+        return ["auto_commit must be a mapping"]
+
+    violations: list[str] = []
+
+    mode = ac_cfg.get("mode", "off")
+    if mode not in _MODES:
+        violations.append(
+            f"auto_commit.mode '{mode}' is not one of off|suggest|auto|custom")
+
+    triggers = ac_cfg.get("triggers", [])
+    if not isinstance(triggers, list):
+        violations.append("auto_commit.triggers must be a list")
+        triggers = []
+    else:
+        bad = [str(t) for t in triggers if t not in _TRIGGERS]
+        if bad:
+            violations.append(
+                f"auto_commit.triggers contains unknown value(s): {', '.join(bad)}")
+        # schema: triggers.uniqueItems = true
+        duplicates = sorted({str(t) for t in triggers if triggers.count(t) > 1})
+        if duplicates:
+            violations.append(
+                "auto_commit.triggers contains duplicate value(s): "
+                + ", ".join(duplicates))
+
+    if triggers and mode != "auto":
+        violations.append("auto_commit.triggers is only valid with mode: auto")
+
+    custom_script = ac_cfg.get("custom_script")
+    # schema: type ["string", "null"]
+    if custom_script is not None and not isinstance(custom_script, str):
+        violations.append("auto_commit.custom_script must be a string or null")
+    if (mode == "custom" or "custom" in triggers) and not (
+        isinstance(custom_script, str) and custom_script.strip()
+    ):
+        violations.append(
+            "auto_commit.custom_script is required for mode: custom or trigger: custom")
+
+    # schema: type boolean
+    secret_scan = ac_cfg.get("secret_scan", True)
+    if not isinstance(secret_scan, bool):
+        violations.append("auto_commit.secret_scan must be a boolean")
+
+    unknown = sorted(set(ac_cfg) - _KEYS)
+    if unknown:
+        violations.append(f"auto_commit has unknown key(s): {', '.join(unknown)}")
+
+    threshold = ac_cfg.get("file_count_threshold", 5)
+    if not _is_positive_integer(threshold):
+        violations.append("auto_commit.file_count_threshold must be an integer >= 1")
+
+    return violations
+
+
+def _is_positive_integer(value) -> bool:
+    """JSON-Schema ``type: integer`` semantics: 5.0 is an integer, 5.5 is not."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value >= 1
+    if isinstance(value, float):
+        return value.is_integer() and value >= 1
+    return False
+
+
+def _normalize_threshold(value) -> int:
+    """Return ``value`` as an int when it is an integral float (5.0 -> 5)."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
 def resolve_auto_commit_config(
     config: dict,
     active_roles: list[str],
@@ -152,7 +261,22 @@ def resolve_auto_commit_config(
     `eligible_roles` lists only active roles with DIRECT commit capability
     (Bash + Edit/Write). It is deliberately mode-independent (capability, not
     a mode-gated grant); the guard hook keys the actual sentinel on `mode`.
+
+    Issue #1091: a schema-invalid block never raises (sync must not break
+    existing projects) -- it resolves to a fail-safe allowlist with commit
+    authority fully disabled. No time-based grace.
     """
+    if auto_commit_violations(config):
+        return {
+            "version": ALLOWLIST_VERSION,
+            "mode": "off",
+            "eligible_roles": [],
+            "triggers": [],
+            "file_count_threshold": 5,
+            "custom_script": None,
+            "secret_scan": True,
+        }
+
     ac_cfg = config.get("auto_commit", {}) or {}
     mode = ac_cfg.get("mode", "off")
 
@@ -167,7 +291,8 @@ def resolve_auto_commit_config(
         "mode": mode,
         "eligible_roles": eligible_roles,
         "triggers": list(ac_cfg.get("triggers", [])),
-        "file_count_threshold": ac_cfg.get("file_count_threshold", 5),
+        "file_count_threshold": _normalize_threshold(
+            ac_cfg.get("file_count_threshold", 5)),
         "custom_script": ac_cfg.get("custom_script"),
         "secret_scan": ac_cfg.get("secret_scan", True),
     }
@@ -204,6 +329,12 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
     role's exclusive job. An unknown/None `authority` fails CLOSED (rendered
     as "none", i.e. ""); only the explicit default parameter is "direct".
     """
+    # Issue #1091 fail-safe: an invalid block is rendered as an explicit
+    # "off" notice for every authority (see INVALID_CONFIG_MARKER) -- the
+    # rendered prose is the only enforcement path on hookless providers.
+    if resolved.get(INVALID_CONFIG_MARKER):
+        return _DISABLED_LINE
+
     if authority not in (
         AUTHORITY_DIRECT,
         AUTHORITY_DELEGATE,
