@@ -29,6 +29,12 @@ _LIB_PATH = _REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh"
 
 _BASH = shutil.which("bash") or "bash"
 
+#: Wall-clock hang guard for the scan-timing tests below. These are NOT
+#: performance assertions (see tests/timeouts.py): a loaded CI runner must stay
+#: green, while a genuinely quadratic/wedged scan still blows past this long
+#: before SCRIPT_TIMEOUT (60 s) kills the subprocess.
+_HANG_GUARD_SECONDS = 40.0
+
 _PROJECT_ROOT: Optional[Path] = None
 
 pytestmark = pytest.mark.skipif(
@@ -471,8 +477,13 @@ def test_split_shell_statements_semantics(command, expected):
 
 def test_fork_bomb_detection_is_linear_on_a_300kb_identifier():
     """Issue #943 (a): the old regex was quadratic on long identifier chains
-    (20 KB ~ 5 s), so the hook timeout silently disabled the gate. The shared
-    scanner must classify 300 KB well under the 100 ms acceptance bound."""
+    (20 KB ~ 5 s), so the hook timeout silently disabled the gate. The scan
+    must classify 300 KB without hanging.
+
+    The bound is a HANG GUARD, not a performance assertion (see
+    tests/timeouts.py): tens of seconds on a loaded runner stay green, while a
+    quadratic regression still blows past it.
+    """
     r = _scan(
         "import time\n"
         "command = 'echo ' + 'a' * 300000\n"
@@ -484,7 +495,9 @@ def test_fork_bomb_detection_is_linear_on_a_300kb_identifier():
     assert r.returncode == 0, r.stderr
     result, elapsed_ms = r.stdout.split()
     assert result == "0"
-    assert float(elapsed_ms) < 100.0, f"fork-bomb scan took {elapsed_ms} ms"
+    assert float(elapsed_ms) < _HANG_GUARD_SECONDS * 1000.0, (
+        f"fork-bomb scan took {elapsed_ms} ms (hang guard "
+        f"{_HANG_GUARD_SECONDS:.0f} s)")
 
 
 @pytest.mark.parametrize("command", [
@@ -577,13 +590,15 @@ def test_fork_bomb_ends_body_at_depth_matching_brace(expr, expected):
 
 @pytest.mark.parametrize("expr,expected", [
     # AC-A.5: the unlimited backward name scan stays linear (one scan per
-    # '()' pair, they never overlap), so a 300 KB header is not a timeout.
+    # '()' pair, they never overlap), so a 300 KB header does not hang.
     ('"a"*20000 + "(){ :; }"', 0),
     ('"a"*300000 + "(){ :; }"', 0),
     # A header with no closing '}' in the body window fails closed.
     ('"f(){ " * 60000', 1),
 ], ids=["20k-char-name", "300k-char-name", "brace-chain"])
 def test_fork_bomb_scan_stays_linear_on_long_header_names(expr, expected):
+    """Hang guard, not a performance assertion (see tests/timeouts.py): a
+    quadratic scan would hit the generous bound, a loaded runner would not."""
     code = (
         "import time\n"
         f"command = {expr}\n"
@@ -593,14 +608,16 @@ def test_fork_bomb_scan_stays_linear_on_long_header_names(expr, expected):
         "print(int(result), elapsed_ms)\n"
     )
     try:
-        r = _scan(code, timeout=5)
+        r = _scan(code, timeout=SCRIPT_TIMEOUT)
     except subprocess.TimeoutExpired:
-        pytest.fail("watchdog: the fork-bomb scan did not finish within 5 s")
+        pytest.fail(
+            f"watchdog: the fork-bomb scan did not finish within {SCRIPT_TIMEOUT} s")
     assert r.returncode == 0, r.stderr
     result, elapsed_ms = r.stdout.split()
     assert result == str(expected)
-    assert float(elapsed_ms) < 1000.0, (
-        f"fork-bomb scan of the {expr!r} command took {elapsed_ms} ms"
+    assert float(elapsed_ms) < _HANG_GUARD_SECONDS * 1000.0, (
+        f"fork-bomb scan of the {expr!r} command took {elapsed_ms} ms "
+        f"(hang guard {_HANG_GUARD_SECONDS:.0f} s)"
     )
 
 

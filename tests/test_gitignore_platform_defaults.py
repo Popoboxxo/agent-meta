@@ -14,12 +14,16 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import pytest
 
+from lib.context import ensure_gitignore_entries
 from lib.generated_file_drift import PLATFORM_DEFAULTS_RESOLVED_REL
 from lib.gitignore import (
     FRAMEWORK_GENERATED_ENTRIES,
+    GITIGNORE_BLOCK_BEGIN,
+    GITIGNORE_BLOCK_END,
     compute_base_gitignore_entries,
     framework_baseline_entries,
 )
+from lib.log import SyncLog
 
 _PC = {"Claude": {"has_dedicated_context_file": True, "agents_dir": ".claude/agents",
                   "gitignore_entries": [".claude/settings.local.json"]}}
@@ -50,3 +54,31 @@ def test_git_check_ignore_matches_entry(tmp_path):
     r = subprocess.run(
         ["git", "check-ignore", "-q", PLATFORM_DEFAULTS_RESOLVED_REL], cwd=tmp_path)
     assert r.returncode == 0
+
+
+def test_written_managed_block_contains_and_ignores_snapshot(tmp_path):
+    """C1 integration: round-trip compute -> ensure_gitignore_entries -> git.
+
+    The unit assertions above cover the computed entry list and a hand-written
+    .gitignore line; neither proves that the entry the syncer actually WRITES
+    reaches the managed block (and therefore that git ignores the generated
+    snapshot on a real project). This drives the real writer and then asks git.
+    """
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    entries = compute_base_gitignore_entries(["Claude"], _PC, {})
+    assert PLATFORM_DEFAULTS_RESOLVED_REL in entries
+
+    ensure_gitignore_entries(
+        tmp_path, SyncLog(), dry_run=False, exact_entries=entries)
+
+    written = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    begin = written.index(GITIGNORE_BLOCK_BEGIN)
+    end = written.index(GITIGNORE_BLOCK_END)
+    assert begin < end, written
+    block_lines = written[begin:end].splitlines()
+    assert PLATFORM_DEFAULTS_RESOLVED_REL in block_lines, written
+
+    r = subprocess.run(
+        ["git", "check-ignore", "-q", PLATFORM_DEFAULTS_RESOLVED_REL],
+        cwd=tmp_path, capture_output=True, text=True)
+    assert r.returncode == 0, f"git check-ignore rc={r.returncode} out={r.stdout!r} err={r.stderr!r}\n{written}"
