@@ -2068,3 +2068,44 @@ tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py
 tests/test_opencode_v2_surface.py -q` → **alle passed**, rc `0`; `scripts/sync.py
 --validate` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest:
 9 von 1099 Hashes geändert, 0 added/removed, per Entry gepatcht (kein `--write`).
+
+---
+
+## 22. Re-Baseline der Golden-Baseline für 5 Rollen (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Der Bug-Batch PR B (`fix/consistency-false-positives`) schließt drei
+> Konsistenz-Falsch-Positive: #1071 (Dispatch-Tabellen folgen dem ActiveSet via
+> `ROLE_<R>_ACTIVE`), #1083 (Frontmatter-Rollen-Mention ist nur noch ein
+> `active-set.dangling-mention-frontmatter`-WARNING; `tester`/`data-engineer`-Beschreibungen
+> rollenneutral) und #1082 (Code-Spans/-Fences werden vom Platzhalter-Check ignoriert).
+> Fünf Templates wurden minor gebumpt (`orchestrator` 8.9.0, `senior-developer` 1.11.0,
+> `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0). Das Gate meldet die
+> Drift als „diff not attributable to declared normalizations" (bzw. bei `orchestrator`
+> als „unexpected diff on an unmigrated role").
+
+**Geändert (5 Fixtures):** `orchestrator.md` (+2/−2), `senior-developer.md` (+2/−2),
+`meta-feedback.md` (+2/−2), `tester.md` (+4/−4) und `data-engineer.md` (+3/−3) — jeweils
+**nur** Frontmatter-Pins (`version:`, `generated-from:`); bei `tester` und `data-engineer`
+zusätzlich die #1083-Beschreibungszeilen. Die übrigen 53 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+
+**Ursache:** Rollen-Template-Versionierung plus zwei Beschreibungstext-Korrekturen, kein
+migrierter Block. Der Rot-Lauf wies ausschließlich diese Frontmatter-Zeilen aus; der
+echte Sync-Render (`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-regen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz entweder der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist oder innerhalb einer deklarierten B2b-Normalisierung
+liegt (bei `meta-feedback` die `PI-BLANK`-Region). `_NORMALIZATIONS`, `_LOCATORS`,
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht betroffen;
+die eingefrorenen Meta-Tokens und die `model:`-Pins bleiben unverändert
+(`_GOLDEN_MODEL_MAP`).
+
+**Herkunft:** Der reale Sync-Render diente als Referenz; da alle Bodies byte-identisch
+bzw. normalisierungsgedeckt sind, wurden die fünf Goldens **frontmatter-only** neu
+gepinnt — die eingefrorenen Inline-Regionen der B2b-Goldens bleiben dadurch erhalten.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py
+tests/test_compact_matrix.py -q` → **alle passed**, rc `0`; `scripts/sync.py --validate`
+rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 36 von 1099
+Hashes geändert (die vier Matrix-Rollen `data-engineer`/`meta-feedback`/`orchestrator`/
+`tester` × 9 Provider), 0 added/removed, per Entry gepatcht (kein `--write`).

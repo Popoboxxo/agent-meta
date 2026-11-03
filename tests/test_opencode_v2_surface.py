@@ -5407,9 +5407,16 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # hashes (the `git` agent render of every provider); `slimming-golden` re-pinned for
 # the `git.md` version pin (2.1.1 -> 2.1.2, frontmatter only); `compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Bug batch PR B (#1071 dispatch gating, #1083 frontmatter-mention warning,
+# #1082 code-span placeholder skip): `ac01-baseline` re-pinned — 36 hashes
+# (`data-engineer`, `meta-feedback`, `orchestrator` and `tester` × 9 providers);
+# `slimming-golden` re-pinned for the five touched role goldens (`data-engineer`,
+# `meta-feedback`, `orchestrator`, `senior-developer`, `tester`; frontmatter incl.
+# the two #1083 descriptions); `compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "74290aada8345c25dc4d93b86af464bb42cab3bde05df0cef7856c8159406c3e",
-    "slimming-golden": "8857b666c88425b724989049d0dcf841dcf5a089b4a0e364fb07eea38d3ee74a",
+    "ac01-baseline": "2adf04f66db9670ebe05b448a8e1e9e38935e9a2c0b4ebcf0b9ccbf5f24c50af",
+    "slimming-golden": "607b6c8afad8de18151e68171326efdc50bc50dfdf57ea4a66069e989ee4ee79",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 

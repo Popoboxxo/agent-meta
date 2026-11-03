@@ -229,6 +229,28 @@
   provider experts have no role-defaults entry at all. A missing role-defaults
   entry is the expected state and resolves to tier `balanced` without a warning;
   only an existing entry with an empty or unknown `model` still warns.
+- **Dispatch tables follow the active set instead of naming inactive roles (#1071)**:
+  the worker dispatch/NEXT lines are gated on their target role (`ROLE_<R>_ACTIVE`), so
+  a project that deactivates a role no longer renders a dangling hand-off to it. The
+  five touched templates are minor-bumped (`orchestrator` 8.9.0, `senior-developer`
+  1.11.0, `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0);
+  `hacs-tester` follows `tester@2.10.0`. **behavior change:** the consistency check
+  stops reporting dangling-dispatch false positives for routes whose target is simply
+  inactive, and the generated tables only list renderable targets.
+- **A frontmatter role mention is a WARNING, not an error (#1083)**:
+  `active-set.dangling-mention-frontmatter` replaces the hard error for a role mention
+  that only appears in a template's frontmatter description, because that text is
+  metadata, not a dispatch. The `tester` and `data-engineer` descriptions are rewritten
+  role-neutrally (no hard reference to `se-test-engineer` or `database-engineer`), so
+  they stay accurate in projects where those roles are inactive. **behavior change:**
+  projects that previously failed the consistency check on a description-only mention
+  now pass with a WARNING.
+- **Code spans and fences are ignored by the placeholder check (#1082)**:
+  the consistency check skips `{{PLACEHOLDER}}`-shaped text inside inline code spans
+  and fenced code blocks, so escaped documentation examples (for example the
+  `{{VAR}}` → renders-as-`{{VAR}}` convention) are no longer flagged as unknown
+  placeholders. **behavior change:** a real unknown placeholder in running text is
+  still reported; only code-context occurrences are exempt.
 
 ## [2.0.0-beta.6] - 2026-10-31
 
