@@ -11,7 +11,8 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 from lib.active_set import compute_active_set  # noqa: E402
 from lib.consistency import active_set_refs as asr  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
-from tests.active_set_render import sync_configs_parallel, synced_project  # noqa: E402
+from tests.active_set_render import (  # noqa: E402
+    sync_configs_parallel, synced_project, tiers_on_config)
 
 _FIX = Path(__file__).resolve().parent / "fixtures" / "active-set"
 _AC43_ROLES = ("senior-developer", "validator", "bug-feature-analyzer",
@@ -268,7 +269,7 @@ def matrix(tmp_path_factory):
     instead (see ``_SHARED_CONTEXT_HARD_CAP``); the allowlisted fixtures keep
     the full matrix.
     """
-    names = ("p10", "p20", "pall", "ha")
+    names = ("p10", "p20", "pall", "ha", "pt")
     configs = {name: yaml.safe_load(
         (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
         for name in names}
@@ -281,13 +282,34 @@ def matrix(tmp_path_factory):
             for name in names}
 
 
-@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha", "pt"])
 def test_ac49_no_dangling_dispatch_over_provider_matrix(matrix, name):
     project, active = matrix[name]
     found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
     assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
 
 
+def test_1071_inactive_principal_and_feedback_not_dispatched(matrix):
+    # The dev tiers are on (junior+senior) but `principal-developer` and `feedback`
+    # are not in the allowlist: no generated artifact may dispatch either of them.
+    project, active = matrix["pt"]
+    assert "principal-developer" not in active.roles and "feedback" not in active.roles
+    found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+def test_1071_active_principal_row_still_rendered(tmp_path_factory):
+    # Positive control: the gate must not hide the row when the role IS active.
+    project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
+    text = (project / ".claude" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
+    assert "| `principal-developer` |" in text
+
+
+# `pt` is deliberately NOT part of this parametrization: the shared pipeline block
+# ("Review / Critic feedback") contains the English noun "feedback", which the
+# mention heuristic reports as a role mention. That false positive predates B1 and
+# lives in the pipeline source (scripts/lib/pipelines.py), not in the templates
+# this task owns; it stays an INFO finding on `pt`.
 @pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
 def test_ac49_no_dangling_mention_in_orchestrator_pipelines_commands(matrix, name):
     project, active = matrix[name]

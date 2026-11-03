@@ -1,0 +1,18 @@
+# developer tiers ON (junior+senior) but WITHOUT principal-developer and WITHOUT feedback (#1071).
+agent-meta-version: "2.0.0-beta.4"
+ai-providers:
+- Claude
+roles:
+- orchestrator
+- developer
+- junior-developer
+- senior-developer
+- tester
+- documenter
+- git
+- requirements
+- planner
+- code-reviewer
+- explorer
+- release
+- meta-feedback
