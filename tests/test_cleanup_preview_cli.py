@@ -151,8 +151,10 @@ def test_preview_emits_single_json_object(tmp_path):
     assert stale["adopted"] is False
 
     # IC-05/N-01 gap: the preview recomputes the would-be prune set purely.
+    # Issue #1081: retention is count-only -- only the 3 newest survive.
     assert claude["backups_to_prune"] == [
-        ".claude/agents/old.md.sync-backup-20200101-000000"
+        ".claude/agents/old.md.sync-backup-20200101-000000",
+        ".claude/agents/old.md.sync-backup-20200102-000000",
     ]
 
 

@@ -73,6 +73,7 @@ from lib.generated_file_drift import (
     migrate_managed_artifact,
     prune_sync_backups,
     remove_managed_artifact,
+    resolve_drift_findings,
     scan_generated_file_drift,
 )
 from lib.gitignore import (
@@ -934,8 +935,9 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
-# OQ-2 (frozen): bounded backup retention. Both thresholds must be exceeded;
-# the newest backup of a source is never pruned.
+# OQ-2 (revised #1081): bounded backup retention, count-only. The newest
+# `SYNC_BACKUP_MAX_PER_SOURCE` backups of a source survive; the age value is
+# still passed through for API stability but no longer drives pruning.
 SYNC_BACKUP_MAX_AGE_DAYS = 30
 SYNC_BACKUP_MAX_PER_SOURCE = 3
 
@@ -1012,37 +1014,57 @@ def _prune_managed_sync_backups(
 def _sync_stage_generated_file_drift_scan(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, args: argparse.Namespace, log: SyncLog,
-) -> None:
+) -> list[dict]:
     """Early drift scan -- runs BEFORE _sync_stage_per_provider overwrites
-    anything, so it can still see a manual edit made since the last sync.
-    Warn-only for the drift signal itself: the edit is still overwritten
-    (skip-overwrite is an explicit non-goal), but a timestamped
-    `.sync-backup-<ts>` sibling of every drifted file is written first as a
-    safety net (issue #734)."""
+    anything, so it can still capture the pre-overwrite content of a
+    manually edited file.
+
+    The scan itself only collects findings (each carrying ``pre_text``); the
+    real-vs-stale decision, the backup and the warning happen in
+    _sync_stage_generated_file_drift_resolve() AFTER the writers ran
+    (issue #1081: a stale hash baseline is not a manual edit)."""
+    findings: list[dict] = []
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
     else:
         findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
-        backups = backup_drifted_files(findings, project_root, log, args.dry_run)
-        backup_name_by_source = {
-            backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
-        }
-        for finding in findings:
-            backup_name = backup_name_by_source.get(finding["path"])
-            backup_note = f" Backup written to {backup_name}." if backup_name else ""
-            log.warning(
-                f"generated-file-drift: '{finding['path']}' was manually edited "
-                f"since the last sync (provider '{finding['provider']}') -- this "
-                f"sync will overwrite it.{backup_note} Add it to "
-                ".meta-config/drift-allowlist.yaml if this edit should be "
-                "preserved going forward."
-            )
 
     # AC-09/OQ-2 (R-02): the backup pruner runs **unconditionally** -- also when
     # drift detection is disabled -- because cleanup backups (IC-05) are written
     # outside this stage. Gating it behind the drift-enabled guard left the
     # `.sync-backup-*` growth unbounded with `drift-detection.enabled: false`.
     _prune_managed_sync_backups(project_root, config, provider_config, args, log)
+    return findings
+
+
+def _sync_stage_generated_file_drift_resolve(
+    project_root: Path, findings: list[dict], args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Post-writer drift decision: back up and warn only for real edits.
+
+    Runs after _sync_stage_per_provider, so it can compare the now-written
+    file against the ``pre_text`` captured by the scan. Equal content means
+    the baseline was stale, not that the user edited the file -- no backup,
+    no warning (issue #1081). The edit is still overwritten; the backup is a
+    safety net, not preservation.
+    """
+    if not findings:
+        return
+    real = resolve_drift_findings(findings, project_root, log, args.dry_run)
+    backups = backup_drifted_files(real, project_root, log, args.dry_run)
+    backup_name_by_source = {
+        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+    }
+    for finding in real:
+        backup_name = backup_name_by_source.get(finding["path"])
+        backup_note = f" Backup written to {backup_name}." if backup_name else ""
+        log.warning(
+            f"generated-file-drift: '{finding['path']}' was manually edited "
+            f"since the last sync (provider '{finding['provider']}') -- this "
+            f"sync will overwrite it.{backup_note} Add it to "
+            ".meta-config/drift-allowlist.yaml if this edit should be "
+            "preserved going forward."
+        )
 
 
 def _sync_stage_platform_defaults_snapshot(

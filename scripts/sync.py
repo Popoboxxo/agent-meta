@@ -624,14 +624,12 @@ def _preview_backups_to_prune(
     """Pure would-be-prune list for ``target_dir`` (IC-06 ``backups_to_prune``).
 
     ``generated_file_drift.prune_sync_backups`` is a no-op in dry-run (IC-05),
-    so the preview recomputes the very same dual-threshold candidate set without
-    deleting anything: age strictly greater than *max_age_days* AND strictly
-    more than *max_per_source* newer backups for the same source. The naming /
-    timestamp helpers are imported from the pruner module so only the threshold
-    decision is mirrored here.
+    so the preview recomputes the very same count-only candidate set without
+    deleting anything: at least *max_per_source* newer backups for the same
+    source (issue #1081 -- age is ignored, the newest always survives). The
+    naming / timestamp helpers are imported from the pruner module so only the
+    threshold decision is mirrored here.
     """
-    from datetime import datetime
-
     from lib.generated_file_drift import (
         _is_sync_backup_name,
         _sync_backup_source,
@@ -655,16 +653,14 @@ def _preview_backups_to_prune(
             continue
         backups.append((path, _sync_backup_source(path.name), stamp))
 
-    now = datetime.now()
+    keep = max(max_per_source, 1)
     prunable: list = []
     for path, source, stamp in backups:
-        if (now - stamp).days <= max_age_days:
-            continue
         newer = sum(
             1 for _other, other_source, other_stamp in backups
             if other_source == source and other_stamp > stamp
         )
-        if newer <= max_per_source:
+        if newer < keep:
             continue
         prunable.append(_relative_posix(path, project_root))
     return sorted(prunable)

@@ -86,6 +86,7 @@ from lib.sync_pipeline import (
     _sync_stage_external_skills_check,
     _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
+    _sync_stage_generated_file_drift_resolve,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
     _sync_stage_knowledge_and_isolation,
@@ -1546,8 +1547,9 @@ def _handle_sync(ctx: _SyncContext) -> None:
                                providers, ctx.args, ctx.log)
     # Stage 5b: generated-file drift scan -- MUST run before stage 6
     # overwrites anything (see docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md).
-    _sync_stage_generated_file_drift_scan(ctx.agent_meta_root, ctx.project_root,
-                                          config, provider_config, ctx.args, ctx.log)
+    drift_findings = _sync_stage_generated_file_drift_scan(
+        ctx.agent_meta_root, ctx.project_root, config, provider_config,
+        ctx.args, ctx.log)
     # Stage 5c: write the resolved platform-preset snapshot -- AFTER the drift
     # scan (it is a hash-tracked generated file) and before the hash capture.
     _sync_stage_platform_defaults_snapshot(ctx.agent_meta_root, ctx.project_root,
@@ -1577,6 +1579,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
                           env_gitignore, ctx.args, ctx.viz_cfg, ctx.log)
     # Stage 12: lightweight config-audit summary.
     _sync_stage_config_audit(ctx.agent_meta_root, ctx.config_path, ctx.log)
+    # Stage 12b: generated-file drift decision -- the writers have now run, so
+    # only findings whose file actually changed are real manual edits
+    # (issue #1081); backup + WARN happen here, before the hash capture.
+    _sync_stage_generated_file_drift_resolve(
+        ctx.project_root, drift_findings, ctx.args, ctx.log)
     # Stage 13: generated-file hash-baseline capture -- MUST run last, after
     # every writer above, so it captures fully post-write state.
     _sync_stage_generated_file_hash_capture(ctx.agent_meta_root, ctx.project_root,

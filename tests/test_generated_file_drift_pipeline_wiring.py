@@ -50,6 +50,16 @@ def _write(root, rel: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def test_hash_capture_stage_runs_after_drift_resolve_stage() -> None:
+    """Issue #1081: the drift decision must happen after the writers ran and
+    before the hash baseline is re-captured."""
+    source = inspect.getsource(cli_commands._handle_sync)
+    per_provider_pos = source.index("_sync_stage_per_provider(")
+    resolve_pos = source.index("_sync_stage_generated_file_drift_resolve(")
+    capture_pos = source.index("_sync_stage_generated_file_hash_capture(")
+    assert per_provider_pos < resolve_pos < capture_pos
+
+
 def test_drift_scan_stage_skips_and_warns_nothing_when_disabled(tmp_path) -> None:
     from scripts.lib.log import SyncLog
     from scripts.lib.sync_pipeline import _sync_stage_generated_file_drift_scan
@@ -118,19 +128,26 @@ def _drifted_agent_project(tmp_path):
 
 
 def test_drift_scan_stage_writes_backup_and_names_it_in_warning(tmp_path) -> None:
-    """Issue #734: the stage writes the `.sync-backup-<ts>` sibling BEFORE
-    the writers run and names it in the warning."""
+    """Issue #734/#1081: the resolve stage writes the `.sync-backup-<ts>`
+    sibling (from the scan-captured pre_text) AFTER the writers ran and names
+    it in the warning."""
     from scripts.lib.log import SyncLog
-    from scripts.lib.sync_pipeline import _sync_stage_generated_file_drift_scan
+    from scripts.lib.sync_pipeline import (
+        _sync_stage_generated_file_drift_resolve,
+        _sync_stage_generated_file_drift_scan,
+    )
     import argparse
 
     project_root, provider_config = _drifted_agent_project(tmp_path)
     log = SyncLog()
     args = argparse.Namespace(dry_run=False)
 
-    _sync_stage_generated_file_drift_scan(
+    findings = _sync_stage_generated_file_drift_scan(
         tmp_path / "agent-meta", project_root, {}, provider_config, args, log,
     )
+    # Simulate the per-provider writers that run between scan and resolve.
+    _write(project_root, ".claude/agents/developer.md", "generated content")
+    _sync_stage_generated_file_drift_resolve(project_root, findings, args, log)
 
     backup_files = list(
         (project_root / ".claude" / "agents").glob("developer.md.sync-backup-*")
@@ -145,16 +162,20 @@ def test_drift_scan_stage_writes_backup_and_names_it_in_warning(tmp_path) -> Non
 
 def test_drift_scan_stage_writes_no_backup_in_dry_run(tmp_path) -> None:
     from scripts.lib.log import SyncLog
-    from scripts.lib.sync_pipeline import _sync_stage_generated_file_drift_scan
+    from scripts.lib.sync_pipeline import (
+        _sync_stage_generated_file_drift_resolve,
+        _sync_stage_generated_file_drift_scan,
+    )
     import argparse
 
     project_root, provider_config = _drifted_agent_project(tmp_path)
     log = SyncLog()
     args = argparse.Namespace(dry_run=True)
 
-    _sync_stage_generated_file_drift_scan(
+    findings = _sync_stage_generated_file_drift_scan(
         tmp_path / "agent-meta", project_root, {}, provider_config, args, log,
     )
+    _sync_stage_generated_file_drift_resolve(project_root, findings, args, log)
 
     assert list((project_root / ".claude" / "agents").glob("*.sync-backup-*")) == []
     assert any("Backup written to" in warning for warning in log.warnings), log.warnings

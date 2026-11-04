@@ -520,6 +520,95 @@ def test_backup_is_fail_soft_when_target_is_missing(tmp_path: Path) -> None:
     assert backups == []
 
 
+from scripts.lib.generated_file_drift import resolve_drift_findings
+
+
+def _finding(rel: str, pre_text: str) -> dict:
+    return {"path": rel, "provider": "Claude", "pre_text": pre_text}
+
+
+def test_scan_findings_carry_pre_text(tmp_path: Path, monkeypatch) -> None:
+    """Issue #1081: the scan must capture the pre-write content, because the
+    writers overwrite the file before the drift decision is made."""
+    from scripts.lib import generated_file_drift as gfd
+
+    project_root = tmp_path / "project"
+    target = project_root / ".claude/agents/a.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("edited", encoding="utf-8")
+    gfd._save_hashes(project_root, {".claude/agents/a.md": gfd.content_hash("orig")}, dry_run=False)
+    monkeypatch.setattr(gfd, "_iter_managed_files", lambda *a, **k: [target])
+    monkeypatch.setattr(gfd, "get_active_providers", lambda c, p: ["Claude"])
+
+    assert gfd.scan_generated_file_drift(project_root / "am", project_root, {}, {"Claude": {}}) == [
+        {"path": ".claude/agents/a.md", "provider": "Claude", "pre_text": "edited"}
+    ]
+
+
+def test_stale_baseline_no_warning_no_backup(tmp_path: Path) -> None:
+    """A baseline that merely lagged behind the generated content is not a
+    manual edit: no backup, no warning -- just a stale-baseline note."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/a.md", "fresh")
+    log = SyncLog()
+
+    real = resolve_drift_findings([_finding(".claude/agents/a.md", "fresh")], project_root, log, dry_run=False)
+
+    assert real == []
+    assert list(project_root.rglob("*.sync-backup-*")) == []
+    assert log.warnings == []
+    assert any("stale hash baseline" in info for info in log.infos)
+
+
+def test_real_edit_backed_up_from_pre_text(tmp_path: Path) -> None:
+    """R3: the writer already overwrote the manual edit, so the backup must
+    come from the content captured by the scan, not from the disk."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/a.md", "generated v2")
+    log = SyncLog()
+
+    real = resolve_drift_findings(
+        [_finding(".claude/agents/a.md", "user edit")], project_root, log, dry_run=False,
+    )
+
+    assert [r["path"] for r in real] == [".claude/agents/a.md"]
+    backups = backup_drifted_files(real, project_root, log, dry_run=False)
+    assert len(backups) == 1
+    assert (project_root / backups[0]).read_text(encoding="utf-8") == "user edit"
+
+
+def test_dry_run_writes_nothing(tmp_path: Path) -> None:
+    """R3: --dry-run reports the pending findings/backups but writes nothing."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/a.md", "user edit")
+    log = SyncLog()
+    findings = [_finding(".claude/agents/a.md", "user edit")]
+
+    assert resolve_drift_findings(findings, project_root, log, dry_run=True) == findings
+    assert len(backup_drifted_files(findings, project_root, log, dry_run=True)) == 1
+    assert list(project_root.rglob("*.sync-backup-*")) == []
+
+
+def test_resolve_treats_unreadable_file_as_real(tmp_path: Path) -> None:
+    """Fail-safe: an unreadable file cannot prove the writer overwrote the
+    edit, so it stays a real finding instead of being silently dropped."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+
+    real = resolve_drift_findings(
+        [_finding(".claude/agents/gone.md", "user edit")], project_root, SyncLog(), dry_run=False,
+    )
+
+    assert [r["path"] for r in real] == [".claude/agents/gone.md"]
+
+
 from datetime import datetime, timedelta
 
 from scripts.lib.generated_file_drift import prune_sync_backups
@@ -576,41 +665,43 @@ def test_prune_never_deletes_newest_backup(tmp_path: Path) -> None:
     assert pruned  # older, over-threshold backups are still pruned
 
 
-def test_prune_requires_both_thresholds(tmp_path: Path) -> None:
-    """AC-09: prune only when age > max_age_days AND > max_per_source newer exist."""
+def test_prune_keeps_three_newest_regardless_of_age(tmp_path: Path) -> None:
+    """Issue #1081: retention is count-only -- the 3 newest backups per
+    source survive even when they are all younger than max_age_days."""
     from scripts.lib.log import SyncLog
     project_root = tmp_path / "project"
     target_dir = project_root / ".claude" / "agents"
-
-    # (a) Age threshold NOT exceeded: many recent backups survive.
-    for days in (1, 2, 3, 4, 5, 6):
-        _write_backup(project_root, ".claude/agents/recent.md", _stamp(days))
-
-    # (b) Count threshold NOT exceeded: fewer than (> max_per_source) newer backups.
-    _write_backup(project_root, ".claude/agents/few.md", _stamp(100))
-    _write_backup(project_root, ".claude/agents/few.md", _stamp(90))
-
-    # (c) Both thresholds exceeded for the oldest of five old siblings.
-    many_stamps = [_stamp(days) for days in (100, 90, 80, 70, 60)]
-    for stamp in many_stamps:
-        _write_backup(project_root, ".claude/agents/many.md", stamp)
-
-    # (d) Age boundary: exactly 30 days old is not > 30, 31 days is.
-    boundary_stamps = [_stamp(days) for days in (31, 30, 29, 28, 27, 26)]
-    for stamp in boundary_stamps:
-        _write_backup(project_root, ".claude/agents/boundary.md", stamp)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(10):
+        (target_dir / f"a.md.sync-backup-20261031-0100{i:02d}").write_text("x", encoding="utf-8")
 
     pruned = prune_sync_backups(
         target_dir, project_root, SyncLog(), dry_run=False,
         max_age_days=30, max_per_source=3,
     )
 
-    pruned_names = {Path(p).name for p in pruned}
-    assert pruned_names == {
-        f"many.md.sync-backup-{many_stamps[0]}",
-        f"boundary.md.sync-backup-{boundary_stamps[0]}",
+    left = sorted(p.name for p in target_dir.iterdir())
+    assert left == [f"a.md.sync-backup-20261031-0100{i:02d}" for i in (7, 8, 9)]
+    assert {Path(p).name for p in pruned} == {
+        f"a.md.sync-backup-20261031-0100{i:02d}" for i in (0, 1, 2, 3, 4, 5, 6)
     }
-    assert _backup_count(target_dir) == 6 + 2 + 5 + 6 - 2
+
+
+def test_prune_single_old_backup_survives(tmp_path: Path) -> None:
+    """Issue #1081: age is ignored -- a lone, ancient backup is never pruned."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    (target_dir / "a.md.sync-backup-20260101-000000").write_text("x", encoding="utf-8")
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert pruned == []
+    assert [p.name for p in target_dir.iterdir()] == ["a.md.sync-backup-20260101-000000"]
 
 
 def test_prune_ignores_non_backup_names(tmp_path: Path) -> None:
@@ -657,7 +748,8 @@ def test_prune_skips_unparsable_timestamp(tmp_path: Path) -> None:
 
 
 def test_prune_default_policy_three_and_thirty(tmp_path: Path) -> None:
-    """OQ-2: with max_per_source=3 and max_age_days=30 the newest four survive."""
+    """OQ-2/#1081: with max_per_source=3 exactly the 3 newest survive; the
+    age argument stays in the API but no longer drives pruning."""
     from scripts.lib.log import SyncLog
     project_root = tmp_path / "project"
     target_dir = project_root / ".claude" / "agents"
@@ -674,10 +766,10 @@ def test_prune_default_policy_three_and_thirty(tmp_path: Path) -> None:
         f"a.md.sync-backup-{stamps[100]}",
         f"a.md.sync-backup-{stamps[90]}",
         f"a.md.sync-backup-{stamps[80]}",
+        f"a.md.sync-backup-{stamps[70]}",
     }
     remaining = {p.name for p in target_dir.iterdir()}
     assert remaining == {
-        f"a.md.sync-backup-{stamps[70]}",
         f"a.md.sync-backup-{stamps[60]}",
         f"a.md.sync-backup-{stamps[50]}",
         f"a.md.sync-backup-{stamps[1]}",

@@ -151,14 +151,16 @@ def prune_sync_backups(
 
     Only direct children of *target_dir* are considered, and only names that
     match ``_is_sync_backup_name`` with a parsable ``YYYYmmdd-HHMMSS`` suffix
-    (per the ``backup_drifted_files`` convention). A backup is pruned only when
-    **both** thresholds are exceeded: its age is strictly greater than
-    *max_age_days* AND strictly more than *max_per_source* newer backups exist
-    for the same source. The most recent backup of a source therefore survives
-    unconditionally, as do non-backup names and unparsable-timestamp names.
+    (per the ``backup_drifted_files`` convention). Retention is **count-only**
+    (issue #1081): a backup is pruned when at least *max_per_source* newer
+    backups of the same source exist. The newest backup of a source therefore
+    survives unconditionally, as do non-backup names and unparsable-timestamp
+    names.
 
-    Recommended default policy (OQ-2): ``max_per_source=3``,
-    ``max_age_days=30``; callers pass the values explicitly.
+    *max_age_days* is kept for API stability but ignored -- the dual-threshold
+    (age AND count) policy let 409 backups accumulate because files younger
+    than the age threshold were never pruned. Recommended default policy
+    (OQ-2): ``max_per_source=3``; callers pass the values explicitly.
 
     No-op in ``dry_run`` (returns ``[]``, no filesystem mutation). Fail-soft: a
     per-file ``OSError`` is logged at debug level and iteration continues.
@@ -185,16 +187,15 @@ def prune_sync_backups(
             continue
         backups.append((path, _sync_backup_source(path.name), stamp))
 
-    now = datetime.now()
+    # A zero/negative cap must never delete the newest backup of a source.
+    keep = max(max_per_source, 1)
     pruned: list[str] = []
     for path, source, stamp in backups:
-        if (now - stamp).days <= max_age_days:
-            continue
         newer = sum(
             1 for _other, other_source, other_stamp in backups
             if other_source == source and other_stamp > stamp
         )
-        if newer <= max_per_source:
+        if newer < keep:
             continue
         try:
             path.unlink()
@@ -320,6 +321,10 @@ def scan_generated_file_drift(
     A file with no stored hash yet (first sync, or newly added to a
     managed index) is never a finding -- there is nothing to compare
     against yet.
+
+    Each finding carries ``pre_text`` -- the pre-overwrite content read
+    here. The writers run between this scan and ``resolve_drift_findings``,
+    so this snapshot is the only evidence of the user's edit (issue #1081).
     """
     stored_hashes = _load_hashes(project_root)
     allowlist = _load_allowlist_patterns(project_root)
@@ -334,29 +339,82 @@ def scan_generated_file_drift(
             stored = stored_hashes.get(rel_path)
             if stored is None:
                 continue
-            current = content_hash(abs_path.read_text(encoding="utf-8"))
-            if current == stored:
+            try:
+                text = abs_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if content_hash(text) == stored:
                 continue
             if is_allowlisted(rel_path, allowlist):
                 continue
-            findings.append({"path": rel_path, "provider": provider})
+            findings.append({"path": rel_path, "provider": provider, "pre_text": text})
 
     resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL
     stored_resolved = stored_hashes.get(PLATFORM_DEFAULTS_RESOLVED_REL)
     if stored_resolved is not None and resolved_path.is_file():
-        current_resolved = content_hash(resolved_path.read_text(encoding="utf-8"))
-        if current_resolved != stored_resolved and not is_allowlisted(PLATFORM_DEFAULTS_RESOLVED_REL, allowlist):
-            findings.append({"path": PLATFORM_DEFAULTS_RESOLVED_REL, "provider": "platform-defaults"})
+        try:
+            text = resolved_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            text = None
+        if text is not None and content_hash(text) != stored_resolved \
+                and not is_allowlisted(PLATFORM_DEFAULTS_RESOLVED_REL, allowlist):
+            findings.append({
+                "path": PLATFORM_DEFAULTS_RESOLVED_REL,
+                "provider": "platform-defaults",
+                "pre_text": text,
+            })
 
     return findings
+
+
+def resolve_drift_findings(
+    findings: list[dict], project_root: Path, log: SyncLog, dry_run: bool,
+) -> list[dict]:
+    """Decide which scan findings are real manual edits, AFTER the writers ran.
+
+    A finding is real when the on-disk content no longer equals the
+    ``pre_text`` the scan captured: the writers overwrote the user's edit.
+    When disk still equals ``pre_text`` the writer changed nothing, so the
+    hash baseline was merely stale -- no backup, no warning, just a note
+    (issue #1081).
+
+    ``dry_run`` cannot observe the post-write state (nothing is written), so
+    every finding is returned unchanged and the caller still reports it.
+    An unreadable file stays a finding (fail-safe: it cannot prove that no
+    edit was overwritten).
+    """
+    if dry_run:
+        return list(findings)
+    real: list[dict] = []
+    for finding in findings:
+        rel_path = finding.get("path")
+        if not rel_path:
+            continue
+        try:
+            current = (project_root / rel_path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            real.append(finding)
+            continue
+        if current == finding.get("pre_text"):
+            log.note(
+                "generated-file-drift",
+                f"{rel_path}: stale hash baseline (disk equals generated) - baseline refreshed",
+            )
+            continue
+        real.append(finding)
+    return real
+
 
 
 def backup_drifted_files(
     findings: list[dict], project_root: Path, log: SyncLog, dry_run: bool = False,
 ) -> list[str]:
     """Write a `<file>.sync-backup-<YYYYmmdd-HHMMSS>` sibling for every
-    finding, containing exactly the current (pre-overwrite) drifted
-    content. One timestamp per invocation, so every backup written by the
+    finding, containing exactly the drifted (pre-overwrite) content. The
+    scan-captured ``pre_text`` wins over the on-disk content, because the
+    writers have already overwritten the user's edit when this runs
+    (issue #1081); findings without ``pre_text`` fall back to reading the
+    file. One timestamp per invocation, so every backup written by the
     same sync shares the same suffix (mirrors context.py's
     _backup_context_file).
 
@@ -377,14 +435,16 @@ def backup_drifted_files(
         if not rel_path:
             continue
         target = project_root / rel_path
-        try:
-            existing_content = target.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            log.debug(
-                "generated-file-drift",
-                f"could not read '{rel_path}' for backup: {type(exc).__name__}: {exc}",
-            )
-            continue
+        existing_content = finding.get("pre_text")
+        if existing_content is None:
+            try:
+                existing_content = target.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                log.debug(
+                    "generated-file-drift",
+                    f"could not read '{rel_path}' for backup: {type(exc).__name__}: {exc}",
+                )
+                continue
         backup = target.with_name(f"{target.name}.sync-backup-{ts}")
         if not dry_run:
             try:
