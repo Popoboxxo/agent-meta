@@ -151,8 +151,10 @@ def test_preview_emits_single_json_object(tmp_path):
     assert stale["adopted"] is False
 
     # IC-05/N-01 gap: the preview recomputes the would-be prune set purely.
+    # Issue #1081: retention is count-only -- only the 3 newest survive.
     assert claude["backups_to_prune"] == [
-        ".claude/agents/old.md.sync-backup-20200101-000000"
+        ".claude/agents/old.md.sync-backup-20200101-000000",
+        ".claude/agents/old.md.sync-backup-20200102-000000",
     ]
 
 
@@ -195,6 +197,37 @@ def test_preview_exit_code_zero_for_nonempty_stale(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert _claude_payload(payload)["stale"]
+
+
+def test_preview_prune_set_matches_real_prune_set(tmp_path):
+    """Advisory #1123: the read-only preview and the real pruner share one
+    pure selector, so their candidate sets can never silently diverge."""
+    from scripts.lib.generated_file_drift import prune_sync_backups
+    from scripts.lib.log import SyncLog
+
+    worked = tmp_path / "worked"
+    previewed = tmp_path / "previewed"
+    for root in (worked, previewed):
+        target = root / ".claude" / "agents"
+        target.mkdir(parents=True)
+        for i in range(7):
+            (target / f"a.md.sync-backup-20261031-0100{i:02d}").write_text(
+                "x", encoding="utf-8")
+        (target / "b.md.sync-backup-20261031-010000").write_text(
+            "x", encoding="utf-8")
+
+    preview = sync._preview_backups_to_prune(
+        previewed / ".claude" / "agents", previewed)
+    pruned = prune_sync_backups(
+        worked / ".claude" / "agents", worked, SyncLog(), dry_run=False,
+        max_age_days=sync._PREVIEW_PRUNE_MAX_AGE_DAYS,
+        max_per_source=sync._PREVIEW_PRUNE_MAX_PER_SOURCE,
+    )
+
+    assert sorted(preview) == sorted(pruned)
+    # b.md has only one backup -> never selected; a.md keeps its 3 newest.
+    assert not any("b.md" in path for path in preview)
+    assert len(preview) == 4
 
 
 def test_preview_fingerprint_stable_over_canonical_stale_set():
