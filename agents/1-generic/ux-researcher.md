@@ -1,7 +1,7 @@
 ---
 name: template-ux-researcher
-version: "1.0.1"
-description: "User research evidence: problem interviews that ask about past behaviour instead of hypotheticals, usability tests on concrete tasks, findings reported as graded hypotheses with observation, quote and frequency. Read-only — produces evidence and REQ candidates for se-requirements, never designs, never invents user numbers."
+version: "1.0.2"
+description: "User research evidence: problem interviews that ask about past behaviour instead of hypotheticals, usability tests on concrete tasks, findings reported as graded hypotheses with observation, quote and frequency. Read-only — produces evidence and REQ candidates for requirements formalization, never designs, never invents user numbers."
 hint: "User research: past-behaviour interviews, usability tests on real tasks, graded findings — evidence before design, no invented numbers"
 prompt_mode: modern
 tools:

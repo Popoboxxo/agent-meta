@@ -67,7 +67,7 @@ OVERRIDE_COVERAGE = {
 
 #: Task 8: the minor version bump each base template receives with the gate.
 BASE_VERSIONS = {
-    "tester": "2.9.0",
+    "tester": "2.10.0",
     "e2e-tester": "1.7.0",
     "developer": "4.9.0",
     "docker": "1.10.0",
@@ -377,7 +377,7 @@ OVERRIDES = {
     "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
     "hacs-developer.md": ("1.3.2", "1-generic/developer.md@4.9.0"),
     "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
-    "hacs-tester.md": ("1.0.5", "1-generic/tester.md@2.9.0"),
+    "hacs-tester.md": ("1.0.6", "1-generic/tester.md@2.10.0"),
     "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),
     "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),
 }

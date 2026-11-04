@@ -5407,10 +5407,28 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # hashes (the `git` agent render of every provider); `slimming-golden` re-pinned for
 # the `git.md` version pin (2.1.1 -> 2.1.2, frontmatter only); `compact-golden`
 # unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Bug batch PR B (#1071 dispatch gating, #1083 frontmatter-mention warning,
+# #1082 code-span placeholder skip): `ac01-baseline` re-pinned — 36 hashes
+# (`data-engineer`, `meta-feedback`, `orchestrator` and `tester` × 9 providers);
+# `slimming-golden` re-pinned for the five touched role goldens (`data-engineer`,
+# `meta-feedback`, `orchestrator`, `senior-developer`, `tester`; frontmatter incl.
+# the two #1083 descriptions); `compact-golden` unchanged. Log:
+# Review follow-up PR #1122 (Bug-Batch PR B): `ac01-baseline` re-pinned — 28
+# hashes (`code-reviewer`, `orchestrator`, `ux-researcher` × 9 providers plus
+# `Copilot/.github/copilot-instructions.md`, which embeds the `code-reviewer`
+# hint); `slimming-golden` re-pinned for `orchestrator`, `code-reviewer` and
+# `senior-developer` (version/generated-from pins, plus the neutralized
+# `code-reviewer` hint; manifest §23); `compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
+# Compact-golden catch-up for the same PR #1122: the orchestrator template bump
+# (8.8.1 -> 8.9.1) regenerated the slimming golden but not the compact one, so
+# the frozen compact render still carried the old version/generated-from pins.
+# Re-derived from the real compact render (two version lines only); digest
+# re-pinned 44148ea7 -> 416cd520. `ac01-baseline`/`slimming-golden` unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "74290aada8345c25dc4d93b86af464bb42cab3bde05df0cef7856c8159406c3e",
-    "slimming-golden": "8857b666c88425b724989049d0dcf841dcf5a089b4a0e364fb07eea38d3ee74a",
-    "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
+    "ac01-baseline": "1a6df729fb13bfba81ce8e07121411c8a2eedcffc44e8c01f70146337e17ab7b",
+    "slimming-golden": "dcd2f5be3e3f7d8f4a1fd4be60c239763b65846e4657cdc164369455ca565fad",
+    "compact-golden": "416cd520ac0fe48e14a11c59affcfac03a6d54cd71841081f41843c404e73ea5",
 }
 
 

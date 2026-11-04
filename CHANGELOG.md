@@ -229,6 +229,32 @@
   provider experts have no role-defaults entry at all. A missing role-defaults
   entry is the expected state and resolves to tier `balanced` without a warning;
   only an existing entry with an empty or unknown `model` still warns.
+- **Dispatch tables follow the active set instead of naming inactive roles (#1071)**:
+  the worker dispatch/NEXT lines are gated on their target role (`ROLE_<R>_ACTIVE`), so
+  a project that deactivates a role no longer renders a dangling hand-off to it. The
+  touched templates are bumped (`orchestrator` 8.9.1, `senior-developer`
+  1.11.1, `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0,
+  `code-reviewer` 1.9.3, `ux-researcher` 1.0.2);
+  `hacs-tester` follows `tester@2.10.0`. **behavior change:** the consistency check
+  stops reporting dangling-dispatch false positives for routes whose target is simply
+  inactive, and the generated tables only list renderable targets.
+- **A frontmatter role mention is a WARNING, not an error (#1083)**:
+  `active-set.dangling-mention-frontmatter` is a dedicated WARNING for a role mention
+  that only appears in a template's frontmatter (`description`/`hint`). A
+  description-only mention was previously reported as the body-mention INFO; it is now
+  a WARNING. It was never a hard error — the dispatch check never applied to
+  frontmatter (decision D7: frontmatter is metadata, not a dispatch). The `tester`,
+  `data-engineer`, `code-reviewer` and `ux-researcher` frontmatter texts are rewritten
+  role-neutrally (no hard reference to `se-test-engineer`, `database-engineer`,
+  `validator` or `se-requirements`), so they stay accurate in projects where those
+  roles are inactive. **behavior change:** projects that previously saw a
+  description-only mention as INFO now get a WARNING.
+- **Code spans and fences are ignored by the placeholder check (#1082)**:
+  the consistency check skips `{{PLACEHOLDER}}`-shaped text inside inline code spans
+  and fenced code blocks, so escaped documentation examples (for example the
+  `{{VAR}}` → renders-as-`{{VAR}}` convention) are no longer flagged as unknown
+  placeholders. **behavior change:** a real unknown placeholder in running text is
+  still reported; only code-context occurrences are exempt.
 
 ## [2.0.0-beta.6] - 2026-10-31
 

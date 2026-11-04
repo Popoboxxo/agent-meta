@@ -1,4 +1,5 @@
 """IC-19 active-set reference checks (Task 0b.3, AC-43)."""
+import re
 import sys
 from pathlib import Path
 
@@ -11,7 +12,8 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 from lib.active_set import compute_active_set  # noqa: E402
 from lib.consistency import active_set_refs as asr  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
-from tests.active_set_render import sync_configs_parallel, synced_project  # noqa: E402
+from tests.active_set_render import (  # noqa: E402
+    sync_configs_parallel, synced_project, tiers_on_config)
 
 _FIX = Path(__file__).resolve().parent / "fixtures" / "active-set"
 _AC43_ROLES = ("senior-developer", "validator", "bug-feature-analyzer",
@@ -45,13 +47,17 @@ def test_p10_dangling_dispatch_covers_ac43_roles(synced):
 def test_p10_dangling_mention_is_info(synced):
     project, active = synced("p10")
     findings = asr.check_dangling_mention(project, _PROVIDERS, {}, active)
-    assert findings and all(f.severity == Severity.INFO for f in findings)
-    assert all(f.check == "active-set.dangling-mention" for f in findings)
-    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
+    # #1083: body mentions stay INFO, frontmatter mentions are WARNING.
+    body = [f for f in findings if f.check == "active-set.dangling-mention"]
+    frontmatter = [f for f in findings
+                   if f.check == "active-set.dangling-mention-frontmatter"]
+    assert body and all(f.severity == Severity.INFO for f in body)
+    assert all(f.severity == Severity.WARNING for f in frontmatter)
+    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in body}
     # Prose references (boundary lists, "Delegation (reference only)") are mentions.
     assert {("code-reviewer.md", "validator"), ("release.md", "validator"),
-            ("developer.md", "validator"), ("tester.md", "se-validator")} <= pairs
-    assert all("(" in f.message and "x," in f.message for f in findings)  # count + first line
+            ("developer.md", "validator"), ("tester.md", "se-test-engineer")} <= pairs
+    assert all("(" in f.message and "x," in f.message for f in body)  # count + first line
 
 
 def test_p20_gate_dropped_reports_senior_developer(synced):
@@ -268,7 +274,7 @@ def matrix(tmp_path_factory):
     instead (see ``_SHARED_CONTEXT_HARD_CAP``); the allowlisted fixtures keep
     the full matrix.
     """
-    names = ("p10", "p20", "pall", "ha")
+    names = ("p10", "p20", "pall", "ha", "pt")
     configs = {name: yaml.safe_load(
         (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
         for name in names}
@@ -281,13 +287,117 @@ def matrix(tmp_path_factory):
             for name in names}
 
 
-@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha", "pt"])
 def test_ac49_no_dangling_dispatch_over_provider_matrix(matrix, name):
     project, active = matrix[name]
     found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
     assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
 
 
+def test_1071_inactive_principal_and_feedback_not_dispatched(matrix):
+    # The dev tiers are on (junior+senior) but the base `developer`,
+    # `principal-developer` and `feedback` are not in the allowlist: no
+    # generated artifact may dispatch any of them.
+    project, active = matrix["pt"]
+    for role in ("developer", "principal-developer", "feedback"):
+        assert role not in active.roles
+    found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+def test_1071_active_principal_row_still_rendered(tmp_path_factory):
+    # Positive control: the gate must not hide the row when the role IS active.
+    project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
+    text = (project / ".claude" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
+    assert "| `principal-developer` |" in text
+    assert "| `developer` | Standard, clear scope, ≤3 files |" in text
+
+
+def test_1071_active_feedback_row_still_rendered(tmp_path_factory):
+    # Positive control for the #1071 `ROLE_FEEDBACK_ACTIVE` gate (meta-feedback).
+    project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
+    text = (project / ".claude" / "agents" / "meta-feedback.md").read_text(encoding="utf-8")
+    assert "| `feedback` |" in text
+
+
+# --- #1083: dangling role mentions in frontmatter are a WARNING --------------
+
+def test_1083_frontmatter_mention_is_warning_body_is_info(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "see se-test-engineer"\n---\n'
+                              "body mentions se-test-engineer\n")
+    found = asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+    by_check = {f.check: f for f in found}
+    assert set(by_check) == {"active-set.dangling-mention-frontmatter",
+                             "active-set.dangling-mention"}
+    assert by_check["active-set.dangling-mention-frontmatter"].severity == Severity.WARNING
+    assert by_check["active-set.dangling-mention"].severity == Severity.INFO
+
+
+def test_1083_no_frontmatter_only_info(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "body mentions se-test-engineer\n")
+    found = asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+    assert [f.severity for f in found] == [Severity.INFO]
+
+
+def test_1083_frontmatter_dispatch_phrase_is_metadata_not_a_dispatch(synced, tmp_path):
+    # Decision D7: frontmatter is metadata. A dispatch-shaped phrase there is
+    # neither a hard error (dispatch check) nor a body dispatch.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "Hand off to validator"\n---\n'
+                              "body names no inactive role\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+    fm = [f for f in asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+          if f.check == asr.CHECK_DANGLING_MENTION_FM]
+    assert fm == []
+
+
+def test_1083_frontmatter_dispatch_phrase_stays_error(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "x"\n---\n'
+                              'background(agent="validator", prompt="x")\n')
+    assert [f.severity for f in asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)] == [
+        Severity.ERROR]
+
+
+def test_1083_templates_description_names_no_inactive_role():
+    # Frontmatter conditionals are parser-risky (decision D7): the descriptions
+    # name the sibling role neutrally instead of using a conditional block.
+    for name in ("tester", "data-engineer"):
+        text = (_ROOT / "agents" / "1-generic" / f"{name}.md").read_text(encoding="utf-8")
+        desc = re.search(r'^description: "(.*)"$', text, re.M).group(1)
+        assert "se-test-engineer" not in desc and "database-engineer" not in desc
+
+
+# --- #1082: code spans/fences are documentation, not unresolved placeholders -
+
+def test_1082_placeholder_in_inline_code_and_fence_is_not_flagged(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "use `{{VAR}}` as example\n```\n{{FLAG_A}}\n```\n``{{X_Y}}``\n")
+    assert asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active) == []
+
+
+def test_1082_plain_and_mixed_placeholders_still_flagged(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "plain {{FOO}} text\nmixed `{{BAR}}` and {{BAZ}}\n")
+    found = asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active)
+    assert sorted(f.message.split()[2] for f in found) == ["{{BAZ}}", "{{FOO}}"]
+
+
+def test_1082_unclosed_fence_does_not_hide_the_rest(synced, tmp_path):
+    # A stray ``` must not blind the check for the whole file.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "text ``` stray\nplain {{FOO}}\n")
+    found = asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active)
+    assert [f.message.split()[2] for f in found] == ["{{FOO}}"]
+
+
+# `pt` is deliberately NOT part of this parametrization: the shared pipeline block
+# ("Review / Critic feedback") contains the English noun "feedback", which the
+# mention heuristic reports as a role mention. That false positive predates B1 and
+# lives in the pipeline source (scripts/lib/pipelines.py), not in the templates
+# this task owns; it stays an INFO finding on `pt`.
 @pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
 def test_ac49_no_dangling_mention_in_orchestrator_pipelines_commands(matrix, name):
     project, active = matrix[name]

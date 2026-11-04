@@ -187,6 +187,17 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   ``_GOLDEN_ROLE_COUNT`` (58) are unchanged; ``compact-golden`` was not touched.
   AC-01 hashes rebaselined separately (see the rebaseline log in
   ``tests/test_ac01_render_identity.py``).
+* Bug batch PR B (#1071/#1083/#1082): five goldens were re-pinned
+  **frontmatter only** -- ``orchestrator`` (8.8.1 -> 8.9.0), ``senior-developer``
+  (1.10.0 -> 1.11.0), ``meta-feedback`` (2.6.1 -> 2.7.0), ``tester``
+  (2.9.0 -> 2.10.0) and ``data-engineer`` (0.6.1 -> 0.7.0). ``tester`` and
+  ``data-engineer`` additionally carry the #1083 role-neutral descriptions.
+  The real-sync render (``AGENT_META_TEST_REPO=… sync.py --validate``) confirmed
+  that every body difference is either the stripped ``AUTO_COMMIT_BLOCK`` tail
+  or sits inside a declared B2b normalization region, so the frozen meta tokens,
+  the ``model:`` pins, the declaration regions and ``_GOLDEN_ROLE_COUNT`` (58)
+  are unchanged. Diff manifest §22. AC-01 hashes rebaselined separately (see the
+  rebaseline log in ``tests/test_ac01_render_identity.py``).
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

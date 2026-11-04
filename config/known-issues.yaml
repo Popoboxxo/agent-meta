@@ -288,6 +288,19 @@ issues:
     introduced-in: 2.0.0-beta.1
     fixed-in: null
 
+  - id: dangling-role-mention-frontmatter
+    title: The generated agent frontmatter names a role that is not active
+    applies_to: []
+    target: {artifact: agents_dir}
+    detector: {kind: finding-ref, check: active-set.dangling-mention-frontmatter, source: active-set}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "scripts/lib/consistency/active_set_refs.py:345", date: '2026-11-04'}
+    fix-hint: Name the role conditionally or neutrally in the template description.
+    fix-owner: agent-meta
+    introduced-in: 2.0.0-beta.7
+    fixed-in: null
+
   - id: gate-dropped-allowlist-role
     title: A gate dropped a role that the allowlist still references
     applies_to: []

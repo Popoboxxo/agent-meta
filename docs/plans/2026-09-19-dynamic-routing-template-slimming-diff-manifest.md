@@ -2068,3 +2068,82 @@ tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py
 tests/test_opencode_v2_surface.py -q` → **alle passed**, rc `0`; `scripts/sync.py
 --validate` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest:
 9 von 1099 Hashes geändert, 0 added/removed, per Entry gepatcht (kein `--write`).
+
+---
+
+## 22. Re-Baseline der Golden-Baseline für 5 Rollen (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Der Bug-Batch PR B (`fix/consistency-false-positives`) schließt drei
+> Konsistenz-Falsch-Positive: #1071 (Dispatch-Tabellen folgen dem ActiveSet via
+> `ROLE_<R>_ACTIVE`), #1083 (Frontmatter-Rollen-Mention ist nur noch ein
+> `active-set.dangling-mention-frontmatter`-WARNING; `tester`/`data-engineer`-Beschreibungen
+> rollenneutral) und #1082 (Code-Spans/-Fences werden vom Platzhalter-Check ignoriert).
+> Fünf Templates wurden minor gebumpt (`orchestrator` 8.9.0, `senior-developer` 1.11.0,
+> `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0). Das Gate meldet die
+> Drift als „diff not attributable to declared normalizations" (bzw. bei `orchestrator`
+> als „unexpected diff on an unmigrated role").
+
+**Geändert (5 Fixtures):** `orchestrator.md` (+2/−2), `senior-developer.md` (+2/−2),
+`meta-feedback.md` (+2/−2), `tester.md` (+4/−4) und `data-engineer.md` (+3/−3) — jeweils
+**nur** Frontmatter-Pins (`version:`, `generated-from:`); bei `tester` und `data-engineer`
+zusätzlich die #1083-Beschreibungszeilen. Die übrigen 53 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+
+**Ursache:** Rollen-Template-Versionierung plus zwei Beschreibungstext-Korrekturen, kein
+migrierter Block. Der Rot-Lauf wies ausschließlich diese Frontmatter-Zeilen aus; der
+echte Sync-Render (`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-regen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz entweder der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist oder innerhalb einer deklarierten B2b-Normalisierung
+liegt (bei `meta-feedback` die `PI-BLANK`-Region). `_NORMALIZATIONS`, `_LOCATORS`,
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht betroffen;
+die eingefrorenen Meta-Tokens und die `model:`-Pins bleiben unverändert
+(`_GOLDEN_MODEL_MAP`).
+
+**Herkunft:** Der reale Sync-Render diente als Referenz; da alle Bodies byte-identisch
+bzw. normalisierungsgedeckt sind, wurden die fünf Goldens **frontmatter-only** neu
+gepinnt — die eingefrorenen Inline-Regionen der B2b-Goldens bleiben dadurch erhalten.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py
+tests/test_compact_matrix.py -q` → **alle passed**, rc `0`; `scripts/sync.py --validate`
+rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 36 von 1099
+Hashes geändert (die vier Matrix-Rollen `data-engineer`/`meta-feedback`/`orchestrator`/
+`tester` × 9 Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
+
+## 23. Review-Nachbesserung PR #1122 (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Die Review-Auflagen zu PR #1122 schließen die AC-38-Lücke
+> (`dangling-role-mention-frontmatter` ohne Doctor-Fixtures), richten die
+> Senior-Eskalations-Persona am tatsächlichen `STATUS: escalate`-Vertrag aus,
+> überspringen Frontmatter im Dispatch-Check (D7), gaten die `developer`-Zeile
+> der Tier-Tabelle (#1071) und neutralisieren zwei weitere Frontmatter-Texte
+> (`code-reviewer`-Hint, `ux-researcher`-Description), die im Default-Render
+> unvermeidbares WARNING-Rauschen erzeugten.
+
+**Geändert (3 Fixtures):** `orchestrator.md`, `code-reviewer.md` und
+`senior-developer.md` — `orchestrator` und `senior-developer` **nur**
+Frontmatter-Pins (`version:`, `generated-from:`); `code-reviewer` zusätzlich die
+neutralisierte `hint:`-Zeile. Die übrigen 55 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+`ux-researcher` ist in diesem Repo nicht aktiv und hat kein Golden.
+
+**Ursache:** Rollen-Template-Versionierung plus die `code-reviewer`-Hint-Korrektur,
+kein migrierter Block. Die Senior-Persona-Änderung liegt ausschließlich im
+`ROLE_PRINCIPAL_DEVELOPER_ACTIVE=false`-Zweig; dieses Repo rendert den aktiven
+Zweig, daher bleibt der Golden-Body unverändert. Der echte Sync-Render
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist (Gate-Schritt `_strip_auto_commit_tail`) und
+die `model:`-Zeilen der `_GOLDEN_MODEL_MAP`-Portierung unterliegen. Die Goldens
+wurden deshalb **frontmatter-/hint-only** neu gepinnt, nicht aus dem Render
+kopiert; `_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY`
+und die B2a/B2b-Klassifikation bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q`
+→ alle passed, rc `0`; `scripts/sync.py --validate` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 28 von 1099
+Hashes geändert (die Matrix-Rollen `code-reviewer`/`orchestrator`/
+`ux-researcher` × 9 Provider plus `Copilot/.github/copilot-instructions.md`,
+das den `code-reviewer`-Hint einbettet), 0 added/removed, per Entry gepatcht
+(kein `--write`). `AC01_EXCEPTIONS` wurde nicht erweitert.

@@ -780,6 +780,54 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   justified ``--write`` drops them). No other key embeds an absolute host path
   (``sync.log`` was already skipped by ``_SKIP_RE``). ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Bug batch PR B (#1071/#1083/#1082, 2026-11-03, ``fix/consistency-false-positives``):
+  #1071 gates the dispatch tables on ``ROLE_<R>_ACTIVE`` (no dangling-dispatch false
+  positives), #1083 downgrades a frontmatter role mention to the
+  ``active-set.dangling-mention-frontmatter`` WARNING and neutralizes the ``tester`` /
+  ``data-engineer`` descriptions, #1082 makes the placeholder check skip code spans and
+  fences. Five templates were minor-bumped (``orchestrator`` 8.9.0,
+  ``senior-developer`` 1.11.0, ``meta-feedback`` 2.7.0, ``tester`` 2.10.0,
+  ``data-engineer`` 0.7.0) and ``hacs-tester`` re-pinned to ``tester@2.10.0``.
+  Exactly **36 of 1099 hashes moved; 0 added/removed** -- the four matrix roles
+  ``data-engineer``/``meta-feedback``/``orchestrator``/``tester`` × 9 providers.
+  ``senior-developer``/``hacs-tester`` are not in the default matrix. No rule,
+  ``AGENTS.md``, ``context-hashes.json`` or other artifact changed. The manifest was
+  patched **per entry** (36 single-line replacements, 1065 of the 1101 lines untouched)
+  -- not via ``--write`` -- after independently recomputing every digest from the
+  rendered file bytes with the harness's own ``_hash_file``. Because ``hashes.json`` is
+  the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from
+  the fixture bytes: ``74290aad…`` -> ``2adf04f6…``). ``slimming-golden`` was re-pinned
+  for the five touched role goldens (``data-engineer``, ``meta-feedback``,
+  ``orchestrator``, ``senior-developer``, ``tester``; frontmatter incl. the two #1083
+  descriptions, manifest §22) and its AC-T4 digest moved (``8857b666…`` ->
+  ``607b6c8a…``); ``compact-golden`` stayed unchanged (``44148ea7…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Review follow-up PR #1122 (Bug-Batch PR B, 2026-11-04,
+  ``fix/consistency-false-positives``): the AC-38 doctor fixtures for
+  ``dangling-role-mention-frontmatter``, the senior-escalation persona aligned to
+  ``STATUS: escalate`` + reason + metric, the frontmatter skip in the dispatch
+  check (D7), the gated base ``developer`` row (#1071) and the neutralized
+  ``code-reviewer`` hint / ``ux-researcher`` description change three templates:
+  ``orchestrator`` 8.9.1, ``senior-developer`` 1.11.1, ``code-reviewer`` 1.9.3
+  and ``ux-researcher`` 1.0.2 (``hacs-code-reviewer`` re-pinned to
+  ``code-reviewer@1.9.3``). Exactly **28 of 1099 hashes moved; 0 added/removed**
+  -- ``code-reviewer``/``orchestrator``/``ux-researcher`` × 9 providers plus
+  ``Copilot/.github/copilot-instructions.md`` (it embeds the ``code-reviewer``
+  hint). No rule, ``AGENTS.md``, ``context-hashes.json`` or other artifact
+  changed. The manifest was patched **per entry** (28 single-line replacements,
+  1071 of the 1099 lines untouched) -- not via ``--write`` -- after independently
+  recomputing every digest from the rendered file bytes with the harness's own
+  ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its
+  AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``2adf04f6…`` -> ``1a6df729…``).
+  ``slimming-golden`` was re-pinned for ``orchestrator``, ``code-reviewer`` and
+  ``senior-developer`` (frontmatter pins plus the neutralized ``code-reviewer``
+  hint; manifest §23) and its AC-T4 digest moved (``607b6c8a…`` -> ``dcd2f5be…``);
+  ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

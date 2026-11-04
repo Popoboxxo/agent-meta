@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.6.1"
+version: "2.7.0"
 description: "Collect improvement suggestions for agent-meta and submit them as GitHub issues."
 hint: "Submit improvement suggestions for agent-meta as GitHub issues"
 prompt_mode: modern
@@ -77,7 +77,9 @@ Feature/design issues state an explicit **problem** plus an **acceptance criteri
 | Agent | Responsible for |
 |-------|-----------------|
 | `meta-feedback` | Issues for the **agent-meta framework** (this repo) |
+{{#if ROLE_FEEDBACK_ACTIVE}}
 | `feedback` | Issues for the **own project** |
+{{/if}}
 </context>
 
 <tools>
