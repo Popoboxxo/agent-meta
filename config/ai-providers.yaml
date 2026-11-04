@@ -325,6 +325,16 @@ providers:
       surface-formats:
         v1: opencode-json
         v2: opencode-json-v2
+    # Runtime files the Opencode toolchain itself creates inside .opencode/
+    # (npm/bun plugins, package metadata, node_modules). External-tools drift
+    # excuses these basenames data-driven instead of hardcoding provider
+    # names in code (issue #1084).
+    infra_known_names:
+    - .gitignore
+    - package.json
+    - package-lock.json
+    - node_modules
+    - bun.lock
     # SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (Task 6): per-surface CLI
     # settings filename. `surface-version` SELECTS it and the loader exposes
     # the flat resolved key `cli_file`; no v1 entry means v1 writes no such

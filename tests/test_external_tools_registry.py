@@ -861,3 +861,100 @@ def test_render_drift_artifacts_warns_even_without_has_rules(tmp_path):
     assert not (project_root / ".opencode" / "external-tools-drift.md").exists()
     # But warning should still fire.
     assert any("undeclared artifact" in w and "rogue" in w for w in log.warnings)
+
+
+# ---------------------------------------------------------------------------
+# #1084: drift false positives for agent-meta's own runtime artifacts
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _scan(agent_meta_root, project_root, provider_config, name):
+    from scripts.lib.external_tools import scan_injection_drift
+    _write_framework_registry(agent_meta_root, {})
+    return scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": [name]}, provider_config)
+
+
+def test_guard_audit_log_not_flagged(tmp_path):
+    """(a) hooks/1-generic/orchestrator-guard-impl.sh writes .guard-audit.log
+    at runtime; it is not a sync output and must not read as a foreign hook."""
+    project = tmp_path / "project"
+    (project / ".claude" / "hooks").mkdir(parents=True)
+    (project / ".claude" / "hooks" / ".guard-audit.log").write_text("x", encoding="utf-8")
+    pc = {"Claude": {"skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+                     "has_hooks": True, "hooks_dir": ".claude/hooks"}}
+    assert _scan(tmp_path / "agent-meta", project, pc, "Claude")["Claude"] == []
+
+
+def test_mcp_local_json_not_flagged_but_unknown_file_is(tmp_path):
+    """(b) the mcp-config committed/secrets basenames are resolved from the
+    provider data, not hardcoded per provider."""
+    project = tmp_path / "project"
+    (project / ".opencode").mkdir(parents=True)
+    (project / ".opencode" / "mcp.local.json").write_text("{}", encoding="utf-8")
+    (project / ".opencode" / "evil.sh").write_text("x", encoding="utf-8")
+    pc = {"Opencode": {"skills_dir": ".opencode/skills", "agents_dir": ".opencode/agents",
+                       "mcp-config": {"committed-file": "opencode.json",
+                                      "secrets-file": ".opencode/mcp.local.json"}}}
+    paths = [f["path"] for f in _scan(tmp_path / "agent-meta", project, pc, "Opencode")["Opencode"]]
+    assert paths == [".opencode/evil.sh"]
+
+
+def test_backup_only_dir_is_managed(tmp_path):
+    """(c) a directory holding only .sync-backup-* siblings is agent-meta's own
+    retention artifact, not a foreign injected directory."""
+    project = tmp_path / "project"
+    d = project / ".claude" / "hooks" / "old-dir"
+    d.mkdir(parents=True)
+    (d / "a.sh.sync-backup-20261031-000000").write_text("x", encoding="utf-8")
+    pc = {"Claude": {"skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+                     "has_hooks": True, "hooks_dir": ".claude/hooks"}}
+    assert _scan(tmp_path / "agent-meta", project, pc, "Claude")["Claude"] == []
+
+
+def test_infra_known_names_excused_but_unknown_file_flagged(tmp_path):
+    """(d) the optional provider key infra_known_names excuses runtime files
+    data-driven; an undeclared file is still flagged."""
+    project = tmp_path / "project"
+    (project / ".opencode" / "node_modules").mkdir(parents=True)
+    (project / ".opencode" / "package.json").write_text("{}", encoding="utf-8")
+    (project / ".opencode" / "evil.sh").write_text("x", encoding="utf-8")
+    pc = {"Opencode": {"skills_dir": ".opencode/skills", "agents_dir": ".opencode/agents",
+                       "infra_known_names": ["package.json", "node_modules"]}}
+    paths = [f["path"] for f in _scan(tmp_path / "agent-meta", project, pc, "Opencode")["Opencode"]]
+    assert paths == [".opencode/evil.sh"]
+
+
+def test_opencode_declares_runtime_infra_names():
+    data = yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))
+    assert {"package.json", "package-lock.json", "node_modules", ".gitignore"} <= set(
+        data["providers"]["Opencode"]["infra_known_names"])
+
+
+def test_non_rules_provider_findings_in_first_rules_report(tmp_path):
+    """(e) findings of a provider without has_rules are merged into the first
+    has_rules provider's report, tagged with the source provider."""
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project = tmp_path / "project"
+    (project / ".claude" / "rules").mkdir(parents=True)
+    findings = {"Claude": [],
+                "Gemini": [{"path": ".gemini/rogue", "kind": "other", "tool": None}]}
+    pc = {"Claude": {"has_rules": True, "rules_dir": ".claude/rules"}, "Gemini": {}}
+    render_injection_drift_artifacts(findings, project, pc, SyncLog(), dry_run=False)
+    text = (project / ".claude" / "rules" / "external-tools-drift.md").read_text(encoding="utf-8")
+    assert "`.gemini/rogue` (other) [Gemini]" in text
+
+
+def test_no_rules_provider_logs_note_only(tmp_path):
+    """(e) without any has_rules provider there is nowhere to write the
+    report: findings stay in sync.log and nothing is rendered."""
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    log = SyncLog()
+    render_injection_drift_artifacts(
+        {"Gemini": [{"path": ".gemini/rogue", "kind": "other", "tool": None}]},
+        tmp_path, {"Gemini": {}}, log, dry_run=False)
+    assert not list(tmp_path.rglob("external-tools-drift.md"))
+    assert any("only in sync.log" in info for info in log.infos)
+    assert len(log.warnings) == 1
