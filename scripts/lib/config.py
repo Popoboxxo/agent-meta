@@ -172,6 +172,22 @@ _CONFIG_FIELD_DESCRIPTIONS: dict = {
 # fallback and needs no persisted value (PR #709 finding 1).
 _CASCADE_MANAGED_PRESET_KEYS = frozenset({"dod-preset", "conventions-preset"})
 
+# Preset/flag defaults that only an explicit `--fill-defaults`/`--init` may
+# materialize. A plain sync auto-fill leaves them virtual: they resolve
+# through the runtime fallbacks (`config_field_defaults`, platforms cascade),
+# and persisting them on every sync would rewrite third-party project.yaml
+# files (issues #1074, #1092). `repo_containment` and `project.short` are
+# deliberately NOT in this set — they are structural and must be visible.
+_SYNC_SKIPPED_DEFAULT_KEYS = frozenset({
+    "rules-preset",
+    "speech-mode",
+    "tier-preset",
+    "se-focus",
+    "max-parallel-agents",
+    "debug-mode",
+    "allow-committed-secrets",
+})
+
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
 _DOD_FIELD_DEFAULTS: dict = {
     "req-traceability": True,
@@ -1039,6 +1055,7 @@ def fill_defaults(
     log: SyncLog,
     dry_run: bool,
     silent: bool = False,
+    materialize_presets: bool = True,
 ) -> None:
     """Write missing config fields with their default values into project.yaml.
 
@@ -1049,6 +1066,11 @@ def fill_defaults(
       Only reported as [WARN] — no empty strings written (no sensible default).
 
     If silent=True, only the summary line is logged (for auto-fill during sync).
+
+    If materialize_presets=False (plain sync auto-fill), the seven
+    preset/flag defaults in ``_SYNC_SKIPPED_DEFAULT_KEYS`` and the nested
+    ``dod.*`` fill are skipped; they stay virtual through the runtime
+    fallbacks. ``--fill-defaults``/``--init`` keep the default True.
     """
     config = load_config(config_path)
     changed = False
@@ -1071,6 +1093,8 @@ def fill_defaults(
             continue  # nested fields handled below
         if field in _CASCADE_MANAGED_PRESET_KEYS:
             continue  # resolved via platforms: cascade at runtime -- never persist
+        if not materialize_presets and field in _SYNC_SKIPPED_DEFAULT_KEYS:
+            continue  # only --fill-defaults/--init may persist these
         if field not in config:
             config[field] = default
             desc = effective_descriptions.get(field, "")
@@ -1098,7 +1122,7 @@ def fill_defaults(
     # dod.* values then would re-freeze the resolved DoD via the `dod:` block,
     # the same failure mode finding 1 fixes for the preset key itself. ---
     active_preset = config.get("dod-preset")
-    if active_preset in ("full", "strict"):
+    if materialize_presets and active_preset in ("full", "strict"):
         dod_block = config.get("dod", {})
         for field_path, (default, desc) in schema_defaults.items():
             if not field_path.startswith("dod."):
@@ -1181,14 +1205,34 @@ def fill_defaults(
 def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[str, str]]) -> None:
     """Write YAML with auto-filled field comments.
 
-    Since PyYAML does not support comments, we dump to text and inject
-    #-style comment lines before each auto-filled top-level key.
+    Prefers a top-level segment patch (``yaml_patch.patch_top_level``): only
+    the segments that changed are re-rendered, so every untouched comment,
+    blank line and key order in the user's project.yaml survives (issues
+    #1074, #1092). If the patch refuses the document (anchors, multi-doc,
+    tabs, self-check mismatch, …), the historical full-dump path runs and
+    injects ``#`` comment lines before the auto-filled top-level keys.
     """
     from .io import yaml_dump_preserving_multiline
-    buf = io.StringIO()
-    yaml_dump_preserving_multiline(_yaml, data, buf, allow_unicode=True,
-                                   default_flow_style=False, sort_keys=False, indent=2)
-    text = buf.getvalue()
+    from .yaml_patch import patch_top_level
+
+    def _dump(payload: dict) -> str:
+        buf = io.StringIO()
+        yaml_dump_preserving_multiline(_yaml, payload, buf, allow_unicode=True,
+                                       default_flow_style=False, sort_keys=False, indent=2)
+        return buf.getvalue()
+
+    # ``newline=""`` keeps CRLF byte-for-byte; ``read_text`` would normalise
+    # the document to LF before the patcher ever sees it.
+    with path.open("r", encoding="utf-8", newline="") as f:
+        original = f.read()
+    descriptions = {name: desc for name, desc in auto_filled if "." not in name}
+    patched = patch_top_level(original, data, _dump, comments=descriptions)
+    if patched is not None:
+        with path.open("w", encoding="utf-8", newline="") as f:
+            f.write(patched)
+        return
+
+    text = _dump(data)
 
     auto_filled_keys = {name.split(".")[0] for name, _ in auto_filled}
     descriptions = {name: desc for name, desc in auto_filled}

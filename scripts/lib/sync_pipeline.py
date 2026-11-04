@@ -172,8 +172,11 @@ def _sync_stage_config_and_presets(
     orchestrator's final write-back (the original rebind of the local
     ``config`` variable, sync.py L1276).
     """
-    # Auto-fill missing config fields with defaults (silent mode — only logs additions)
-    fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
+    # Auto-fill missing config fields with defaults (silent mode — only logs additions).
+    # A plain sync leaves the preset/flag defaults virtual (runtime fallbacks +
+    # platforms cascade); only --init / --fill-defaults persist them (#1074).
+    fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True,
+                  materialize_presets=bool(getattr(args, "init", False)))
     # Reload config after auto-fill to pick up newly written defaults
     config = load_config(config_path)
 

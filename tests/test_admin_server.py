@@ -2231,6 +2231,159 @@ class TestProjectFullPutGuardWp3(unittest.TestCase):
                 handler._route_put_config("project")
 
 
+_COMMENTED_PROJECT_YAML = (
+    "# top of file\n"
+    "project:\n"
+    "  name: t\n"
+    "  prefix: t\n"
+    "\n"
+    "# keep this block\n"
+    "roles:\n"
+    "- orchestrator\n"
+    "- developer\n"
+    "\n"
+    "# a flag\n"
+    "speech-mode: full  # inline\n"
+    "\n"
+    "# variables stay untouched\n"
+    "variables:\n"
+    "  A: one\n"
+)
+
+
+class TestProjectWriteKeepsComments(unittest.TestCase):
+    """#1092 / D14: admin ``project.yaml`` writes preserve comments.
+
+    The admin write paths (``ConfigManager.write``, the full-document PUT and
+    the partial-section route) go through ``yaml_patch.patch_top_level``: only
+    changed top-level segments are re-rendered, so every comment and unrelated
+    byte survives. The historical full-dump fallback keeps the round-trip
+    guard, so a genuinely lossy dump still aborts (HTTP 400) unless the caller
+    explicitly opts in with ``__allow_lossy__``.
+    """
+
+    def _make_root(self, tmp: str, text: str = _COMMENTED_PROJECT_YAML) -> Path:
+        root = Path(tmp)
+        (root / ".meta-config").mkdir()
+        (root / ".meta-config" / "project.yaml").write_text(text, encoding="utf-8")
+        return root
+
+    def _make_handler(self, root: Path):
+        handler = admin_server.AdminRequestHandler.__new__(
+            admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def _config_text(self, root: Path) -> str:
+        return (root / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
+
+    def test_unchanged_write_is_byte_identical(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            manager = admin_server.ConfigManager(root, mode="project_admin")
+            manager.write("project", manager.read("project"))
+            self.assertEqual(self._config_text(root), _COMMENTED_PROJECT_YAML)
+
+    def test_section_write_keeps_comments_and_unrelated_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            handler = self._make_handler(root)
+            handler._read_body = lambda: {
+                "section": "roles", "data": ["orchestrator"]}
+            handler._write_project_section()
+
+            out = self._config_text(root)
+            for preserved in (
+                "# top of file",
+                "  name: t",
+                "  prefix: t",
+                "# keep this block",
+                "# a flag",
+                "speech-mode: full  # inline",
+                "# variables stay untouched",
+                "  A: one",
+            ):
+                self.assertIn(preserved, out)
+            self.assertNotIn("- developer", out)
+            self.assertEqual(yaml.safe_load(out)["roles"], ["orchestrator"])
+
+    def test_full_document_put_keeps_unchanged_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            handler = self._make_handler(root)
+            handler._read_body = lambda: {
+                "roles": ["orchestrator", "tester"],
+                "__allow_lossy__": True,
+            }
+            handler._route_put_config("project")
+
+            out = self._config_text(root)
+            self.assertIn("# keep this block", out)
+            self.assertIn("# a flag", out)
+            self.assertIn("speech-mode: full  # inline", out)
+            self.assertIn("# variables stay untouched", out)
+            self.assertIn("  A: one", out)
+            persisted = yaml.safe_load(out)
+            self.assertEqual(persisted["roles"], ["orchestrator", "tester"])
+            # The opt-in flag is consumed, never persisted as a section.
+            self.assertNotIn("__allow_lossy__", persisted)
+
+    def test_section_write_consumes_allow_lossy_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            handler = self._make_handler(root)
+            handler._read_body = lambda: {
+                "section": "roles",
+                "data": ["orchestrator"],
+                "__allow_lossy__": True,
+            }
+            handler._write_project_section()
+            self.assertNotIn("__allow_lossy__", self._config_text(root))
+            self.assertEqual(
+                yaml.safe_load(self._config_text(root))["roles"],
+                ["orchestrator"],
+            )
+
+    def test_crlf_line_endings_survive_a_section_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(
+                tmp, _COMMENTED_PROJECT_YAML.replace("\n", "\r\n"))
+            handler = self._make_handler(root)
+            handler._read_body = lambda: {
+                "section": "roles", "data": ["orchestrator"]}
+            handler._write_project_section()
+
+            raw = (root / ".meta-config" / "project.yaml").read_bytes()
+            self.assertIn(b"# keep this block\r\n", raw)
+            self.assertIn(b"speech-mode: full  # inline\r\n", raw)
+            # No lone LF may sneak in where the document used CRLF.
+            self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))
+            self.assertEqual(yaml.safe_load(raw)["roles"], ["orchestrator"])
+
+    def test_fallback_keeps_roundtrip_guard(self) -> None:
+        from lib.yaml_roundtrip import YamlRoundTripLoss
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fallback_text = "# top\na: &x 1\nb: *x\n"
+            root = self._make_root(tmp, fallback_text)
+            manager = admin_server.ConfigManager(root, mode="project_admin")
+            data = manager.read("project")
+            data["c"] = 3
+
+            # Anchors make the patcher refuse the document -> full dump, which
+            # would drop the comment, so the guard aborts before any write.
+            with self.assertRaises(YamlRoundTripLoss):
+                manager.write("project", data)
+            self.assertEqual(self._config_text(root), fallback_text)
+
+            manager.write("project", data, allow_lossy=True)
+            self.assertEqual(
+                yaml.safe_load(self._config_text(root))["c"], 3)
+
+
 class TestWriteProjectSectionContextFile(unittest.TestCase):
     """AC-20 (SPEC-CONTEXT-FILE-MODES-2026-09-13): the ``context_file`` section
     (``topology``/``core_file``/density) is writable through the guarded

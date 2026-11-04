@@ -274,6 +274,33 @@
   `{{VAR}}` → renders-as-`{{VAR}}` convention) are no longer flagged as unknown
   placeholders. **behavior change:** a real unknown placeholder in running text is
   still reported; only code-context occurrences are exempt.
+- **Plain sync no longer materializes the preset/flag defaults (#1074, behavior change)**:
+  `fill_defaults` gains `materialize_presets`, which the sync auto-fill passes only
+  for `--init`, so `rules-preset`, `speech-mode`, `tier-preset`, `se-focus`,
+  `max-parallel-agents`, `debug-mode` and `allow-committed-secrets` stay virtual
+  through the runtime fallbacks and the `platforms:` cascade instead of being written
+  into third-party `project.yaml` files. Only `repo_containment`, the derived
+  `project.short` and the remaining structural fields are still materialized;
+  `--fill-defaults`/`--init` keep the full set. `meta_optimizer.refill_keys` excludes
+  the same seven keys (and the nested `dod.*` fill, which is likewise `--init`-only),
+  so deleting one is no longer reported — and undone — as a re-materialization on
+  the next sync. **behavior change:** a plain sync no longer adds or restores those
+  seven keys; only `--fill-defaults`/`--init` do.
+- **Admin and sync config writes keep the comments in `project.yaml` (#1092)**:
+  the new `lib.yaml_patch.patch_top_level` re-renders only the changed top-level
+  segments, so **unchanged blocks keep their comments**, blank lines, key order,
+  inline comments and CRLF line endings across `ConfigManager.write`, the
+  full-document `PUT` and the partial-section route. A changed block is re-rendered
+  through the YAML dumper, so an inline comment on that key is still dropped, and
+  trailing document comments are kept as a tail (new keys are inserted before them).
+  When the document cannot be patched safely (anchors/aliases, tabs, multi-document
+  streams, a splitter/parse mismatch, or a dump failure) the patch falls back to the
+  historical **lossy full dump**. The round-trip guard now protects that full-dump
+  fallback only, so a commented file is no longer rejected for a changed section, and
+  the `__allow_lossy__` opt-in is consumed by the handler instead of being persisted
+  as a section. `ai-providers` keeps its always-guarded behaviour.
+  **behavior change:** an admin save of an anchored `project.yaml` that previously
+  succeeded with a lossy full dump now returns 400 unless `__allow_lossy__` is set.
 
 ## [2.0.0-beta.6] - 2026-10-31
 
