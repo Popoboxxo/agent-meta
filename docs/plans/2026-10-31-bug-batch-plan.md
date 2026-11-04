@@ -1,6 +1,6 @@
 # Bug Batch Implementation Plan
 
-> Status: geplant
+> Status: **DONE (2026-11-04)** — alle 22 Batch-Issues geschlossen; 9 PRs gemergt: A `ff612c0b` (#1078, #1041), C1 `d884fa1d` (#1072, #1073), F `a84304d6` + Residue `eb3984f4` (#1093), D1 `95756dfe` (#1095, #1091), E `f5e12ad6` (#1090, #1080, #1094), G `1bb1b231` (#1079, #1032, #971), B `9b426532` (#1071, #1082, #1083), C2 `a80d9828` (#1081, #1084), D2 `2937f649` (#1074, #1092). Kein Merge nutzte force/squash/admin.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox syntax (`- [ ]`) for tracking.
 
@@ -79,6 +79,8 @@ Quellen: Empfehlungen aus den Verify-Reports (A/B/C) übernommen; Widersprüche 
 | 1 (Quick-Wins, disjunkte Dateien) | A1-A3 (#1078 -> #1050 -> #1041), C1-C2 (#1072+#1073), D1 (#1095), E5 (#1094), F1 (#1093), G1 (#971), G2 (#1032) | klein, eindeutig, Security-Hooks zuerst |
 | 2 (mittel) | B1-B3 (#1071 -> #1083 -> #1082), D2-D3 (#1091), E1-E4 (#1090, #1080), G3-G4 (#1079) | mehrere Dateien, #1090/#1071 sind P1 |
 | 3 (Design) | C4-C8 (#1081 -> #1084), D5-D7 (#1074+#1092) | Verhaltens-/Contract-Entscheidungen, größtes Risiko |
+
+> **Nachtrag:** Zwei PRs liefen außerhalb dieses Plans und waren Voraussetzung für 21/21 grüne Checks: der CI-Timeout-Fix `a1e52097` (`test` und `subprocess-shard` wurden bei 30 min und 97–99 % abgebrochen — auch auf `main`) und die Deferred-Test-Härtung `1591d701` (C1-Integrationsassertion + Wall-Clock-Hang-Guard-Bounds).
 
 **Serielle Abhängigkeiten (gleiche Datei):** `hook_common.sh` #1078 -> #1050; `dod-push-check.sh` #1041 (nach A2 wegen gemeinsamer Rebaseline); `consistency/active_set_refs.py` #1083 -> #1082 (#1071 zuvor, gleiche Template-Dateien nicht); `gitignore.py` #1072 + #1073 in einem PR; `admin-server.py` #1095 -> #1092; `config.py`/YAML-Writer #1074+#1092 -> nach #1091 nicht nötig (andere Dateien), aber nach #1095; Drift #1081 -> #1084 (`sync_pipeline.py`). `sync_pipeline.py` wird von #1080, #1079, #1091, #1081, #1074 berührt (verschiedene Hunks): kein Parallel-Merge, Rebase vor jedem Merge.
 
@@ -178,8 +180,8 @@ Branch `fix/hooks-guards`. Alle Hook-Tests laufen mit `--basetemp="$PYTEST_BASET
 **Files:** keine (nur Issue-Aktion)
 **Interfaces:** Consumes: Issue #1041 (Original), #1042 (Duplikat). Produces: #1042 geschlossen.
 
-- [ ] Step 1: Kommentar auf #1042 "Duplicate of #1041" posten und #1042 als `not planned` schließen (Rolle `git`, `gh` unter `/home/hermes/.local/bin/gh`).
-- [ ] Step 2: Prüfen: `gh issue view 1042 --json state` liefert `CLOSED`.
+- [x] Step 1: Kommentar auf #1042 "Duplicate of #1041" posten und #1042 als `not planned` schließen (Rolle `git`, `gh` unter `/home/hermes/.local/bin/gh`).
+- [x] Step 2: Prüfen: `gh issue view 1042 --json state` liefert `CLOSED`.
 
 ### Task A1: #1078 ToolSearch und weitere Built-ins in der Allow-Liste
 
@@ -194,7 +196,7 @@ Branch `fix/hooks-guards`. Alle Hook-Tests laufen mit `--basetemp="$PYTEST_BASET
 - Produces: `hook_known_tool_name <name>` -> return 0 für die 17 neuen Namen (`ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData`); `EnterWorktree`/`ExitWorktree`/Unbekanntes weiter return 1.
 - Consumes: bestehende Aufrufer `orchestrator-guard-impl.sh:250`, `repo-containment-impl.sh:216` (unverändert).
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 
 `tests/test_hook_common_lib.py` (nach `test_hook_known_tool_name_accepts_known_tools`):
 ```python
@@ -216,19 +218,19 @@ def test_toolsearch_is_allowed_and_unknown_tool_still_blocked():
     assert bad.returncode == 2
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_hook_common_lib.py::test_hook_known_tool_name_accepts_1078_builtins tests/test_orchestrator_guard_hook.py::test_toolsearch_is_allowed_and_unknown_tool_still_blocked --basetemp="$PYTEST_BASETEMP"` — erwartet: 17 Parametrisierungen `AssertionError: 'unknown' == 'known'` und `returncode == 2` statt 0.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `hook_known_tool_name` (Z.164-178) vor `Write|AskUserQuestion) return 0 ;;` zwei `case`-Zeilen einfügen, jeweils `return 0 ;;`:
 `ArtifactData|Artifact|ArtifactComments|CronCreate|CronDelete|CronList|EnterPlanMode|Monitor) return 0 ;;`
 `PushNotification|RemoteTrigger|ScheduleWakeup|SendUserFile|TaskCreate|TaskGet|TaskList|TaskUpdate|ToolSearch) return 0 ;;`
 Header-Kommentar Z.133-163 um die Namen ergänzen; `# version: 1.6.1`; `# changelog:` vorn `v1.6.1: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch blocked the main chat and SendMessage, #1078); EnterWorktree/ExitWorktree stay blocked; ` ergänzen.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 Dasselbe Kommando plus `python3 -m pytest tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py --basetemp="$PYTEST_BASETEMP"` (Regression, der `rejects`-Test für `EnterWorktree`/`ExitWorktree` bleibt grün).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 Betreff zählen: `fix: allow ToolSearch and current built-ins in tool allow-list` (<= 72).
 `git add hooks/1-generic/lib/hook_common.sh tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py`
 `git commit -m "fix: allow ToolSearch and current built-ins in tool allow-list" -m "Closes #1078"`
@@ -246,7 +248,7 @@ Betreff zählen: `fix: allow ToolSearch and current built-ins in tool allow-list
 - Produces: `is_fork_bomb(command: str) -> bool` (Python-Teil von `hook_shell_scan_py`), Semantik: der Funktionskörper endet an der ersten `}` bei Tiefe 0 innerhalb von `_MAX_FUNC_BODY = 512` Zeichen; kein schließendes `}` im Fenster => `True` (fail-closed, unverändert).
 - Consumes: `_body_calls_itself_piped(body, name)`, `_MAX_FUNC_BODY`.
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 
 `tests/test_hook_common_lib.py` (Helfer `_fork_bomb_verdict`, `_scan`):
 ```python
@@ -278,10 +280,10 @@ def test_nested_brace_fork_bomb_is_blocked_end_to_end():
     assert r.returncode == 2
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_hook_common_lib.py -k "nested_braces or nesting_keeps" tests/test_orchestrator_guard_hook.py::test_nested_brace_fork_bomb_is_blocked_end_to_end --basetemp="$PYTEST_BASETEMP"` — erwartet: `'0' == '1'` für beide Bypass-Beispiele, Exit 0 statt 2.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `hook_common.sh` Z.771 `close = command.find('}', j + 1, j + 1 + _MAX_FUNC_BODY)` ersetzen durch (innerhalb derselben Schleife, selbe Einrückung):
 ```python
         close = -1
@@ -298,10 +300,10 @@ In `hook_common.sh` Z.771 `close = command.find('}', j + 1, j + 1 + _MAX_FUNC_BO
 ```
 Der anschließende `if close < 0: return True`-Zweig bleibt (fail-closed). Kommentar Z.444-447 (Lücke) streichen/anpassen; Version `1.7.0`, changelog vorn. `branch-guard.md` Z.33: Lücke 5 ersetzen durch: `5. Der Fork-Bomb-Scan zählt geschweifte Klammern (Nesting innerhalb von 512 Zeichen). Eine ungequotete, unbalancierte `{` im Funktionskörper blockt fail-closed (mögliche Fehlalarme).` (Datei hat kein `version:`-Frontmatter; kein Bump.)
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 Dasselbe Kommando; zusätzlich `python3 -m pytest tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py --basetemp="$PYTEST_BASETEMP"` (bestehende Linearitäts- und Window-Tests bleiben grün).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add hooks/1-generic/lib/hook_common.sh rules/1-generic/branch-guard.md tests/test_hook_common_lib.py tests/test_orchestrator_guard_hook.py`
 `git commit -m "fix: count braces in fork-bomb function body scan" -m "Closes #1050"`
 
@@ -317,7 +319,7 @@ Dasselbe Kommando; zusätzlich `python3 -m pytest tests/test_hook_common_lib.py 
 - Produces (Python-Teil des Hooks): `config_recurses(p) -> bool` — `True` wenn (a) `git_config()` den letzten Wert von `push.recursesubmodules` (lowercase) als `on-demand`/`only` führt oder (b) ein Token in `p.override` den Substring `push.recursesubmodules` enthält (wert-agnostisch, deckt `-c`, `--config-env`, `GIT_CONFIG_*`); ein explizites `--recurse-submodules`/`--no-recurse-submodules` in `p`'s Optionen mit anderem Wert überspringt (a)/(b).
 - Consumes: `git_config()` (Z.738), `Push.override` (Z.352-361), `destination_block(p)`, `stmt_is_tag_only(args)` (Z.517), `has_submodules()`.
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 
 `tests/test_dod_push_check_hook.py` (Fixtures `repo_on_feature_branch`, `_run_hook(cwd, command)`; Submodule-Erkennung wie `test_953_...` über `.gitmodules`):
 ```python
@@ -357,16 +359,16 @@ def test_1041_no_submodules_means_no_block(repo_on_feature_branch):
     assert _run_hook(repo_on_feature_branch, "git push origin feat/x").returncode == 0
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_dod_push_check_hook.py -k 1041 --basetemp="$PYTEST_BASETEMP"` — erwartet: Blockfälle liefern Exit 0 statt 2; Negativfälle sind schon grün.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `dod-push-check.sh` (Python-Teil) `config_recurses(p)` oberhalb von `destination_block` definieren (Semantik siehe Interfaces; `opts` nach `--recurse-submodules`/`--no-recurse-submodules` mit Wert `check`/`no`/`false` oder `--no-…` => `return False`). In `destination_block` nach der CLI-Flag-Prüfung (Z.829-833): `if config_recurses(p) and (p.foreign or has_submodules()): return <gleiche Block-Meldung mit "push.recurseSubmodules" statt Flag>`. Z.1069: `not stmt_is_tag_only(p.args)` -> `(not stmt_is_tag_only(p.args) or config_recurses(p))`. Foreign-Repo (`-C`/`GIT_DIR`) unverändert; Restlücke im Header-Abschnitt "Known alias/config limits" dokumentieren. Version `2.1.8` + changelog.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 Dasselbe Kommando plus `python3 -m pytest tests/test_dod_push_check_hook.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add hooks/1-generic/dod-push-check.sh tests/test_dod_push_check_hook.py`
 `git commit -m "fix: block push when push.recurseSubmodules config recurses" -m "Closes #1041"`
 
@@ -377,11 +379,11 @@ Dasselbe Kommando plus `python3 -m pytest tests/test_dod_push_check_hook.py --ba
 **Files:** Modify `CHANGELOG.md`, `tests/fixtures/ac01-baseline/hashes.json`, `tests/test_ac01_render_identity.py` (Rebaseline-Log)
 **Interfaces:** Consumes: Close-out-Protokoll (Batch-Strategie). Produces: PR `fix/hooks-guards` mit `Closes #1078`, `Closes #1050`, `Closes #1041` (je eigene Zeile; #1042 bereits geschlossen).
 
-- [ ] Step 1: Rebase auf `main` (Rolle `git`).
-- [ ] Step 2: `python tests/test_ac01_render_identity.py --write`; `git diff --stat` darf nur diese Schlüssel ändern: `Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`, `Claude/.claude/hooks/dod-push-check.sh` und die `branch-guard`-Rule-Renders je Provider; Log-Eintrag "hook + rule renders (#1078/#1050/#1041)" in den Docstring.
-- [ ] Step 3: CHANGELOG-Einträge (3x `Fixed:`).
-- [ ] Step 4: Volllauf (Close-out Schritt 4), `code-reviewer`-Self-Review.
-- [ ] Step 5: Commit `git add CHANGELOG.md tests/fixtures/ac01-baseline/hashes.json tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline hooks and changelog for guard fixes"`; PR durch `git`, kein Merge.
+- [x] Step 1: Rebase auf `main` (Rolle `git`).
+- [x] Step 2: `python tests/test_ac01_render_identity.py --write`; `git diff --stat` darf nur diese Schlüssel ändern: `Claude/.claude/hooks/lib/hook_common.sh`, `Gemini/.agents/hooks/lib/hook_common.sh`, `Claude/.claude/hooks/dod-push-check.sh` und die `branch-guard`-Rule-Renders je Provider; Log-Eintrag "hook + rule renders (#1078/#1050/#1041)" in den Docstring.
+- [x] Step 3: CHANGELOG-Einträge (3x `Fixed:`).
+- [x] Step 4: Volllauf (Close-out Schritt 4), `code-reviewer`-Self-Review.
+- [x] Step 5: Commit `git add CHANGELOG.md tests/fixtures/ac01-baseline/hashes.json tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline hooks and changelog for guard fixes"`; PR durch `git`, kein Merge.
 
 ## Tasks Cluster B
 
@@ -402,7 +404,7 @@ Branch `fix/consistency-false-positives`. Abweichung zu Verify-A: Zeilen in `act
 - Consumes: `ROLE_PRINCIPAL_DEVELOPER_ACTIVE`, `ROLE_FEEDBACK_ACTIVE` (`variables.py:448-450`, `active_set.py`), `DEVELOPER_TIERS_ENABLED`; `asr.check_dangling_dispatch(project, providers, {}, active)`.
 - Produces: gerenderte Templates ohne Dispatch auf inaktive `principal-developer`/`feedback`; Checker unverändert.
 
-- [ ] **Step 1: Failing Test schreiben**
+- [x] **Step 1: Failing Test schreiben**
 
 Fixture `tests/fixtures/active-set/pt/.meta-config/project.yaml`:
 ```yaml
@@ -439,19 +441,19 @@ def test_1071_active_principal_row_still_rendered(matrix):
     assert "| `principal-developer` |" in text
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_active_set_dangling.py::test_1071_inactive_principal_and_feedback_not_dispatched --basetemp="$PYTEST_BASETEMP"` — erwartet: Findings mit `dispatch to inactive role 'principal-developer'` (orchestrator.md, senior-developer.md) und `'feedback'` (meta-feedback.md).
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
   - `orchestrator.md`: Z.113 `{{#if DEVELOPER_TIERS_ENABLED}}` -> `{{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}`; Zeile 140 (`principal-developer`-Tabellenzeile) in eigene Zeilen `{{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}` / `{{/if}}` einrahmen; Z.153 (Satz mit `principal-developer`) und der `principal-developer`-Satz in Z.167-168 gleichermaßen mit `ROLE_PRINCIPAL_DEVELOPER_ACTIVE` gaten (Rest der Tiers-Prosa bleibt unter `DEVELOPER_TIERS_ENABLED`); Z.165 XL-Spalte: `{{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}`principal-developer`{{else}}{{#if DEVELOPER_TIERS_ENABLED}}`senior-developer`{{else}}`developer`{{/if}}{{/if}}`; Z.178 `, inkl. senior-developer → principal-developer` auf `ROLE_PRINCIPAL_DEVELOPER_ACTIVE` stellen.
   - `senior-developer.md`: Z.26 Satz `For last-resort escalations … route to principal-developer …` in `{{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}…{{else}}If blocked after 2+ verified failures, report `STATUS: failed` to the orchestrator.{{/if}}`; die Abschnitte "7. Escalation to principal-developer" (Z.78-83), Z.136 (`RECOMMENDED_TIER`), Z.152 und der Delegations-Tail Z.154 auf dieselbe Bedingung stellen (Absätze in eigene `{{#if}}`-Zeilen).
   - `meta-feedback.md`: Z.80 Tabellenzeile `| feedback | … |` in eigene Zeilen `{{#if ROLE_FEEDBACK_ACTIVE}}` / `{{/if}}`.
   - Versionen bumpen. Jede vom Test gemeldete weitere Fundstelle derselben Dateien nach demselben Muster gaten (Test ist das Orakel); `grep -n "principal-developer" agents/1-generic/{orchestrator,senior-developer}.md` darf danach nur noch Treffer innerhalb eines `ROLE_PRINCIPAL_DEVELOPER_ACTIVE`-Blocks zeigen.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_active_set_dangling.py --basetemp="$PYTEST_BASETEMP"` (inkl. bestehender Heuristik-Tests, `test_table_heuristic_positive_only_dispatch_columns` bleibt unverändert grün) und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add agents/1-generic/orchestrator.md agents/1-generic/senior-developer.md agents/1-generic/meta-feedback.md tests/fixtures/active-set/pt tests/test_active_set_dangling.py`
 `git commit -m "fix: gate inactive-role dispatch in orchestrator templates" -m "Closes #1071"`
 
@@ -469,7 +471,7 @@ def test_1071_active_principal_row_still_rendered(matrix):
 - Produces: `CHECK_DANGLING_MENTION_FM = "active-set.dangling-mention-frontmatter"`; `_frontmatter_end(lines: list) -> int` (Zeilennummer 1-basiert des schließenden `---`, `0` wenn `lines[0].strip() != "---"` oder kein Abschluss); `_collect(..., kind="mention")` liefert pro Rolle ein WARNING (Frontmatter-Treffer) und ein INFO (Body-Treffer).
 - Consumes: `_line_hits`, `_read_lines`, `mention_allow`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_active_set_dangling.py`, Helfer `_scratch`, `synced`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_active_set_dangling.py`, Helfer `_scratch`, `synced`)
 ```python
 def test_1083_frontmatter_mention_is_warning_body_is_info(synced, tmp_path):
     _, active = synced("p10")
@@ -500,10 +502,10 @@ def test_1083_templates_description_names_no_inactive_role():
 ```
 (`Finding` hat die Felder `severity`, `check`, `file`, `message`, `suggestion` — verifiziert in `scripts/lib/consistency/report.py:29-34`.)
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_active_set_dangling.py -k 1083 --basetemp="$PYTEST_BASETEMP"` — erwartet: nur `active-set.dangling-mention` (INFO) vorhanden; Description-Test schlägt an `se-test-engineer`/`database-engineer` fehl.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `active_set_refs.py`:
 ```python
 CHECK_DANGLING_MENTION_FM = "active-set.dangling-mention-frontmatter"
@@ -518,10 +520,10 @@ def _frontmatter_end(lines: list) -> int:
 ```
 In `_collect` (Kind `mention`) pro Datei `fm_end = _frontmatter_end(lines)` berechnen (die Zeilenliste einmal lesen, an `_line_hits` übergeben); `per_role` nach (`role`, `in_fm = lineno <= fm_end`) trennen; `in_fm` => `Finding(Severity.WARNING, CHECK_DANGLING_MENTION_FM, rel, f"mention of inactive role '{role}' in frontmatter ({n}x, first line {first})", "Name the role conditionally or neutrally in the description")`, sonst unverändertes INFO. `_dedupe` bleibt. Check-Name in `config/known-issues.yaml` neben `active-set.dangling-mention` eintragen. `tester.md` description: `"Isolated unit tests with mocks/stubs following a TDD workflow. Integration tests belong to a dedicated integration-test role when one is active."`; `data-engineer.md`: den Satz `Distinct from database-engineer query/index work.` durch `Distinct from query/index tuning work.` ersetzen.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_active_set_dangling.py tests/test_known_issues_registry.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/consistency/active_set_refs.py config/known-issues.yaml agents/1-generic/tester.md agents/1-generic/data-engineer.md agents/2-platform/hacs-tester.md tests/test_active_set_dangling.py`
 `git commit -m "fix: warn on inactive role named in frontmatter description" -m "Closes #1083"`
 
@@ -538,7 +540,7 @@ In `_collect` (Kind `mention`) pro Datei `fm_end = _frontmatter_end(lines)` bere
 - Produces: `_non_code_lines(lines: list) -> list` — gibt Zeilen ohne Fence-Blöcke (Zeilen, die mit ```` ``` ```` oder `~~~` beginnen, schalten um) und mit entfernten Inline-Code-Spans (`re.sub(r"(`+)[^`\n]*?\1", "", line)`) zurück; Zeilenanzahl bleibt (ausgeblendete Zeilen werden zu `""`).
 - Consumes: `_PLACEHOLDER_RE`, `_refs()["placeholder_allow"]` (bleibt `[]`).
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 ```python
 def test_1082_placeholder_in_inline_code_and_fence_is_not_flagged(synced, tmp_path):
     _, active = synced("p10")
@@ -552,16 +554,16 @@ def test_1082_plain_and_mixed_placeholders_still_flagged(synced, tmp_path):
     assert sorted(f.message.split()[2] for f in found) == ["{{BAZ}}", "{{FOO}}"]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_active_set_dangling.py -k 1082 --basetemp="$PYTEST_BASETEMP"` — erwartet: erster Test liefert 4 Findings statt `[]`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `_non_code_lines` wie in Interfaces; in `check_unresolved_placeholder` `for line in _read_lines(path):` -> `for line in _non_code_lines(_read_lines(path)):`. `.meta-config/project.yaml`: in `variables.KEY_PATTERNS` die freie Prosa `Platzhalter {{VARIABLE}} werden …` zu ``Platzhalter `{{VARIABLE}}` werden …`` ändern (Grep `Platzhalter {{VARIABLE}}`; Sync-Drift in `CLAUDE.md`/`AGENTS.md` wird NICHT committet).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_active_set_dangling.py --basetemp="$PYTEST_BASETEMP"` (`test_pall_unresolved_placeholder_extra_donts` und `test_placeholder_allow_suppresses` bleiben grün; sonst Fixture anpassen) und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/consistency/active_set_refs.py .meta-config/project.yaml tests/test_active_set_dangling.py`
 `git commit -m "fix: skip code spans in unresolved-placeholder check" -m "Closes #1082"`
 
@@ -572,11 +574,11 @@ def test_1082_plain_and_mixed_placeholders_still_flagged(synced, tmp_path):
 **Files:** Modify `CHANGELOG.md`, `tests/fixtures/ac01-baseline/hashes.json`, `tests/test_ac01_render_identity.py`, `standalone/agents/{orchestrator,senior-developer,meta-feedback,tester,data-engineer}.md` (nur soweit enthalten und geändert), ggf. `tests/fixtures/slimming-golden/*`, `tests/fixtures/compact-golden/*`
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/consistency-false-positives` mit `Closes #1071`, `Closes #1083`, `Closes #1082` (je eigene Zeile).
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_context_budget_checks.py tests/test_standalone_export_in_sync.py --basetemp="$PYTEST_BASETEMP"`; bei Diff `python scripts/sync.py --render-standalone` (Standalone-Export, `test_standalone_export_in_sync.py` ist das Gate) und `--write` für AC-01, danach `git diff --stat`: erlaubt sind nur Renders von `orchestrator`, `senior-developer`, `meta-feedback`, `tester`, `data-engineer`, `hacs-tester` (alle Provider). `slimming-golden`/`compact-golden`/`active-set-prose` nur bei Diff nachziehen, Grund im Rebaseline-Log (#1071/#1083).
-- [ ] Step 3: CHANGELOG (`Fixed:` x3; #1083 mit "new check `active-set.dangling-mention-frontmatter` (WARNING)").
-- [ ] Step 4: Volllauf, `code-reviewer`-Self-Review, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline template renders for consistency fixes"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_context_budget_checks.py tests/test_standalone_export_in_sync.py --basetemp="$PYTEST_BASETEMP"`; bei Diff `python scripts/sync.py --render-standalone` (Standalone-Export, `test_standalone_export_in_sync.py` ist das Gate) und `--write` für AC-01, danach `git diff --stat`: erlaubt sind nur Renders von `orchestrator`, `senior-developer`, `meta-feedback`, `tester`, `data-engineer`, `hacs-tester` (alle Provider). `slimming-golden`/`compact-golden`/`active-set-prose` nur bei Diff nachziehen, Grund im Rebaseline-Log (#1071/#1083).
+- [x] Step 3: CHANGELOG (`Fixed:` x3; #1083 mit "new check `active-set.dangling-mention-frontmatter` (WARNING)").
+- [x] Step 4: Volllauf, `code-reviewer`-Self-Review, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline template renders for consistency fixes"`.
 
 ## Tasks Cluster C
 
@@ -595,7 +597,7 @@ Zwei PRs: **C1** (`fix/gitignore-managed-block`, Welle 1: C1+C2+C3) und **C2** (
 - Produces (`gitignore.py`): `GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"`, `GITIGNORE_BLOCK_END = "# --- end agent-meta managed ---"` (Werte unverändert von `context.py:327-328`); `_line_in_managed_block(gitignore_text: str, lineno: int) -> bool` (1-basiert, True nur zwischen BEGIN und END).
 - Consumes: `run_git_check_ignore(probe, root, "-v")`; Ausgabeformat `<source>:<line>:<pattern>\t<path>`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_gitignore_shadowing.py`, Helfer `_init_repo`, `_PROVIDER_CONFIG`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_gitignore_shadowing.py`, Helfer `_init_repo`, `_PROVIDER_CONFIG`)
 ```python
 from lib.gitignore import GITIGNORE_BLOCK_BEGIN, GITIGNORE_BLOCK_END
 
@@ -615,16 +617,16 @@ def test_warning_when_rule_outside_block_even_if_block_exists(tmp_path):
     assert len(warnings) == 1 and ".gitignore:1:.claude/" in warnings[0]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_gitignore_shadowing.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ImportError: cannot import name 'GITIGNORE_BLOCK_BEGIN' from 'lib.gitignore'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Konstanten und `_line_in_managed_block` in `gitignore.py` definieren; `context.py` importiert sie statt sie zu definieren (kein Zyklus: `gitignore.py` importiert nur `.io`, `.providers`, `.tmp_paths`). In `detect_shadowed_provider_roots` nach `source_rule = ...`: `src, ln, _pat = (source_rule.split(":", 2) + ["", ""])[:3]`; wenn `src == ".gitignore"` und `ln.isdigit()` und `_line_in_managed_block((project_root / ".gitignore").read_text(encoding="utf-8"), int(ln))` => `continue`. Docstring-Aussage "predates" auf "pre-existing rule outside the managed block" korrigieren.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_gitignore_shadowing.py tests/test_context_gitignore*.py --basetemp="$PYTEST_BASETEMP"` (Glob ggf. leer; dann `-k gitignore`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/gitignore.py scripts/lib/context.py tests/test_gitignore_shadowing.py`
 `git commit -m "fix: skip shadowing warning for rules inside managed block" -m "Closes #1072"`
 
@@ -641,7 +643,7 @@ Konstanten und `_line_in_managed_block` in `gitignore.py` definieren; `context.p
 - Produces: `FRAMEWORK_GENERATED_ENTRIES: tuple[str, ...] = (".meta-config/platform-defaults.resolved.yaml",)`; `framework_baseline_entries() -> list[str]` = `["sync.log", "*.sync-backup-*", *FRAMEWORK_GENERATED_ENTRIES]`.
 - Consumes: `compute_base_gitignore_entries(providers, provider_config, gitignore_cfg, ...)`; `generated_file_drift.PLATFORM_DEFAULTS_RESOLVED_REL` (Wert muss gleich sein, per Test gepinnt statt Import wegen Zyklusrisiko).
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_gitignore_platform_defaults.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_gitignore_platform_defaults.py`)
 ```python
 import subprocess, sys
 from pathlib import Path
@@ -674,16 +676,16 @@ def test_git_check_ignore_matches_entry(tmp_path):
     assert r.returncode == 0
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_gitignore_platform_defaults.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ImportError: cannot import name 'FRAMEWORK_GENERATED_ENTRIES'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Konstante und Funktion in `gitignore.py` ergänzen; in `compute_base_gitignore_entries` direkt nach dem `custom_entries`-Block (:319-321) `for _e in FRAMEWORK_GENERATED_ENTRIES: if _e not in entries: entries.append(_e)` (unbedingt, unabhängig von Toggles). `sync_pipeline.py:1568` ersetzen durch `framework_baseline = framework_baseline_entries()`; Import ergänzen. `generated_file_drift.PLATFORM_DEFAULTS_RESOLVED_REL` bleibt unverändert (Quelle bleibt der Pin-Test). Kein `git rm --cached` im Fix (Folge-Housekeeping).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_gitignore_platform_defaults.py tests/test_gitignore_shadowing.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/gitignore.py scripts/lib/sync_pipeline.py tests/test_gitignore_platform_defaults.py`
 `git commit -m "fix: ignore platform-defaults snapshot in managed block" -m "Closes #1073"`
 
@@ -694,11 +696,11 @@ Konstante und Funktion in `gitignore.py` ergänzen; in `compute_base_gitignore_e
 **Files:** Modify `CHANGELOG.md`, `tests/fixtures/ac01-baseline/hashes.json`, `tests/test_ac01_render_identity.py` (Rebaseline-Log), ggf. `.gitignore`-haltige Fixtures (`grep -rn "agent-meta managed (do not edit)" tests/fixtures`)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/gitignore-managed-block` mit `Closes #1072`, `Closes #1073`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: `python tests/test_ac01_render_identity.py --write`; erlaubt im Diff: nur `<Provider>/.gitignore`-Schlüssel (z. B. `Claude/.gitignore`); Log "only .gitignore hashes (#1073)".
-- [ ] Step 3: CHANGELOG (`Fixed:` x2; Hinweis "tracked `platform-defaults.resolved.yaml` in Bestandsprojekten bleibt getrackt").
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline gitignore renders for managed block fixes"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: `python tests/test_ac01_render_identity.py --write`; erlaubt im Diff: nur `<Provider>/.gitignore`-Schlüssel (z. B. `Claude/.gitignore`); Log "only .gitignore hashes (#1073)".
+- [x] Step 3: CHANGELOG (`Fixed:` x2; Hinweis "tracked `platform-defaults.resolved.yaml` in Bestandsprojekten bleibt getrackt").
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline gitignore renders for managed block fixes"`.
 
 ### Task C4: #1081 Drift-Entscheidung nach den Writern
 
@@ -714,7 +716,7 @@ Konstante und Funktion in `gitignore.py` ergänzen; in `compute_base_gitignore_e
 - Produces: `scan_generated_file_drift(...) -> list[dict]` mit Findings `{"path": str, "provider": str, "pre_text": str}`; `resolve_drift_findings(findings: list[dict], project_root: Path, log: SyncLog, dry_run: bool) -> list[dict]` (liefert nur echte Änderungen; stale Baseline => `log.note("generated-file-drift", f"{path}: stale hash baseline (disk equals generated) - baseline refreshed")`; `dry_run=True` => alle Findings unverändert zurück); `_sync_stage_generated_file_drift_scan(...) -> list[dict]`; `_sync_stage_generated_file_drift_resolve(project_root, findings, args, log) -> None`.
 - Consumes: `backup_drifted_files(findings, project_root, log, dry_run)` (nimmt `finding.get("pre_text")` als Backup-Inhalt, sonst Disk-Inhalt wie bisher).
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_generated_file_drift.py`; Importe `from scripts.lib import generated_file_drift as gfd`, `from scripts.lib.generated_file_drift import resolve_drift_findings, backup_drifted_files`, `from scripts.lib.io import content_hash`, `from scripts.lib.log import SyncLog`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_generated_file_drift.py`; Importe `from scripts.lib import generated_file_drift as gfd`, `from scripts.lib.generated_file_drift import resolve_drift_findings, backup_drifted_files`, `from scripts.lib.io import content_hash`, `from scripts.lib.log import SyncLog`)
 ```python
 def _f(rel, pre):
     return {"path": rel, "provider": "Claude", "pre_text": pre}
@@ -753,16 +755,16 @@ def test_dry_run_writes_nothing(tmp_path):                    # R3
     assert list(tmp_path.rglob("*.sync-backup-*")) == []
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_generated_file_drift.py -k "pre_text or stale_baseline or real_edit or dry_run_writes" --basetemp="$PYTEST_BASETEMP"` — erwartet: `ImportError: cannot import name 'resolve_drift_findings'` / Finding ohne `pre_text`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `scan_generated_file_drift`: Findings um `"pre_text": <gelesener Text>` erweitern (beide Stellen :342 und :349). `backup_drifted_files`: `existing_content = finding["pre_text"] if finding.get("pre_text") is not None else target.read_text(...)` (bestehender Lesepfad bleibt Fallback). `resolve_drift_findings` wie in Interfaces (Disk per `read_text(encoding="utf-8")`, `OSError`/`UnicodeDecodeError` => Finding als echt behandeln). Neue Funktion <= 30 Zeilen (Modul ist Alt-Überschreitung). `_sync_stage_generated_file_drift_scan`: `findings` zurückgeben (`[]` bei disabled), Backup- und `log.warning`-Block entfernen (Prune bleibt unverändert hier). Neue `_sync_stage_generated_file_drift_resolve`: `real = resolve_drift_findings(findings, project_root, log, args.dry_run)`, dann der bisherige Backup+Warn-Block auf `real` (Text der Warnung unverändert). `cli_commands.py`: `drift_findings = _sync_stage_generated_file_drift_scan(...)` und vor Stage 13 `_sync_stage_generated_file_drift_resolve(ctx.project_root, drift_findings, ctx.args, ctx.log)`. `test_generated_file_drift_pipeline_wiring.py`: bestehende Tests, die WARN/Backup aus der Scan-Stage erwarten, rufen zusätzlich die Resolve-Stage auf.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_generated_file_drift.py tests/test_generated_file_drift_pipeline_wiring.py tests/test_managed_index_alignment.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/generated_file_drift.py scripts/lib/sync_pipeline.py scripts/lib/cli_commands.py tests/test_generated_file_drift.py tests/test_generated_file_drift_pipeline_wiring.py`
 `git commit -m "fix: decide generated-file drift after writers ran" -m "Closes #1081"`
 
@@ -779,7 +781,7 @@ def test_dry_run_writes_nothing(tmp_path):                    # R3
 - Produces: `prune_sync_backups(target_dir, project_root, log, dry_run, max_age_days, max_per_source) -> list[str]` — Signatur unverändert; Semantik: ein Backup wird gelöscht, wenn mindestens `max_per_source` neuere Backups derselben Quelle existieren; `max_age_days` bleibt aus API-Stabilität erhalten und wird ignoriert; das neueste Backup überlebt immer.
 - Consumes: `_sync_backup_timestamp`, `_sync_backup_source`.
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 ```python
 def _backups(d, source, stamps):
     d.mkdir(parents=True, exist_ok=True)
@@ -800,16 +802,16 @@ def test_prune_single_old_backup_survives(tmp_path):
     assert [p.name for p in d.iterdir()] == ["a.md.sync-backup-20260101-000000"]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_generated_file_drift.py -k "three_newest_regardless or single_old" --basetemp="$PYTEST_BASETEMP"` — erwartet: erster Test lässt alle 10 Dateien stehen (Alter < 30 Tage).
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `prune_sync_backups` die Altersprüfung (`if (now - stamp).days <= max_age_days: continue`, :191-192) und `now = datetime.now()` entfernen; Löschbedingung `if newer < max_per_source: continue`. Docstring (:150-161) auf die neue Semantik und "age ignored since #1081" ändern; `sync_pipeline.py:927-929` Kommentar angleichen. Die beiden bestehenden Tests, die die AND-Semantik festschreiben, ersetzen (Erwartung: genau die `max_per_source` neuesten bleiben).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_generated_file_drift.py tests/test_managed_index_alignment.py tests/test_backup_robustness.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/generated_file_drift.py scripts/lib/sync_pipeline.py tests/test_generated_file_drift.py`
 `git commit -m "fix: prune sync backups by count, not age" -m "Closes #1081"`
 (Der Issue-Body wird von C4 und C5 gemeinsam adressiert; `Closes #1081` steht in beiden, geschlossen wird beim PR-Merge einmal.)
@@ -826,7 +828,7 @@ In `prune_sync_backups` die Altersprüfung (`if (now - stamp).days <= max_age_da
 - Produces: `_AGENT_META_RUNTIME_ARTIFACTS: frozenset[str] = frozenset({".guard-audit.log"})`; Infra-Root `known_names` enthält zusätzlich `Path(v).name` für `pc["mcp-config"]["committed-file"]` und `["secrets-file"]`; `_dir_is_fully_managed` gibt `saw_managed or saw_backup` zurück.
 - Consumes: `scan_injection_drift`, `_is_sync_backup_name`.
 
-- [ ] **Step 1: Failing Tests schreiben** (Muster `test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_settings_local`, `_write_framework_registry`)
+- [x] **Step 1: Failing Tests schreiben** (Muster `test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_settings_local`, `_write_framework_registry`)
 ```python
 def _scan(tmp_path, project_root, provider_config, name):
     from scripts.lib.external_tools import scan_injection_drift
@@ -863,16 +865,16 @@ def test_backup_only_dir_is_managed(tmp_path):
     assert _scan(tmp_path, project, pc, "Claude")["Claude"] == []
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_external_tools_registry.py -k "guard_audit or mcp_local_json or backup_only" --basetemp="$PYTEST_BASETEMP"` — erwartet: je ein Finding (`.claude/hooks/.guard-audit.log`, `.opencode/mcp.local.json`, `.claude/hooks/old-dir`).
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 (a) in der Schleife :331 nach den Sidecar-Index-Checks: `if kind == "hook" and child.name in _AGENT_META_RUNTIME_ARTIFACTS: continue`. (b) nach der `_INFRA_ROOT_KNOWN_KEYS`-Schleife (:388-391): `for _k in ("committed-file", "secrets-file"): _v = (pc.get("mcp-config") or {}).get(_k); if _v: known_names.add(Path(_v).name)`. (d) in `_dir_is_fully_managed`: `saw_backup = False` initialisieren, im Zweig `_is_sync_backup_name(name)` `saw_backup = True` setzen, `return saw_managed or saw_backup`. Kommentar zu `.guard-audit.log` (geschrieben von `hooks/1-generic/orchestrator-guard-impl.sh`, Laufzeit-Output, nicht Sync-Output).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_external_tools_registry.py --basetemp="$PYTEST_BASETEMP"` (bestehendes `test_scan_injection_drift_flags_empty_dir` bleibt grün).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/external_tools_drift.py tests/test_external_tools_registry.py`
 `git commit -m "fix: excuse own runtime artifacts in external-tools drift" -m "Closes #1084"`
 
@@ -890,7 +892,7 @@ def test_backup_only_dir_is_managed(tmp_path):
 - Produces: optionaler Provider-Key `infra_known_names: list[str]`; `known_names.update(Path(n).name for n in pc.get("infra_known_names") or [])`.
 - Consumes: C6-Struktur.
 
-- [ ] **Step 1: Failing Test schreiben**
+- [x] **Step 1: Failing Test schreiben**
 ```python
 def test_infra_known_names_excused_but_unknown_file_flagged(tmp_path):
     project = tmp_path / "project"
@@ -910,16 +912,16 @@ def test_opencode_declares_runtime_infra_names():
 ```
 (`REPO_ROOT` im Testmodul definieren, falls nicht vorhanden: `Path(__file__).resolve().parent.parent`.)
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_external_tools_registry.py -k "infra_known_names or runtime_infra" --basetemp="$PYTEST_BASETEMP"` — erwartet: `.opencode/package.json` und `.opencode/node_modules` geflaggt bzw. `KeyError: 'infra_known_names'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Key in `ai-providers.yaml` (Kommentar: Opencode-Runtime legt sie an, npm-Plugins); in `external_tools_drift.py` nach dem `mcp-config`-Block aus C6 `known_names.update(Path(n).name for n in (pc.get("infra_known_names") or []))`. Kein Provider-Name im Code.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_external_tools_registry.py tests/test_provider_matrix_sync.py -k "not matrix_full" --basetemp="$PYTEST_BASETEMP"` (falls `-k` nicht passt: ganze Datei `tests/test_external_tools_registry.py` plus `python3 scripts/sync.py --validate`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add config/ai-providers.yaml scripts/lib/external_tools_drift.py tests/test_external_tools_registry.py`
 `git commit -m "fix: declare opencode runtime files as known infra names" -m "Closes #1084"`
 
@@ -935,7 +937,7 @@ Key in `ai-providers.yaml` (Kommentar: Opencode-Runtime legt sie an, npm-Plugins
 - Produces: `render_injection_drift_artifacts(findings_by_provider, project_root, provider_config, log, dry_run) -> None` (Signatur unverändert) — Findings von Providern ohne `has_rules` werden mit `{"provider": <Name>}` getaggt dem ersten `has_rules`-Provider (Reihenfolge von `findings_by_provider`) zugeschlagen; Zeilenformat bei Tag: `` - `{path}` ({kind}) [{provider}] — {tool_label} ``; ohne `has_rules`-Provider zusätzlich `log.note("external-tools-drift", f"{n} findings only in sync.log (no provider with has_rules)")`.
 - Consumes: `_DRIFT_CAP = 10`, `write_checked`.
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 ```python
 def test_non_rules_provider_findings_in_first_rules_report(tmp_path):
     from scripts.lib.external_tools import render_injection_drift_artifacts
@@ -958,16 +960,16 @@ def test_no_rules_provider_logs_note_only(tmp_path):
     assert len(log.warnings) == 1                                # per-finding warning stays
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_external_tools_registry.py -k "first_rules_report or logs_note_only" --basetemp="$PYTEST_BASETEMP"` — erwartet: Claude-Datei existiert nicht bzw. ohne `[Gemini]`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `render_injection_drift_artifacts` vor der Schleife: `rules_providers = [p for p in findings_by_provider if provider_config.get(p, {}).get("has_rules")]`; `extras = [{**f, "provider": p} for p, fs in findings_by_provider.items() if p not in rules_providers for f in fs]`; für `p == rules_providers[0]` Findings = eigene + `extras`. Warnungs-Logging je Finding unverändert pro Quell-Provider. `_generate_drift_content`: `tag = f" [{f['provider']}]" if f.get("provider") else ""` in die Zeile einfügen. Cap 10 unverändert.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_external_tools_registry.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/external_tools_drift.py tests/test_external_tools_registry.py`
 `git commit -m "fix: merge non-rules provider drift into rules report" -m "Closes #1084"`
 
@@ -978,11 +980,11 @@ In `render_injection_drift_artifacts` vor der Schleife: `rules_providers = [p fo
 **Files:** Modify `CHANGELOG.md`; kein AC-01-Diff erwartet (`python3 -m pytest tests/test_ac01_render_identity.py --basetemp="$PYTEST_BASETEMP"` muss ohne `--write` grün sein, sonst Ursache klären)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/drift-false-positives` mit `Closes #1081`, `Closes #1084`.
 
-- [ ] Step 1: Rebase auf `main`; `sync_pipeline.py`/`cli_commands.py`-Konflikte mit den zuvor gemergten PRs (D1, E, G) manuell lösen.
-- [ ] Step 2: AC-01-Test ohne `--write` laufen lassen.
-- [ ] Step 3: CHANGELOG (`Fixed:` #1081 mit "behavior change: prune keeps the 3 newest backups per source regardless of age", #1084).
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for drift false-positive fixes"`.
+- [x] Step 1: Rebase auf `main`; `sync_pipeline.py`/`cli_commands.py`-Konflikte mit den zuvor gemergten PRs (D1, E, G) manuell lösen.
+- [x] Step 2: AC-01-Test ohne `--write` laufen lassen.
+- [x] Step 3: CHANGELOG (`Fixed:` #1081 mit "behavior change: prune keeps the 3 newest backups per source regardless of age", #1084).
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for drift false-positive fixes"`.
 
 ## Tasks Cluster D
 
@@ -1000,7 +1002,7 @@ Zwei PRs: **D1** (`fix/admin-symlink-and-validate`, Welle 1/2: Tasks D1-D4) und 
 - Produces: `resolve_path(key) -> Path` erlaubt zusätzlich Pfade im Fallback-Zweig (`rel.startswith("config/")`, primary fehlt), wenn `target` unter `(self.root / ".agent-meta").resolve() / "config"` liegt (`config` selbst NICHT aufgelöst); `write()` wirft `SecurityError("framework symlink is read-only via Admin UI")`, wenn der aufgelöste Pfad außerhalb von `self.root` liegt.
 - Consumes: `SUPER_ADMIN_FILES` (:204), `PROJECT_FILES` (:217).
 
-- [ ] **Step 1: Failing Tests schreiben**
+- [x] **Step 1: Failing Tests schreiben**
 ```python
 import pytest
 
@@ -1042,10 +1044,10 @@ def test_dotdot_traversal_still_blocked(tmp_path):
         mgr.resolve_path("../etc")
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_admin_server.py -k "symlink or dotdot" --basetemp="$PYTEST_BASETEMP"` — erwartet: `SecurityError: resolved path escapes root` im ersten Test, `DID NOT RAISE ... read-only` im dritten.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `resolve_path`: `used_fallback = False`; im Zweig `if fallback.exists(): target = fallback; used_fallback = True`. Containment-Block (:1113-1117) ersetzen durch:
 ```python
         try:
@@ -1061,10 +1063,10 @@ In `resolve_path`: `used_fallback = False`; im Zweig `if fallback.exists(): targ
 ```
 In `write()` direkt nach `path = self.resolve_path(key)`: `try: path.relative_to(self.root)` / `except ValueError: raise SecurityError("framework symlink is read-only via Admin UI")`. Docstring-Hinweis auf die Symlink-Semantik; `# pragma: no cover` am alten Zweig entfernen.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_admin_server.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/admin-server.py tests/test_admin_server.py`
 `git commit -m "fix: allow symlinked framework config in admin path resolve" -m "Closes #1095"`
 
@@ -1080,7 +1082,7 @@ In `write()` direkt nach `path = self.resolve_path(key)`: `try: path.relative_to
 - Produces: `auto_commit_violations(config: dict) -> list[str]` (stdlib, ohne jsonschema; Nachrichtenpräfix `auto_commit.`): (i) `mode` ∉ `off|suggest|auto|custom`; (ii) `triggers` kein Array oder Wert ∉ `task-boundary|per-edit|context-pressure|file-count-threshold|custom`; (iii) nicht-leeres `triggers` bei `mode != "auto"`; (iv) `mode == "custom"` oder `"custom"` in `triggers` ohne nicht-leeren String `custom_script`; (v) unbekannter Schlüssel; (vi) `file_count_threshold` kein int >= 1 (bool abgelehnt). Block fehlt/`None` => `[]`. `resolve_auto_commit_config(config, active_roles, agent_meta_root, platform=None) -> dict` liefert bei Violations `{"version": ALLOWLIST_VERSION, "mode": "off", "eligible_roles": [], "triggers": [], "file_count_threshold": 5, "custom_script": None, "secret_scan": True}`.
 - Consumes: bestehende Konstanten `ALLOWLIST_VERSION`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_auto_commit_violations.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_auto_commit_violations.py`)
 ```python
 import sys
 from pathlib import Path
@@ -1122,16 +1124,16 @@ def test_valid_config_unchanged():                                       # R4
     assert out["mode"] == "auto" and out["eligible_roles"] == ["developer"]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_auto_commit_violations.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ImportError: cannot import name 'auto_commit_violations'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Modulkonstanten `_MODES`, `_TRIGGERS`, `_KEYS = {"mode","triggers","file_count_threshold","custom_script","secret_scan"}`; `auto_commit_violations` wie in Interfaces, Nachrichtentexte exakt wie die Tests (`"auto_commit.triggers is only valid with mode: auto"`, `"auto_commit.custom_script is required for mode: custom or trigger: custom"`, `f"auto_commit.triggers contains unknown value(s): {', '.join(bad)}"`, `f"auto_commit.mode '{mode}' is not one of off|suggest|auto|custom"`, `f"auto_commit has unknown key(s): {', '.join(unknown)}"`, `"auto_commit.file_count_threshold must be an integer >= 1"`). In `resolve_auto_commit_config` am Anfang: bei `auto_commit_violations(config)` das Fail-safe-Dict zurückgeben.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_auto_commit_violations.py tests/test_auto_commit_lib.py tests/test_auto_commit_allowlist_pipeline.py tests/test_auto_commit_schema.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/auto_commit.py tests/test_auto_commit_violations.py`
 `git commit -m "fix: fail safe on schema-invalid auto_commit blocks" -m "Closes #1091"`
 
@@ -1148,7 +1150,7 @@ Modulkonstanten `_MODES`, `_TRIGGERS`, `_KEYS = {"mode","triggers","file_count_t
 - Produces: `--validate` zählt jede Violation als `consistency_errors` und loggt `log.warning(f"config-audit [ERROR] auto_commit: {v}")`; die Allowlist-Stage loggt je Violation `log.warn(f"auto_commit is invalid ({v}); commit authority disabled (mode: off)")`.
 - Consumes: `auto_commit_violations(config)` (D2).
 
-- [ ] **Step 1: Failing Tests schreiben** (E2E im Muster `tests/test_auto_commit_allowlist_pipeline.py`: `_run_sync`)
+- [x] **Step 1: Failing Tests schreiben** (E2E im Muster `tests/test_auto_commit_allowlist_pipeline.py`: `_run_sync`)
 ```python
 import json, subprocess
 
@@ -1185,16 +1187,16 @@ def test_validate_rc0_on_valid_config(tmp_path):
     assert _sync(p, "--validate").returncode == 0
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_auto_commit_violations.py -k "validate or fail_safe" --basetemp="$PYTEST_BASETEMP"` — erwartet: `--validate` rc 0 statt 1; Allowlist mit `mode == "auto"`-Rest bzw. fehlende WARN-Zeile (Fail-safe greift ab D2 bereits für `mode`, die WARN-Ausgabe fehlt).
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `_handle_validate`: nach dem `_unpaired_tags`-Block `from lib.auto_commit import auto_commit_violations`; `for _v in auto_commit_violations(config): log.warning(f"config-audit [ERROR] auto_commit: {_v}"); consistency_errors += 1`. `_sync_stage_auto_commit_allowlist`: vor `resolve_auto_commit_config` `for v in auto_commit_violations(config): log.warn(...)` (Import neben :38); Exit-Code unverändert. Kein Zeit-Grace.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_auto_commit_violations.py tests/test_auto_commit_allowlist_pipeline.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate` (Self-Hosting bleibt rc 0).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/cli_commands.py scripts/lib/sync_pipeline.py tests/test_auto_commit_violations.py`
 `git commit -m "fix: fail validate on schema-invalid auto_commit config" -m "Closes #1091"`
 
@@ -1205,11 +1207,11 @@ def test_validate_rc0_on_valid_config(tmp_path):
 **Files:** Modify `CHANGELOG.md`; kein AC-01-Diff erwartet (Basis-Configs haben `auto_commit.mode: off`; `python3 -m pytest tests/test_ac01_render_identity.py --basetemp="$PYTEST_BASETEMP"` ohne `--write` muss grün sein)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/admin-symlink-and-validate` mit `Closes #1095`, `Closes #1091`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: AC-01-Test ohne `--write`.
-- [ ] Step 3: CHANGELOG: `Fixed:` #1095; #1091 mit `behavior change: --validate now exits 1 for schema-invalid auto_commit blocks (sync stays rc 0 and writes mode: off)`.
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for admin and validate fixes"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: AC-01-Test ohne `--write`.
+- [x] Step 3: CHANGELOG: `Fixed:` #1095; #1091 mit `behavior change: --validate now exits 1 for schema-invalid auto_commit blocks (sync stays rc 0 and writes mode: off)`.
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for admin and validate fixes"`.
 
 ### Task D5: #1074/#1092 Modul `yaml_patch.patch_top_level`
 
@@ -1223,7 +1225,7 @@ def test_validate_rc0_on_valid_config(tmp_path):
 - Produces: `patch_top_level(original_text: str, new_doc: dict, dump_fn: Callable[[dict], str], comments: Optional[dict] = None) -> Optional[str]`. Semantik: Zerlegung in Präfix (Kommentare vor dem ersten Key) und Top-Level-Segmente (Key-Zeile in Spalte 0 + zugehörige Folgezeilen; führende Kommentar-/Leerzeilen gehören zum folgenden Key); unveränderte Keys (`old_doc[k] == new_doc[k]`) bleiben byte-identisch; geänderte Keys: führende Kommentarzeilen des alten Segments + `dump_fn({k: new_doc[k]})`; entfernte Keys: Segment samt führenden Kommentaren entfernt; neue Keys: am Ende angehängt, davor optional `# {comments[k]}\n`; Originalreihenfolge bleibt. Rückgabe `None` bei: Mehrdokument (`^---`/`^...` Zeile), Anker/Alias (`&name`/`*name` in Nicht-Kommentarzeilen), Tab-Einrückung, `old_doc` kein Mapping, YAML-Fehler, oder Selbstcheck `yaml.safe_load(result) != new_doc`.
 - Consumes: PyYAML (`yaml`, im Repo bereits Abhängigkeit des Syncers).
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_yaml_patch.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_yaml_patch.py`)
 ```python
 import sys
 from pathlib import Path
@@ -1276,16 +1278,16 @@ def test_selfcheck_failure_returns_none():
     assert patch_top_level(ORIG, doc, lambda d: "roles: [unclosed\n") is None
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_yaml_patch.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ModuleNotFoundError: No module named 'lib.yaml_patch'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Modul `scripts/lib/yaml_patch.py` (`from __future__ import annotations`, stdlib + `yaml`): Key-Regex `^(?P<key>"[^"]+"|'[^']+'|[A-Za-z0-9_][^\s#:]*):(?:[ \t]|$)`; `_split(text) -> (prefix: str, segments: list[tuple[str, str]])` über `text.splitlines(keepends=True)`; beim Erreichen einer Key-Zeile wandert der maximale Rest-Block aus Leer-/`#`-Spalte-0-Zeilen am Ende des vorigen Segments (bzw. des Präfix) in das neue Segment. `_leading_comments(segment)` = Zeilen vor der Key-Zeile. Beim Anhängen eines Segments, dessen Text nicht auf `\n` endet, ein `\n` ergänzen. Kein Fallback in diesem Modul (der Aufrufer entscheidet).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_yaml_patch.py --basetemp="$PYTEST_BASETEMP"`; `wc -l scripts/lib/yaml_patch.py` <= 200.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/yaml_patch.py tests/test_yaml_patch.py`
 `git commit -m "feat: add top-level yaml segment patcher" -m "Refs #1074, #1092"`
 
@@ -1302,7 +1304,7 @@ Modul `scripts/lib/yaml_patch.py` (`from __future__ import annotations`, stdlib 
 - Produces: `fill_defaults(config_path: Path, agent_meta_root: Path, log: SyncLog, dry_run: bool, silent: bool = False, materialize_presets: bool = True) -> None`; `_SYNC_SKIPPED_DEFAULT_KEYS = frozenset({"rules-preset","speech-mode","tier-preset","se-focus","max-parallel-agents","debug-mode","allow-committed-secrets"})` — bei `materialize_presets=False` werden diese Keys im Top-Level-Fill übersprungen (`repo_containment` und `project.short` bleiben); `_write_yaml_with_comments` versucht zuerst `patch_top_level(original, data, dump_fn, comments=descriptions)` und fällt bei `None` auf den bisherigen Voll-Dump zurück (+ `log`-freier Hinweis entfällt, der Aufrufer loggt nicht).
 - Consumes: `patch_top_level` (D5), `yaml_dump_preserving_multiline`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_fill_defaults_comments.py`; Muster `tests/test_project_yaml_permissions_864.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_fill_defaults_comments.py`; Muster `tests/test_project_yaml_permissions_864.py`)
 ```python
 import sys
 from pathlib import Path
@@ -1344,16 +1346,16 @@ def test_explicit_fill_defaults_materializes_presets_and_keeps_comments(tmp_path
     assert "# my header" in out and "# inline" in out
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_fill_defaults_comments.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `TypeError: fill_defaults() got an unexpected keyword argument 'materialize_presets'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Signatur erweitern; im Top-Level-Fill (:1060-1069) `if not materialize_presets and field in _SYNC_SKIPPED_DEFAULT_KEYS: continue`; den nested-`dod`-Fill (:1091-1103) ebenfalls nur bei `materialize_presets`. `_write_yaml_with_comments` mit `patch_top_level` (Original-Text aus `path.read_text`, `dump_fn` ruft `yaml_dump_preserving_multiline(_yaml, d, buf, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)` in einen `io.StringIO`; `comments={name: desc for name, desc in auto_filled if "." not in name}`), bei `None` bestehender Pfad. `sync_pipeline.py:167`: `fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True, materialize_presets=False)`. `--fill-defaults`/`--init` (`cli_commands.py:749`) bleiben bei Default `True`. Danach `config = load_config(config_path)` (:169) liest Defaults weiterhin über Laufzeit-Fallbacks (`config_field_defaults`).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_fill_defaults_comments.py tests/test_version_bookkeeping.py tests/test_config_variable_fallbacks.py tests/test_project_yaml_permissions_864.py tests/test_meta_optimizer_refill.py tests/test_yaml_multiline_roundtrip.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/config.py scripts/lib/sync_pipeline.py tests/test_fill_defaults_comments.py`
 `git commit -m "fix: keep project.yaml comments when auto-filling defaults" -m "Closes #1074"`
 
@@ -1369,7 +1371,7 @@ Signatur erweitern; im Top-Level-Fill (:1060-1069) `if not materialize_presets a
 - Produces: `ConfigManager.write(key, data, *, allow_lossy=False) -> dict` — für `key == "project"` und existierende Datei: `patch_top_level(original, data, dump_fn)`; bei `None` Voll-Dump + `assert_roundtrip_preserved(original, new_text, context=f"config/{path.name}", allow_lossy=allow_lossy)` (nur Fallback-Pfad, siehe Cluster-Notiz); `_route_put_config("project")` und `_write_project_section` poppen `ALLOW_LOSSY_KEY` aus dem Body und reichen `allow_lossy` durch.
 - Consumes: `patch_top_level`, `lib.yaml_roundtrip.ALLOW_LOSSY_KEY`, `assert_roundtrip_preserved`, `YamlRoundTripLoss`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_admin_server.py`, pytest-Funktionen)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_admin_server.py`, pytest-Funktionen)
 ```python
 PROJECT_YAML = "# top\nproject:\n  name: t\n  prefix: t\n# keep\nroles:\n- orchestrator\nspeech-mode: full  # inline\n"
 
@@ -1404,10 +1406,10 @@ def test_project_write_fallback_is_guarded_unless_lossy(tmp_path):
 ```
 (`lib` ist in `test_admin_server.py` via `sys.path` auf `scripts` erreichbar — Importzeile des Moduls kopf prüfen, ggf. `sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))` ergänzen.)
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_admin_server.py -k "project_write" --basetemp="$PYTEST_BASETEMP"` — erwartet: Kommentare verschwunden (`# top` nicht in out) bzw. `DID NOT RAISE YamlRoundTripLoss`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 In `write()` (nach `new_text = ...`): 
 ```python
         if key == "project" and path.exists():
@@ -1426,10 +1428,10 @@ In `write()` (nach `new_text = ...`):
 ```
 (`data` ist bei `project` immer ein Mapping; `list` => `patch_top_level` liefert `None`.) `_route_put_config`: im `key == "project"`-Zweig `body = dict(body)` und `allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))` vor `_assert_project_update_writable`, `write("project", merged, allow_lossy=allow_lossy)`. `_write_project_section`: `allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))` auf einer Kopie von `body`, an `write(...)` durchreichen. Doku: Eintrag in `docs/api/` bzw. Admin-Howto (Grep `__allow_lossy__` in `docs/`) um `project` ergänzen.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_admin_server.py tests/test_yaml_patch.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/admin-server.py tests/test_admin_server.py docs`
 `git commit -m "fix: preserve project.yaml comments on admin save" -m "Closes #1092"`
 
@@ -1440,11 +1442,11 @@ In `write()` (nach `new_text = ...`):
 **Files:** Modify `CHANGELOG.md`; AC-01 prüfen (`grep "project.yaml" tests/fixtures/ac01-baseline/hashes.json`; nur bei Treffer `--write` und nur diese Schlüssel committen)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/yaml-comment-preserving-writer` mit `Closes #1074`, `Closes #1092`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: Scratch-Sync-Lauf zur Verifikation (Close-out Schritt 4 deckt ab); AC-01-Test ohne `--write`, bei Diff nur `project.yaml`-Schlüssel nachziehen.
-- [ ] Step 3: CHANGELOG: `Fixed:` #1074/#1092; `behavior change: auto-sync no longer writes the preset/flag defaults (rules-preset, speech-mode, tier-preset, se-focus, max-parallel-agents, debug-mode, allow-committed-secrets) into project.yaml; use --fill-defaults/--init`.
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md tests/fixtures/ac01-baseline/hashes.json` (nur falls geändert) / `git commit -m "docs: changelog entries for comment-preserving writer"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: Scratch-Sync-Lauf zur Verifikation (Close-out Schritt 4 deckt ab); AC-01-Test ohne `--write`, bei Diff nur `project.yaml`-Schlüssel nachziehen.
+- [x] Step 3: CHANGELOG: `Fixed:` #1074/#1092; `behavior change: auto-sync no longer writes the preset/flag defaults (rules-preset, speech-mode, tier-preset, se-focus, max-parallel-agents, debug-mode, allow-committed-secrets) into project.yaml; use --fill-defaults/--init`.
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md tests/fixtures/ac01-baseline/hashes.json` (nur falls geändert) / `git commit -m "docs: changelog entries for comment-preserving writer"`.
 
 ## Tasks Cluster E
 
@@ -1463,7 +1465,7 @@ Branch `fix/provider-mcp-opencode-hermes`. Innerhalb des Branches seriell (E1 ->
 - Produces: `role_emitted_for_provider(role: str, active_set, config: dict, provider: str) -> bool` — `True` wenn (`active_set is None` oder `role in active_set.roles`) und NICHT (`role == "orchestrator"` und `_resolve_orch_mode(orch_cfg, override, validate=False) == "main-chat"`), mit `orch_cfg = config.get("orchestrator") or {}` und `override = (orch_cfg.get("provider-overrides") or {}).get(provider)` (nur wenn `dict`); `_opencode_entry_point(provider: str, provider_config: dict, active_set, config: Optional[dict] = None) -> Optional[str]` — mit `config` zusätzlich `role_emitted_for_provider`; `config=None` => bisheriges Verhalten.
 - Consumes: `providers.explicit_primary_role`, `variables._resolve_orch_mode`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_opencode_main_chat_entry_point.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_opencode_main_chat_entry_point.py`)
 ```python
 import json, sys
 from pathlib import Path
@@ -1515,16 +1517,16 @@ def test_strict_unchanged_writes_default_agent(tmp_path):
     assert doc["default_agent"] == "orchestrator"
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_opencode_main_chat_entry_point.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ImportError: cannot import name 'role_emitted_for_provider'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `active_set.py`: Funktion wie in Interfaces (Docstring: "single source for #1077; `agent_sync.py:617` uses the per-provider `ORCH_MODE_MAIN_CHAT` variable derived from the same resolver"). `isolation.py`: `_opencode_entry_point` um den optionalen vierten Parameter erweitern (`from .active_set import role_emitted_for_provider` function-lokal, falls Zyklus: `active_set` importiert `variables`/`roles`, nicht `isolation`); an allen drei Aufrufstellen `config` als 4. Argument übergeben (`:804`: `config`, `:1299`: `config`, `:1669`: `config`). `agent_sync.py:617` bleibt unverändert (Call D16).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_opencode_main_chat_entry_point.py tests/test_runtime_gate_wiring.py tests/test_opencode_runtime_gate.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/active_set.py scripts/lib/isolation.py tests/test_opencode_main_chat_entry_point.py`
 `git commit -m "fix: skip opencode entry point when orchestrator not emitted" -m "Closes #1090"`
 
@@ -1541,7 +1543,7 @@ def test_strict_unchanged_writes_default_agent(tmp_path):
 - Produces: `apply_settings_surface_shape(content: str, pc: dict, capabilities: Optional[dict] = None, *, emit_default_agent: bool = True) -> str` (Key `default_agent` nur bei `emit_default_agent`); `_init_provider_settings_json` übergibt `emit_default_agent = not (pc.get("primary-role") == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true")`; Warntext (Log-Level `warning`): `opencode.default-agent.dangling: default_agent '<x>' names role '<x>' which this sync does not generate (orchestrator.mode main-chat?) — remove the key or set orchestrator.mode: strict`, ausgelöst wenn `not rollback_only`, `entry is None`, `active_set is not None`, `existing["default_agent"]` ein `str` in `active_set.known_roles` ist und `not role_emitted_for_provider(<x>, active_set, config, provider)`; der Wert bleibt unangetastet.
 - Consumes: `role_emitted_for_provider` (E1), per-Provider-Variable `ORCH_MODE_MAIN_CHAT` (`variables._orch_mode_flags`).
 
-- [ ] **Step 1: Failing Tests schreiben** (anhängen an `tests/test_opencode_main_chat_entry_point.py`)
+- [x] **Step 1: Failing Tests schreiben** (anhängen an `tests/test_opencode_main_chat_entry_point.py`)
 ```python
 from lib.context import apply_settings_surface_shape
 
@@ -1575,16 +1577,16 @@ def test_invariant_default_agent_is_emitted_or_absent(tmp_path, cfg):
     assert value is None or role_emitted_for_provider(value, AS, cfg, "Opencode")
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_opencode_main_chat_entry_point.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `TypeError: apply_settings_surface_shape() got an unexpected keyword argument 'emit_default_agent'`; Dangling-Test ohne Warnung.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `context.py:1655`: Keyword-only Parameter `emit_default_agent: bool = True`; `:1700-1702` nur bei `emit_default_agent`. `_init_provider_settings_json:1755`: `apply_settings_surface_shape(content, pc, capabilities, emit_default_agent=emit)` mit `emit` wie oben. `isolation.py`: nach dem `entry = (...)`-Block `if (not rollback_only and entry is None and active_set is not None):` `current = existing.get(_DEFAULT_AGENT_JSON_KEY)`; wenn `isinstance(current, str) and current in active_set.known_roles and not role_emitted_for_provider(current, active_set, config, provider)`: `log.warning(...)` mit dem Text aus den Interfaces. CHANGELOG-Hinweis im Close-out: bereits geschriebene v2-Init-Werte werden nicht automatisch entfernt (nur WARN).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_opencode_main_chat_entry_point.py tests/test_opencode_v2_surface.py tests/test_runtime_gate_wiring.py --basetemp="$PYTEST_BASETEMP"`; Golden `tests/scenarios/configs/69-opencode-v2-surface.project.yaml` unverändert (strict).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/context.py scripts/lib/isolation.py tests/test_opencode_main_chat_entry_point.py`
 `git commit -m "fix: omit dangling opencode default_agent in main-chat" -m "Closes #1090"`
 
@@ -1602,7 +1604,7 @@ def test_invariant_default_agent_is_emitted_or_absent(tmp_path, cfg):
 - Produces: `_INTERPRETER_FALLBACKS: dict[str, tuple[str, ...]] = {"python3": ("python", "py")}`; `_resolve_stdio_command(cmd: str) -> str` — `cmd`, wenn `shutil.which(cmd)` aufgelöst, sonst der erste auflösbare Fallback, sonst `cmd`.
 - Consumes: `_build_connection_entry(conn, secrets, fmt=None)` (:156).
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_mcp_config.py`; Importe `import scripts.lib.mcp_provider_config as mpc`, `from scripts.lib.registry_query import load_mcp_registry`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_mcp_config.py`; Importe `import scripts.lib.mcp_provider_config as mpc`, `from scripts.lib.registry_query import load_mcp_registry`)
 ```python
 def test_catalog_stdio_commands_use_python3():
     repo_root = Path(__file__).resolve().parents[1]
@@ -1627,16 +1629,16 @@ def test_stdio_command_unchanged_when_nothing_resolves(monkeypatch):
     assert mpc._build_connection_entry(_entry(), None)["command"] == "python3"
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_mcp_config.py -k "python3 or falls_back or nothing_resolves" --basetemp="$PYTEST_BASETEMP"` — erwartet: Katalog-Test schlägt für `viz-logger` und `a2a-handoff` fehl; `AttributeError: module ... has no attribute 'shutil'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Katalog beide Einträge auf `python3`. In `mcp_provider_config.py`: `import shutil`; `_INTERPRETER_FALLBACKS`/`_resolve_stdio_command` oberhalb von `_build_connection_entry`; im stdio-Zweig `cmd = _resolve_stdio_command(conn.get("command", ""))`. Kommentar: `shortcut: host-local resolution at sync time, .mcp.json is gitignored per host; revisit with #814 (invocation/cwd)`.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_mcp_config.py tests/test_mcp_stale_servers_key.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add config/plugin-catalog.yaml scripts/lib/mcp_provider_config.py tests/test_mcp_config.py`
 `git commit -m "fix: use python3 for repo-owned mcp servers with fallback" -m "Closes #1080"`
 
@@ -1654,7 +1656,7 @@ Katalog beide Einträge auf `python3`. In `mcp_provider_config.py`: `import shut
 - Produces: `check_mcp_health(agent_meta_root: Path, project_root: Path, config: dict, log: SyncLog, env: Optional[Mapping[str, str]] = None) -> None` — je aktivem Server mit `secrets:` EINE `log.warn(f"mcp.secret-empty: server '{name}': required secret(s) {', '.join(missing)} empty (secrets.local.yaml / environment) — server will not connect")`, wenn ein Secret weder in `secrets.local.yaml` nicht-leer noch in `env` (Default `os.environ`) gesetzt ist; je aktivem stdio-Server mit `shutil.which(_resolve_stdio_command(cmd)) is None` `log.warn(f"mcp.command-unresolved: server '{name}': command '{cmd}' not found on PATH")`. Wirft nie.
 - Consumes: `registry_query.load_mcp_registry`, `registry_query.resolve_active_mcp_servers`, `registry_query.SECRETS_LOCAL_FILE`, `io._load_yaml_or_json`, `mcp_provider_config._resolve_stdio_command`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_mcp_health.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_mcp_health.py`)
 ```python
 import sys
 from pathlib import Path
@@ -1708,16 +1710,16 @@ def test_unresolved_command_warns(tmp_path, monkeypatch):
     assert len(log.warnings) == 1 and "mcp.command-unresolved" in log.warnings[0]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_mcp_health.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ModuleNotFoundError: No module named 'scripts.lib.mcp_health'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Modul wie in Interfaces (stdlib: `os`, `shutil`, `pathlib`; Fehler in Registry-/Secrets-Lesen mit `try/except Exception` fail-soft, Debug-Log). `sync_pipeline.py`: `from lib.mcp_health import check_mcp_health` neben :98 und direkt nach `sync_secrets_template(...)` (:363) `check_mcp_health(agent_meta_root, project_root, config, log)`. Katalog-Hinweis: im `agent-hint` des Reqogniloom-Servers ergänzen "Wenn das externe Plugin UND dieser Katalog-Server aktiv sind, beide Variablen (`REQOGNILOOM_MCP_URL` und `MCP_REQOGNILOOM_URL`) setzen oder eine Quelle deaktivieren." (kein Umbenennen, Call D17).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_mcp_health.py tests/test_mcp_config.py --basetemp="$PYTEST_BASETEMP"`; `python3 scripts/sync.py --dry-run` zeigt für dieses Repo keine neue `mcp.command-unresolved`-Warnung für `viz-logger` (python3 auflösbar); `wc -l scripts/lib/mcp_health.py` <= 80.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/mcp_health.py scripts/lib/sync_pipeline.py tests/test_mcp_health.py config/plugin-catalog.yaml`
 `git commit -m "fix: warn on empty mcp secrets and unresolved commands" -m "Closes #1080"`
 
@@ -1734,7 +1736,7 @@ Modul wie in Interfaces (stdlib: `os`, `shutil`, `pathlib`; Fehler in Registry-/
 - Produces: `_SKILL_DIR = "agent-meta-{role}"`; Manifest `skill` = `roles/agent-meta-<role>/SKILL.md`, `persona` = `roles/agent-meta-<role>/references/persona.md`; `_role_description(role, entry, agent_meta_root) -> str` — Priorität: Template-Frontmatter `description` -> role-defaults `description` -> `short_desc` -> Rollenname; `collect_role_meta(...) -> tuple[dict, Optional[str]]` — Rolle ohne Eintrag in `roles_cfg["roles"]` => Tier `balanced` ohne Warnung; Eintrag mit leerem/unbekanntem `model` warnt weiter.
 - Consumes: `resolve_abstract_tier`, `parse_frontmatter_text`, `load_roles_config`.
 
-- [ ] **Step 1: Failing/angepasste Tests** (`tests/test_hermes_export.py`, Klasse `TestExportSkillPackMiniRepo`)
+- [x] **Step 1: Failing/angepasste Tests** (`tests/test_hermes_export.py`, Klasse `TestExportSkillPackMiniRepo`)
 Bestehende Assertions ändern: `test_writes_expected_layout` -> Pfade `roles/agent-meta-alpha/SKILL.md`, `roles/agent-meta-alpha/references/persona.md`, `roles/agent-meta-gamma/...`; `(out / "roles" / "agent-meta-alpha" / ...)`; `test_skill_md_frontmatter...`: Pfad `agent-meta-alpha` und `"Alpha test role." in fm["description"]`; `test_manifest_structure`: `entry["description"] == "Alpha test role."`, `entry["skill"] == "roles/agent-meta-alpha/SKILL.md"`, `entry["persona"] == "roles/agent-meta-alpha/references/persona.md"`; `test_orphan_role_defaults_to_balanced_with_warning` -> umbenennen `test_template_only_role_has_no_tier_warning`: `tier == "balanced"` und `not any(w.startswith("gamma:") for w in summary["warnings"])`. Neue Tests:
 ```python
     def test_skill_dir_equals_frontmatter_name(self, mini_meta: Path, tmp_path: Path) -> None:
@@ -1760,16 +1762,16 @@ Bestehende Assertions ändern: `test_writes_expected_layout` -> Pfade `roles/age
 ```
 `test_frontmatter_description_fallback_for_orphan_template` bleibt unverändert grün.
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_hermes_export.py --basetemp="$PYTEST_BASETEMP"` — erwartet: Pfad-Assertions (`roles/alpha/...` vs. neu), Beschreibung `Alpha role description.` statt `Alpha test role.`, Warnung für `gamma` vorhanden.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `_SKILL_DIR`-Konstante; `rel_skill = f"roles/{_SKILL_DIR.format(role=role)}/SKILL.md"` (analog persona und die zwei `output_dir`-Pfade :542-543). `_role_description`: Template-Block vor den role-defaults-Quellen. `collect_role_meta`: `has_entry = role in (roles_cfg.get("roles") or {})`; `tier, warning = resolve_abstract_tier(...)` nur wenn `has_entry`, sonst `(DEFAULT_TIER, None)`. Kopfdoku :16 und Howto-Pfade angleichen. Die 8 deutschen Template-Descriptions bleiben Folge-Issue (kein Template-Edit hier).
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_hermes_export.py --basetemp="$PYTEST_BASETEMP"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/hermes_export.py tests/test_hermes_export.py docs`
 `git commit -m "fix: align hermes skill dir, description and tier handling" -m "Closes #1094"`
 
@@ -1780,11 +1782,11 @@ Bestehende Assertions ändern: `test_writes_expected_layout` -> Pfade `roles/age
 **Files:** Modify `CHANGELOG.md`; kein AC-01-Diff erwartet (`python3 -m pytest tests/test_ac01_render_identity.py --basetemp="$PYTEST_BASETEMP"` ohne `--write`; Goldens für `.mcp.json` per `grep -rn '"command": "python"' tests/fixtures` prüfen)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/provider-mcp-opencode-hermes` mit `Closes #1090`, `Closes #1080`, `Closes #1094`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: AC-01-Test ohne `--write`; Scenario-Lauf `tests/scenarios/run.sh` für Opencode-Szenarien.
-- [ ] Step 3: CHANGELOG: #1090 mit Bestandsprojekt-Hinweis (v2-Init-Werte nur WARN), #1080 (`python3`, neue WARN `mcp.secret-empty`/`mcp.command-unresolved`), #1094 (`behavior change: skill directories are now roles/agent-meta-<role>/`).
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for provider and mcp fixes"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: AC-01-Test ohne `--write`; Scenario-Lauf `tests/scenarios/run.sh` für Opencode-Szenarien.
+- [x] Step 3: CHANGELOG: #1090 mit Bestandsprojekt-Hinweis (v2-Init-Werte nur WARN), #1080 (`python3`, neue WARN `mcp.secret-empty`/`mcp.command-unresolved`), #1094 (`behavior change: skill directories are now roles/agent-meta-<role>/`).
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for provider and mcp fixes"`.
 
 ## Tasks Cluster F
 
@@ -1806,7 +1808,7 @@ Branch `fix/git-template-empty-remote-url`. Es gibt keinen Platform-Override von
 - Produces: Variable `GIT_REMOTE_URL_SET` (`"true"`/`"false"`), abgeleitet wie `DEVELOPER_SNIPPETS_PATH_SET`; Template-Zeile `**Git platform:** {{GIT_PLATFORM}}{{#if GIT_REMOTE_URL_SET}} ({{GIT_REMOTE_URL}}){{/if}}`; Standalone-Fallback `"GIT_REMOTE_URL_SET": "false"`.
 - Consumes: `strip_inactive_conditional_blocks` (`variables.py:431`, erkennt Schlüssel, die literal im Variablen-Dict stehen), `build_variables(cfg, repo_root, repo_root)`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_git_section_variables.py`, Helfer `_vars`, `_load`; für den Render-Test `render_standalone_agent` und die Sync-Pipeline nicht nötig: der Templatetext wird direkt substituiert)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_git_section_variables.py`, Helfer `_vars`, `_load`; für den Render-Test `render_standalone_agent` und die Sync-Pipeline nicht nötig: der Templatetext wird direkt substituiert)
 ```python
 from lib.variables import substitute, strip_inactive_conditional_blocks  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
@@ -1835,16 +1837,16 @@ def test_template_line_is_the_gated_form():
 ```
 (Signaturen verifiziert: `strip_inactive_conditional_blocks(text, variables)` `variables.py:417`, `substitute(text, variables, source_label, log)` `variables.py:544`.)
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_git_section_variables.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `KeyError: 'GIT_REMOTE_URL_SET'` und `_LINE not in text`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 `config.py:1442`: Tupel um `"GIT_REMOTE_URL"` erweitern (erzeugt `GIT_REMOTE_URL_SET`; `setdefault("GIT_REMOTE_URL", "")` ist harmlos). `git.md:123` auf die gegatete Zeile, Version `2.1.1`. `standalone.py`: `"GIT_REMOTE_URL_SET": "false",` in `_CONDITIONAL_FALSE_FLAGS`. `placeholders.py:40`: `"GIT_REMOTE_URL_SET"` neben `"GIT_REMOTE_URL"` registrieren (NICHT in `_UNREGISTERED_BUILDER_RATCHET`, Ratchet ist shrink-only). Variablen-Doku `docs/guides/setup/first-steps.md` (Grep `GIT_REMOTE_URL`) um die abgeleitete Variable ergänzen. `python scripts/sync.py --render-standalone` für `standalone/agents/git.md`.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_git_section_variables.py tests/test_standalone_export_in_sync.py tests/test_standalone_render.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add agents/1-generic/git.md scripts/lib/config.py scripts/lib/standalone.py scripts/lib/consistency/placeholders.py tests/test_git_section_variables.py standalone/agents/git.md docs`
 `git commit -m "fix: omit empty remote url parens in git agent template" -m "Closes #1093"`
 
@@ -1855,11 +1857,11 @@ def test_template_line_is_the_gated_form():
 **Files:** Modify `CHANGELOG.md`, `tests/fixtures/ac01-baseline/hashes.json`, `tests/test_ac01_render_identity.py` (Log), ggf. `tests/fixtures/slimming-golden/git.md` (nur bei Diff; Golden hat URL gesetzt, Diff nicht erwartet)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/git-template-empty-remote-url` mit `Closes #1093`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: `python tests/test_ac01_render_identity.py --write`; erlaubt im Diff: nur `<Provider>/…/git.md`-Schlüssel (9 Provider, nur falls die Baseline-Config keine `remote-url` setzt; sonst kein Diff). Log "git.md only (#1093)".
-- [ ] Step 3: CHANGELOG (`Fixed:` #1093, Hinweis "template version 2.1.1 propagates to all projects on next sync; only the empty parentheses disappear").
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline git agent renders for remote url fix"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: `python tests/test_ac01_render_identity.py --write`; erlaubt im Diff: nur `<Provider>/…/git.md`-Schlüssel (9 Provider, nur falls die Baseline-Config keine `remote-url` setzt; sonst kein Diff). Log "git.md only (#1093)".
+- [x] Step 3: CHANGELOG (`Fixed:` #1093, Hinweis "template version 2.1.1 propagates to all projects on next sync; only the empty parentheses disappear").
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md tests/fixtures tests/test_ac01_render_identity.py` / `git commit -m "chore: rebaseline git agent renders for remote url fix"`.
 
 ## Tasks Cluster G
 
@@ -1875,12 +1877,12 @@ Branch `fix/test-basetemp-allowlist` (PR G; Tasks G1/G2 sind ohne Abhängigkeit,
 **Interfaces:**
 - Consumes: bestehende Tests `tests/test_provider_matrix_sync.py` (AC-11 `context.dangling-pointer`, AC-12 `context.rule-unreachable`), `tests/test_unread_channels_removed.py` (AC-19), `tests/test_context_budget_checks.py`. Produces: Verifikationsnachweis (Test-IDs), geschlossenes #971, abgehakte #977-Checkbox.
 
-- [ ] **Step 1: Verifikationslauf (Test, der bestehen muss)**
+- [x] **Step 1: Verifikationslauf (Test, der bestehen muss)**
 `python3 -m pytest tests/test_provider_matrix_sync.py -k "dangling or unreachable" tests/test_unread_channels_removed.py tests/test_context_budget_checks.py -q --basetemp="$PYTEST_BASETEMP"` — erwartet: alle grün (Matrix 9 Provider x 4 Presets leer, `_PENDING = {}`).
-- [ ] **Step 2: Bei ROT:** genau der rote Fall wird zum eigenen Bug (Ergebnis an den Nutzer melden, G1 bleibt offen, #971 NICHT schließen). Bei GRÜN weiter.
-- [ ] **Step 3:** `python3 scripts/sync.py --doctor` auf dem Self-Hosting-Repo: kein `context.dangling-pointer`/`context.rule-unreachable`/`context.unread-channel`-Befund.
-- [ ] **Step 4:** Plan-Status-Zeile in `docs/plans/2026-10-11-context-profiles-plan.md` nachziehen.
-- [ ] **Step 5:** `git`: #971 mit Evidenz (Test-IDs + Doctor-Ergebnis) schließen, #977-Checkbox abhaken. Commit `git add docs/plans/2026-10-11-context-profiles-plan.md` / `git commit -m "docs: mark context-profile phase 1 checks as verified" -m "Closes #971"`.
+- [x] **Step 2: Bei ROT:** genau der rote Fall wird zum eigenen Bug (Ergebnis an den Nutzer melden, G1 bleibt offen, #971 NICHT schließen). Bei GRÜN weiter.
+- [x] **Step 3:** `python3 scripts/sync.py --doctor` auf dem Self-Hosting-Repo: kein `context.dangling-pointer`/`context.rule-unreachable`/`context.unread-channel`-Befund.
+- [x] **Step 4:** Plan-Status-Zeile in `docs/plans/2026-10-11-context-profiles-plan.md` nachziehen.
+- [x] **Step 5:** `git`: #971 mit Evidenz (Test-IDs + Doctor-Ergebnis) schließen, #977-Checkbox abhaken. Commit `git add docs/plans/2026-10-11-context-profiles-plan.md` / `git commit -m "docs: mark context-profile phase 1 checks as verified" -m "Closes #971"`.
 
 ### Task G2: #1032 Docstring und Pin-Test, Issue mit Evidenz schließen
 
@@ -1894,7 +1896,7 @@ Branch `fix/test-basetemp-allowlist` (PR G; Tasks G1/G2 sind ohne Abhängigkeit,
 - Produces: `_antigravity_adapter_command(target_filename: str, hooks_dir_rel: str, config_path_rel: str) -> str` unverändert; zusätzlicher Pin-Test des Vertrags "relativ zum Verzeichnis der hooks.json".
 - Consumes: Evidenz `docs/analysis/evidence/2026-09-30-runtime-claude-antigravity.md` §2.1 (cwd = Verzeichnis der `hooks.json`, statisch/in-binary; Runtime-Beleg offen, #860).
 
-- [ ] **Step 1: Failing Test schreiben** (`tests/test_antigravity_hooks_registration.py`, `lib.hooks` ist über `sys.path` importierbar wie `sync_hooks`)
+- [x] **Step 1: Failing Test schreiben** (`tests/test_antigravity_hooks_registration.py`, `lib.hooks` ist über `sys.path` importierbar wie `sync_hooks`)
 ```python
 from lib.hooks import _antigravity_adapter_command  # noqa: E402
 
@@ -1906,13 +1908,13 @@ def test_command_follows_hooks_json_location():
     assert _antigravity_adapter_command("x.sh", ".agents/hooks", "hooks.json") == (
         "bash ./.agents/hooks/antigravity-json-adapter.sh x.sh")
 ```
-- [ ] **Step 2: Run -> erwartet PASS bereits** (Pin-Test; kein FAIL erwartet, weil kein Code-Fix beschlossen ist — der Test dokumentiert den Vertrag und bricht bei künftiger Änderung bewusst)
+- [x] **Step 2: Run -> erwartet PASS bereits** (Pin-Test; kein FAIL erwartet, weil kein Code-Fix beschlossen ist — der Test dokumentiert den Vertrag und bricht bei künftiger Änderung bewusst)
 `python3 -m pytest tests/test_antigravity_hooks_registration.py::test_command_is_relative_to_hooks_json_dir tests/test_antigravity_hooks_registration.py::test_command_follows_hooks_json_location --basetemp="$PYTEST_BASETEMP"`.
-- [ ] **Step 3: Implementierung (nur Docstring)**
+- [x] **Step 3: Implementierung (nur Docstring)**
 Docstring `hooks.py:283-292`: "verified AGY IDE behavior — third-party empirical report" ersetzen durch "AGY runtime documentation (in-binary, static evidence): the command runs via `sh -c` with the working directory set to the directory containing hooks.json — docs/analysis/evidence/2026-09-30-runtime-claude-antigravity.md §2.1; runtime verification pending (#860). If runtime evidence shows a different cwd, use a provider key analogous to `hook-command-anchor` (config/ai-providers.yaml:34) instead of changing this function." Kein Code- und kein Skript-Edit (Hook-Skript-Änderung würde Hook-Version und AC-01-Hashes auslösen).
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_antigravity_hooks_registration.py --basetemp="$PYTEST_BASETEMP"`.
-- [ ] **Step 5: Commit und Issue**
+- [x] **Step 5: Commit und Issue**
 `git add scripts/lib/hooks.py tests/test_antigravity_hooks_registration.py`
 `git commit -m "docs: pin antigravity hook command base to hooks.json dir" -m "Closes #1032"`
 `git` schließt #1032 mit Verweis auf die Evidenz (`not reproducible with documented cwd`); Label `needs-runtime-evidence` bleibt am Tracking von #860.
@@ -1929,7 +1931,7 @@ Docstring `hooks.py:283-292`: "verified AGY IDE behavior — third-party empiric
 - Produces: `sync_allowed_directories(project_root: Path, pc: dict, directories: list, log: SyncLog, dry_run: bool) -> None` — nur wenn `pc` die Keys `settings-allow-dirs-key` (dotted, z. B. `permissions.additionalDirectories`) UND `settings_local_file` trägt und `directories` nicht leer ist: liest die Datei lenient (`io.read_json_lenient`), legt den Pfad im Key an (fehlende Zwischen-Dicts), fügt jeden Eintrag nur hinzu, wenn nicht vorhanden (Listen-Union, nie entfernen, Nutzerkeys unberührt), schreibt per `io.write_atomic`; ungültiges JSON => Datei unberührt + `log.warn`; `dry_run` => nichts schreiben. `outside_project_dirs(project_root: Path, candidates: list) -> list` — Kandidaten, die NICHT unter `project_root` liegen (resolve), als Strings.
 - Consumes: `io.read_json_lenient(path) -> Optional[dict]` (:334), `io.write_atomic(path, content)` (:350), `SyncLog.note/warn`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_settings_dirs.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_settings_dirs.py`)
 ```python
 import json, sys
 from pathlib import Path
@@ -1987,16 +1989,16 @@ def test_outside_project_dirs_filters_inside_paths(tmp_path):
     assert outside_project_dirs(tmp_path, [inside, BASETEMP]) == [BASETEMP]
 ```
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_settings_dirs.py --basetemp="$PYTEST_BASETEMP"` — erwartet: `ModuleNotFoundError: No module named 'lib.settings_dirs'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Modul gemäß Interfaces (`from __future__ import annotations`; `read_json_lenient` liefert `None` bei Fehler und bei fehlender Datei: Existenz vorab per `path.exists()` unterscheiden; bei existierender, unparsebarer Datei `log.warn("settings-dirs: <rel> is not valid JSON — additionalDirectories not updated")` und return). Ausgabe `json.dumps(doc, indent=2, ensure_ascii=False) + "\n"`.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_settings_dirs.py --basetemp="$PYTEST_BASETEMP"`; `wc -l scripts/lib/settings_dirs.py` <= 80.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add scripts/lib/settings_dirs.py tests/test_settings_dirs.py`
 `git commit -m "feat: add additive settings allowed-directories writer" -m "Refs #1079"`
 
@@ -2014,7 +2016,7 @@ Modul gemäß Interfaces (`from __future__ import annotations`; `read_json_lenie
 - Produces: im Sync pro Provider mit Key: `dirs = outside_project_dirs(project_root, [resolve_tmp_paths(project_root, config).pytest_basetemp])` (`TmpSinkError` => `[]`), danach `sync_allowed_directories(project_root, pc, dirs, log, args.dry_run)` und `log.note("settings-dirs", f"pytest basetemp {dir} allowed via {pc['settings_local_file']}")` je Eintrag.
 - Consumes: `tmp_paths.resolve_tmp_paths(project_root, config) -> TmpPaths` (`.pytest_basetemp: str`), `repo_containment.TmpSinkError`.
 
-- [ ] **Step 1: Failing Tests schreiben** (`tests/test_settings_dirs.py`)
+- [x] **Step 1: Failing Tests schreiben** (`tests/test_settings_dirs.py`)
 ```python
 import yaml
 
@@ -2036,16 +2038,16 @@ def test_basetemp_dirs_empty_when_sink_used(tmp_path):
 ```
 Zusätzlich in `lib/settings_dirs.py`: `basetemp_dirs(project_root: Path, config: dict) -> list` = `outside_project_dirs(project_root, [resolve_tmp_paths(project_root, config).pytest_basetemp])`, `TmpSinkError` => `[]`.
 
-- [ ] **Step 2: Run -> FAIL erwarten**
+- [x] **Step 2: Run -> FAIL erwarten**
 `python3 -m pytest tests/test_settings_dirs.py -k "allow_dirs_key or basetemp_dirs" --basetemp="$PYTEST_BASETEMP"` — erwartet: `KeyError: 'settings-allow-dirs-key'` und `ImportError: cannot import name 'basetemp_dirs'`.
 
-- [ ] **Step 3: Implementierung**
+- [x] **Step 3: Implementierung**
 Key in `ai-providers.yaml` (Kommentar: "Claude only; format of other providers' allow-dir keys unverified — add when documented"). `basetemp_dirs` in `settings_dirs.py` (lokaler Import von `lib.tmp_paths`/`lib.repo_containment` gegen Zyklen). In `sync_pipeline.py` nach dem Hooks-Block: `if pc.get("settings-allow-dirs-key"):` `dirs = basetemp_dirs(project_root, config)`; `sync_allowed_directories(...)`; `log.note(...)`. Kein Code in `if provider == ...`. Howto-Absatz: Effekt auf den Claude-Code-Dialog ist laut Issue ungeprüft ("not verified") und wird im PR als Annahme benannt.
 
-- [ ] **Step 4: Run -> PASS**
+- [x] **Step 4: Run -> PASS**
 `python3 -m pytest tests/test_settings_dirs.py tests/test_tmp_paths*.py --basetemp="$PYTEST_BASETEMP"` und `python3 scripts/sync.py --dry-run && python3 scripts/sync.py --validate`; danach `git status`: `.claude/settings.local.json` ist gitignored und wird NICHT committet.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git add config/ai-providers.yaml scripts/lib/sync_pipeline.py scripts/lib/settings_dirs.py tests/test_settings_dirs.py docs howto`
 `git commit -m "fix: allow pytest basetemp dir in local claude settings" -m "Closes #1079"`
 
@@ -2056,11 +2058,11 @@ Key in `ai-providers.yaml` (Kommentar: "Claude only; format of other providers' 
 **Files:** Modify `CHANGELOG.md`; AC-01-Check: `grep settings.local tests/fixtures/ac01-baseline/hashes.json` — nur bei Treffer `--write` (nur diese Schlüssel)
 **Interfaces:** Consumes: Close-out-Protokoll. Produces: PR `fix/test-basetemp-allowlist` mit `Closes #1079`, `Closes #1032`, `Closes #971`.
 
-- [ ] Step 1: Rebase auf `main`.
-- [ ] Step 2: AC-01-Test ohne `--write` (`python3 -m pytest tests/test_ac01_render_identity.py --basetemp="$PYTEST_BASETEMP"`), bei Diff nur `settings.local`-Schlüssel nachziehen.
-- [ ] Step 3: CHANGELOG: #1079 (Option C, Pfad in gitignored `settings.local.json`, Wirkung auf den Claude-Code-Dialog ungeprüft), #1032 (kein Code-Fix, Evidenz), #971 (Verifikation).
-- [ ] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
-- [ ] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for basetemp allow-list and pins"`.
+- [x] Step 1: Rebase auf `main`.
+- [x] Step 2: AC-01-Test ohne `--write` (`python3 -m pytest tests/test_ac01_render_identity.py --basetemp="$PYTEST_BASETEMP"`), bei Diff nur `settings.local`-Schlüssel nachziehen.
+- [x] Step 3: CHANGELOG: #1079 (Option C, Pfad in gitignored `settings.local.json`, Wirkung auf den Claude-Code-Dialog ungeprüft), #1032 (kein Code-Fix, Evidenz), #971 (Verifikation).
+- [x] Step 4: Volllauf, `code-reviewer`, PR durch `git`.
+- [x] Step 5: Commit `git add CHANGELOG.md` / `git commit -m "docs: changelog entries for basetemp allow-list and pins"`.
 
 ## Spec Coverage
 
@@ -2145,3 +2147,31 @@ Gegen die Vorgaben geprüft (Skill `writing-plans`) und direkt behoben:
 - **Review Focus je mit Test:** R1 `test_fork_bomb_nesting_keeps_fail_closed_and_linear` (A2), R2 `test_1041_cli_flag_overrides_config_and_inert_values` (A3), R3 `test_real_edit_backed_up_from_pre_text`/`test_dry_run_writes_nothing` (C4), R4 `test_sync_rc0_but_allowlist_fail_safe` (D3) + `test_valid_config_unchanged` (D2), R5 `test_symlink_target_outside_config_still_blocked`/`test_write_via_symlink_blocked` (D1). Befund behoben: R4 verwies ursprünglich beide Tests auf D3; `test_valid_config_unchanged` liegt in D2 und ist korrigiert.
 - **Proportion:** 39 Tasks / 9 PRs für 21 Bugs: Bündelung nur bei gleicher Datei oder gleichem Defekt (#1072+#1073, #1074+#1092, #1081, #1084 in Teilschritten). Reine Verifikations-/Doku-Fälle (#971, #1032) sind je ein Task ohne Produktionscode. Bewusst kleiner gehalten: kein Doctor-Befund für #1079, kein Template-Edit der 8 deutschen Descriptions, keine Konsistenz-Check-Quelle für Tool-Namen.
 - **Offene Verifikationslücken (nicht per Plan lösbar):** Wirkung von `additionalDirectories` auf den Claude-Code-Dialog (#1079), AGY-Runtime-cwd (#1032), exakte Template-Zeilen im Render (#1071) — jeweils im Task bzw. in den Risiken benannt.
+
+---
+
+## Ausführungsnachweis (Ledger)
+
+Stand: `main` = `2937f649`; alle 22 Batch-Issues CLOSED, `gh pr list --state open` = 0, 21/21 Checks grün, kein Merge mit force/squash/admin.
+
+| PR | Branch | Issues | Merge |
+|---|---|---|---|
+| A | `fix/hooks-guards` | #1078, #1041 | `ff612c0b` |
+| C1 | `fix/gitignore-managed-block` | #1072, #1073 | `d884fa1d` |
+| F | `fix/git-template-empty-remote-url` | #1093 | `a84304d6` (+ Residue `eb3984f4`) |
+| D1 | `fix/admin-symlink-and-validate` | #1095, #1091 | `95756dfe` |
+| E | `fix/provider-mcp-opencode-hermes` | #1090, #1080, #1094 | `f5e12ad6` |
+| G | `fix/test-basetemp-allowlist` | #1079, #1032, #971 (nur Verifikation) | `1bb1b231` |
+| B | `fix/consistency-false-positives` | #1071, #1082, #1083 | `9b426532` |
+| C2 | `fix/drift-false-positives` | #1081, #1084 | `a80d9828` |
+| D2 | `fix/yaml-comment-preserving-writer` | #1074, #1092 | `2937f649` |
+
+**Abweichungen:**
+
+- A2 (#1050) war bereits vor dem Batch-Start gefixt und gemergt (PR #1097), daher schrumpfte PR A auf A1+A3 und `hook_common.sh` stand bei 1.7.0 statt bei den im Plan angenommenen 1.6.x.
+- G0 schloss #1042 als Duplikat von #1041.
+- Der Batch benötigte **zwei PRs außerhalb des Plans**: einen CI-Timeout-Fix (`test` und `subprocess-shard` wurden bei 30 min und 97–99 % abgebrochen — auch auf `main`) und eine Deferred-Test-Härtung (C1-Integrationsassertion + Wall-Clock-Hang-Guard-Bounds).
+- #1079 erforderte den Ausschluss der **host-lokalen `settings.local.json`** aus der AC-01-Render-Identity statt eines erneuten Pinnens von Username/Temp-Pfad.
+- Template-Version-Bumps ließen gepinnte Erwartungen wiederholt über **drei Fixture-Ebenen** veralten (compact-golden, test-env-Baseline, legacy mcp-registry); jede wurde erst durch die CI aufgedeckt.
+- #971 war reine Verifikation (71 Tests, AC-11/12/19) und wurde mit der Evidenz geschlossen.
+- #1085/#1051 blieben gemäß Entscheidung D1 außerhalb des Scopes.
