@@ -295,10 +295,12 @@ def test_ac49_no_dangling_dispatch_over_provider_matrix(matrix, name):
 
 
 def test_1071_inactive_principal_and_feedback_not_dispatched(matrix):
-    # The dev tiers are on (junior+senior) but `principal-developer` and `feedback`
-    # are not in the allowlist: no generated artifact may dispatch either of them.
+    # The dev tiers are on (junior+senior) but the base `developer`,
+    # `principal-developer` and `feedback` are not in the allowlist: no
+    # generated artifact may dispatch any of them.
     project, active = matrix["pt"]
-    assert "principal-developer" not in active.roles and "feedback" not in active.roles
+    for role in ("developer", "principal-developer", "feedback"):
+        assert role not in active.roles
     found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
     assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
 
@@ -308,6 +310,14 @@ def test_1071_active_principal_row_still_rendered(tmp_path_factory):
     project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
     text = (project / ".claude" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
     assert "| `principal-developer` |" in text
+    assert "| `developer` | Standard, clear scope, ≤3 files |" in text
+
+
+def test_1071_active_feedback_row_still_rendered(tmp_path_factory):
+    # Positive control for the #1071 `ROLE_FEEDBACK_ACTIVE` gate (meta-feedback).
+    project = synced_project(tmp_path_factory, tiers_on_config(), providers=["Claude"])
+    text = (project / ".claude" / "agents" / "meta-feedback.md").read_text(encoding="utf-8")
+    assert "| `feedback` |" in text
 
 
 # --- #1083: dangling role mentions in frontmatter are a WARNING --------------
@@ -329,6 +339,18 @@ def test_1083_no_frontmatter_only_info(synced, tmp_path):
     proj = _scratch(tmp_path, "body mentions se-test-engineer\n")
     found = asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
     assert [f.severity for f in found] == [Severity.INFO]
+
+
+def test_1083_frontmatter_dispatch_phrase_is_metadata_not_a_dispatch(synced, tmp_path):
+    # Decision D7: frontmatter is metadata. A dispatch-shaped phrase there is
+    # neither a hard error (dispatch check) nor a body dispatch.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, '---\ndescription: "Hand off to validator"\n---\n'
+                              "body names no inactive role\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+    fm = [f for f in asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+          if f.check == asr.CHECK_DANGLING_MENTION_FM]
+    assert fm == []
 
 
 def test_1083_frontmatter_dispatch_phrase_stays_error(synced, tmp_path):

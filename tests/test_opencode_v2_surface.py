@@ -5413,10 +5413,16 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `slimming-golden` re-pinned for the five touched role goldens (`data-engineer`,
 # `meta-feedback`, `orchestrator`, `senior-developer`, `tester`; frontmatter incl.
 # the two #1083 descriptions); `compact-golden` unchanged. Log:
+# Review follow-up PR #1122 (Bug-Batch PR B): `ac01-baseline` re-pinned — 28
+# hashes (`code-reviewer`, `orchestrator`, `ux-researcher` × 9 providers plus
+# `Copilot/.github/copilot-instructions.md`, which embeds the `code-reviewer`
+# hint); `slimming-golden` re-pinned for `orchestrator`, `code-reviewer` and
+# `senior-developer` (version/generated-from pins, plus the neutralized
+# `code-reviewer` hint; manifest §23); `compact-golden` unchanged. Log:
 # `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "2adf04f66db9670ebe05b448a8e1e9e38935e9a2c0b4ebcf0b9ccbf5f24c50af",
-    "slimming-golden": "607b6c8afad8de18151e68171326efdc50bc50dfdf57ea4a66069e989ee4ee79",
+    "ac01-baseline": "1a6df729fb13bfba81ce8e07121411c8a2eedcffc44e8c01f70146337e17ab7b",
+    "slimming-golden": "dcd2f5be3e3f7d8f4a1fd4be60c239763b65846e4657cdc164369455ca565fad",
     "compact-golden": "44148ea74407a7694846168aab741095a0b2ce03fb2ee8ec1f3be2dd3c78db41",
 }
 

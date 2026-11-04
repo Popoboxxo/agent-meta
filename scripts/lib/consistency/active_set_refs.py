@@ -11,7 +11,8 @@ and the context file.
 Frontmatter mentions (``active-set.dangling-mention-frontmatter``, WARNING,
 issue #1083) are reported separately from body mentions (INFO): an inactive
 role named in the generated frontmatter ``description`` reaches routing and
-display before any body text, so it is not a pure prose reference.
+display before any body text, so it is not a pure prose reference. Frontmatter
+is metadata, not a dispatch (decision D7): the dispatch check skips it.
 
 Dispatch patterns are derived from ``config/delegation-syntax.yaml`` (per active
 provider, nothing hardcoded) plus the shared ``dispatch_phrases`` of
@@ -300,15 +301,20 @@ def _collect(project_root, providers, active_set, kind: str) -> list:
             if kind == "mention" and any(fnmatch.fnmatch(rel, g) for g in mention_allow):
                 continue
             lines = _read_lines(path)
-            fm_end = _frontmatter_end(lines) if kind == "mention" else 0
+            fm_end = _frontmatter_end(lines)
             per_role: dict = {}
             per_frontmatter: dict = {}
             for lineno, dispatch, mentions in _line_hits(lines, pats, dangling):
+                if 0 < lineno <= fm_end:
+                    # Decision D7: frontmatter is metadata, not a dispatch. Only
+                    # the mention scan reports it (as the #1083 WARNING); a
+                    # dispatch-shaped phrase in the frontmatter is never a route.
+                    if kind == "mention":
+                        for role in mentions:
+                            per_frontmatter.setdefault(role, []).append(lineno)
+                    continue
                 for role in (dispatch if kind == "dispatch" else mentions):
-                    if 0 < lineno <= fm_end:
-                        per_frontmatter.setdefault(role, []).append(lineno)
-                    else:
-                        per_role.setdefault(role, []).append(lineno)
+                    per_role.setdefault(role, []).append(lineno)
             for role, linenos in sorted(per_frontmatter.items()):
                 findings.append(Finding(
                     Severity.WARNING, CHECK_DANGLING_MENTION_FM, rel,

@@ -13,7 +13,7 @@ case below ``positive/`` or ``negative/``. The doctor runs in-process
 (``run_doctor``; the CLI is covered by ``test_doctor_cli.py``); the active set,
 registry load and ``subprocess`` are the only things stubbed, see ``_run_case``.
 
-Coverage matrix (29 seeds): all registered seeds are fixturable (the retired
+Coverage matrix (30 seeds): all registered seeds are fixturable (the retired
 ``instruction-soft-cap-chars`` seed owns no fixture directory). Seeds that need a stub
 because the real environment cannot be put into a small tree are marked
 ``STUBBED`` below with the reason; ``NOT_FIXTURABLE`` is empty on purpose and
@@ -85,6 +85,7 @@ EXPECTED_REF = {
     "rule-unreachable": "context.rule-unreachable",
     "unread-channel": "context.unread-channel",
     "dangling-role-dispatch": "active-set.dangling-dispatch",
+    "dangling-role-mention-frontmatter": "active-set.dangling-mention-frontmatter",
     "gate-dropped-allowlist-role": "active-set.gate-dropped",
     "unresolved-placeholder-in-output": "active-set.unresolved-placeholder",
     "hooks-not-registered": "hooks.enabled-but-not-registered",

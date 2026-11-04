@@ -804,6 +804,30 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``607b6c8a…``); ``compact-golden`` stayed unchanged (``44148ea7…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Review follow-up PR #1122 (Bug-Batch PR B, 2026-11-04,
+  ``fix/consistency-false-positives``): the AC-38 doctor fixtures for
+  ``dangling-role-mention-frontmatter``, the senior-escalation persona aligned to
+  ``STATUS: escalate`` + reason + metric, the frontmatter skip in the dispatch
+  check (D7), the gated base ``developer`` row (#1071) and the neutralized
+  ``code-reviewer`` hint / ``ux-researcher`` description change three templates:
+  ``orchestrator`` 8.9.1, ``senior-developer`` 1.11.1, ``code-reviewer`` 1.9.3
+  and ``ux-researcher`` 1.0.2 (``hacs-code-reviewer`` re-pinned to
+  ``code-reviewer@1.9.3``). Exactly **28 of 1099 hashes moved; 0 added/removed**
+  -- ``code-reviewer``/``orchestrator``/``ux-researcher`` × 9 providers plus
+  ``Copilot/.github/copilot-instructions.md`` (it embeds the ``code-reviewer``
+  hint). No rule, ``AGENTS.md``, ``context-hashes.json`` or other artifact
+  changed. The manifest was patched **per entry** (28 single-line replacements,
+  1071 of the 1099 lines untouched) -- not via ``--write`` -- after independently
+  recomputing every digest from the rendered file bytes with the harness's own
+  ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its
+  AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``2adf04f6…`` -> ``1a6df729…``).
+  ``slimming-golden`` was re-pinned for ``orchestrator``, ``code-reviewer`` and
+  ``senior-developer`` (frontmatter pins plus the neutralized ``code-reviewer``
+  hint; manifest §23) and its AC-T4 digest moved (``607b6c8a…`` -> ``dcd2f5be…``);
+  ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

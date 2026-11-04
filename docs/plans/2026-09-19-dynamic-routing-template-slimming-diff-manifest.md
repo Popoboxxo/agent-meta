@@ -2109,3 +2109,41 @@ tests/test_compact_matrix.py -q` → **alle passed**, rc `0`; `scripts/sync.py -
 rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 36 von 1099
 Hashes geändert (die vier Matrix-Rollen `data-engineer`/`meta-feedback`/`orchestrator`/
 `tester` × 9 Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
+
+## 23. Review-Nachbesserung PR #1122 (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Die Review-Auflagen zu PR #1122 schließen die AC-38-Lücke
+> (`dangling-role-mention-frontmatter` ohne Doctor-Fixtures), richten die
+> Senior-Eskalations-Persona am tatsächlichen `STATUS: escalate`-Vertrag aus,
+> überspringen Frontmatter im Dispatch-Check (D7), gaten die `developer`-Zeile
+> der Tier-Tabelle (#1071) und neutralisieren zwei weitere Frontmatter-Texte
+> (`code-reviewer`-Hint, `ux-researcher`-Description), die im Default-Render
+> unvermeidbares WARNING-Rauschen erzeugten.
+
+**Geändert (3 Fixtures):** `orchestrator.md`, `code-reviewer.md` und
+`senior-developer.md` — `orchestrator` und `senior-developer` **nur**
+Frontmatter-Pins (`version:`, `generated-from:`); `code-reviewer` zusätzlich die
+neutralisierte `hint:`-Zeile. Die übrigen 55 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+`ux-researcher` ist in diesem Repo nicht aktiv und hat kein Golden.
+
+**Ursache:** Rollen-Template-Versionierung plus die `code-reviewer`-Hint-Korrektur,
+kein migrierter Block. Die Senior-Persona-Änderung liegt ausschließlich im
+`ROLE_PRINCIPAL_DEVELOPER_ACTIVE=false`-Zweig; dieses Repo rendert den aktiven
+Zweig, daher bleibt der Golden-Body unverändert. Der echte Sync-Render
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist (Gate-Schritt `_strip_auto_commit_tail`) und
+die `model:`-Zeilen der `_GOLDEN_MODEL_MAP`-Portierung unterliegen. Die Goldens
+wurden deshalb **frontmatter-/hint-only** neu gepinnt, nicht aus dem Render
+kopiert; `_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY`
+und die B2a/B2b-Klassifikation bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q`
+→ alle passed, rc `0`; `scripts/sync.py --validate` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 28 von 1099
+Hashes geändert (die Matrix-Rollen `code-reviewer`/`orchestrator`/
+`ux-researcher` × 9 Provider plus `Copilot/.github/copilot-instructions.md`,
+das den `code-reviewer`-Hint einbettet), 0 added/removed, per Entry gepatcht
+(kein `--write`). `AC01_EXCEPTIONS` wurde nicht erweitert.

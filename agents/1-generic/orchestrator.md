@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.9.0"
+version: "8.9.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -135,7 +135,9 @@ An optimizer proposal (`config-patch-proposal-v1` from `meta-optimizer`) is a pr
 | Tier | When |
 |------|------|
 | `junior-developer` | Solution obvious, ≤2 files |
+{{#if ROLE_DEVELOPER_ACTIVE}}
 | `developer` | Standard, clear scope, ≤3 files |
+{{/if}}
 | `senior-developer` | Architecture impact, risk |
 {{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}
 | `principal-developer` | Last resort: `senior-developer` has failed 2+ times on the same task and returns `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer` — requires explicit escalation gate (reason + metric per ESCALATE-Card intake, typically `repeated_failure` / `attempts: 2`, plus task summary + failure log), `orchestrator_only`, never called directly by other agents |
@@ -166,7 +168,7 @@ Developer tiers are inactive in this project (`developer_tiers` gate off): every
 | Task size | Concept agents | Developer tier |
 |:---------:|----------------|:--------------:|
 | S (≤2 files) | *(skipped — solution obvious)* | {{#if DEVELOPER_TIERS_ENABLED}}`junior-developer`{{else}}`developer`{{/if}} |
-| M (3–8 files) | {{#if ROLE_CONCEPT_SPECIFIER_ACTIVE}}`concept-specifier` (+ review loop){{else}}*(no concept agent active)*{{/if}} | `developer` |
+| M (3–8 files) | {{#if ROLE_CONCEPT_SPECIFIER_ACTIVE}}`concept-specifier` (+ review loop){{else}}*(no concept agent active)*{{/if}} | {{#if ROLE_DEVELOPER_ACTIVE}}`developer`{{else}}`senior-developer`{{/if}} |
 | L (9–20 files) | {{#if ROLE_CONCEPT_SPECIFIER_ACTIVE}}`concept-specifier`{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}} + `concept-reviewer`{{/if}}{{else}}{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}}`concept-reviewer`{{else}}*(no concept agent active)*{{/if}}{{/if}} | {{#if DEVELOPER_TIERS_ENABLED}}`senior-developer`{{else}}`developer`{{/if}} |
 | XL (>20 files) | {{#if ROLE_CONCEPT_ARCHITECT_ACTIVE}}`concept-architect`{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}} + `concept-reviewer`{{/if}}{{else}}{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}}`concept-reviewer`{{else}}*(no concept agent active)*{{/if}}{{/if}} | {{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}`principal-developer`{{else}}{{#if DEVELOPER_TIERS_ENABLED}}`senior-developer`{{else}}`developer`{{/if}}{{/if}} |
 
