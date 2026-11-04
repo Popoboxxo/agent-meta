@@ -386,10 +386,135 @@ def _normalize_subagent_permissions_mode(config: dict) -> None:
                 entry["mode"] = "off"
 
 
+#: Normative ``mode`` x ``topology`` interaction matrix (spec section
+#: "mode × topology-Interaktionsmatrix"). Row = effective orchestrator mode,
+#: column = declared topology. The values are cell semantics, not a second
+#: resolver: ``primary`` puts the orchestrator at the entry point, ``subagent``
+#: has the main chat spawn 1..N, ``hybrid`` is position-agnostic by declaration
+#: (v1 degrades every hybrid cell to ``subagent`` via the capability fallback).
+#: ``main-chat`` is the only dominance cell; ``orchestrator_topology_cell``
+#: maps it to ``error`` (same scope) or ``inert`` (cross scope, P2 WARNING).
+ORCHESTRATOR_TOPOLOGY_MATRIX: dict[tuple[str, str], str] = {
+    ("strict", "primary"): "entry",
+    ("strict", "subagent"): "spawned",
+    ("strict", "hybrid"): "position-agnostic",
+    ("advisory", "primary"): "entry",
+    ("advisory", "subagent"): "spawned",
+    ("advisory", "hybrid"): "position-agnostic",
+    ("main-chat", "primary"): "error",
+    ("main-chat", "subagent"): "error",
+    ("main-chat", "hybrid"): "error",
+}
+
+
+def orchestrator_topology_cell(
+    mode: str, topology: str, *, same_scope: bool = True
+) -> str:
+    """Return the normative 3x3 cell for *mode* x *topology* (AC-5).
+
+    ``same_scope`` distinguishes the hard validator error from the cross-scope
+    P2 WARNING (``inert``): ``mode: main-chat`` in the same object as a
+    topology is a contradiction, while a provider override ``main-chat`` under
+    a global topology merely makes the topology inert.
+
+    Raises ``KeyError`` for an unknown mode/topology — the matrix is data, not
+    a normalizer.
+    """
+    if mode == "main-chat":
+        return "error" if same_scope else "inert"
+    return ORCHESTRATOR_TOPOLOGY_MATRIX[(mode, topology)]
+
+
+def _topology_error(config_path: Path, message: str) -> None:
+    print(f"ERROR: {config_path}: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
+    """Hard-reject same-scope ``mode`` x ``topology`` contradictions (IC-8).
+
+    Runs after ``_validate_providers`` and before the warn-only schema block,
+    so both ``sync`` and ``sync --validate`` abort (rc != 0) without requiring
+    ``jsonschema``. Pinned P1 substrings (AC-17):
+
+    * ``unknown orchestrator.topology``
+    * ``orchestrator.topology conflicts with orchestrator.mode: main-chat``
+    * ``orchestrator.topology conflicts with orchestrator.enabled: false``
+    * ``provider-overrides.<P>.topology conflicts with
+      provider-overrides.<P>.mode: main-chat``
+
+    Cross-scope (provider override ``mode: main-chat`` with a global topology,
+    or the reverse) is intentionally NOT rejected here: ``main-chat`` is then
+    inert for that provider and the P2 consistency check owns the WARNING.
+    """
+    from .topology import VALID_TOPOLOGIES
+
+    orch = config.get("orchestrator")
+    if not isinstance(orch, dict):
+        return
+
+    valid_values = "'primary', 'subagent', 'hybrid'"
+
+    project_topology = orch.get("topology")
+    if project_topology is not None:
+        value = str(project_topology).strip()
+        if value not in VALID_TOPOLOGIES:
+            _topology_error(
+                config_path,
+                f"unknown orchestrator.topology value {value!r}. "
+                f"Valid values are: {valid_values}. "
+                "Hint: omit the key to keep the provider-derived default.",
+            )
+        if orch.get("enabled") is False:
+            _topology_error(
+                config_path,
+                "orchestrator.topology conflicts with "
+                "orchestrator.enabled: false. The role does not exist when "
+                "the orchestrator is disabled; remove one of the two keys.",
+            )
+        if _resolve_orch_mode(orch, validate=False) == "main-chat":
+            _topology_error(
+                config_path,
+                "orchestrator.topology conflicts with orchestrator.mode: "
+                "main-chat. main-chat supersedes every topology in the same "
+                "scope; remove one of the two keys.",
+            )
+
+    overrides = orch.get("provider-overrides")
+    if not isinstance(overrides, dict):
+        return
+    for provider, entry in overrides.items():
+        if not isinstance(entry, dict):
+            continue
+        override_topology = entry.get("topology")
+        if override_topology is None:
+            continue
+        value = str(override_topology).strip()
+        if value not in VALID_TOPOLOGIES:
+            _topology_error(
+                config_path,
+                f"unknown orchestrator.topology value {value!r} in "
+                f"provider-overrides.{provider}. "
+                f"Valid values are: {valid_values}.",
+            )
+        override_mode = entry.get("mode")
+        if (
+            override_mode is not None
+            and str(override_mode).strip().lower() == "main-chat"
+        ):
+            _topology_error(
+                config_path,
+                f"provider-overrides.{provider}.topology conflicts with "
+                f"provider-overrides.{provider}.mode: main-chat. main-chat "
+                "supersedes every topology in the same scope; remove one of "
+                "the two keys.",
+            )
+
+
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Four kinds of checks:
+    Five kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -402,18 +527,24 @@ def _validate_config(config: dict, config_path: Path) -> None:
        'ai-provider'/'ai-providers'/'default-provider' names abort the sync
        instead of silently falling back to Claude (issue #732).
 
-    3. Hard-fatal repo-containment checks (_validate_repo_containment):
+    3. Hard-fatal orchestrator topology checks
+       (_validate_orchestrator_topology): unknown enum values and same-scope
+       ``main-chat`` x topology contradictions abort the sync (stderr +
+       exit 1). stdlib only, no jsonschema.
+
+    4. Hard-fatal repo-containment checks (_validate_repo_containment):
        wrong types and unsafe tmp-sink paths abort the sync (stderr + exit 1).
        Structure/path checks always run, even when the mode is disabled, so a
        later opt-in never surfaces a dormant misconfiguration.
 
-    4. Schema validation against agent-meta.schema.json if jsonschema is
+    5. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
     """
     _validate_model_inheritance(config, config_path)
     _validate_providers(config, config_path)
+    _validate_orchestrator_topology(config, config_path)
     _validate_repo_containment(config, config_path)
     _validate_subagent_permissions(config, config_path)
     validate_test_environments(config, config_path)
