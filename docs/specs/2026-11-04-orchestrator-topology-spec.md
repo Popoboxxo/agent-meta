@@ -1,7 +1,7 @@
 # Orchestrator-Topologie konfigurierbar — Spec
 
 > Status: Entwurf
-> Revision: 1
+> Revision: 2
 > Datum: 2026-11-04
 > spec-id: SPEC-orchestrator-topology-2026-11-03
 > Issue: #1077
@@ -14,6 +14,13 @@ Diese Spec ist die implementierbare Ableitung des Designs Rev. 4. Sie enthält
 Interface-Contracts, Datenfluss und testbare Abnahmekriterien — **keinen
 Implementierungscode**. Alle fünf offenen Fragen sind entschieden; die
 Entscheidungen sind als Fakten eingefaltet (D1–D10, §15 des Designs).
+
+## Revision
+
+| Rev | Datum | Autor | Änderung |
+|---|---|---|---|
+| 1 | 2026-11-04 | concept-specifier | Erste implementierbare Ableitung des Designs Rev. 4. |
+| 2 | 2026-11-04 | concept-specifier | Review-Fix-Pass (**Status bleibt Entwurf**): **B1** Ist-Zustand rebased — #1090 hat `active_set.role_emitted_for_provider`, `emit_default_agent` und die direkten `primary-role`-Lesezugriffe bereits gelandet; IC-3/IC-6/IC-7, P1/P2-Dateilisten und Call-Site-Zählung darauf neu aufgesetzt, kein zweiter Steuerparameter. **B2** Resolver-Regel vervollständigt: `support == false` **oder** `UNVERIFIED` ⇒ Fallback; `effective ∈ VALID_TOPOLOGIES` garantiert, Mechanismus-Wort wandert nach `degradation_reason`; AC-15 erweitert. **B3** Evidenz-Gate auf alle drei Design-Bedingungen (§7 inkl. §3.1-Zeile + Invariantentest) erweitert; §3.1 im Trace-Anker. **B4** Sync-Summary-Zeile, `default-agent-conflict` und Gate-Inactive-WARNUNG als IC + AC nachgezogen; v1-DoD aktualisiert. **B5** Governance-Hinweis auf das reale `_classify`-Verhalten korrigiert (akzeptierte WARNING-only, kein Grün). Advisories 1–5, 7–9 eingearbeitet (AC-17-Teilstring, P0→AC-Liste, normative Matrix-Kopie, `degraded_from`-Bedingung, `mode`-Quelle, P3-Registrierungen, AC-4-P3-Marker, 3×3-Matrix). Zusätzlich D5-Klausel (redundantes `singleton`-INFO) und AC-11-Reduktionssatz. |
 
 ---
 
@@ -110,11 +117,11 @@ Konsequenz ist jeweils eingefaltet.
 | **D2** | #1077 §2 beschreibt `hybrid` als „primary **und** zusätzlich spawnbar". | **Deviation:** `hybrid` = **entweder/oder** (eine positions-agnostische Rolle), nicht zwei gleichzeitige Positionen. Anzahl ist ausschließlich `max-instances` (D5). | Ein Identitätsmodell für alle Topologien; `hybrid` ist in v1 akzeptiert, aber degradiert, solange keine Evidenz vorliegt. Deviationssatz muss in Concept-Doc und Doku-Tabelle stehen. |
 | **D3** | `mode: main-chat` entfernt die Rolle; eine gesetzte Topologie wäre gegenstandslos. Widerspruch kann im selben Scope oder cross-scope auftreten. | **Same-Scope = harter ERROR** (`_validate_orchestrator_topology`, stdlib, rc≠0 in `sync` **und** `--validate`), inkl. Same-Object `{mode: main-chat, topology: primary}`. **Cross-Scope = WARNING** (`main-chat-supersedes`); `primary` × globales N>1 cross-scope = WARNING `instances-clamped`, effektiv N=1. Schema-`if/then` bleibt Editor-Hilfe, kein Fehlerkanal. | Tippfehler-Paar bricht früh mit Pfadangabe; der legitime Mischfall (Claude main-chat, Opencode strict) bleibt möglich und laut. |
 | **D4** | `mode` (Gate-Stärke/Existenz) und `topology` (Position) sind verschiedene Achsen. | Zwei orthogonale Achsen; genau **eine** Dominanzzelle (`main-chat` macht Topologie inert). Topologie ist per Provider überschreibbar: `orchestrator.provider-overrides.<P>.topology`; Präzedenz `provider-override > project > derived`. | Symmetrie zu `mode`; Degradierung ist pro Provider auflösbar. `provider-overrides` wird von „nur `mode`" auf zwei Properties erweitert. |
-| **D5** | Der Issue-Kommentar fordert eine von der Enum unabhängige Multiplizitäts-Achse mit hartem Konflikt statt stiller Präzedenz. | `orchestrator.max-instances` integer 1..**8** (**OQ-3 = A**, **P3-only**), kanonischer Wert. `orchestrator.singleton` presence-only Alias (`enum: [true]`, **kein Schema-`default`**, P3). Same-Scope-Konflikte (`singleton` present + N>1; `primary` + N>1) = harter ERROR; `singleton: false` = ERROR mit Hint „use max-instances". N>1 nur, wenn Capability `orchestrator_instances.multiple == true` und Zelle nicht `UNVERIFIED`. | Default 1 = heutiges Verhalten; kein stiller Vorrang. `max-instances` existiert **vor P3 nicht** — kein Zwischenschritt mit `maximum: 1`. |
+| **D5** | Der Issue-Kommentar fordert eine von der Enum unabhängige Multiplizitäts-Achse mit hartem Konflikt statt stiller Präzedenz. | `orchestrator.max-instances` integer 1..**8** (**OQ-3 = A**, **P3-only**), kanonischer Wert. `orchestrator.singleton` presence-only Alias (`enum: [true]`, **kein Schema-`default`**, P3). Same-Scope-Konflikte (`singleton` present + N>1; `primary` + N>1) = harter ERROR; `singleton: false` = ERROR mit Hint „use max-instances". **`singleton` present + N=1 ist kein Konflikt, sondern ein redundanter Sync-INFO** (`orchestrator-topology.singleton-redundant`, P3-only). N>1 nur, wenn Capability `orchestrator_instances.multiple == true` und Zelle nicht `UNVERIFIED`. | Default 1 = heutiges Verhalten; kein stiller Vorrang. `max-instances` existiert **vor P3 nicht** — kein Zwischenschritt mit `maximum: 1`. Das redundante INFO macht den Alias sichtbar, ohne zu blockieren. |
 | **D6** | Checkpoints sind eine Datei pro Session, Fortschritt ist eine Datei, Event-Log ist eine Datei; bei N>1 kollidieren sie. | Instanz-Identität ist ein State-Namespace, kein Rollenname: `orchestrator_id` = `[a-z0-9][a-z0-9._-]{0,39}`, Default `None` bei N=1. Session-ID = `<base>__<id>`. Fortschritt: `progress-<id>.md` **nur menschlich lesbar**; `current.md` bleibt maschinell gelesen. Event-Log bleibt eine Datei mit Feldern `orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`. N=1 byte-identisch, kein Backfill. | N>1 ohne neue Verzeichnisstruktur und ohne Konsumenten-Bruch; `recovery.py` liest weiterhin nur Checkpoints. **P3-only.** |
 | **D7** | Die Singleton-Regel ist heute über „es gibt genau einen" begründet; bei N>1 ist das falsch. | Drei mechanisch prüfbare Klauseln: **G1** Worker → orchestrator = HARD REJECT (immer); **G2** nur `main_chat` spawnt Orchestratoren, höchstens `max-instances`, eindeutige ID, disjunkter Scope, doppelte ID/Scope-Überlappung = HARD ERROR beim Spawn; **G3** orchestrator → orchestrator = HARD REJECT. | Anti-Recursion bleibt aus dem Envelope beweisbar (Spawner of record + fehlende Kante). Kein neues State-Artefakt; Scope-Registry ist P5, nicht v1. |
 | **D8** | Der Guard arbeitet mit einem selbstdeklarierten Sentinel; Rollen-Identität ist von keinem Provider verifizierbar (#516). | Convention-Boundary bleibt. Sentinel darf optional `id=<id>` tragen; der Guard **parst** sie, nutzt sie **nie** für Allow/Deny und schreibt sie ins Audit-Log (**OQ-2 = A**, **P3-only**). „Bekannte Grenzen" wird um den Audit-Satz ergänzt. | Ehrlich: keine neue Sicherheitszusage, aber Nachvollziehbarkeit. Hook-Change + Test liegen in P3, nicht P4. |
-| **D9** | Kein Projekt darf durch das Upgrade sein Verhalten ändern; gleichzeitig muss `topology: subagent` den Main Chat als Default behalten. | Key ungesetzt ⇒ exakt heutige Ableitung (`primary-role` + ActiveSet ⇒ `primary`, sonst `subagent`; `hybrid` nie abgeleitet). Key gesetzt (`subagent`) ⇒ `apply_settings_surface_shape` schreibt **kein** `default_agent`, `_opencode_entry_point` liefert `None`, Runtime-Gate wird laut suspendiert. Die Ableitung erscheint **nur** als Sync-Summary-Zeile (**OQ-4 = A**, **kein** `--check`-INFO). | `sync --check` bleibt byte-identisch; kein neues Rendering in bestehenden Templates, solange `ORCH_TOPOLOGY_EXPLICIT != "true"`. Nutzereigener `default_agent` wird nicht gelöscht, nur gewarnt. |
+| **D9** | Kein Projekt darf durch das Upgrade sein Verhalten ändern; gleichzeitig muss `topology: subagent` den Main Chat als Default behalten. | Key ungesetzt ⇒ exakt heutige Ableitung (`primary-role` + ActiveSet ⇒ `primary`, sonst `subagent`; `hybrid` nie abgeleitet). Key gesetzt (`subagent`) ⇒ `apply_settings_surface_shape` schreibt **kein** `default_agent`, `_opencode_entry_point` liefert `None`, Runtime-Gate wird laut suspendiert. Die Ableitung erscheint **nur** als Sync-Summary-Zeile (IC-11/AC-19; **OQ-4 = A**, **kein** `--check`-INFO). | `sync --check` bleibt byte-identisch; kein neues Rendering in bestehenden Templates, solange `ORCH_TOPOLOGY_EXPLICIT != "true"`. Nutzereigener `default_agent` wird nicht gelöscht, nur gewarnt. |
 | **D10** | Das Issue macht die Provider-Matrix zur Freigabe-Vorbedingung: nicht versprechen, was nicht belegbar ist. | Matrix aus **vorhandenen** Capability-Keys ableiten (`main_agent_selectable`, `subagent_dispatch`, `parallel_execution`); neue Strukturen `topology_support`, `topology_degrade`, `orchestrator_instances`, `topology_verified_state`. Regel `UNVERIFIED ⇒ no`; `hybrid`-Degradierung fail-safe auf `"subagent"`. **OQ-1 = B:** die fünf Provider-Probes (§16 Nr. 2–6 des Designs) werden **jetzt in P0** ausgeführt; nur belegte Zellen dürfen `yes` werden. | Keine Zelle ist eine Behauptung; 25 Basis-Zellen + N **gemessene** Upgrades; 0 spekulative `yes`. Neue Provider sind fail-safe eingeordnet. |
 
 ---
@@ -150,11 +157,11 @@ VERIFIED_STATES: frozenset[str] = frozenset(
 @dataclass(frozen=True)
 class TopologyResolution:
     declared: str | None       # Roh-Wert oder None (Key ungesetzt)
-    effective: str             # "primary" | "subagent" | "hybrid"
+    effective: str             # IMMER in VALID_TOPOLOGIES (nie ein Mechanismus-Wort)
     source: str                # "provider-override" | "project" | "derived"
     derived_from: str | None   # z.B. "providers.Opencode.primary-role"
-    degraded_from: str | None
-    degradation_reason: str | None
+    degraded_from: str | None  # declared, wenn declared != effective; sonst None
+    degradation_reason: str | None  # Grund + ggf. Mechanismus-Wort
     verification_state: str    # Zelle aus topology_verified_state
 
 def resolve_topology(
@@ -164,6 +171,7 @@ def resolve_topology(
     provider_config: dict,
     capabilities: dict,
     mode: str,                 # bereits durch _resolve_orch_mode aufgelöst
+    active_set: "ActiveSet | None" = None,  # D9-Ableitung: Rolle im ActiveSet?
     validate: bool = True,
 ) -> TopologyResolution: ...
 
@@ -179,14 +187,38 @@ def compose_instance_session_id(      # P3
 ) -> str: ...
 ```
 
-**Vertrag:** Präzedenz `provider-overrides.<P>.topology > orchestrator.topology >
-Ableitung aus providers.<P>.primary-role`. Ist die Zielzelle
-`topology_verified_state == UNVERIFIED`, liefert der Resolver **nie** den
-deklarierten Wert, sondern den konservativen Fallback aus `topology_degrade`
-mit `degraded_from` + `degradation_reason = "capability cell UNVERIFIED"`.
-`mode` kommt als Parameter herein; das Modul importiert `variables.py` **nicht**
-(kein zweiter Mode-Resolver). `validate=False` liefert den normalisierten String
-ohne zu werfen (Konsistenz-Checker).
+**Vertrag (Rev. 2):**
+
+1. **Präzedenz:** `provider-overrides.<P>.topology > orchestrator.topology >
+   Ableitung aus providers.<P>.primary-role`. Key ungesetzt ⇒ Ableitung
+   (`primary`, wenn `primary-role` gesetzt und die Rolle im ActiveSet liegt,
+   sonst `subagent`; `hybrid` wird nie abgeleitet), `degraded_from is None`,
+   keine WARNING (D9).
+2. **Fallback-Regel (B2):** Ist `topology_support.<achse> == false` **oder**
+   `topology_verified_state.<achse> == "UNVERIFIED"`, liefert der Resolver
+   **nie** den deklarierten Wert. `effective` wird `topology_degrade.<achse>`,
+   sofern dieser Wert in `VALID_TOPOLOGIES` liegt; andernfalls Fail-safe
+   `"subagent"`. `degraded_from = declared` (nur wenn `declared != effective`
+   wirklich degradiert wurde), `degradation_reason` trägt den Grund **und** das
+   Mechanismus-Wort, z. B.
+   `"capability cell UNVERIFIED"`, `"support=false"` oder
+   `"support=false (degrade mechanism: sequential-text; clamped to subagent)"`.
+   ```python
+   VALID_TOPOLOGIES = frozenset({"primary", "subagent", "hybrid"})
+   # topology_support.<axis> == false or verified_state == UNVERIFIED
+   raw = (cfg.get("topology_degrade") or {}).get(axis)
+   effective = raw if raw in VALID_TOPOLOGIES else "subagent"   # Fail-safe
+   assert effective in VALID_TOPOLOGIES                         # Invariante
+   ```
+   Ein Mechanismus-Wort (`"sequential-text"`, Continue) ist **nie** ein
+   gültiger `effective`-Wert; es lebt ausschließlich in `degradation_reason`.
+3. **Parameter `mode`:** kommt aufgelöst herein. Einzige Quelle ist
+   `variables._resolve_orch_mode(orch, provider_override, validate=False)`,
+   **einmal** pro Provider im Aufrufer gerufen; `topology.py` importiert
+   `variables.py` **nicht** (kein zweiter Mode-Resolver).
+4. `validate=False` liefert den normalisierten String ohne zu werfen
+   (Konsistenz-Checker); die `effective ∈ VALID_TOPOLOGIES`-Invariante gilt
+   auch dort.
 
 **Fehlerpfade:** `SyncError` bei unbekanntem Enum-Wert;
 `resolve_orchestrator_instances` wirft `SyncError` bei `singleton`-Widerspruch
@@ -194,28 +226,50 @@ oder `topology: primary` mit N>1 im selben Scope (D5);
 `compose_instance_session_id` wirft `ValueError`, wenn die Komposition
 `validate_session_id()` verletzt.
 
-### IC-3 `scripts/lib/active_set.py::role_emitted_for_provider` (neu, P1)
+### IC-3 `scripts/lib/active_set.py::role_emitted_for_provider` (bestehend; P2 Call-Site-Angleichung)
+
+> **Ist-Zustand (Rev. 2, B1):** Die Funktion existiert bereits
+> (`scripts/lib/active_set.py::role_emitted_for_provider`) und ist verdrahtet in
+> `context.py::_init_provider_settings_json` (Aufruf) sowie in
+> `isolation.py::_opencode_entry_point`, `isolation.py::_sync_opencode_runtime_gate`
+> (Dangling-Warnung und Gate-Suspendierung). Sie ist **keine** P1-Neuentwicklung.
 
 ```python
 def role_emitted_for_provider(
     role: str,
+    active_set: Optional[ActiveSet],
+    config: Optional[Mapping],
     provider: str,
-    config: dict,
-    *,
-    active_set: "ActiveSet | None" = None,
-    provider_config: dict | None = None,
-    capabilities: dict | None = None,
-    mode: str | None = None,
 ) -> bool: ...
 ```
 
-Einzige Quelle für „wird diese Rolle für diesen Provider erzeugt?". Drei
-boolesche Konjunkte: (1) Rolle im ActiveSet, (2) Provider aktiv, (3)
-`not _role_suppressed_by_mode(role, mode)` — `True` nur bei
-`mode == "main-chat" AND role == "orchestrator"`. `main-chat` ist **kein**
-Topologie-Wert. P1 landet **nur** Funktion + Unit-Test; die Call-Sites
-(`agent_sync._should_skip_role`, `isolation._opencode_entry_point`) werden in P2
-umgestellt.
+Signatur bleibt **unverändert**. Vertrag: (1) `active_set is None` ⇒
+fail-open (historisch); sonst muss `role in active_set.roles` gelten. (2) Nicht-
+Orchestrator-Rollen sind danach `True`. (3) Für `role == "orchestrator"` ist
+das Ergebnis `_resolve_orch_mode(orch_cfg, provider_override, validate=False)
+!= "main-chat"` — Provider-Override zuerst, dann global. Die Funktion bleibt
+provider-agnostisch: einzige Provider-Eingabe ist der Daten-Key
+`orchestrator.provider-overrides.<provider>`.
+
+**Topologie ist kein zweiter „emitted"-Begriff.** `topology: subagent` erzeugt
+`orchestrator.md` weiterhin (als Subagent); die Rolle ist also *emittiert*. Die
+Topologie steuert ausschließlich den **Entry-Point**
+(`default_agent`/`_opencode_entry_point`) und wird dort als zusätzliche
+Konjunktion ausgewertet (IC-6/IC-7) — **kein** neuer Parameter in
+`apply_settings_surface_shape`, **kein** `topology_effective`-Flag.
+
+**P2-Call-Site (B1 — die tatsächlichen Stellen, nicht „die zweite"):**
+
+| Site | Heute | P2-Änderung |
+|---|---|---|
+| `scripts/lib/agent_sync.py::_should_skip_role` | liest `variables["ORCH_MODE_MAIN_CHAT"]` | ruft `role_emitted_for_provider(role, active_set, config, provider)`; der Variablen-Read entfällt |
+| `scripts/lib/context.py::_init_provider_settings_json` | ruft das Prädikat bereits | zusätzlich `and topology.effective == "primary"` für `emit_default_agent` |
+| `scripts/lib/isolation.py::_opencode_entry_point` | ruft das Prädikat bereits | zusätzlich `topology.effective == "primary"` |
+| `scripts/lib/isolation.py::_sync_opencode_runtime_gate` (Dangling-Warnung) | ruft das Prädikat bereits | zusätzlich Topologie-Konjunktion für `orchestrator-topology.default-agent-conflict` |
+| `scripts/lib/isolation.py::_sync_opencode_runtime_gate` (Gate-Suspendierung) | nutzt das Prädikat + `explicit_primary_role` | zusätzlich Topologie-Konjunktion für `orchestrator-topology.gate-inactive` |
+
+Genau **eine** Funktion entscheidet weiterhin über Datei-Emission; nirgends
+wird `main-chat` als Topologie-Wert behandelt.
 
 ### IC-4 `scripts/lib/variables.py` (P1; P3-Erweiterung)
 
@@ -264,6 +318,15 @@ fehlt eine, rendert der heutige Mechanismus **beide** Zweige bzw. den falschen:
 4. `scripts/lib/consistency/placeholders.py::_BUILTIN_VARS` — alle neuen
    Builder-Variablen registrieren (Ratchet ist shrink-only).
 
+**P3-Nachzug (Advisory 7):** `ORCH_MAX_INSTANCES` und
+`ORCH_SINGLETON_DECLARED` werden in P3 in **allen vier** Registrierungen
+nachgezogen — Präfix-Whitelist in `strip_inactive_conditional_blocks`
+(`ORCH_MAX_INSTANCES`/`ORCH_SINGLETON_DECLARED` explizit, nicht nur
+`ORCH_TOPOLOGY_`), `variables.py::_FALSE_DEFAULT_CONDITIONALS`,
+`standalone.py::_CONDITIONAL_FALSE_FLAGS` und
+`consistency/placeholders.py::_BUILTIN_VARS`. Fehlt eine, rendert der
+Conditional-Mechanismus den falschen Zweig (fail-open).
+
 ### IC-5 `scripts/lib/consistency/topology.py` (neu, P2)
 
 ```python
@@ -272,22 +335,28 @@ def check_orchestrator_topology(
 ) -> list[Finding]: ...
 ```
 
-| Check-ID | Severity | Bedingung |
-|---|---|---|
-| `orchestrator-topology.degraded` | WARNING | `resolution.degraded_from is not None` (Provider kann den deklarierten Wert nicht ausdrücken **oder** Zelle ist `UNVERIFIED`) |
-| `orchestrator-topology.hybrid-unverified` | WARNING | Deklaration `hybrid` und `topology_verified_state.hybrid == "UNVERIFIED"` |
-| `orchestrator-topology.main-chat-supersedes` | WARNING | Cross-Scope: Provider-Override `mode: main-chat` bei übergeordnet gesetzter Topologie |
-| `orchestrator-topology.instances-clamped` | WARNING | N>1, aber `orchestrator_instances.multiple == false` **oder** Cross-Scope `primary` + globales N>1 |
-| `orchestrator-topology.unresolved-global-flags` | WARNING | Ein `ORCH_TOPOLOGY_*`-Platzhalter wurde provider-los gerendert |
-| ~~`orchestrator-topology.derived`~~ | **entfällt** | **OQ-4 = A:** kein INFO-Finding; Ableitung nur als Sync-Summary-Zeile |
+| Check-ID | Severity | Phase | Bedingung |
+|---|---|---|---|
+| `orchestrator-topology.degraded` | WARNING | P2 | `resolution.degraded_from is not None` (`support == false` **oder** Zelle `UNVERIFIED`; declared ≠ effective) |
+| `orchestrator-topology.hybrid-unverified` | WARNING | P2 | Deklaration `hybrid` und `topology_verified_state.hybrid == "UNVERIFIED"` |
+| `orchestrator-topology.main-chat-supersedes` | WARNING | P2 | Cross-Scope: Provider-Override `mode: main-chat` bei übergeordnet gesetzter Topologie |
+| `orchestrator-topology.instances-clamped` | WARNING | P2/P3 | N>1, aber `orchestrator_instances.multiple == false` **oder** Cross-Scope `primary` + globales N>1 |
+| `orchestrator-topology.unresolved-global-flags` | WARNING | P2 | Ein `ORCH_TOPOLOGY_*`-Platzhalter wurde provider-los gerendert |
+| `orchestrator-topology.default-agent-conflict` | WARNING | P2 | Nutzereigener `default_agent` (kein State-Record) auf der Orchestrator-Rolle bei effektiver Topologie ≠ `primary`; Text nennt die Handlung, **kein** Auto-Delete |
+| `orchestrator-topology.gate-inactive` | WARNING | P2 | Das Runtime-Gate wäre gewollt, aber `_opencode_entry_point` ist `None`, weil die Topologie ≠ `primary`; der Deny wird bewusst **nicht** geschrieben |
+| `orchestrator-topology.singleton-redundant` | **INFO** | **P3** | `singleton` present **und** `max-instances == 1` (kein Konflikt, kein Fehler; nur Hinweis „redundant, `max-instances` ist bei 1 der Default") |
+| ~~`orchestrator-topology.derived`~~ | **entfällt** | — | **OQ-4 = A:** kein INFO-Finding; Ableitung nur als Sync-Summary-Zeile (IC-11/AC-19) |
 
 **Vertrag:** kein Schreiben, kein Exit, nur `Finding`s. Genau **eine** WARNING
-pro Provider und Lauf (dedupliziert); `--check` bleibt rc 0.
+pro Provider und Lauf (dedupliziert); `--check` bleibt rc 0. Das
+`singleton-redundant`-INFO ist P3-only und zählt nicht als Degradierungs-WARNUNG
+(AC-16).
 
 ### IC-6 `scripts/lib/provider_transform.py::_apply_agent_transform` (P2)
 
-Die Ableitung wird von `explicit_primary_role(...)` auf
-`resolve_topology(...).effective` umgestellt:
+Heute entscheidet `explicit_primary_role(...)` allein (`mode: primary` nur bei
+explizitem `primary-role`; sonst v2 `subagent`). P2 ergänzt die
+Topologie-Konjunktion — die Ableitung bleibt sonst unverändert:
 
 | effektive Topologie | opencode-native v1 | opencode-native v2 |
 |---|---|---|
@@ -295,37 +364,67 @@ Die Ableitung wird von `explicit_primary_role(...)` auf
 | `subagent` | `mode` **nicht** geschrieben (heutiges v1-Verhalten) | `mode: subagent` |
 | `hybrid` | wie `primary` (v1 nie gewährt → WARNING + Fallback) | wie `primary` |
 
+Konkret: `mode = 'primary'` nur wenn `role == explicit_primary_role(...)`
+**und** `resolve_topology(...).effective == "primary"`; sonst v2 `subagent`,
+v1 kein `mode`. `effective` ist durch IC-2 garantiert in `VALID_TOPOLOGIES`;
+der Fallback passiert im Resolver, nicht hier.
+
 Template-Fallbacks (`mode or template_fm["mode"]`) und der Write-Scope-Lock
 („primary ⇒ edit-deny") bleiben an `mode == 'primary'` gebunden — **keine**
 zweite Bedingung.
 
-**Ein Lesezugriff (A4):** In P1 entsteht
-`scripts/lib/providers.py::primary_role(provider_config, provider, *, default: str | None = None)`
-als **einziger** Lesezugriff. Beide Aufrufer werden migriert:
-`context.py::apply_settings_surface_shape` → `default=None`;
-`provider_transform.py::_apply_agent_transform` → `default="orchestrator"`
-(heutige Allowlist-Bytes bleiben erhalten).
+**Bestehende `primary-role`-Lesezugriffe (B1 — bleiben, kein neuer Accessor):**
+`primary-role` ist ein Daten-Key, kein Steuerparameter. Die direkten Reads
+liegen in `provider_transform.py::_apply_agent_transform`
+(`explicit_primary_role` + der Allowlist-Read), in
+`context.py::apply_settings_surface_shape`, in
+`context.py::_init_provider_settings_json` und in
+`context.py::init_settings_json` (Entry-Point-Vorprüfung). P1 führt **keinen**
+neuen `providers.primary_role(...)`-Accessor ein (die frühere A4-Annahme ist
+durch #1090 überholt); `providers.explicit_primary_role` bleibt der
+Registry-Read, die Topologie-Achse liest `primary-role` nur als
+Ableitungsquelle (D9).
 
 ### IC-7 `scripts/lib/isolation.py` + `scripts/lib/context.py` (P2)
 
-`_opencode_entry_point` liefert `None`, sobald die effektive Topologie
-`subagent` ist; der ActiveSet-Konjunkt bleibt unverändert (A5):
+`_opencode_entry_point` bleibt die **einzige** Entry-Point-Quelle und wird um
+die Topologie-Konjunktion erweitert; der ActiveSet-Konjunkt bleibt unverändert
+(A5). `mode` ist **nicht** frei erfunden: es ist das Ergebnis von
+`variables._resolve_orch_mode(orch_cfg, provider_override, validate=False)`, das
+der Aufrufer `_sync_opencode_runtime_gate` **einmal** pro Provider auflöst und
+durchreicht; ist `mode=None`, löst die aufgerufene Prädikat-Kette es
+rückwärtskompatibel selbst auf (heutiges Verhalten).
 
 ```python
-role = providers.primary_role(provider_config, provider, default=None)
-if role is None:
-    return None
-if active_set is not None and role not in active_set.roles:
-    return None
-if resolve_topology(..., mode=mode).effective != "primary":
-    return None
-return role
+def _opencode_entry_point(
+    provider: str,
+    provider_config: dict,
+    active_set,
+    config: dict | None = None,
+    *,
+    mode: str | None = None,          # aus _resolve_orch_mode im Aufrufer
+    topology: "TopologyResolution | None" = None,  # aus resolve_topology(...)
+) -> str | None:
+    role = providers.explicit_primary_role(provider_config, provider)
+    if role is None:
+        return None
+    if config is not None and not role_emitted_for_provider(
+        role, active_set, config, provider,
+    ):
+        return None
+    if active_set is not None and role not in active_set.roles:
+        return None
+    if topology is not None and topology.effective != "primary":
+        return None
+    return role
 ```
 
 Damit greift die bestehende D1a-Invariante: kein `default_agent` ⇒ kein Deny,
-Gate wird laut suspendiert.
+Gate wird laut suspendiert (`orchestrator-topology.gate-inactive`, IC-5/AC-20).
 
-**Zweiter Schreiber (B2):**
+**Zweiter Schreiber — in den bestehenden `emit_default_agent`-Pfad gefaltet
+(B1):** `context.py::apply_settings_surface_shape` behält **exakt** seine
+bestehende Signatur; es kommt **kein** `topology_effective`-Parameter hinzu:
 
 ```python
 def apply_settings_surface_shape(
@@ -333,26 +432,40 @@ def apply_settings_surface_shape(
     pc: dict,
     capabilities: dict | None = None,
     *,
-    topology_effective: str | None = None,
+    emit_default_agent: bool = True,   # #1090/D16 — unverändert
 ) -> str: ...
 ```
 
-`topology_effective` ist die **aufgelöste effektive** Topologie (nicht
-`variables["ORCH_TOPOLOGY"]`!). `None` = Legacy-Aufrufer, heutiges Verhalten
-(byte-identisch). Ist `topology_effective != "primary"`:
-`document.pop("default_agent", None)` und **kein** Schreiben. Ist
-`topology_effective == "primary"`: heutiges Verhalten. Der Aufrufer
-`_init_provider_settings_json` reicht `topology.effective` aus dem
-Per-Provider-Loop durch.
+Der Aufrufer `context.py::_init_provider_settings_json` berechnet den bereits
+vorhandenen Bool als Konjunktion:
+
+```python
+emit_default_agent = role_emitted_for_provider(primary_role, active_set, config, provider) \
+    and topology.effective == "primary"
+```
+
+Begründung (B1): `emit_default_agent` ist bereits der einzige Steuerparameter
+für „schreibe `default_agent`"; ein zweiter Parameter wäre eine parallele
+Wahrheit. Topologie und ActiveSet/Mode sind zwei Gründe für **denselben** Bool.
+`apply_settings_surface_shape` läuft nur bei der **Erst-Erzeugung** der
+Settings-Datei (Datei fehlt); es löscht keinen Nutzerwert. Bestehende Dateien
+gehen ausschließlich über `_sync_opencode_runtime_gate` /
+`_merge_default_agent`.
 
 **Migrationsregel:**
 
 | Fall | Verhalten |
 |---|---|
-| Frisches v2-Projekt, effektive Topologie ≠ `primary` | Datei ohne `default_agent`; **kein** WARNING (AC-14) |
+| Frisches v2-Projekt, effektive Topologie ≠ `primary` | Datei ohne `default_agent`; **kein** `default-agent-conflict` (der gilt nur für nutzereigene Werte); die `gate-inactive`-WARNUNG bleibt laut (AC-20) |
 | Bestehender Wert verwaltet (`default-agent`-State-Record) | `_merge_default_agent` rollt beim Wechsel `primary → subagent` zurück (vorhanden) |
 | Bestehender Wert nutzereigen (kein State-Record), Topologie ≠ `primary` | WARN `orchestrator-topology.default-agent-conflict` mit Handlungssatz; **kein** Auto-Delete |
+| Gate wäre gewollt, aber Topologie ≠ `primary` | Gate-Deny wird nicht geschrieben; WARN `orchestrator-topology.gate-inactive` (IC-5/AC-20) |
 | `topology: primary` | heutiges Verhalten unverändert |
+
+Der Check-ID-Name `orchestrator-topology.default-agent-conflict` ersetzt die
+frühere Formulierung „WARN default-agent-conflict" und ist in IC-5 registriert;
+der bestehende Laufzeit-Text `opencode.default-agent.dangling` bleibt als
+Emitter-Detail erhalten, die stabile ID ist die des Konsistenz-Checks.
 
 ### IC-8 `scripts/lib/config.py::_validate_orchestrator_topology` (neu, P1; P3-Erweiterung)
 
@@ -396,6 +509,60 @@ abgelehnt (das ist die WARNING-Regel aus D3/IC-5).
 - Viz-Events: eine Datei, Felder `orchestrator_id`, `scope_id`, `spawned_by`,
   `spawned_at` — kein Datei-Sharding.
 
+### IC-11 `scripts/lib/sync_pipeline.py::emit_topology_summary` (neu, P2)
+
+OQ-4 = A braucht einen **Produzenten**, nicht nur eine Satzform. Ein neuer
+Summary-Schritt läuft in `sync_pipeline` **nach** der Provider-Schleife und
+**vor** `log.finish`:
+
+```python
+def emit_topology_summary(
+    config: dict,
+    provider_config: dict,
+    providers: Sequence[str],
+    log: SyncLog,
+    *,
+    mode: str,                         # "sync" | "check" | "validate"
+    capabilities: dict | None = None,
+) -> None: ...
+```
+
+**Vertrag:**
+
+| Aspekt | Regel |
+|---|---|
+| Bedingung | Nur für Provider, deren `TopologyResolution.source == "derived"` ist (Projekt-Key ungesetzt **und** kein Provider-Override). Bei expliziter Deklaration entsteht **keine** Zeile. |
+| Modus | Nur `mode == "sync"`. In `--check` und `--validate` wird die Funktion **nicht aufgerufen** ⇒ keine Byte-/Ausgabe-Drift (AC-6). |
+| Text (exakt, `derived_from` gesetzt) | `topology: <effective> (derived from providers.<P>.primary-role)` — `<P>` ist der Provider aus `derived_from`. |
+| Text (exakt, kein `primary-role`) | `topology: subagent (derived: active-set default)` |
+| Kanal | `log.note("topology", <line>)` — INFO-Zeile in der Sync-Zusammenfassung; keine Datei, kein Finding, kein Exit-Code-Einfluss. |
+| Dedup | Höchstens eine Zeile pro Provider und Lauf. |
+
+`emit_topology_summary` schreibt nichts und ändert keine gerenderten Bytes; es
+ist die **einzige** Stelle, an der die Ableitung sichtbar wird (kein INFO-Finding
+in IC-5).
+
+---
+
+## mode × topology-Interaktionsmatrix (normativ für AC-5)
+
+Lesart: **Zeile = effektiver `mode`** (nach `variables._resolve_orch_mode`),
+**Spalte = deklarierte Topologie**. Die Matrix ist die Testgrundlage für AC-5
+und die Ableitungsregel für IC-8 (b)/(c).
+
+| `mode` \ `topology` | `primary` | `subagent` | `hybrid` |
+|---|---|---|---|
+| `strict` | Einstieg, strikte Gates, 1 Instanz | Main Chat spawnt 1..N, strikte Gates | positions-agnostisch, strikte Gates |
+| `advisory` | Einstieg, advisory Gates | Main Chat spawnt 1..N, advisory Gates | positions-agnostisch, advisory Gates |
+| `main-chat` | **ERROR** (gleicher Scope, inkl. Same-Object) / **inert + WARNING** (Cross-Scope) | **ERROR** (gleicher Scope) / **inert + WARNING** (Cross-Scope) | **ERROR** (gleicher Scope) / **inert + WARNING** (Cross-Scope) |
+
+**Ableitungsregel:** `topology` ändert nie die Gate-Stärke; `mode` ändert nie
+die Position. `main-chat` ist die einzige Dominanzzelle (Rolle existiert nicht
+⇒ Topologie inert). Cross-Scope `primary` + globales N>1 ⇒ WARNING
+`instances-clamped`, effektiv N=1. Bei `mode != main-chat` und effektiver
+Topologie `subagent` entfällt der Entry-Point samt Gate-Deny
+(`gate-inactive`-WARNING, nicht still).
+
 ## Provider-Matrix (Stand vor P0)
 
 Ableitung ausschließlich aus vorhandenen Capability-Keys
@@ -418,9 +585,14 @@ ohne Datenbasis sind `UNVERIFIED ⇒ no`. Die Tabelle zeigt den Stand **vor P0**
 | *(custom / nicht im Registry)* | **no** — `UNVERIFIED`, kein Registry-Datum | **no** — `UNVERIFIED`, kein Registry-Datum | **no→subagent** — Fail-safe-Ziel, keine Capability-Zusage | **no** — keine Capability-Daten |
 
 **Invariante:** `topology_support.* == true` ⇒ `topology_verified_state.* !=
-UNVERIFIED` (AC-15). **Zählregel:** 25 Basis-Zellen + N belegte Upgrades (AC-16).
-**Loudness:** jede `degraded→`/`no→`/`UNVERIFIED`-Zelle erzeugt beim Sync genau
-eine WARNING pro Provider und Lauf.
+UNVERIFIED` (AC-15); äquivalent dazu liefert `topology_support.* == false`
+**oder** `UNVERIFIED` **nie** den deklarierten Wert (IC-2, Fallback-Regel).
+**Zählregel:** 25 Basis-Zellen + N belegte Upgrades (AC-16). **Normative Kopie
+für AC-16 ist genau diese Tabelle** (die Design-Matrix §7 ist Referenz, nicht
+zweite Wahrheit). **Loudness:** jede **tatsächliche Degradierung**
+(`degraded_from is not None`, d. h. declared ≠ effective) erzeugt beim Sync genau
+eine WARNING pro Provider und Lauf — nicht jede `no`-Zelle eines unveränderten
+Projekts (sonst warnt jeder Sync, vgl. D9/R5).
 
 ---
 
@@ -535,15 +707,15 @@ Jede Phase ist eigenständig mergebar (grün, rückrollbar) und lässt
 
 | Phase | Größe | Dateien (Kern) | Was sie landet |
 |---|---|---|---|
-| **P0 — Capability-Daten, Verified-State & Probe-Ausführung** | **M (5)** | `config/provider-capabilities.yaml`, `docs/spikes/2026-11-03-issue-1077-topology-probe.md` (**Evidenz-Dokument**), `scripts/topology-probe.py` (read-only Probe-Harness), `tests/test_topology_capability_invariant.py`, `tests/test_topology_probe_evidence.py` | Vier Capability-Strukturen je Provider + Invariante; **die fünf Provider-Probes (§16 Nr. 2–6 des Designs) werden jetzt ausgeführt** und im Spike-Doc aufgezeichnet (OQ-1 = B). Nur belegte Zellen → `yes`; unbelegte bleiben `no` mit genau einer WARNING. |
-| **P1 — Config-Fläche, Auflöser, Validator, Flags** | **L (11–12)** | `config/project-config.schema.json`, `scripts/lib/topology.py` (neu), `scripts/lib/config.py` ((a)–(c), globale Flags), `scripts/lib/variables.py`, `scripts/lib/standalone.py`, `scripts/lib/consistency/placeholders.py`, `scripts/lib/providers.py` (`primary_role`), `scripts/lib/active_set.py` (Funktion + Unit-Test), drei neue Tests, Doku-Beispiele | Enum + Defaults, hartes Same-Scope-Validieren (a)–(c), Auflösekette, flache Topologie-Flags, fail-closed Conditional-Registrierung. `role_emitted_for_provider` landet **ohne** Call-Site. |
-| **P2 — Emission, laute Degradierung, Builder-Default** | **L (10–11)** | `provider_transform.py`, `isolation.py`, `context.py`, `agent_sync.py`, `consistency/topology.py` (neu), `consistency-check.py`, drei Tests, `tests/fixtures/topology-golden/*`, `config/ai-providers.yaml` (Kommentar) | `subagent` auf Opencode funktioniert real; kein `default_agent` bei Topologie ≠ `primary`; `agent_sync.py` nutzt das Prädikat an der zweiten Stelle; WARNING + Sync-Summary-Zeile (**kein** `--check`-INFO). |
-| **P3 — Multi-Instanz, Zustands-Namespaces & Guard-Audit** | **L (12–14)** | `project-config.schema.json` (`max-instances` max 8, `singleton`), `config.py` ((d)/(e)), `variables.py` (`_instance_flags`), `topology.py`, `a2a-delegation-gates.md`, `orchestrator-guard-impl.sh` (**OQ-2 = A**), `tests/test_orchestrator_guard_hook.py`, `checkpoint.py`, `schemas/a2a-handoff.schema.json`, `delegation_syntax.py`, Viz-Emitter, zwei Tests | N>1 sicher: presence-only `singleton`, ID, Session-ID-Komposition, Event-Tagging, Gate-Wortlaut mit `max {{ORCH_MAX_INSTANCES}}`, Guard-Audit-ID. **OQ-2/OQ-3 sind P3-only.** |
+| **P0 — Capability-Daten, Verified-State & Probe-Ausführung** | **M (5)** | `config/provider-capabilities.yaml`, `docs/spikes/2026-11-03-issue-1077-topology-probe.md` (**Evidenz-Dokument**), `scripts/topology-probe.py` (read-only Probe-Harness), `tests/test_topology_capability_invariant.py`, `tests/test_topology_probe_evidence.py` | Vier Capability-Strukturen je Provider + Invariante; **die fünf Provider-Probes (§16 Nr. 2–6 des Designs) werden jetzt ausgeführt** und im Spike-Doc aufgezeichnet (OQ-1 = B). Nur belegte Zellen → `yes`; unbelegte bleiben `no` (eine WARNING entsteht nur bei tatsächlicher Degradierung, `degraded_from is not None`; AC-16). |
+| **P1 — Config-Fläche, Auflöser, Validator, Flags** | **L (9–11)** | `config/project-config.schema.json`, `scripts/lib/topology.py` (neu), `scripts/lib/config.py` ((a)–(c), globale Flags), `scripts/lib/variables.py`, `scripts/lib/standalone.py`, `scripts/lib/consistency/placeholders.py`, drei neue Tests, Doku-Beispiele | Enum + Defaults, hartes Same-Scope-Validieren (a)–(c), Auflösekette inkl. `support == false`-Fallback und `effective ∈ VALID_TOPOLOGIES`, flache Topologie-Flags, fail-closed Conditional-Registrierung. **Kein** Eingriff in `active_set.py`/`providers.py`: das Prädikat existiert seit #1090, ein neuer `primary_role`-Accessor entfällt (B1). |
+| **P2 — Emission, laute Degradierung, Builder-Default** | **L (11–12)** | `provider_transform.py`, `isolation.py`, `context.py`, `agent_sync.py`, `sync_pipeline.py` (IC-11), `consistency/topology.py` (neu), `consistency-check.py`, vier Tests, `tests/fixtures/topology-golden/*`, `config/ai-providers.yaml` (Kommentar) | `subagent` auf Opencode funktioniert real; kein `default_agent` bei Topologie ≠ `primary` (in den bestehenden `emit_default_agent`-Bool gefaltet); `agent_sync.py::_should_skip_role` ruft das **bestehende** Prädikat statt des `ORCH_MODE_MAIN_CHAT`-Reads; WARN `degraded`/`default-agent-conflict`/`gate-inactive` + Sync-Summary-Zeile (**kein** `--check`-INFO). |
+| **P3 — Multi-Instanz, Zustands-Namespaces & Guard-Audit** | **L (14–16)** | `project-config.schema.json` (`max-instances` max 8, `singleton`), `config.py` ((d)/(e)), `variables.py` (`_instance_flags` **plus** Registrierung von `ORCH_MAX_INSTANCES`/`ORCH_SINGLETON_DECLARED` in der `strip_inactive_conditional_blocks`-Whitelist, `_FALSE_DEFAULT_CONDITIONALS` und — via `standalone.py` — `_CONDITIONAL_FALSE_FLAGS` **sowie** `consistency/placeholders.py::_BUILTIN_VARS`), `topology.py`, `consistency/topology.py` (`singleton-redundant`-INFO), `a2a-delegation-gates.md`, `orchestrator-guard-impl.sh` (**OQ-2 = A**), `tests/test_orchestrator_guard_hook.py`, `checkpoint.py`, `schemas/a2a-handoff.schema.json`, `delegation_syntax.py`, Viz-Emitter, zwei Tests | N>1 sicher: presence-only `singleton` (mit redundantem INFO bei N=1), ID, Session-ID-Komposition, Event-Tagging, Gate-Wortlaut mit `max {{ORCH_MAX_INSTANCES}}`, Guard-Audit-ID. **OQ-2/OQ-3 sind P3-only.** |
 | **P4 — Regel- und Doku-Amendment** | **S–M (5–7)** | `rules/1-generic/a2a-delegation-gates.md`, `agents/1-generic/orchestrator.md`, `agents/1-generic/_reference-agent.md`, `docs/concepts/active/orchestrator-topology.md` (neu), `docs/concepts/active/singleton-orchestrator-architecture.md`, `CHANGELOG.md` | Neue Gate-Formulierung (conditional, else wortgleich, ohne Instanz-Platzhalter), Concept-Doc + Cross-Links. |
 
-**Summe:** 43–50 Datei-Berührungen (mit Doppelzählungen von
-`project-config.schema.json`, `config.py`, `topology.py`), **XL** (öffentliche
-Config-Contracts + Schema + mehr als eine Subsystemgrenze).
+**Summe:** 44–51 Datei-Berührungen (mit Doppelzählungen von
+`project-config.schema.json`, `config.py`, `topology.py`, `consistency/topology.py`),
+**XL** (öffentliche Config-Contracts + Schema + mehr als eine Subsystemgrenze).
 
 **v1 = P0–P2 + P4.** P0 ist v1-Bestandteil, aber **keine Spec-Vorbedingung**:
 die Spec hängt an der Upgrade-**Regel**, nicht an einem bereits gemessenen N.
@@ -552,9 +724,9 @@ die Spec hängt an der Upgrade-**Regel**, nicht an einem bereits gemessenen N.
 
 ## Acceptance Criteria
 
-> **v1-DoD (OQ-5 = A):** AC-1…AC-7, AC-13…AC-16, AC-18 sowie die **P1-Zeilen**
-> von AC-17 und das **P0-Gate**. AC-8…AC-12 und die **P3-Zeilen** von AC-17 sind
-> **P3-only** und nicht Teil der v1-DoD.
+> **v1-DoD (OQ-5 = A):** AC-1…AC-7, AC-13…AC-16, AC-18, AC-19, AC-20 sowie die
+> **P1-Zeilen** von AC-17 und das **P0-Gate**. AC-8…AC-12 und die **P3-Zeilen**
+> von AC-17 sind **P3-only** und nicht Teil der v1-DoD.
 
 Jedes Kriterium ist nummeriert, testbar und in Given/When/Then-Form formuliert.
 Jedes AC referenziert mindestens einen Interface-Contract.
@@ -589,14 +761,17 @@ kommentiert; **when** eine Zelle degradiert, **then** existiert genau eine
 `docs/concepts/active/orchestrator-topology.md` die drei Topologien, die
 Support-/Degradierungsmatrix, die Multi-Instanz-Adressierung **und** den
 `hybrid`-Deviationssatz (D2); die Singleton-Concept und die A2A-Rule verlinken
-darauf. *Contract:* IC-1. *Test:* Doku-Existenz + Link-Check
-(`consistency/docs.py`-Muster).
+darauf. Die Multi-Instanz-Passage ist ausdrücklich als **„P3, designed, not
+shipped"** markiert (kein v1-Versprechen). *Contract:* IC-1. *Test:*
+Doku-Existenz + Link-Check (`consistency/docs.py`-Muster) + Text-Assertion auf
+den P3-Marker.
 
 ### AC-5 — Testabdeckung der Kernflächen
 
 **Given** die Testsuite, **when** sie läuft, **then** existieren Tests für Enum,
-`mode`×`topology`-Matrix, `main-chat`-Konflikt und abgeleiteten Default.
-*Contracts:* IC-1, IC-2, IC-8. *Test:* vier Testmodule aus P1/P2.
+die **3×3-Matrix aus „mode × topology-Interaktionsmatrix"** (alle neun Zellen
+inkl. der `main-chat`-ERROR-/inert-Regel), `main-chat`-Konflikt und abgeleiteten
+Default. *Contracts:* IC-1, IC-2, IC-8. *Test:* vier Testmodule aus P1/P2.
 
 ### AC-6 — Kein Verhaltenswechsel ohne Key
 
@@ -619,8 +794,11 @@ main-chat`, **when** der Sync läuft, **then** existiert genau eine
 **Given** eine konsistente Config, **when** validiert wird, **then** akzeptiert
 das Schema `max-instances` (min 1, **max 8**, Default 1; der Key existiert vor
 P3 nicht) und `singleton` (nur `true`, **kein** `default`); `singleton` present
-+ N>1 ist ein harter Validator-ERROR; `--validate` ist grün.
-*Contracts:* IC-1, IC-8. *Test:* Schema-Test (beide Richtungen) + Validator-Test.
++ N>1 ist ein harter Validator-ERROR; `singleton` present + N=1 ist **kein**
+Fehler, sondern das INFO `orchestrator-topology.singleton-redundant` (rc bleibt
+0); `--validate` ist grün.
+*Contracts:* IC-1, IC-5, IC-8. *Test:* Schema-Test (beide Richtungen) +
+Validator-Test + Konsistenz-Test (INFO).
 
 ### AC-9 — (P3-only) `primary` × N im selben Scope
 
@@ -641,10 +819,13 @@ der heutige Pfad; **given** N=2, **then** entstehen `<base>__<id>`-Dateien und
 
 **Given** N>1, **when** Events geschrieben werden, **then** tragen sie
 `orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`; das Log bleibt eine
-Datei; `viz-report` konsumiert unverändert; das Guard-Audit-Log trägt die ID.
+Datei; `viz-report` konsumiert unverändert; das Guard-Audit-Log trägt die ID,
+**und die Reduktion des Audit-Datensatzes auf `orchestrator_id` ist im
+Guard-Audit dokumentiert** (Feldname + Reduktionssatz, nicht nur implizit).
 **Given** ein Sentinel mit `id=`, **when** der Guard entscheidet, **then** wird
 die ID **nie** für Allow/Deny benutzt (**OQ-2 = A**).
-*Contracts:* IC-9, IC-10. *Test:* Event-Fixture + Reader-Test + Hook-Test.
+*Contracts:* IC-9, IC-10. *Test:* Event-Fixture + Reader-Test + Hook-Test +
+Audit-Text-Assertion.
 
 ### AC-12 — (P3-only) Abgrenzung der beiden Limits
 
@@ -665,41 +846,55 @@ trägt jeder registrierte Provider `topology_support`, `topology_degrade`,
 
 **Given** ein frisches Opencode-v2-Projekt mit `topology: subagent`, **when**
 der Sync läuft, **then** enthält die Config **kein** `default_agent` auf der
-Orchestrator-Rolle; **given** ein verwalteter Wert, **when** `primary →
-subagent` wechselt, **then** wird er zurückgerollt; **given** ein nutzereigener
-Wert, **then** entsteht `default-agent-conflict` (WARN, kein Auto-Delete) und
-der ActiveSet-Konjunkt bleibt wirksam.
-*Contracts:* IC-7. *Test:* `tests/test_ac01_render_identity.py` +
-Isolation-Test.
+Orchestrator-Rolle (der bestehende `emit_default_agent`-Bool ist `False`);
+**given** ein verwalteter Wert, **when** `primary → subagent` wechselt, **then**
+wird er zurückgerollt; **given** ein nutzereigener Wert, **then** entsteht die
+WARN `orchestrator-topology.default-agent-conflict` (kein Auto-Delete) und der
+ActiveSet-Konjunkt bleibt wirksam.
+*Contracts:* IC-5, IC-7. *Test:* `tests/test_ac01_render_identity.py` +
+Isolation-Test + Konsistenz-Test.
 
-### AC-15 — Invariante: kein `yes` ohne State
+### AC-15 — Invariante: kein `yes` ohne State, kein Durchreichen ohne Support
 
 **Given** eine Provider-Zelle mit `topology_support.* == true`, **when** der
 Invariantentest läuft, **then** ist `topology_verified_state.* != UNVERIFIED`;
-**given** eine `UNVERIFIED`-Zelle, **when** aufgelöst wird, **then** liefert der
-Resolver **nie** den deklarierten Wert. Eine `yes`-Zelle existiert nur mit
-aufgezeichneter Probe-Evidenz. *Contract:* IC-2. *Test:*
-Provider-Invariantentest + Resolver-Test.
+**given** eine `UNVERIFIED`-Zelle **oder** eine Zelle mit
+`topology_support.* == false`, **when** aufgelöst wird, **then** liefert der
+Resolver **nie** den deklarierten Wert, sondern den Fallback aus
+`topology_degrade` (bzw. Fail-safe `subagent`), und `effective` liegt immer in
+`VALID_TOPOLOGIES`. Eine `yes`-Zelle existiert nur mit aufgezeichneter
+Probe-Evidenz **und** erfüllter §3.1-Bedingung (P0-Gate, alle drei Bedingungen;
+Design §3.1 im Trace-Anker). *Contracts:* IC-2, IC-5. *Test:*
+Provider-Invariantentest + Resolver-Test (Support-false- und
+UNVERIFIED-Zweig).
 
 ### AC-16 — Matrix-Zählung als gemessene Regel
 
-**Given** die Matrix aus §7 des Designs, **when** der Zähl-Test läuft, **then**
-gilt: 40 Zellen = **`25 + N` datenabgeleitet** / **`15 − N` `UNVERIFIED ⇒ no`**,
-wobei **N aus der Evidenzliste des Spike-Docs gemessen** wird (`0 ≤ N ≤ 15`;
-die fünf Probes sind die Evidenzquellen, eine Probe kann mehrere Zellen
-stützen) und **0 spekulative `yes`** existieren; jede Degradierung erzeugt genau eine WARNING
-pro Provider und Lauf. Der Test pinnt **keine** konkrete Endzahl.
-*Contracts:* IC-2, IC-5. *Test:* Matrix-Zähl-Test + Konsistenz-Test.
+**Given** die **normative Matrix dieser Spec** („Provider-Matrix (Stand vor
+P0)"; Design §7 ist Referenz), **when** der Zähl-Test läuft, **then** gilt:
+40 Zellen = **`25 + N` datenabgeleitet** / **`15 − N` `UNVERIFIED ⇒ no`**, wobei
+**N aus der Evidenzliste des Spike-Docs gemessen** wird (`0 ≤ N ≤ 15`; die fünf
+Probes sind die Evidenzquellen, eine Probe kann mehrere Zellen stützen) und
+**0 spekulative `yes`** existieren. Jedes Zell-Upgrade erfüllt **alle drei**
+P0-Gate-Bedingungen (Evidenz, State-Wechsel, §3.1-Zeile + Invariantentest).
+**WARNING-Bedingung:** genau eine `orchestrator-topology.degraded`-WARNING pro
+Provider und Lauf **nur wenn `degraded_from is not None`** (declared ≠
+effective); eine unveränderte `no`-Zelle ohne Deklaration warnt **nicht**
+(D9/R5). Der Test pinnt **keine** konkrete Endzahl.
+*Contracts:* IC-2, IC-5. *Test:* Matrix-Zähl-Test + Konsistenz-Test
+(Degradierungs-Zähler).
 
 ### AC-17 — Harte Validator-Teilstrings
 
 **Given** eine widersprüchliche Config, **when** `sync` oder `--validate` läuft,
 **then** bricht der stdlib-Validator mit rc≠0 ab (ohne `jsonschema`) und die
-Meldung enthält den in IC-8 gepinnten Teilstring: **(P1)** Same-Scope
-`main-chat` × Topologie (auch Same-Object), `enabled: false` × Topologie;
-**(P3-only)** `singleton: false`, `singleton` present × N>1, `primary` × N>1 im
-selben Scope. *Contract:* IC-8. *Test:*
-`tests/test_orchestrator_topology_validator.py` (P1) + P3-Erweiterung.
+Meldung enthält den in IC-8 gepinnten Teilstring: **(P1)** unbekanntes Enum
+(`unknown orchestrator.topology`), Same-Scope `main-chat` × Topologie (auch
+Same-Object), `enabled: false` × Topologie; **(P3-only)** `singleton: false`,
+`singleton` present × N>1, `primary` × N>1 im selben Scope. Jeder dieser
+Teilstrings wird **assertet**, nicht nur dokumentiert. *Contract:* IC-8. *Test:*
+`tests/test_orchestrator_topology_validator.py` (P1: alle vier P1-Teilstrings)
++ P3-Erweiterung.
 
 ### AC-18 — Fail-closed Conditional-Registrierung
 
@@ -713,6 +908,30 @@ rendert doppelt; `ORCH_TOPOLOGY_*` steht in der Whitelist von
 *Contract:* IC-4. *Test:* Golden-Fixtures + `check_builder_known_set` +
 Conditional-Test.
 
+### AC-19 — Sync-Summary-Zeile der Ableitung (v1)
+
+**Given** ein Projekt ohne `orchestrator.topology` (und ohne Provider-Override),
+**when** `sync` läuft, **then** gibt `emit_topology_summary` genau eine
+INFO-Zeile pro abgeleitetem Provider aus, wörtlich
+`topology: <effective> (derived from providers.<P>.primary-role)` (bzw.
+`topology: subagent (derived: active-set default)`, wenn kein `primary-role`
+existiert); **given** derselbe Zustand mit `--check` oder `--validate`,
+**then** wird die Funktion nicht aufgerufen und die Ausgabe ist byte-identisch
+zu heute; **given** ein explizit gesetzter Key, **then** existiert keine
+Summary-Zeile. *Contract:* IC-11. *Test:*
+`tests/test_topology_summary_line.py` (Text-Assertion + Mode-Negativtest) +
+AC-6-Golden.
+
+### AC-20 — Gate-Inactive ist laut (v1)
+
+**Given** `mode != main-chat` und effektive Topologie ≠ `primary` (z. B.
+`subagent`) auf Opencode, **when** der Sync das Gate aufbauen will, **then**
+wird **kein** Deny geschrieben und genau eine WARN
+`orchestrator-topology.gate-inactive` entsteht (Text nennt Provider, Topologie
+und die Handlung); **given** effektive Topologie `primary`, **then** entsteht
+diese WARN nicht. Kein rc≠0, kein stilles Absenken.
+*Contracts:* IC-5, IC-7. *Test:* Isolation-Test + Konsistenz-Test.
+
 ### P0-Gate — Probe-Abnahme (v1-Bestandteil)
 
 P0 ist abgeschlossen, wenn **jede** der fünf Probes (§16 Nr. 2–6 des Designs)
@@ -722,13 +941,26 @@ im Evidenz-Dokument `docs/spikes/2026-11-03-issue-1077-topology-probe.md` ein
 - **P0-1 … P0-5:** je Probe entweder (a) **Evidenz** — Befehl, Datum,
   Provider-Version, beobachtetes Ergebnis inkl. Fehlerfall — oder (b) die
   wörtliche Zeile **„not run — CLI unavailable"** mit Grund.
-- **Upgrade-Regel:** Eine Matrix-Zelle wechselt nur dann auf `yes`, wenn
-  `docs/spikes/…-topology-probe.md` die zugehörige Evidenz enthält **und**
-  `topology_verified_state` auf `DOCUMENTED`/`VERIFIED-RUNTIME` steht; ein
-  `yes` ohne Evidenzzeile ist ein Testfehler (AC-16).
+- **Upgrade-Regel (B3 — alle drei Design-§7-Bedingungen, nicht zwei):** Eine
+  Matrix-Zelle wechselt nur dann auf `yes`, wenn **alle drei** gemeinsam
+  erfüllt sind:
+  1. **Evidenz aufgezeichnet:** `docs/spikes/…-topology-probe.md` enthält die
+     zugehörige Probe mit Befehl, Datum, Provider-Version und beobachtetem
+     Ergebnis (inkl. Fehlerfall).
+  2. **State-Wechsel:** `topology_verified_state.<achse>` steht danach auf
+     `DOCUMENTED` oder `VERIFIED-RUNTIME` (nie `UNVERIFIED`).
+  3. **Invariante grün:** Die **§3.1-Zeile** (Design §3.1,
+     Invocation-/Main-Loop-Checkliste) für die Position hat keine offenen
+     `unverified`-Felder mehr — Ausnahme ausschließlich `prompt-caching` und
+     `progress` — **und** der Invariantentest (AC-15/AC-16) deckt die Änderung
+     ab.
+
+  Ein `yes` ohne eine dieser drei Bedingungen ist ein Testfehler (AC-16), kein
+  Datenpunkt.
 - **Kein „unverifiziert für immer":** „not run" ist ein gültiges Ergebnis,
-  lässt die Zelle aber `no` und erzeugt genau eine WARNING — es ist **kein**
-  Grund, die Probe zu wiederholen, bevor eine CLI verfügbar ist.
+  lässt die Zelle `no` und ist **kein** Grund, die Probe zu wiederholen, bevor
+  eine CLI verfügbar ist; eine WARNING entsteht nur bei tatsächlicher
+  Degradierung (AC-16).
 - **N wird gemessen:** Die Endzahl der Upgrades steht erst nach P0 fest; die
   Spec/AC-16 assertet die Bilanz, nicht eine geratene Zahl.
 
@@ -738,11 +970,11 @@ im Evidenz-Dokument `docs/spikes/2026-11-03-issue-1077-topology-probe.md` ein
 
 | # | Risiko | Wirkung | Gegenmaßnahme |
 |---|---|---|---|
-| **R1** | **Zweite Skip-Stelle** (`main-chat`-Skip in `agent_sync.py` + neue Topologie-Logik) | Orchestrator verschwindet still oder wird doppelt gepruned | Ein Prädikat `role_emitted_for_provider` (IC-3); P1 landet nur Funktion + Test, P2 stellt beide Call-Sites um; AST-/Grep-Assertion „genau eine Funktion entscheidet". |
-| **R2** | **`default_agent` ↔ Gate-Deny-Kopplung + zweiter Schreiber** | Nutzer verliert Builder-Default oder Main-Chat-Schreibblockade | `_opencode_entry_point` bleibt einzige Quelle; `apply_settings_surface_shape` erhält `topology_effective` (IC-7/AC-14); D1a-Invariante unverändert; zusätzlicher WARNING „gate inactive because topology removed the entry point". |
+| **R1** | **Zweite Skip-Stelle** (`main-chat`-Skip in `agent_sync.py` + neue Topologie-Logik) | Orchestrator verschwindet still oder wird doppelt gepruned | Das **bestehende** Prädikat `role_emitted_for_provider` (IC-3) bleibt einzige Datei-Emissions-Quelle; P2 stellt `agent_sync.py::_should_skip_role` auf das Prädikat um (der `ORCH_MODE_MAIN_CHAT`-Read entfällt); AST-/Grep-Assertion „genau eine Funktion entscheidet". |
+| **R2** | **`default_agent` ↔ Gate-Deny-Kopplung + zweiter Schreiber** | Nutzer verliert Builder-Default oder Main-Chat-Schreibblockade | `_opencode_entry_point` bleibt einzige Quelle; `apply_settings_surface_shape` behält seinen bestehenden `emit_default_agent`-Bool (kein `topology_effective`; IC-7/AC-14); D1a-Invariante unverändert; WARN `orchestrator-topology.gate-inactive` (AC-20). |
 | **R4** | **Byte-Identität bricht** durch unbedingte Textänderung oder `{{else}}` auf eigener Zeile | Jedes Consumer-Projekt meldet Drift nach Upgrade | Conditional-Rendering mit **inline** platzierten Markern und wortgleichem else-Zweig; AC-6 + AC-18; Golden-Fixtures „Rolle inaktiv/aktiv + Key unset". |
 | **R8** | **N>1 ohne Zustands-Isolation** (P3) | Stiller Resume-Datenverlust | Harte Kopplung: `max-instances` existiert vor P3 nicht und wird gemeinsam mit `maximum: 8` und der Isolation eingeführt; kein Zwischenschritt mit `maximum: 1`. |
-| **R10** | **Matrix-Zellen werden als Freigabe gelesen, obwohl `UNVERIFIED`** / Probe belegt nichts | Spec verspricht `hybrid`/N>1 ohne Evidenz | Upgrade-Prozedur (P0-Gate): `yes` nur mit Evidenzzeile + State-Wechsel + grünem Invariantentest; AC-15/AC-16; unbelegte Zellen bleiben `no` mit genauer einer WARNING. |
+| **R10** | **Matrix-Zellen werden als Freigabe gelesen, obwohl `UNVERIFIED`** / Probe belegt nichts | Spec verspricht `hybrid`/N>1 ohne Evidenz | Upgrade-Prozedur (P0-Gate): `yes` nur mit **allen drei** Bedingungen — Evidenzzeile, State-Wechsel, §3.1-Zeile ohne offene `unverified`-Felder + grüner Invariantentest; AC-15/AC-16; unbelegte Zellen bleiben `no` und warnen nur bei tatsächlicher Degradierung. |
 
 ---
 
@@ -764,15 +996,23 @@ Fakten in D1–D10 eingefaltet; ein späterer Widerspruch ist ein
 - **Kontext-Issues:** #1007, #1006, #547 (Nicht-Ziel), #516 (Guard),
   #369 (Delegationstiefe).
 - **Design-Quelle:** `docs/specs/2026-11-03-orchestrator-topology-design.md`,
-  Rev. 4 vom 2026-11-04 — §4 (Contracts), §7 (Matrix + Upgrade-Prozedur),
+  Rev. 4 vom 2026-11-04 — **§3.1** (Invocation-/Main-Loop-Checkliste, dritte
+  Upgrade-Bedingung), §4 (Contracts), §7 (Matrix + Upgrade-Prozedur),
   §9 (Multi-Instanz, P3), §11 (Phasen), §12 (ACs), §15 (entschiedene OQ).
-- **Phasen → AC:** P0 → P0-Gate, AC-13…AC-16; P1 → AC-1, AC-2, AC-5, AC-17
-  (P1-Zeilen), AC-18; P2 → AC-3, AC-6, AC-7, AC-14; P4 → AC-4; P3 →
-  AC-8…AC-12, AC-17 (P3-Zeilen).
-- **Governance-Hinweis (A9/R12):** Dieses Dokument trägt die literalen
-  Spec-Überschriften (`## Problem`, `## Ziel`, `## Nicht-Ziele`,
-  `## Interface Contracts`, `## Datenfluss`, `## Acceptance Criteria`,
-  `## Offene Fragen`, `## Trace-Anker`). `consistency/spec_plan.py::_classify`
-  ordnet derzeit `*-design.md` als `spec` ein; `*-spec.md` fällt in die
-  Plan-Rolle. Die Überschriften sind deshalb bewusst zusätzlich vorhanden —
-  verbindlich bleibt die Design-Referenz, nicht der Dateiname.
+- **Phasen → AC:** P0 → P0-Gate, **AC-13, AC-15, AC-16** (AC-14 ist P2, nicht
+  P0); P1 → AC-1, AC-2, AC-5, AC-17 (P1-Zeilen), AC-18; P2 → AC-3, AC-6, AC-7,
+  AC-14, AC-19, AC-20; P4 → AC-4; P3 → AC-8…AC-12, AC-17 (P3-Zeilen).
+- **Governance-Hinweis (A9/R12, Rev. 2/B5 — korrigiert):** Dieses Dokument
+  trägt die acht literalen Spec-Überschriften (`## Problem`, `## Ziel`,
+  `## Nicht-Ziele`, `## Interface Contracts`, `## Datenfluss`,
+  `## Acceptance Criteria`, `## Offene Fragen`, `## Trace-Anker`) **zusätzlich**
+  zur Design-Referenz. Das ist **kein** Grün-Machen: `consistency/spec_plan.py`
+  klassifiziert über `_classify(name)` — `*-spike.md` → `spike`,
+  `*-design.md` → `spec`, **alles andere (also auch `*-spec.md`) → `plan`**.
+  Für diese Datei prüft `--validate-spec-plan` daher `REQUIRED_PLAN_SECTIONS`:
+  **7 fehlende Plan-Abschnitte + 1 Traceability-Finding = 8 WARNINGs**
+  (`spec-plan-required: false` ⇒ WARNING, nicht ERROR; `dod-traceability` aus ⇒
+  Traceability-WARNING). Der Zustand ist — wie Design R12 — **bewusst
+  akzeptiert** (WARNING-only, kein Fehler); die Überschriften bleiben trotzdem
+  als menschenlesbare Spec-Struktur erhalten. Eine `_classify`-Korrektur ist
+  **nicht** Teil dieser Spec.
