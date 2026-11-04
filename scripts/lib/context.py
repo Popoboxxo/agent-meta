@@ -29,6 +29,7 @@ from .rule_index import (
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
+    _topology_flags,
     repo_containment_variables,
     strip_inactive_conditional_blocks,
     substitute,
@@ -2526,6 +2527,26 @@ def _build_managed_block(
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
     local_vars.update(_orch_mode_flags(_orch_mode))
+
+    # Orchestrator topology axis (IC-4): same provider-scoped re-resolution as
+    # the ORCH_MODE_* flags above (provider-override > project). Only the
+    # DECLARED position is rendered; an unset key stays "" => all position flags
+    # "false" (fail-closed, AC-18), never a derived provider value.
+    from .providers import load_provider_capabilities
+    from .topology import resolve_topology, topology_explicit
+
+    _topology_resolution = resolve_topology(
+        config,
+        provider,
+        provider_config=provider_config or {},
+        capabilities=load_provider_capabilities(agent_meta_root).get(provider, {}),
+        mode=_orch_mode,
+    )
+    local_vars.update(_topology_flags(
+        _topology_resolution.declared or "",
+        explicit=topology_explicit(config, provider),
+        source=_topology_resolution.source,
+    ))
 
     # Repo-containment ("prison mode") flags for THIS provider — same
     # provider-scoped wiring as the ORCH_MODE_* flags above (provider-override
