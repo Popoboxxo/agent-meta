@@ -274,6 +274,26 @@
   `{{VAR}}` → renders-as-`{{VAR}}` convention) are no longer flagged as unknown
   placeholders. **behavior change:** a real unknown placeholder in running text is
   still reported; only code-context occurrences are exempt.
+- **Plain sync no longer materializes the preset/flag defaults (#1074, behavior change)**:
+  `fill_defaults` gains `materialize_presets`, which the sync auto-fill passes only
+  for `--init`, so `rules-preset`, `speech-mode`, `tier-preset`, `se-focus`,
+  `max-parallel-agents`, `debug-mode` and `allow-committed-secrets` stay virtual
+  through the runtime fallbacks and the `platforms:` cascade instead of being written
+  into third-party `project.yaml` files. Only `repo_containment`, the derived
+  `project.short` and the remaining structural fields are still materialized;
+  `--fill-defaults`/`--init` keep the full set. `meta_optimizer.refill_keys` excludes
+  the same seven keys, so deleting one is no longer reported — and undone — as a
+  re-materialization on the next sync.
+- **Admin and sync config writes keep the comments in `project.yaml` (#1092)**:
+  the new `lib.yaml_patch.patch_top_level` re-renders only the changed top-level
+  segments, so comments, blank lines, key order, inline comments and CRLF line
+  endings survive `ConfigManager.write`, the full-document `PUT` and the
+  partial-section route; the patch falls back to the historical full dump when the
+  document cannot be patched safely (anchors, multi-doc, tabs, self-check mismatch).
+  The round-trip guard now protects that full-dump fallback only, so a commented
+  file is no longer rejected for a changed section, and the `__allow_lossy__`
+  opt-in is consumed by the handler instead of being persisted as a section.
+  `ai-providers` keeps its always-guarded behaviour.
 
 ## [2.0.0-beta.6] - 2026-10-31
 
