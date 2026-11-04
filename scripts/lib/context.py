@@ -1823,6 +1823,43 @@ def _init_provider_settings_json(
         emit_default_agent = role_emitted_for_provider(
             primary_role, active_set, config, provider
         )
+        # IC-7: fold the resolved topology into the SAME bool — no second
+        # control parameter on ``apply_settings_surface_shape``. The role may be
+        # emitted (as a subagent) while the position withholds the entry point.
+        if emit_default_agent and provider and config is not None:
+            from .providers import load_providers_config
+            from .topology import resolve_topology, topology_explicit
+
+            orch_config = config.get("orchestrator", {})
+            if not isinstance(orch_config, dict):
+                orch_config = {}
+            provider_override = orch_config.get("provider-overrides", {})
+            provider_override = (
+                provider_override.get(provider)
+                if isinstance(provider_override, dict) else None
+            )
+            if not isinstance(provider_override, dict):
+                provider_override = None
+            try:
+                registry = load_providers_config(agent_meta_root) or {}
+            except Exception:  # noqa: BLE001 - init is fail-soft
+                registry = {}
+            resolution = resolve_topology(
+                config,
+                provider,
+                provider_config=registry,
+                capabilities=capabilities or {},
+                mode=_resolve_orch_mode(
+                    orch_config, provider_override, validate=False
+                ),
+                active_set=active_set,
+            )
+            emit_default_agent = resolution.effective == "primary"
+            if not topology_explicit(config, provider) and active_set is None:
+                # No active-set information and no declared position: the
+                # resolver cannot derive anything but its fail-safe. Keep the
+                # historic emission instead of demoting on missing information.
+                emit_default_agent = True
     content = apply_settings_surface_shape(
         content, pc, capabilities, emit_default_agent=emit_default_agent
     )
