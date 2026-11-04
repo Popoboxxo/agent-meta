@@ -1,7 +1,7 @@
 # Orchestrator-Topologie konfigurierbar — Spec
 
 > Status: Entwurf
-> Revision: 2
+> Revision: 3
 > Datum: 2026-11-04
 > spec-id: SPEC-orchestrator-topology-2026-11-03
 > Issue: #1077
@@ -21,6 +21,7 @@ Entscheidungen sind als Fakten eingefaltet (D1–D10, §15 des Designs).
 |---|---|---|---|
 | 1 | 2026-11-04 | concept-specifier | Erste implementierbare Ableitung des Designs Rev. 4. |
 | 2 | 2026-11-04 | concept-specifier | Review-Fix-Pass (**Status bleibt Entwurf**): **B1** Ist-Zustand rebased — #1090 hat `active_set.role_emitted_for_provider`, `emit_default_agent` und die direkten `primary-role`-Lesezugriffe bereits gelandet; IC-3/IC-6/IC-7, P1/P2-Dateilisten und Call-Site-Zählung darauf neu aufgesetzt, kein zweiter Steuerparameter. **B2** Resolver-Regel vervollständigt: `support == false` **oder** `UNVERIFIED` ⇒ Fallback; `effective ∈ VALID_TOPOLOGIES` garantiert, Mechanismus-Wort wandert nach `degradation_reason`; AC-15 erweitert. **B3** Evidenz-Gate auf alle drei Design-Bedingungen (§7 inkl. §3.1-Zeile + Invariantentest) erweitert; §3.1 im Trace-Anker. **B4** Sync-Summary-Zeile, `default-agent-conflict` und Gate-Inactive-WARNUNG als IC + AC nachgezogen; v1-DoD aktualisiert. **B5** Governance-Hinweis auf das reale `_classify`-Verhalten korrigiert (akzeptierte WARNING-only, kein Grün). Advisories 1–5, 7–9 eingearbeitet (AC-17-Teilstring, P0→AC-Liste, normative Matrix-Kopie, `degraded_from`-Bedingung, `mode`-Quelle, P3-Registrierungen, AC-4-P3-Marker, 3×3-Matrix). Zusätzlich D5-Klausel (redundantes `singleton`-INFO) und AC-11-Reduktionssatz. |
+| 3 | 2026-11-04 | concept-specifier | Wording-Fix-Pass (**Status bleibt Entwurf**): **NC-1** Resolver-Invariante auf „nie unvalidiert durchgereicht" umgestellt; Koinzidenz-Fall (Continue: declared `subagent`, Fail-safe `subagent`) explizit als **keine** Degradierung benannt — `degraded_from = None`, keine WARNING (IC-2, Provider-Matrix, AC-15). **NC-2** WARNING-Dedup in IC-5 auf „genau eine pro Check-ID" präzisiert; mehrere IDs (`degraded`, `gate-inactive`, `default-agent-conflict`) dürfen im selben Lauf feuern. **NC-3** `hybrid`-Spalte der 3×3-Matrix mit Degradations-Fußnote (`→ subagent` in v1) versehen. **NC-4** ungenutzten `mode`-Parameter aus `_opencode_entry_point` entfernt; Aufrufer der einmaligen `TopologyResolution`-Auflösung benannt. **NC-5 (Deviation):** Diese Spec **supersediert** Design Rev. 4 in zwei Punkten — `topology_effective` (ersetzt durch das in den bestehenden `emit_default_agent`-Bool gefaltete Konjunkt, IC-7) und `providers.primary_role` (nicht eingeführt; `explicit_primary_role` bleibt, B1/#1090). Die entsprechenden Design-Passagen sind überholt. |
 
 ---
 
@@ -74,8 +75,9 @@ Schritt und **nicht** Teil der v1-DoD.
 
 - `sync --check` auf unveränderten Consumer-Projekten bleibt byte-identisch
   (AC-6).
-- Degradierung ist laut: genau eine WARNING pro Provider und Lauf, nie stilles
-  Absenken (AC-3, AC-7, AC-16).
+- Degradierung ist laut: genau eine WARNING **pro Check-ID** (d. h. pro
+  Provider und Lauf je Check) — mehrere verschiedene Check-IDs dürfen im selben
+  Lauf feuern —, nie stilles Absenken (AC-3, AC-7, AC-16).
 - Keine Matrix-Zelle behauptet eine Fähigkeit ohne aufgezeichnete Evidenz
   (AC-15, AC-16, P0-Gate).
 - `topology: subagent` erzeugt in einem frischen Opencode-v2-Projekt **kein**
@@ -195,11 +197,18 @@ def compose_instance_session_id(      # P3
    sonst `subagent`; `hybrid` wird nie abgeleitet), `degraded_from is None`,
    keine WARNING (D9).
 2. **Fallback-Regel (B2):** Ist `topology_support.<achse> == false` **oder**
-   `topology_verified_state.<achse> == "UNVERIFIED"`, liefert der Resolver
-   **nie** den deklarierten Wert. `effective` wird `topology_degrade.<achse>`,
+   `topology_verified_state.<achse> == "UNVERIFIED"`, wird der deklarierte Wert
+   **nie unvalidiert durchgereicht**: `effective` wird `topology_degrade.<achse>`,
    sofern dieser Wert in `VALID_TOPOLOGIES` liegt; andernfalls Fail-safe
-   `"subagent"`. `degraded_from = declared` (nur wenn `declared != effective`
-   wirklich degradiert wurde), `degradation_reason` trägt den Grund **und** das
+   `"subagent"`. **Koinzidenz-Fall (kein Degradationsfall):** Fällt der
+   Fail-safe auf denselben String wie die Deklaration — z. B. Continue: declared
+   `subagent`, `topology_support.subagent == false`,
+   `topology_degrade.subagent = "sequential-text"` (nicht in
+   `VALID_TOPOLOGIES`) ⇒ Fail-safe `"subagent"` —, dann gilt `degraded_from =
+   None` und es entsteht **keine** WARNING; der Support-Mangel ist dann nur in
+   der Zelle (`no`/`degraded`) dokumentiert, nicht als Laufzeit-Degradierung.
+   `degraded_from = declared` gilt ausschließlich, wenn `declared != effective`
+   wirklich degradiert wurde; `degradation_reason` trägt den Grund **und** das
    Mechanismus-Wort, z. B.
    `"capability cell UNVERIFIED"`, `"support=false"` oder
    `"support=false (degrade mechanism: sequential-text; clamped to subagent)"`.
@@ -348,9 +357,12 @@ def check_orchestrator_topology(
 | ~~`orchestrator-topology.derived`~~ | **entfällt** | — | **OQ-4 = A:** kein INFO-Finding; Ableitung nur als Sync-Summary-Zeile (IC-11/AC-19) |
 
 **Vertrag:** kein Schreiben, kein Exit, nur `Finding`s. Genau **eine** WARNING
-pro Provider und Lauf (dedupliziert); `--check` bleibt rc 0. Das
-`singleton-redundant`-INFO ist P3-only und zählt nicht als Degradierungs-WARNUNG
-(AC-16).
+**pro Check-ID** und Provider und Lauf (dedupliziert **je Check-ID**);
+verschiedene Check-IDs können im selben Lauf für denselben Provider feuern —
+z. B. `degraded` + `gate-inactive` auf Opencode bei deklariertem `hybrid`, mit
+nutzereigenem `default_agent` zusätzlich `default-agent-conflict`; `--check`
+bleibt rc 0. Das `singleton-redundant`-INFO ist P3-only und zählt nicht als
+Degradierungs-WARNUNG (AC-16).
 
 ### IC-6 `scripts/lib/provider_transform.py::_apply_agent_transform` (P2)
 
@@ -389,11 +401,15 @@ Ableitungsquelle (D9).
 
 `_opencode_entry_point` bleibt die **einzige** Entry-Point-Quelle und wird um
 die Topologie-Konjunktion erweitert; der ActiveSet-Konjunkt bleibt unverändert
-(A5). `mode` ist **nicht** frei erfunden: es ist das Ergebnis von
-`variables._resolve_orch_mode(orch_cfg, provider_override, validate=False)`, das
-der Aufrufer `_sync_opencode_runtime_gate` **einmal** pro Provider auflöst und
-durchreicht; ist `mode=None`, löst die aufgerufene Prädikat-Kette es
-rückwärtskompatibel selbst auf (heutiges Verhalten).
+(A5). **Aufrufer und Auflösungs-Ort:** `isolation.py::_sync_opencode_runtime_gate`
+löst pro Provider genau **einmal** `resolve_topology(config, provider, …,
+mode=<aus _resolve_orch_mode>, …)` auf und reicht das `TopologyResolution`-Objekt
+als `topology=` an `_opencode_entry_point(...)` weiter; dasselbe Objekt verwendet
+`context.py::_init_provider_settings_json` (und die Entry-Point-Vorprüfung in
+`init_settings_json`) für den `emit_default_agent`-Bool. Das Prädikat hat
+**keinen** eigenen `mode`-Parameter; `role_emitted_for_provider` löst `mode` wie
+heute intern über `_resolve_orch_mode(..., validate=False)` auf, wenn es keinen
+Kontext bekommt.
 
 ```python
 def _opencode_entry_point(
@@ -402,8 +418,7 @@ def _opencode_entry_point(
     active_set,
     config: dict | None = None,
     *,
-    mode: str | None = None,          # aus _resolve_orch_mode im Aufrufer
-    topology: "TopologyResolution | None" = None,  # aus resolve_topology(...)
+    topology: "TopologyResolution | None" = None,  # einmal im Aufrufer aufgelöst
 ) -> str | None:
     role = providers.explicit_primary_role(provider_config, provider)
     if role is None:
@@ -552,9 +567,15 @@ und die Ableitungsregel für IC-8 (b)/(c).
 
 | `mode` \ `topology` | `primary` | `subagent` | `hybrid` |
 |---|---|---|---|
-| `strict` | Einstieg, strikte Gates, 1 Instanz | Main Chat spawnt 1..N, strikte Gates | positions-agnostisch, strikte Gates |
-| `advisory` | Einstieg, advisory Gates | Main Chat spawnt 1..N, advisory Gates | positions-agnostisch, advisory Gates |
+| `strict` | Einstieg, strikte Gates, 1 Instanz | Main Chat spawnt 1..N, strikte Gates | positions-agnostisch, strikte Gates¹ |
+| `advisory` | Einstieg, advisory Gates | Main Chat spawnt 1..N, advisory Gates | positions-agnostisch, advisory Gates¹ |
 | `main-chat` | **ERROR** (gleicher Scope, inkl. Same-Object) / **inert + WARNING** (Cross-Scope) | **ERROR** (gleicher Scope) / **inert + WARNING** (Cross-Scope) | **ERROR** (gleicher Scope) / **inert + WARNING** (Cross-Scope) |
+
+¹ **`hybrid`-Degradations-Fußnote:** „positions-agnostisch" beschreibt die
+*deklarierte* Semantik (D1/D2), **nicht** das v1-Verhalten. Weil
+`topology_verified_state.hybrid == "UNVERIFIED"` ist, degradiert in v1 **jede**
+`hybrid`-Zelle auf `subagent` (Fail-safe, IC-2); AC-5 testet die Spalte daher als
+`hybrid → subagent`-Degradierung, nicht als dritte Position.
 
 **Ableitungsregel:** `topology` ändert nie die Gate-Stärke; `mode` ändert nie
 die Position. `main-chat` ist die einzige Dominanzzelle (Rolle existiert nicht
@@ -585,14 +606,18 @@ ohne Datenbasis sind `UNVERIFIED ⇒ no`. Die Tabelle zeigt den Stand **vor P0**
 | *(custom / nicht im Registry)* | **no** — `UNVERIFIED`, kein Registry-Datum | **no** — `UNVERIFIED`, kein Registry-Datum | **no→subagent** — Fail-safe-Ziel, keine Capability-Zusage | **no** — keine Capability-Daten |
 
 **Invariante:** `topology_support.* == true` ⇒ `topology_verified_state.* !=
-UNVERIFIED` (AC-15); äquivalent dazu liefert `topology_support.* == false`
-**oder** `UNVERIFIED` **nie** den deklarierten Wert (IC-2, Fallback-Regel).
+UNVERIFIED` (AC-15); äquivalent dazu wird bei `topology_support.* == false`
+**oder** `UNVERIFIED` **nie** ein unvalidierter Wert durchgereicht — `effective`
+entstammt ausschließlich `topology_degrade` oder dem Fail-safe `subagent` (IC-2,
+Fallback-Regel). Fällt der Fail-safe dabei auf den deklarierten String
+(Continue: declared `subagent`), ist das **keine** Degradierung: `degraded_from =
+None`, keine WARNING; die Zelle bleibt `no`/`degraded`.
 **Zählregel:** 25 Basis-Zellen + N belegte Upgrades (AC-16). **Normative Kopie
 für AC-16 ist genau diese Tabelle** (die Design-Matrix §7 ist Referenz, nicht
 zweite Wahrheit). **Loudness:** jede **tatsächliche Degradierung**
 (`degraded_from is not None`, d. h. declared ≠ effective) erzeugt beim Sync genau
-eine WARNING pro Provider und Lauf — nicht jede `no`-Zelle eines unveränderten
-Projekts (sonst warnt jeder Sync, vgl. D9/R5).
+eine `orchestrator-topology.degraded`-WARNING pro Provider und Lauf — nicht jede
+`no`-Zelle eines unveränderten Projekts (sonst warnt jeder Sync, vgl. D9/R5).
 
 ---
 
@@ -859,14 +884,18 @@ Isolation-Test + Konsistenz-Test.
 **Given** eine Provider-Zelle mit `topology_support.* == true`, **when** der
 Invariantentest läuft, **then** ist `topology_verified_state.* != UNVERIFIED`;
 **given** eine `UNVERIFIED`-Zelle **oder** eine Zelle mit
-`topology_support.* == false`, **when** aufgelöst wird, **then** liefert der
-Resolver **nie** den deklarierten Wert, sondern den Fallback aus
-`topology_degrade` (bzw. Fail-safe `subagent`), und `effective` liegt immer in
-`VALID_TOPOLOGIES`. Eine `yes`-Zelle existiert nur mit aufgezeichneter
-Probe-Evidenz **und** erfüllter §3.1-Bedingung (P0-Gate, alle drei Bedingungen;
-Design §3.1 im Trace-Anker). *Contracts:* IC-2, IC-5. *Test:*
-Provider-Invariantentest + Resolver-Test (Support-false- und
-UNVERIFIED-Zweig).
+`topology_support.* == false`, **when** aufgelöst wird, **then** wird der
+deklarierte Wert **nie unvalidiert durchgereicht**: `effective` entstammt
+ausschließlich `topology_degrade` (bzw. dem Fail-safe `subagent`) und liegt immer
+in `VALID_TOPOLOGIES`; **given** der Fail-safe fällt auf denselben String wie die
+Deklaration (Continue: declared `subagent`), **then** gilt `degraded_from = None`
+und es entsteht keine WARNING (Koinzidenz, keine Degradierung). Eine
+`yes`-Zelle existiert nur mit aufgezeichneter Probe-Evidenz **und** erfüllter
+§3.1-Bedingung (P0-Gate, alle drei Bedingungen; Design §3.1 im Trace-Anker).
+*Contracts:* IC-2, IC-5. *Test:* Provider-Invariantentest + Resolver-Test
+(Support-false- und UNVERIFIED-Zweig) mit den Assertions `effective in
+VALID_TOPOLOGIES` und `degraded_from == (declared if declared != effective else
+None)`.
 
 ### AC-16 — Matrix-Zählung als gemessene Regel
 
