@@ -8,13 +8,17 @@ This is deliberately *not* a YAML parser. The document is split on top-level
 key lines (column 0) into segments; an unchanged segment is copied verbatim,
 a changed one is re-rendered through the caller's ``dump_fn``. Leading
 comment/blank lines belong to the key that follows them, so a changed
-section keeps its explanatory comment.
+section keeps its explanatory comment. A trailing comment/blank block after
+the last key is kept as a separate tail: new keys are inserted *before* it,
+so a footer keeps documenting the document, not the newly added key.
 
 Return contract: ``None`` means "cannot patch safely -- the caller must fall
 back to a full dump". The function never raises for malformed or ambiguous
 input; it refuses multi-document streams, anchors/aliases, tab indentation,
-non-mapping documents, duplicate top-level keys and any result that does not
-round-trip back to ``new_doc``.
+non-mapping documents, duplicate top-level keys, keys the splitter cannot
+recognise (the split must see exactly the same top-level keys ``safe_load``
+sees) and any result that does not round-trip back to ``new_doc``. ``dump_fn``
+exceptions also surface as ``None`` instead of propagating.
 """
 from __future__ import annotations
 
@@ -50,11 +54,15 @@ def _unquote_key(raw_key: str) -> str:
     return raw_key
 
 
-def _split(text: str) -> tuple[str, list[tuple[str, int, list[str]]]]:
-    """Split ``text`` into a prefix plus ``(key, leading_count, lines)``.
+def _split(
+    text: str,
+) -> tuple[str, list[tuple[str, int, list[str]]], list[str]]:
+    """Split ``text`` into a prefix, ``(key, leading_count, lines)`` segments
+    and a trailing noise block.
 
     ``lines`` starts with the leading comment/blank lines (``leading_count``)
-    followed by the key line and its body.
+    followed by the key line and its body. ``tail`` holds the comment/blank
+    lines after the last key so they can be re-emitted after any inserted key.
     """
     prefix: list[str] = []
     segments: list[tuple[str, int, list[str]]] = []
@@ -79,7 +87,17 @@ def _split(text: str) -> tuple[str, list[tuple[str, int, list[str]]]]:
         current = leading + [line]
         segments.append((_unquote_key(match.group("key")), len(leading), current))
 
-    return "".join(prefix), segments
+    tail: list[str] = []
+    if segments:
+        _, leading_count, last_lines = segments[-1]
+        cut = len(last_lines)
+        # Never peel past the key line itself (it is never leading noise).
+        while cut > leading_count + 1 and _is_leading_noise(last_lines[cut - 1]):
+            cut -= 1
+        tail = last_lines[cut:]
+        del last_lines[cut:]
+
+    return "".join(prefix), segments, tail
 
 
 def _has_anchor_alias_or_multidoc(text: str) -> bool:
@@ -101,7 +119,12 @@ def _has_anchor_alias_or_multidoc(text: str) -> bool:
 
 
 def _render_key(dump_fn: Callable[[dict], str], key: str, value, newline: str) -> Optional[str]:
-    rendered = dump_fn({key: value})
+    try:
+        rendered = dump_fn({key: value})
+    except Exception:
+        # The patch contract is "never raises": a failing dump must make the
+        # caller fall back to its own full-dump path, not crash the write.
+        return None
     if not isinstance(rendered, str) or not rendered:
         return None
     # Normalise the dumped line endings to the document's own style.
@@ -143,9 +166,14 @@ def patch_top_level(
     if not isinstance(old_doc, dict):
         return None
 
-    prefix, segments = _split(original_text)
+    prefix, segments, tail = _split(original_text)
     keys = [key for key, _, _ in segments]
     if len(set(keys)) != len(keys):
+        return None
+    # The splitter must be a true superset of the parsed document: an
+    # unrecognised key (explicit `? key`, escaped quotes, non-ASCII, numeric)
+    # would otherwise be dropped and re-appended, losing its leading comment.
+    if set(old_doc) != set(keys):
         return None
 
     newline = "\r\n" if "\r\n" in original_text else "\n"
@@ -185,6 +213,9 @@ def patch_top_level(
         if not rendered.endswith(("\n", "\r")):
             rendered += newline
         result += rendered
+    # The trailing comment/blank block stays at the very end; inserted keys
+    # must land before it, otherwise a footer would document the new key.
+    result += "".join(tail)
 
     try:
         if yaml.safe_load(result) != new_doc:

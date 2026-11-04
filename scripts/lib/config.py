@@ -1221,7 +1221,10 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
                                        default_flow_style=False, sort_keys=False, indent=2)
         return buf.getvalue()
 
-    original = path.read_text(encoding="utf-8")
+    # ``newline=""`` keeps CRLF byte-for-byte; ``read_text`` would normalise
+    # the document to LF before the patcher ever sees it.
+    with path.open("r", encoding="utf-8", newline="") as f:
+        original = f.read()
     descriptions = {name: desc for name, desc in auto_filled if "." not in name}
     patched = patch_top_level(original, data, _dump, comments=descriptions)
     if patched is not None:

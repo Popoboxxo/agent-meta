@@ -97,3 +97,46 @@ def test_changed_last_block_keeps_missing_final_newline():
     out = patch_top_level(text, {"a": 1, "b": 3}, dump)
     assert out == "a: 1\nb: 3"
     assert yaml.safe_load(out) == {"a": 1, "b": 3}
+
+
+def test_changed_segment_keeps_trailing_document_comment():
+    # Regression (PR #1124 review, blocking): the footer after the last key
+    # belongs to the document, not to that key's block -- re-rendering the
+    # last block must not swallow it.
+    text = "a: 1\nb: 2\n# footer note\n"
+    out = patch_top_level(text, {"a": 1, "b": 3}, dump)
+    assert out == "a: 1\nb: 3\n# footer note\n"
+    assert yaml.safe_load(out) == {"a": 1, "b": 3}
+
+
+def test_new_key_inserted_before_trailing_document_comment():
+    # Regression (PR #1124 review, blocking): a footer must keep documenting
+    # the document, not the key appended after it.
+    text = "a: 1\n# footer note\n"
+    out = patch_top_level(text, {"a": 1, "b": 2}, dump)
+    assert out == "a: 1\nb: 2\n# footer note\n"
+    assert yaml.safe_load(out) == {"a": 1, "b": 2}
+
+
+def test_trailing_comment_survives_removing_the_last_key():
+    text = "a: 1\nb: 2\n# footer note\n"
+    out = patch_top_level(text, {"a": 1}, dump)
+    assert out == "a: 1\n# footer note\n"
+
+
+def test_unrecognised_keys_return_none():
+    # The split must see exactly the keys safe_load sees; otherwise a dropped
+    # segment would lose its leading comment even on an unchanged write.
+    assert patch_top_level("1: a\n", {1: "a"}, dump) is None
+    assert patch_top_level('"a\\"b": 1\n', {'a"b': 1}, dump) is None
+    assert patch_top_level("? a\n: 1\n", {"a": 1}, dump) is None
+    assert patch_top_level("\u00fc: 1\n", {"\u00fc": 1}, dump) is None
+
+
+def test_dump_exception_returns_none():
+    text = "a: 1\nb: 2\n"
+
+    def boom(_payload):
+        raise RuntimeError("dump failed")
+
+    assert patch_top_level(text, {"a": 1, "b": 3}, boom) is None

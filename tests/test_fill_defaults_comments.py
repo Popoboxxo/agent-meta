@@ -67,6 +67,20 @@ def test_sync_fill_adds_derived_project_short_without_losing_header(tmp_path):
     assert "short: t" in out
 
 
+def test_crlf_project_yaml_keeps_crlf_on_autofill(tmp_path):
+    # PR #1124 advisory 3: the sync write path must read with newline="" --
+    # text-mode reading normalises CRLF to LF before the patch is computed.
+    p = tmp_path / ".meta-config" / "project.yaml"
+    p.parent.mkdir()
+    p.write_bytes(TEXT.replace("\n", "\r\n").encode("utf-8"))
+    fill_defaults(p, REPO_ROOT, SyncLog(), False, silent=True, materialize_presets=False)
+    out = p.read_bytes().decode("utf-8")
+    assert "\r\n" in out
+    assert "\n" not in out.replace("\r\n", "")
+    assert "repo_containment:" in out
+    assert "# my header" in out and "# inline" in out
+
+
 def test_sync_stage_skips_presets_but_init_materializes(monkeypatch, tmp_path):
     import lib.sync_pipeline as sp
 

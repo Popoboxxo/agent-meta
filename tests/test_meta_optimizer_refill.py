@@ -7,7 +7,10 @@ definition ("``refilled-by-defaults``", spec line 504 ff.).
 
 ``refill_keys`` is derived from the *same* helpers that ``fill_defaults`` calls
 (``config_field_defaults``, the schema top-level defaults, the special blocks
-``repo_containment``/``project.short``/``dod.*``). Keys in that set never get a
+``repo_containment``/``project.short``). It models the plain-sync variant
+(``materialize_presets=False``), so it deliberately excludes the seven
+preset/flag defaults and the nested ``dod.*`` fill that only
+``--fill-defaults``/``--init`` persist. Keys in that set never get a
 removal hunk: the production guard turns them into an ``info-only`` candidate
 with the Mark ``refilled-by-defaults`` and the mandatory warning text. Applying
 every applicable candidate and running a regular sync afterwards must leave
@@ -124,8 +127,11 @@ def test_refill_keys_comes_from_fill_defaults_sources():
     assert "agent-meta-version" in keys       # derived from VERSION
 
     assert "dod.req-traceability" not in keys
-    full_keys = mo.refill_keys(REPO_ROOT, {"dod-preset": "full"})
-    assert "dod.req-traceability" in full_keys
+    # ``refill_keys`` models the plain-sync variant (materialize_presets=False):
+    # the nested dod.* fill runs only for --fill-defaults/--init, so a removed
+    # dod.req-traceability really stays removed after the next sync.
+    assert "dod.req-traceability" not in mo.refill_keys(
+        REPO_ROOT, {"dod-preset": "full"})
 
     assert "project.short" not in keys
     with_project = mo.refill_keys(
@@ -150,8 +156,8 @@ def test_sync_skipped_defaults_are_not_refill_keys():
     """
     keys = mo.refill_keys(REPO_ROOT, {})
     assert keys.isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
-    # A preset value that is explicitly rigorous still does not resurrect the
-    # skipped top-level keys through the nested ``dod.*`` branch.
+    # A rigorous preset does not resurrect the skipped top-level keys either:
+    # the nested dod.* branch only runs for --fill-defaults/--init.
     assert mo.refill_keys(
         REPO_ROOT, {"dod-preset": "full"}).isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
 

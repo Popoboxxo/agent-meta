@@ -1010,14 +1010,19 @@ def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
     Derived from the *same* helpers ``fill_defaults`` uses -- never from a copied
     default table: every ``config_field_defaults`` entry, every schema default
     path without a dot (the first ``fill_defaults`` loop only touches top-level
-    fields), the ``repo_containment`` block (materialized whenever absent), the
-    derived ``project.short`` and -- only for an explicitly rigorous preset --
-    the nested ``dod.*`` fields. The cascade-managed preset keys are excluded
-    because ``fill_defaults`` skips them on purpose. The seven preset/flag
-    defaults in ``_SYNC_SKIPPED_DEFAULT_KEYS`` are excluded too: plain sync
-    passes ``materialize_presets=False`` and no longer re-adds them (D14,
-    issues #1074/#1092), so a removal is not undone on the next sync --
-    ``--fill-defaults``/``--init`` remain the only paths that persist them.
+    fields), the ``repo_containment`` block (materialized whenever absent) and
+    the derived ``project.short``.
+
+    This models the **plain-sync auto-fill** variant
+    (``materialize_presets=False``), which is what the next sync actually runs.
+    The nested ``dod.*`` fill and the seven preset/flag defaults therefore do
+    *not* appear here: only ``--fill-defaults``/``--init`` materialize them.
+    The cascade-managed preset keys are excluded because ``fill_defaults``
+    skips them on purpose.
+    The seven preset/flag defaults in ``_SYNC_SKIPPED_DEFAULT_KEYS`` are
+    excluded too: plain sync passes ``materialize_presets=False`` and no longer
+    re-adds them (D14, issues #1074/#1092), so a removal is not undone on the
+    next sync.
     """
     agent_meta_root = Path(agent_meta_root)
     schema_defaults = _load_schema_defaults(agent_meta_root)
@@ -1032,8 +1037,6 @@ def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
     if isinstance(project_block, Mapping) and (
             project_block.get("name") or project_block.get("prefix")):
         keys.add("project.short")
-    if config.get("dod-preset") in ("full", "strict"):
-        keys.update(path for path in schema_defaults if path.startswith("dod."))
     return keys
 
 

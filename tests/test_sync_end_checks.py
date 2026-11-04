@@ -205,8 +205,8 @@ def test_context_profile_line_single_and_idempotent_across_runs(tmp_path, monkey
         assert len(hits) == 1, f"run {run}: {hits}"
         assert hits[0].startswith("[INFO]")
         assert "profile=full mode=full preset=default" in hits[0]
-        # Stable provenance core; rules_preset flips to "explicit" only once
-        # config auto-fill has persisted the key (second run), so it is not
+        # Stable provenance core; plain sync no longer persists rules-preset
+        # (#1074), so its source stays "default" on every run and is not
         # asserted here.
         assert ("sources: context_file_mode=default, profile=default"
                 in hits[0])
