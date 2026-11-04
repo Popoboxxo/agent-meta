@@ -21,7 +21,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 from scripts.lib.consistency.placeholders import (  # noqa: E402
+    _BUILTIN_VARS,
     check_builder_known_set,
+)
+from scripts.lib.standalone import (  # noqa: E402
+    _CONDITIONAL_FALSE_FLAGS,
+    render_standalone_agent,
 )
 from scripts.lib.variables import (  # noqa: E402
     _FALSE_DEFAULT_CONDITIONALS,
@@ -33,6 +38,17 @@ _TOPOLOGY_FLAGS = (
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+)
+
+# The builder emits these six keys via ``_topology_flags`` (IC-4); every one
+# must be registered in the placeholder check (the ratchet is shrink-only).
+_TOPOLOGY_BUILDER_VARS = (
+    "ORCH_TOPOLOGY",
+    "ORCH_TOPOLOGY_EXPLICIT",
+    "ORCH_TOPOLOGY_PRIMARY",
+    "ORCH_TOPOLOGY_SUBAGENT",
+    "ORCH_TOPOLOGY_HYBRID",
+    "ORCH_TOPOLOGY_SOURCE",
 )
 
 # Mirrors the intended consumer shape: a new branch, an else branch that keeps
@@ -92,3 +108,28 @@ def test_explicit_false_renders_the_else_branch_only():
 
 def test_builder_known_set_is_clean():
     assert check_builder_known_set(_REPO_ROOT) == []
+
+
+def test_standalone_and_placeholder_registrations_keep_render_identical():
+    """Registrations 3-4 (AC-18) exist and change no standalone byte.
+
+    The standalone export is the historical baseline a consumer project sees:
+    with ``orchestrator.topology`` unset, adding the fail-closed flags must not
+    alter a single byte of an orchestrator-bearing persona.
+    """
+    for flag in _TOPOLOGY_FLAGS:
+        assert _CONDITIONAL_FALSE_FLAGS.get(flag) == "false", (
+            f"{flag} must be registered as a literal 'false' in "
+            "_CONDITIONAL_FALSE_FLAGS (standalone has no project config)"
+        )
+    assert _CONDITIONAL_FALSE_FLAGS.get("ORCH_TOPOLOGY") == ""
+    assert set(_TOPOLOGY_BUILDER_VARS) <= _BUILTIN_VARS, (
+        "every builder-emitted topology variable must be in _BUILTIN_VARS, "
+        "not the shrink-only ratchet"
+    )
+
+    rendered = render_standalone_agent("orchestrator", _REPO_ROOT)
+    committed = (
+        _REPO_ROOT / "standalone" / "agents" / "orchestrator.md"
+    ).read_text(encoding="utf-8")
+    assert rendered == committed
