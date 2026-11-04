@@ -71,6 +71,7 @@ from lib.active_set import compute_active_set
 from lib.config import (
     _CASCADE_MANAGED_PRESET_KEYS,
     _load_schema_defaults,
+    _SYNC_SKIPPED_DEFAULT_KEYS,
     _VARIABLE_FALLBACKS,
     build_variables,
     config_field_defaults,
@@ -1012,13 +1013,18 @@ def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
     fields), the ``repo_containment`` block (materialized whenever absent), the
     derived ``project.short`` and -- only for an explicitly rigorous preset --
     the nested ``dod.*`` fields. The cascade-managed preset keys are excluded
-    because ``fill_defaults`` skips them on purpose.
+    because ``fill_defaults`` skips them on purpose. The seven preset/flag
+    defaults in ``_SYNC_SKIPPED_DEFAULT_KEYS`` are excluded too: plain sync
+    passes ``materialize_presets=False`` and no longer re-adds them (D14,
+    issues #1074/#1092), so a removal is not undone on the next sync --
+    ``--fill-defaults``/``--init`` remain the only paths that persist them.
     """
     agent_meta_root = Path(agent_meta_root)
     schema_defaults = _load_schema_defaults(agent_meta_root)
     keys = set(config_field_defaults(agent_meta_root))
     keys.update(path for path in schema_defaults if "." not in path)
     keys.difference_update(_CASCADE_MANAGED_PRESET_KEYS)
+    keys.difference_update(_SYNC_SKIPPED_DEFAULT_KEYS)
     keys.add("repo_containment")
 
     config = config if isinstance(config, Mapping) else {}

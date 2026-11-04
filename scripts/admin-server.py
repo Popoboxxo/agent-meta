@@ -1206,22 +1206,51 @@ class ConfigManager:
         # writes (issue #717) — plain yaml.dump() folds embedded newlines away.
         from lib.io import yaml_dump_preserving_multiline
 
-        new_text = yaml_dump_preserving_multiline(
-            yaml,
-            data,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
+        def _dump(payload: dict) -> str:
+            return yaml_dump_preserving_multiline(
+                yaml,
+                payload,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
 
-        # issue #847: PyYAML cannot round-trip comments. Refuse to silently
-        # strip the (heavily commented) provider registry — abort by default,
-        # warn + proceed only on explicit ``allow_lossy``.
-        if key == "ai-providers" and path.exists():
+        # issues #1074/#1092 (D14): prefer a top-level segment patch for
+        # project.yaml so only the changed blocks are re-rendered — every
+        # comment, blank line and unrelated byte survives an admin save.
+        # ``None`` means the document cannot be patched safely (anchors,
+        # multi-doc, tabs, self-check mismatch, …): fall back to the full dump
+        # below, which is where the round-trip guard applies.
+        original_text: str | None = None
+        patched: str | None = None
+        if key == "project" and path.exists():
+            try:
+                # ``newline=""`` keeps CRLF byte-for-byte; ``read_text`` would
+                # normalise it to LF before the patcher ever sees it.
+                with path.open("r", encoding="utf-8", newline="") as fh:
+                    original_text = fh.read()
+            except OSError:  # pragma: no cover - unreadable file, let dumps handle it
+                original_text = None
+            if original_text is not None and isinstance(data, dict):
+                from lib.yaml_patch import patch_top_level
+
+                patched = patch_top_level(original_text, data, _dump)
+
+        new_text = patched if patched is not None else _dump(data)
+
+        # issue #847 / D14: PyYAML cannot round-trip comments, so the guard
+        # protects the full-dump FALLBACK only. A successfully patched
+        # project.yaml keeps its comments by construction and must not be
+        # rejected for a changed section. ai-providers keeps its historical
+        # always-guarded behaviour (no segment patch is attempted for it).
+        guarded_key = key == "ai-providers" or (key == "project" and patched is None)
+        if guarded_key and path.exists():
             from lib.yaml_roundtrip import assert_roundtrip_preserved
 
+            if original_text is None:
+                original_text = path.read_text(encoding="utf-8")
             assert_roundtrip_preserved(
-                path.read_text(encoding="utf-8"),
+                original_text,
                 new_text,
                 context=f"config/{path.name}",
                 allow_lossy=allow_lossy,
@@ -1234,8 +1263,15 @@ class ConfigManager:
 
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         try:
-            with tmp_path.open("w", encoding="utf-8") as fh:
-                fh.write(new_text)
+            # A patched document is written byte-for-byte (``newline=""``) so
+            # its CRLF line endings and missing final newline survive; the full
+            # dump keeps the historical platform-newline behaviour.
+            if patched is not None:
+                with tmp_path.open("w", encoding="utf-8", newline="") as fh:
+                    fh.write(new_text)
+            else:
+                with tmp_path.open("w", encoding="utf-8") as fh:
+                    fh.write(new_text)
             os.replace(tmp_path, path)
         except Exception:
             # Never leave an orphaned .tmp behind if yaml.dump or os.replace
@@ -3969,6 +4005,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if key in ("plugin-catalog", "project-plugin-catalog") and isinstance(body, dict):
             self._validate_permitted_injections_overrides(body.get("plugins", {}))
         if key == "project":
+            if isinstance(body, dict):
+                # D14: a caller may explicitly accept a lossy full-dump
+                # fallback; consume the flag so it never becomes a section.
+                from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
+                body = dict(body)
+                allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))
             existing = self.__class__.config_manager.read("project")
             if not isinstance(existing, dict):
                 existing = {}
@@ -3995,7 +4038,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     self._guard_test_environments_config(
                         self._deep_merge(existing, body))
             result = self.__class__.config_manager.write(
-                "project", self._deep_merge(existing, body))
+                "project", self._deep_merge(existing, body),
+                allow_lossy=allow_lossy)
         else:
             result = self.__class__.config_manager.write(
                 key, body, allow_lossy=allow_lossy)
@@ -5232,6 +5276,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _write_project_section(self) -> None:
         """Partial update of one top-level section of ``project.yaml``."""
         body = self._read_body()
+        allow_lossy = False
+        if isinstance(body, dict):
+            # D14: consume the explicit lossy opt-in on a shallow copy so it is
+            # never interpreted as (or persisted as) a section.
+            from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
+            body = dict(body)
+            allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))
         if isinstance(body, dict) and "section" in body and "data" in body:
             section = body["section"]
             data = body["data"]
@@ -5255,7 +5307,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._guard_test_environments_write(section, data, existing)
         data = self._guard_release_checklist_write(section, data)
         existing[section] = data
-        return self._send_json(self.__class__.config_manager.write("project", existing))
+        return self._send_json(self.__class__.config_manager.write(
+            "project", existing, allow_lossy=allow_lossy))
 
     def _guard_release_checklist_write(self, section: str, data: Any) -> Any:
         """Normalise/validate a ``release-checklist`` write before it is stored.

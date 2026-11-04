@@ -34,7 +34,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import meta_optimizer as mo  # noqa: E402
 from lib.active_set import compute_active_set  # noqa: E402
-from lib.config import config_field_defaults  # noqa: E402
+from lib.config import (  # noqa: E402
+    _SYNC_SKIPPED_DEFAULT_KEYS,
+    config_field_defaults,
+)
 
 CASCADE_KEYS = {"dod-preset", "conventions-preset"}
 REFILL_MARK = "refilled-by-defaults"
@@ -110,11 +113,14 @@ def test_refill_keys_comes_from_fill_defaults_sources():
     """AC-82/IC-24: same sources as ``fill_defaults``, no copied default tables."""
     keys = mo.refill_keys(REPO_ROOT, {"dod-preset": "rapid-prototyping"})
 
-    expected_fields = set(config_field_defaults(REPO_ROOT)) - CASCADE_KEYS
+    expected_fields = (
+        set(config_field_defaults(REPO_ROOT))
+        - CASCADE_KEYS
+        - _SYNC_SKIPPED_DEFAULT_KEYS
+    )
     assert expected_fields <= keys, expected_fields - keys
 
     assert "repo_containment" in keys
-    assert "debug-mode" in keys               # schema top-level default
     assert "agent-meta-version" in keys       # derived from VERSION
 
     assert "dod.req-traceability" not in keys
@@ -132,6 +138,22 @@ def test_refill_keys_comes_from_fill_defaults_sources():
 
     assert "dod-preset" not in keys
     assert "conventions-preset" not in keys
+
+
+def test_sync_skipped_defaults_are_not_refill_keys():
+    """D14/#1074: plain sync (``materialize_presets=False``) never re-adds the
+    seven preset/flag defaults, so a removal is not undone by the next sync.
+
+    ``refill_keys`` must mirror that plain-sync behaviour instead of the
+    ``--fill-defaults``/``--init`` variant, otherwise every one of those keys
+    is reported as ``refilled-by-defaults`` although it stays removed.
+    """
+    keys = mo.refill_keys(REPO_ROOT, {})
+    assert keys.isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
+    # A preset value that is explicitly rigorous still does not resurrect the
+    # skipped top-level keys through the nested ``dod.*`` branch.
+    assert mo.refill_keys(
+        REPO_ROOT, {"dod-preset": "full"}).isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
 
 
 # --- Case B: the guard neuters a removal candidate -------------------------
