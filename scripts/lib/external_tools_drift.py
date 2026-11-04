@@ -11,6 +11,7 @@ the other way around), so there is no import cycle.
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from .deactivation import get_active_providers
@@ -278,6 +279,30 @@ def _dir_is_fully_managed(directory: Path) -> bool:
     return saw_managed or saw_backup
 
 
+def _infra_known_names(pc: dict, provider: str) -> set[str]:
+    """Basenames declared under the optional ``infra_known_names`` provider key.
+
+    Must be a list/tuple/set of non-empty strings; a scalar (e.g. a bare
+    ``package.json``) would otherwise iterate character-by-character and
+    excuse nonsense names. A wrong type/shape is warned about and ignored
+    (fail-soft: the key is optional; an undeclared artifact stays a finding).
+    """
+    raw = pc.get("infra_known_names")
+    if raw is None:
+        return set()
+    if isinstance(raw, (list, tuple, set)) and all(
+        isinstance(name, str) and name.strip() for name in raw
+    ):
+        return {Path(name).name for name in raw}
+    warnings.warn(
+        f"provider '{provider}': 'infra_known_names' must be a list of "
+        f"non-empty strings (got {type(raw).__name__}); ignoring it",
+        UserWarning,
+        stacklevel=2,
+    )
+    return set()
+
+
 def scan_injection_drift(
     agent_meta_root: Path,
     project_root: Path,
@@ -441,10 +466,9 @@ def scan_injection_drift(
                 # Optional provider key: runtime artifacts the provider's own
                 # toolchain creates inside the infra root (e.g. Opencode's
                 # package.json / node_modules). Data-driven, so no provider
-                # name appears in code (issue #1084).
-                known_names.update(
-                    Path(name).name for name in (pc.get("infra_known_names") or [])
-                )
+                # name appears in code (issue #1084). Type-guarded: a scalar
+                # must not iterate character-by-character (advisory #1123).
+                known_names.update(_infra_known_names(pc, provider))
                 # Capability-gated fallback: the key may be absent from
                 # ai-providers.yaml (Claude's hooks_dir/rules_dir/
                 # commands_dir, Continue's commands_dir) with sync code

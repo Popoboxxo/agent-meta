@@ -93,6 +93,10 @@ from lib.cli_commands import (
 from lib.config import find_agent_meta_root
 from lib.io import clear_gitignore_cache
 from lib.log import SyncLog
+from lib.sync_pipeline import (
+    SYNC_BACKUP_MAX_AGE_DAYS as _PREVIEW_PRUNE_MAX_AGE_DAYS,
+    SYNC_BACKUP_MAX_PER_SOURCE as _PREVIEW_PRUNE_MAX_PER_SOURCE,
+)
 from lib.se_validate import _handle_validate_se
 from lib.spec_plan_validate import _handle_validate_spec_plan
 from lib.checkpoint_record import _handle_checkpoint
@@ -513,9 +517,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 _PREVIEW_VERSION = 1
-# Mirrors the OQ-2 default policy wired into the sync pipeline (IC-05).
-_PREVIEW_PRUNE_MAX_AGE_DAYS = 30
-_PREVIEW_PRUNE_MAX_PER_SOURCE = 3
+# The OQ-2 default policy is owned by the sync pipeline; the preview imports
+# the same constants instead of mirroring them (parity, advisory #1123).
 
 
 class CleanupPreviewLog(SyncLog):
@@ -623,47 +626,20 @@ def _preview_backups_to_prune(
 ) -> list:
     """Pure would-be-prune list for ``target_dir`` (IC-06 ``backups_to_prune``).
 
-    ``generated_file_drift.prune_sync_backups`` is a no-op in dry-run (IC-05),
-    so the preview recomputes the very same count-only candidate set without
-    deleting anything: at least *max_per_source* newer backups for the same
-    source (issue #1081 -- age is ignored, the newest always survives). The
-    naming / timestamp helpers are imported from the pruner module so only the
-    threshold decision is mirrored here.
+    Delegates the candidate selection to
+    ``generated_file_drift.select_prunable_sync_backups`` -- the same pure
+    helper ``prune_sync_backups`` deletes from -- so the read-only preview can
+    never silently diverge from the real retention decision (advisory #1123).
     """
-    from lib.generated_file_drift import (
-        _is_sync_backup_name,
-        _sync_backup_source,
-        _sync_backup_timestamp,
-    )
+    from lib.generated_file_drift import select_prunable_sync_backups
     from lib.rule_index import _relative_posix
 
     if not target_dir.is_dir():
         return []
-    try:
-        entries = sorted(target_dir.iterdir())
-    except OSError:
-        return []
-
-    backups: list = []
-    for path in entries:
-        if not path.is_file() or not _is_sync_backup_name(path.name):
-            continue
-        stamp = _sync_backup_timestamp(path.name)
-        if stamp is None:
-            continue
-        backups.append((path, _sync_backup_source(path.name), stamp))
-
-    keep = max(max_per_source, 1)
-    prunable: list = []
-    for path, source, stamp in backups:
-        newer = sum(
-            1 for _other, other_source, other_stamp in backups
-            if other_source == source and other_stamp > stamp
-        )
-        if newer < keep:
-            continue
-        prunable.append(_relative_posix(path, project_root))
-    return sorted(prunable)
+    return sorted(
+        _relative_posix(path, project_root)
+        for path in select_prunable_sync_backups(target_dir, max_per_source)
+    )
 
 
 def _cleanup_fingerprint(stale_entries: list) -> str:

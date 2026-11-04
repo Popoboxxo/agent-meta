@@ -927,6 +927,36 @@ def test_infra_known_names_excused_but_unknown_file_flagged(tmp_path):
     assert paths == [".opencode/evil.sh"]
 
 
+def test_infra_known_names_scalar_warns_and_is_ignored(tmp_path):
+    """Advisory #1123: a scalar YAML value must not iterate character-by-
+    character. It is ignored with a warning, so the real file is still
+    flagged instead of being excused by a one-character pseudo-name."""
+    project = tmp_path / "project"
+    (project / ".opencode" / "node_modules").mkdir(parents=True)
+    (project / ".opencode" / "package.json").write_text("{}", encoding="utf-8")
+    pc = {"Opencode": {"skills_dir": ".opencode/skills", "agents_dir": ".opencode/agents",
+                       "infra_known_names": "package.json"}}
+
+    with pytest.warns(UserWarning, match="infra_known_names"):
+        result = _scan(tmp_path / "agent-meta", project, pc, "Opencode")
+
+    paths = [f["path"] for f in result["Opencode"]]
+    assert ".opencode/package.json" in paths
+
+
+def test_infra_known_names_accepts_non_list_iterables(tmp_path):
+    """Advisory #1123: tuples/sets of names are legitimate YAML-avoided shapes."""
+    project = tmp_path / "project"
+    (project / ".opencode").mkdir(parents=True)
+    (project / ".opencode" / "package.json").write_text("{}", encoding="utf-8")
+    pc = {"Opencode": {"skills_dir": ".opencode/skills", "agents_dir": ".opencode/agents",
+                       "infra_known_names": ("package.json",)}}
+
+    result = _scan(tmp_path / "agent-meta", project, pc, "Opencode")
+
+    assert result["Opencode"] == []
+
+
 def test_opencode_declares_runtime_infra_names():
     data = yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))
     assert {"package.json", "package-lock.json", "node_modules", ".gitignore"} <= set(

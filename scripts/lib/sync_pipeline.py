@@ -29,6 +29,7 @@ Only stdlib + lib imports at top level (guard:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sys
@@ -1011,6 +1012,70 @@ def _prune_managed_sync_backups(
         )
 
 
+def _project_relative(path, project_root: Path) -> str:
+    """Best-effort project-relative posix string for a writer target."""
+    try:
+        return Path(path).relative_to(project_root).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
+@contextlib.contextmanager
+def _track_writer_targets(project_root: Path, sink: set[str]):
+    """Record every path a writer handles while the context is active.
+
+    The drift decision (``resolve_drift_findings``) must distinguish a stale
+    hash baseline from a manual edit no writer regenerated. The only reliable
+    signal is whether a writer handled the path in this run. Writers funnel
+    through ``lib.io.write_checked`` / ``lib.io.write_atomic``; wrapping both
+    here records the path even when ``write_checked`` skips the write because
+    the generated content is already on disk (the stale-baseline case).
+
+    The wrapper is installed on ``lib.io`` and on every already-imported
+    module that bound the function directly (``from lib.io import ...``), so
+    existing writer modules are covered. Modules imported lazily during the
+    stage pick up the wrapper from ``lib.io``. Always restored in ``finally``.
+    """
+    from lib import io as io_mod
+
+    originals = {
+        "write_atomic": io_mod.write_atomic,
+        "write_checked": io_mod.write_checked,
+    }
+
+    def _make_wrapper(name: str, original):
+        def tracked(path, *args, **kwargs):
+            sink.add(_project_relative(path, project_root))
+            return original(path, *args, **kwargs)
+
+        tracked.__name__ = f"tracked_{name}"
+        tracked.__doc__ = f"Tracking wrapper around lib.io.{name}."
+        return tracked
+
+    wrapped = {name: _make_wrapper(name, orig) for name, orig in originals.items()}
+
+    for name, wrapper in wrapped.items():
+        setattr(io_mod, name, wrapper)
+    # Patch direct `from lib.io import ...` bindings already in module globals.
+    for module in list(sys.modules.values()):
+        if module is None:
+            continue
+        for name, original in originals.items():
+            if getattr(module, name, None) is original:
+                setattr(module, name, wrapped[name])
+    try:
+        yield sink
+    finally:
+        for module in list(sys.modules.values()):
+            if module is None:
+                continue
+            for name, wrapper in wrapped.items():
+                if getattr(module, name, None) is wrapper:
+                    setattr(module, name, originals[name])
+        for name, original in originals.items():
+            setattr(io_mod, name, original)
+
+
 def _sync_stage_generated_file_drift_scan(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, args: argparse.Namespace, log: SyncLog,
@@ -1039,18 +1104,25 @@ def _sync_stage_generated_file_drift_scan(
 
 def _sync_stage_generated_file_drift_resolve(
     project_root: Path, findings: list[dict], args: argparse.Namespace, log: SyncLog,
+    written_paths: set[str] | None = None,
 ) -> None:
     """Post-writer drift decision: back up and warn only for real edits.
 
     Runs after _sync_stage_per_provider, so it can compare the now-written
-    file against the ``pre_text`` captured by the scan. Equal content means
-    the baseline was stale, not that the user edited the file -- no backup,
-    no warning (issue #1081). The edit is still overwritten; the backup is a
-    safety net, not preservation.
+    file against the ``pre_text`` captured by the scan. Equal content *and* a
+    writer that handled the path means the baseline was stale, not that the
+    user edited the file -- no backup, no warning (issue #1081). Equal content
+    on a path no writer handled is a real edit the sync did not overwrite;
+    it is warned about and backed up all the same (advisory: written-paths).
+
+    This stage is also called from the abort path (``_handle_sync`` finally),
+    so the backup safety net is written even when a later stage raises or
+    exits before the normal stage-12b position.
     """
     if not findings:
         return
-    real = resolve_drift_findings(findings, project_root, log, args.dry_run)
+    real = resolve_drift_findings(
+        findings, project_root, log, args.dry_run, written_paths=written_paths)
     backups = backup_drifted_files(real, project_root, log, args.dry_run)
     backup_name_by_source = {
         backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
@@ -1058,10 +1130,14 @@ def _sync_stage_generated_file_drift_resolve(
     for finding in real:
         backup_name = backup_name_by_source.get(finding["path"])
         backup_note = f" Backup written to {backup_name}." if backup_name else ""
+        if finding.get("overwritten", True):
+            outcome = "this sync overwrote it"
+        else:
+            outcome = "no writer rewrote it in this run, so the edit is still on disk"
         log.warning(
             f"generated-file-drift: '{finding['path']}' was manually edited "
-            f"since the last sync (provider '{finding['provider']}') -- this "
-            f"sync will overwrite it.{backup_note} Add it to "
+            f"since the last sync (provider '{finding['provider']}') -- {outcome}."
+            f"{backup_note} Add it to "
             ".meta-config/drift-allowlist.yaml if this edit should be "
             "preserved going forward."
         )

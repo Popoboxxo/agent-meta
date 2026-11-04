@@ -562,6 +562,49 @@ def test_stale_baseline_no_warning_no_backup(tmp_path: Path) -> None:
     assert any("stale hash baseline" in info for info in log.infos)
 
 
+def test_unchanged_and_writer_handled_is_stale_baseline(tmp_path: Path) -> None:
+    """Advisory #1123: unchanged content is only stale when a writer actually
+    handled the path in this run (write_checked evaluated it, even if it
+    skipped the write because the generated content was already on disk)."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/a.md", "fresh")
+    log = SyncLog()
+
+    real = resolve_drift_findings(
+        [_finding(".claude/agents/a.md", "fresh")], project_root, log, dry_run=False,
+        written_paths={".claude/agents/a.md"},
+    )
+
+    assert real == []
+    assert list(project_root.rglob("*.sync-backup-*")) == []
+    assert log.warnings == []
+
+
+def test_unchanged_but_unwritten_stays_a_real_edit(tmp_path: Path) -> None:
+    """Advisory #1123: a managed-index entry no writer handled is a real edit
+    even when its content did not change -- warn + backup, never bless it."""
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/orphan.md", "manual edit")
+    log = SyncLog()
+
+    real = resolve_drift_findings(
+        [_finding(".claude/agents/orphan.md", "manual edit")], project_root,
+        log, dry_run=False, written_paths=set(),
+    )
+
+    assert [r["path"] for r in real] == [".claude/agents/orphan.md"]
+    assert real[0]["overwritten"] is False
+    assert log.warnings == []  # warning is emitted by the resolve *stage*
+    backups = backup_drifted_files(real, project_root, log, dry_run=False)
+    assert len(backups) == 1
+    assert (project_root / backups[0]).read_text(encoding="utf-8") == "manual edit"
+
+
+
 def test_real_edit_backed_up_from_pre_text(tmp_path: Path) -> None:
     """R3: the writer already overwrote the manual edit, so the backup must
     come from the content captured by the scan, not from the disk."""
@@ -788,3 +831,70 @@ def test_prune_fail_soft_when_dir_missing(tmp_path: Path) -> None:
 
     assert pruned == []
 
+
+
+# ---------------------------------------------------------------------------
+# End-to-end sync.py tests (advisory #1123)
+# ---------------------------------------------------------------------------
+
+import json
+import subprocess
+import sys
+
+from tests.timeouts import SYNC_TIMEOUT
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+_MINIMAL_PROJECT_YAML = """
+agent-meta-version: 0.101.0
+ai-providers: [Claude]
+roles: [orchestrator, developer, git]
+project:
+  name: drift-e2e-test
+  prefix: det
+  short: drift-e2e-test
+"""
+
+
+def _run_sync(project_root: Path, *extra: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), *extra],
+        cwd=str(project_root), capture_output=True, text=True, timeout=SYNC_TIMEOUT,
+    )
+
+
+def test_e2e_prior_run_wrote_files_but_not_hashes_is_stale_not_an_edit(tmp_path):
+    """Issue #1081 / advisory #1123: the motivating stale-baseline scenario.
+
+    A previous run wrote the generated files but did not refresh the hash
+    sidecar. The next sync must re-baseline silently -- no manual-edit
+    warning and no backup -- because a writer handled (and confirmed) every
+    one of those files.
+    """
+    (tmp_path / ".meta-config").mkdir()
+    (tmp_path / ".meta-config" / "project.yaml").write_text(
+        _MINIMAL_PROJECT_YAML, encoding="utf-8")
+
+    first = _run_sync(tmp_path)
+    assert first.returncode == 0, first.stdout + first.stderr
+
+    hashes_path = tmp_path / ".meta-config" / "generated-file-hashes.json"
+    hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
+    target = ".claude/agents/developer.md"
+    assert target in hashes["hashes"]
+    # Simulate the interrupted prior run: files on disk are current, the hash
+    # sidecar still carries the pre-write baseline.
+    hashes["hashes"][target] = content_hash("the pre-write content")
+    hashes_path.write_text(json.dumps(hashes, indent=2) + "\n", encoding="utf-8")
+
+    second = _run_sync(tmp_path)
+
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert "was manually edited" not in (second.stdout + second.stderr), (
+        "a writer-confirmed unchanged file must not be reported as an edit"
+    )
+    assert list(tmp_path.rglob("*.sync-backup-*")) == []
+
+    refreshed = json.loads(hashes_path.read_text(encoding="utf-8"))
+    assert refreshed["hashes"][target] == content_hash(
+        (tmp_path / target).read_text(encoding="utf-8"))
