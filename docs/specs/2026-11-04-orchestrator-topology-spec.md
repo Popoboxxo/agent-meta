@@ -1,6 +1,7 @@
 # Orchestrator-Topologie konfigurierbar — Spec
 
-> Status: Entwurf
+> Status: **APPROVED (2026-11-04)**
+> Freigabe durch den User am 2026-11-04 („Freigabe!") nach Beantwortung von OQ-1…OQ-5 (OQ-1 = B, OQ-2 = A, OQ-3 = A, OQ-4 = A, OQ-5 = A) — der Marker wird nie vom Planer gesetzt.
 > Revision: 3
 > Datum: 2026-11-04
 > spec-id: SPEC-orchestrator-topology-2026-11-03
@@ -22,6 +23,7 @@ Entscheidungen sind als Fakten eingefaltet (D1–D10, §15 des Designs).
 | 1 | 2026-11-04 | concept-specifier | Erste implementierbare Ableitung des Designs Rev. 4. |
 | 2 | 2026-11-04 | concept-specifier | Review-Fix-Pass (**Status bleibt Entwurf**): **B1** Ist-Zustand rebased — #1090 hat `active_set.role_emitted_for_provider`, `emit_default_agent` und die direkten `primary-role`-Lesezugriffe bereits gelandet; IC-3/IC-6/IC-7, P1/P2-Dateilisten und Call-Site-Zählung darauf neu aufgesetzt, kein zweiter Steuerparameter. **B2** Resolver-Regel vervollständigt: `support == false` **oder** `UNVERIFIED` ⇒ Fallback; `effective ∈ VALID_TOPOLOGIES` garantiert, Mechanismus-Wort wandert nach `degradation_reason`; AC-15 erweitert. **B3** Evidenz-Gate auf alle drei Design-Bedingungen (§7 inkl. §3.1-Zeile + Invariantentest) erweitert; §3.1 im Trace-Anker. **B4** Sync-Summary-Zeile, `default-agent-conflict` und Gate-Inactive-WARNUNG als IC + AC nachgezogen; v1-DoD aktualisiert. **B5** Governance-Hinweis auf das reale `_classify`-Verhalten korrigiert (akzeptierte WARNING-only, kein Grün). Advisories 1–5, 7–9 eingearbeitet (AC-17-Teilstring, P0→AC-Liste, normative Matrix-Kopie, `degraded_from`-Bedingung, `mode`-Quelle, P3-Registrierungen, AC-4-P3-Marker, 3×3-Matrix). Zusätzlich D5-Klausel (redundantes `singleton`-INFO) und AC-11-Reduktionssatz. |
 | 3 | 2026-11-04 | concept-specifier | Wording-Fix-Pass (**Status bleibt Entwurf**): **NC-1** Resolver-Invariante auf „nie unvalidiert durchgereicht" umgestellt; Koinzidenz-Fall (Continue: declared `subagent`, Fail-safe `subagent`) explizit als **keine** Degradierung benannt — `degraded_from = None`, keine WARNING (IC-2, Provider-Matrix, AC-15). **NC-2** WARNING-Dedup in IC-5 auf „genau eine pro Check-ID" präzisiert; mehrere IDs (`degraded`, `gate-inactive`, `default-agent-conflict`) dürfen im selben Lauf feuern. **NC-3** `hybrid`-Spalte der 3×3-Matrix mit Degradations-Fußnote (`→ subagent` in v1) versehen. **NC-4** ungenutzten `mode`-Parameter aus `_opencode_entry_point` entfernt; Aufrufer der einmaligen `TopologyResolution`-Auflösung benannt. **NC-5 (Deviation):** Diese Spec **supersediert** Design Rev. 4 in zwei Punkten — `topology_effective` (ersetzt durch das in den bestehenden `emit_default_agent`-Bool gefaltete Konjunkt, IC-7) und `providers.primary_role` (nicht eingeführt; `explicit_primary_role` bleibt, B1/#1090). Die entsprechenden Design-Passagen sind überholt. |
+| 3.1 | 2026-11-04 | user | Rev. 3.1 (2026-11-04) — user approval recorded (Status APPROVED). |
 
 ---
 
