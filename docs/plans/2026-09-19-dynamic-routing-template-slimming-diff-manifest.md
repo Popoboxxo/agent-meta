@@ -2147,3 +2147,32 @@ Hashes geändert (die Matrix-Rollen `code-reviewer`/`orchestrator`/
 `ux-researcher` × 9 Provider plus `Copilot/.github/copilot-instructions.md`,
 das den `code-reviewer`-Hint einbettet), 0 added/removed, per Entry gepatcht
 (kein `--write`). `AC01_EXCEPTIONS` wurde nicht erweitert.
+
+## 24. Re-Baseline der Golden-Baseline für `orchestrator` (Orchestrator-Topologie v1, #1077)
+
+> **Anlass:** Task 18 der Orchestrator-Topologie v1
+> (`SPEC-orchestrator-topology-2026-11-03`) stellt die Singleton-Zeile der
+> A2A-Rule und der beiden Singleton-tragenden Agent-Templates auf den
+> bedingten `ORCH_TOPOLOGY_EXPLICIT`-Zweig um. Der else-Zweig bleibt wortgleich,
+> damit ein ungesetzter Key byte-identisch rendert (AC-6).
+
+**Geändert (2 Fixtures):** `orchestrator.md` in `slimming-golden` und
+`compact-golden` — **nur** Frontmatter-Pins (`version: 8.9.1 -> 8.10.0`,
+`generated-from: 1-generic/orchestrator.md@8.10.0`). Die übrigen Goldens
+bleiben unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58. `_reference-agent` ist
+nicht Teil der Matrix und hat kein Golden.
+
+**Ursache:** Rein die Minor-Version des `orchestrator`-Templates. Der neue
+Topologie-Zweig rendert bei ungesetztem Key nicht; die Golden-Bodies sind
+deshalb byte-identisch. Die Goldens wurden frontmatter-only neu gepinnt, nicht
+aus dem Render kopiert; `_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`,
+`_KIND_REGISTRY` und die B2a/B2b-Klassifikation bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q`
+→ alle passed, rc `0`; `python3 scripts/sync.py --check` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. Die beiden
+`tests/fixtures/topology-golden/*`-Fixtures blieben **unverändert**. AC-01:
+9 von 1099 Hashes geändert (der `orchestrator`-Agent-Render aller neun
+Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
+`AC01_EXCEPTIONS` wurde nicht erweitert.

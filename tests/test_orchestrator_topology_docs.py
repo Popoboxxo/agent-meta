@@ -171,6 +171,14 @@ def test_concept_doc_links_spec_and_a2a_rule():
     )
 
 
+def test_a2a_rule_links_the_topology_doc():
+    assert "docs/concepts/active/orchestrator-topology.md" in _text(_A2A_RULE), (
+        "rules/1-generic/a2a-delegation-gates.md must link the concept doc "
+        "(AC-4 cross-link); the link lives in the explicit topology branch so "
+        "the unset render stays byte-identical."
+    )
+
+
 def test_singleton_architecture_links_the_topology_doc():
     targets = set(_LINK_RE.findall(_text(_SINGLETON)))
     topology_links = [t for t in targets if t.split("#", 1)[0] == "orchestrator-topology.md"]

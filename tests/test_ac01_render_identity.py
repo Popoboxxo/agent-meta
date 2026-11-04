@@ -828,6 +828,37 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
   extended.
 
+- Orchestrator topology v1 (SPEC-orchestrator-topology-2026-11-03, issue #1077,
+  Task 18, 2026-11-04, ``feat/orchestrator-topology-v1``): the A2A rule now
+  states the singleton gate conditionally and both singleton-bearing agent
+  templates carry the conditional line (``orchestrator`` 8.9.1 -> **8.10.0**,
+  ``_reference-agent`` 1.2.1 -> 1.3.0). Because the new branch is gated on
+  ``ORCH_TOPOLOGY_EXPLICIT`` and the else branch is word-identical, the **unset**
+  render is byte-identical: the two ``tests/fixtures/topology-golden`` fixtures
+  are **unchanged** (AC-6) and no rule render moved. Exactly **9 of 1099 hashes
+  moved; 0 added/removed** -- the ``orchestrator`` agent render of every provider
+  (``Claude/.claude/agents/orchestrator.md`` ``dd79e5cf…`` -> ``9b7bc261…``,
+  ``Codex/.codex/agents/orchestrator.toml`` ``9e713667…`` -> ``3a99d13a…``,
+  ``Continue/.continue/agents/orchestrator.md`` ``1b8a2c4f…`` -> ``7d8d91f6…``,
+  ``Copilot/.github/agents/orchestrator.agent.md`` ``5cd5fac2…`` -> ``140c93fb…``,
+  ``Gemini/.gemini/agents/orchestrator.md`` ``f4a0a756…`` -> ``14e86f57…``,
+  ``KimiCode/.kimi-code/agents/orchestrator.md`` ``7a38413b…`` -> ``4e0a081c…``,
+  ``Mammouth/.mammouth/agents/orchestrator.md`` ``03a03ae0…`` -> ``379628c6…``,
+  ``Opencode/.opencode/agents/orchestrator.md`` ``df357d75…`` -> ``4d101617…``,
+  ``ZCode/.zcode/agents/orchestrator.md`` ``1db5e066…`` -> ``e69d405a…``) --
+  i.e. the frontmatter version/``generated-from`` pins only; the body is
+  unchanged and the ``_reference-agent`` template is not part of the matrix.
+  The manifest was patched **per entry** (9 single-line replacements, 1090 of the
+  1099 lines untouched) -- not via ``--write`` -- after independently recomputing
+  every digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``1a6df729…`` -> ``a88fca0d…``). ``slimming-golden``
+  and ``compact-golden`` were re-pinned frontmatter-only for the same
+  ``orchestrator`` version pins (manifest §24) and their AC-T4 digests moved
+  (``dcd2f5be…`` -> ``8d1ade1a…`` / ``416cd520…`` -> ``badf2362…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
@@ -1219,9 +1250,18 @@ _TOPOLOGY_FLAG_CASES = (
 
 
 def _topology_gate_line() -> str:
-    """The current Gate-2 source line (single source, no copied wording)."""
+    """The current Gate-2 else-branch source (single source, no copied wording).
+
+    Task 18 wraps the historic line in an inline conditional, so the historic
+    wording now lives after ``{{else}}`` on the same logical line. The helper
+    extracts exactly that branch and keeps working for an unwrapped source.
+    """
+    marker = "{{else}}2. **Orchestrator-Singleton:**"
+    prefix = "2. **Orchestrator-Singleton:**"
     for line in _TOPOLOGY_RULE_SOURCE.read_text(encoding="utf-8").splitlines():
-        if line.startswith("2. **Orchestrator-Singleton:**"):
+        if marker in line:
+            return line[line.index(prefix):].rsplit("{{/if}}", 1)[0]
+        if line.startswith(prefix):
             return line
     raise AssertionError("Gate-2 line not found in the A2A rule source")
 

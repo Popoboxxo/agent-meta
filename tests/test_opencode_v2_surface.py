@@ -5425,10 +5425,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # the frozen compact render still carried the old version/generated-from pins.
 # Re-derived from the real compact render (two version lines only); digest
 # re-pinned 44148ea7 -> 416cd520. `ac01-baseline`/`slimming-golden` unchanged.
+# Issue #1077 (orchestrator topology v1, `orchestrator` 8.9.1 -> 8.10.0):
+# `ac01-baseline` re-pinned — 9 hashes (the `orchestrator` agent render of every
+# provider); `slimming-golden`/`compact-golden` re-pinned frontmatter-only for
+# the same role version pins (manifest §24); the topology goldens are unchanged.
+# Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "1a6df729fb13bfba81ce8e07121411c8a2eedcffc44e8c01f70146337e17ab7b",
-    "slimming-golden": "dcd2f5be3e3f7d8f4a1fd4be60c239763b65846e4657cdc164369455ca565fad",
-    "compact-golden": "416cd520ac0fe48e14a11c59affcfac03a6d54cd71841081f41843c404e73ea5",
+    "ac01-baseline": "a88fca0d0e1e2461830645e0338883d6da117dfe9385150392ba963cfe7bf7c7",
+    "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
+    "compact-golden": "badf23628a2a251d424947d53485cdb0355ca795db23fdc170665ce70b97ab4c",
 }
 
 
