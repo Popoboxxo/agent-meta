@@ -1071,7 +1071,7 @@
         },
         "topology": {
           "type": "string",
-          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
+          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis AND NOT the agent topology: this key describes the context-file layout, while orchestrator.topology describes where the orchestrator agent lives. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
           "enum": [
             "unified",
             "per-provider"
@@ -2480,6 +2480,15 @@
           ],
           "default": "strict"
         },
+        "topology": {
+          "type": "string",
+          "description": "Orchestrator position, i.e. WHERE the orchestrator lives. 'primary' = the role is the session entry point (one orchestrator, no spawn channel); 'subagent' = the role is never the entry point and the main chat spawns 1..N; 'hybrid' = position-agnostic (either/or, never two simultaneous positions). This is a different axis from orchestrator.mode, which describes HOW STRICTLY the gate is enforced ('strict', 'advisory', 'main-chat'). Optional: omitting the key preserves today's derivation (primary when providers.<P>.primary-role names the role and it is in the active set, otherwise subagent; hybrid is never derived). Not context_file.topology, which describes the file layout.",
+          "enum": [
+            "primary",
+            "subagent",
+            "hybrid"
+          ]
+        },
         "enabled": {
           "type": "boolean",
           "default": true,
@@ -2577,7 +2586,7 @@
         },
         "provider-overrides": {
           "type": "object",
-          "description": "Override orchestrator.mode per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without 'mode' set) inherit the global orchestrator.mode default.",
+          "description": "Override orchestrator.mode and/or orchestrator.topology per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without the respective property set) inherit the global orchestrator value.",
           "additionalProperties": {
             "type": "object",
             "description": "Per-provider orchestrator overrides.",
@@ -2589,6 +2598,15 @@
                   "strict",
                   "advisory",
                   "main-chat"
+                ]
+              },
+              "topology": {
+                "type": "string",
+                "description": "Orchestrator position for this provider only. Same enum and semantics as orchestrator.topology. Precedence: provider override > orchestrator.topology > derivation. When unset, inherits the project value. No schema default: the fallback is the existing derivation.",
+                "enum": [
+                  "primary",
+                  "subagent",
+                  "hybrid"
                 ]
               }
             },
