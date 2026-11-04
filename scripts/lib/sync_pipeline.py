@@ -1239,6 +1239,99 @@ def _cleanup_retired_rules_dirs(
         )
 
 
+def emit_topology_summary(
+    config: dict,
+    provider_config: dict,
+    providers,
+    log: SyncLog,
+    *,
+    mode: str,
+    capabilities: dict | None = None,
+    active_set=None,
+) -> None:
+    """Emit the derived orchestrator topology as ONE INFO line per provider.
+
+    SPEC-orchestrator-topology-2026-11-03, IC-11 / AC-19.
+
+    The derivation is the only invisible part of the topology axis (an unset
+    key renders byte-identically to the historic output). This function is its
+    single producer:
+
+        topology: <effective> (derived from providers.<P>.primary-role)
+        topology: subagent (derived: active-set default)
+
+    Contract: ``mode == "sync"`` only — ``--check``/``--validate`` never call
+    it (the caller gates too), so their output stays byte-identical. A provider
+    whose resolution source is explicit (project key or provider override)
+    produces no line. At most one line per provider and run. Writes nothing,
+    changes no rendered bytes and never affects the exit code.
+    """
+    if mode != "sync":
+        return
+
+    from lib.providers import explicit_primary_role
+    from lib.topology import resolve_topology
+
+    if capabilities is None:
+        try:
+            capabilities = load_provider_capabilities(
+                Path(__file__).resolve().parents[2]
+            )
+        except Exception:  # noqa: BLE001 — the summary must never break a sync
+            capabilities = {}
+    if not isinstance(capabilities, dict):
+        capabilities = {}
+
+    orch = config.get("orchestrator") if isinstance(config, dict) else None
+    orch = orch if isinstance(orch, dict) else {}
+
+    # Fail-open role view when the caller has no ActiveSet: the declared
+    # primary roles count as active (the same convention
+    # ``role_emitted_for_provider`` uses for ``active_set is None``).
+    active_view = active_set
+    if active_view is None:
+        roles = set()
+        for provider in providers:
+            role = explicit_primary_role(provider_config, provider)
+            if role:
+                roles.add(role)
+        active_view = frozenset(roles)
+
+    seen: set = set()
+    for provider in providers:
+        if provider in seen:
+            continue
+        seen.add(provider)
+        pc = provider_config.get(provider) if isinstance(provider_config, dict) else None
+        pc = pc if isinstance(pc, dict) else {}
+        caps = capabilities.get(provider)
+        caps = caps if isinstance(caps, dict) else {}
+        overrides = orch.get("provider-overrides")
+        override = overrides.get(provider) if isinstance(overrides, dict) else None
+        override = override if isinstance(override, dict) else None
+        provider_mode = _resolve_orch_mode(orch, override, validate=False)
+        resolution = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=caps,
+            mode=provider_mode,
+            active_set=active_view,
+        )
+        if resolution.source != "derived":
+            continue
+        if resolution.derived_from and resolution.derived_from.startswith(
+            "providers."
+        ):
+            line = (
+                f"topology: {resolution.effective} "
+                f"(derived from {resolution.derived_from})"
+            )
+        else:
+            line = f"topology: {resolution.effective} (derived: active-set default)"
+        log.note("topology", line)
+
+
 def _sync_stage_per_provider(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -1546,6 +1639,20 @@ def _sync_stage_per_provider(
             [p for p in providers if is_provider_active(config, p)],
             log, dry_run=args.dry_run, migrations=_migration_map,
         )
+
+    # IC-11 / AC-19: one factual INFO line per derived provider, after the
+    # provider loop. NEVER in --check/--validate: their output must stay
+    # byte-identical (the function itself also early-returns on mode != sync).
+    if not getattr(args, "check", False):
+        try:
+            emit_topology_summary(
+                config, provider_config, providers, log,
+                mode="sync",
+                capabilities=load_provider_capabilities(agent_meta_root),
+                active_set=active_set,
+            )
+        except Exception as exc:  # noqa: BLE001 — a summary must not break sync
+            log.debug("topology-summary", f"skipped: {type(exc).__name__}: {exc}")
 
 
 def _sync_stage_drift_and_plugins(
