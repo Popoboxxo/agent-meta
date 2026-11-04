@@ -10,6 +10,7 @@ re-introducing the historic agents ↔ config ↔ context import cycle
     (substitute() delegates its replacement pass to the shared escape-safe
     core in substitution.py — issue #476)
   * Orchestrator-mode flags  — _resolve_orch_mode(), _orch_mode_flags()
+  * Topology flags          — _topology_flags() (IC-4)
 
 This module depends only on the neutral low-level layer (io, log) and the
 stdlib. It must never import agents/config/context/rules or any higher-level
@@ -53,6 +54,26 @@ _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     "GATE_NEUTRAL",
     "CONTEXT_PROFILE_COMPACT",
     "ROSTER_IN_HARNESS",
+    # Orchestrator topology axis (IC-4): the position is opt-in. An absent
+    # variable must read as INACTIVE so a consumer project without
+    # ``orchestrator.topology`` renders the historic branch, never the new
+    # one (AC-18 fail-closed).
+    "ORCH_TOPOLOGY_EXPLICIT",
+    "ORCH_TOPOLOGY_PRIMARY",
+    "ORCH_TOPOLOGY_SUBAGENT",
+    "ORCH_TOPOLOGY_HYBRID",
+})
+
+#: The four boolean topology flags as a static set. The strip helper builds
+#: its whitelist from the *present* variables; the static registration keeps an
+#: absent flag resolvable (and, via ``_FALSE_DEFAULT_CONDITIONALS``, inactive)
+#: instead of leaving both branches in the output through the orphaned-marker
+#: cleanup.
+_TOPOLOGY_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
+    "ORCH_TOPOLOGY_EXPLICIT",
+    "ORCH_TOPOLOGY_PRIMARY",
+    "ORCH_TOPOLOGY_SUBAGENT",
+    "ORCH_TOPOLOGY_HYBRID",
 })
 
 # Only these are safe as {{#if}} conditionals: strip_inactive_conditional_blocks
@@ -290,6 +311,35 @@ def _orch_mode_flags(orch_mode: str) -> dict:
     }
 
 
+def _topology_flags(topology: str, *, explicit: bool, source: str) -> dict:
+    """Return the flat ORCH_TOPOLOGY_* flags for a resolved position (IC-4).
+
+    Pure and provider-agnostic: the caller passes the already-resolved
+    topology, whether the declaration is project-scoped (``explicit``) and the
+    resolution source. Exactly one of ``ORCH_TOPOLOGY_PRIMARY`` /
+    ``_SUBAGENT`` / ``_HYBRID`` is ``"true"`` when a topology is set; all three
+    are ``"false"`` when the key is unset (``ORCH_TOPOLOGY == ""``).
+
+    ``explicit`` is the *project-scope* question: a provider override makes the
+    flags explicit for that provider's render, never for the provider-less
+    global block (spec IC-4, "Provider-Override zählt nicht").
+
+    An unknown value fails closed to ``""``/all-false; the hard enum check
+    lives in ``config._validate_orchestrator_topology``.
+    """
+    from .topology import VALID_TOPOLOGIES
+
+    normalized = topology if topology in VALID_TOPOLOGIES else ""
+    return {
+        "ORCH_TOPOLOGY": normalized,
+        "ORCH_TOPOLOGY_EXPLICIT": "true" if explicit else "false",
+        "ORCH_TOPOLOGY_PRIMARY": "true" if normalized == "primary" else "false",
+        "ORCH_TOPOLOGY_SUBAGENT": "true" if normalized == "subagent" else "false",
+        "ORCH_TOPOLOGY_HYBRID": "true" if normalized == "hybrid" else "false",
+        "ORCH_TOPOLOGY_SOURCE": source,
+    }
+
+
 def _repo_containment_block(enabled: bool, sink_active: bool, tmp_path: str) -> str:
     """Render the effective repo-containment policy text (spec §4.5).
 
@@ -442,6 +492,11 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # "true" omits the roster, so an unwired render keeps the names list.
     conditional_vars.update({"ROSTER_IN_HARNESS"})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
+    # IC-4: the topology axis. The prefix catches every present builder value;
+    # the static set keeps the four boolean flags resolvable even when the
+    # variables dict does not carry them yet (absent => inactive, AC-18).
+    conditional_vars.update({k for k in variables if k.startswith("ORCH_TOPOLOGY_")})
+    conditional_vars.update(_TOPOLOGY_CONDITIONAL_FLAGS)
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
