@@ -91,6 +91,25 @@
   `access: read` actions).
 
 ### Fixed
+- **Generated-file drift is judged after the writers, backup retention is count-only
+  (#1081)**: a scan finding now carries `pre_text` — the content read before the sync
+  writers run — and `resolve_drift_findings` compares the post-write disk state against
+  it. A real manual edit is therefore backed up from `pre_text` even though the writers
+  already overwrote the file, while a merely stale hash baseline is refreshed silently
+  (no backup, no warning). **behavior change:** `prune_sync_backups` keeps the 3 newest
+  backups per source regardless of age; `max_age_days` stays in the signature for API
+  stability but is ignored, because the old age-AND-count policy let hundreds of backups
+  accumulate.
+- **Agent-meta's own runtime output and backup-only directories are no longer
+  external-tool drift (#1084)**: `.guard-audit.log` (written by
+  `orchestrator-guard-impl.sh`) is excused as a known runtime artifact, a directory
+  holding only sync backups plus the managed index still counts as managed, and MCP
+  config basenames come from the provider's `mcp-config` data rather than a hardcoded
+  map. The new optional provider key `infra_known_names` lists toolchain files such as
+  Opencode's `package.json` and `node_modules`. **behavior change:** findings of
+  providers without `has_rules` no longer disappear — they are merged, tagged with their
+  source provider as `[provider]`, into the first `has_rules` provider's report (or, if
+  there is none, stay in `sync.log` with a note).
 - **The pytest basetemp is allowed through the gitignored local settings (#1079,
   option C/D20)**: the new provider key `settings-allow-dirs-key` names the list that
   receives the external basetemp **additively** in `settings.local.json` (Claude:
