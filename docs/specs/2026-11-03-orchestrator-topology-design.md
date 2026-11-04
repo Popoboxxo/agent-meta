@@ -9,7 +9,7 @@ status: Entwurf
 # Orchestrator-Topologie konfigurierbar — Design
 
 > Status: **Entwurf** — dieses Dokument ist **Spec-Input**. Den Approval-Marker
-> `Status: APPROVED` setzt ausschließlich `concept-reviewer`, nicht dieses Dokument.
+> setzt ausschließlich `concept-reviewer`, nicht dieses Dokument.
 > Trace-Anker (von der Spec unverändert zu übernehmen):
 > `spec-id: SPEC-orchestrator-topology-2026-11-03`
 
@@ -58,6 +58,7 @@ vorgelagerte Stage-Input der Pipeline `quality_pipelines.concept-driven-dev`
 | 2026-11-03 | concept-architect | **Rev. 3 — Minor 3:** Validator-Meldungstext als stabiler Teilstring-Vertrag gepinnt (§4.7), AC-17 testet Teilstrings statt Satzformen. |
 | 2026-11-03 | concept-architect | **Rev. 3 — Minor 4:** degradiertes `hybrid` fällt fail-safe auf **`subagent`** (nicht „provider-eigene Position"); damit entsteht auf Claude/Opencode/Continue/Kimi kein `default_agent: orchestrator` (§1, D10, §7). |
 | 2026-11-03 | concept-architect | **Rev. 3 — Info:** OQ-5 „v1-Schnitt (Builder-Default + genau ein spawnbarer Orchestrator; Multi-Instanz = P3)" mit Default **ja** und dem Hinweis, dass P3 der unmittelbar nächste Schritt ist (§11, §15). |
+| 2026-11-04 | concept-specifier | **Rev. 4 — Nutzerentscheidungen:** OQ-5 = **A** (v1 = P0–P2 + P4; P3 unmittelbar danach) · OQ-1 = **B** (fünf Provider-Probes **jetzt**, als **P0-Deliverable**; nur belegte Zellen dürfen `yes` werden, der Rest bleibt `no` mit genau einer WARNING) · OQ-2 = **A** (Sentinel-`id=` audit-only, **P3**) · OQ-3 = **A** (`max-instances` `maximum: 8`, **P3**) · OQ-4 = **A** (abgeleitete Topologie nur als Sync-Summary-Zeile, **kein** `--check`-INFO). Geändert: §3.1, §4.4, D5, D8, D9, §5, §7 (Upgrade-Prozedur + Zählregel), §10, §11 (P0/P3/P4 + Summe), §12 (AC-11/15/16/17), §14, §15, §16, §17. `Status: Entwurf` bleibt. |
 
 ---
 
@@ -204,7 +205,7 @@ Neue und geänderte Komponenten mit Grenzen und Verantwortlichkeit (je genau ein
 +---------+   +---------------+  +------------+  +------------------+
 | C3      |   | C4 Variables  |  | C5 Emitter |  | C6 Konsistenz    |
 | active_ |   | ORCH_TOPOLOGY |  | provider_  |  | topology.py      |
-| set.py  |   | ORCH_MAX_...  |  | transform  |  | (WARNING/INFO)   |
+| set.py  |   | ORCH_MAX_...  |  | transform  |  | (WARNING)       |
 | role_   |   | (flat flags)  |  | isolation  |  |                  |
 | emitted |   |               |  | context    |  |                  |
 +---------+   +---------------+  +------------+  +------------------+
@@ -229,7 +230,7 @@ Neue und geänderte Komponenten mit Grenzen und Verantwortlichkeit (je genau ein
 | **C3 `role_emitted_for_provider`** | **neu** in `active_set.py` | Ein einziges Prädikat „wird Rolle R für Provider P emittiert?" | Verhindert die zweite Skip-Stelle (Risiko R1). Ist im Bug-Batch-Plan schon als D16 vorgesehen → **Koordinationspflicht** |
 | **C4 Variables** | geändert | Rendert die aufgelösten Werte in flache, sich gegenseitig ausschließende Flags | Keine Logik; nur `_orch_mode_flags`-Analogon; Whitelist-Registrierung ist Teil des Contracts (B4) |
 | **C5 Emitter** | geändert | Setzt die *effektive* Topologie in `mode` / `default_agent` / Skip um | Liest nur den aufgelösten Wert, nie den Roh-Key, nie den Provider-Namen. **Ausnahme Contract:** `apply_settings_surface_shape` erhält die aufgelöste Topologie als Parameter (B2) |
-| **C6 Konsistenz** | **neu** (`consistency/topology.py`) | Macht Degradierung laut (WARNING) und die Ableitung sichtbar (INFO) | Kein Schreiben, kein Exit; nur `Finding`s |
+| **C6 Konsistenz** | **neu** (`consistency/topology.py`) | Macht Degradierung laut (WARNING); die Ableitung erscheint nur als Sync-Summary-Zeile (OQ-4 = A) | Kein Schreiben, kein Exit; nur `Finding`s (WARNING) |
 | **C7 Zustand** | geändert | Namespaces für N Instanzen; Migration | Nur bei N>1 aktiv; bei N=1 byte-identisch |
 | **C8 Validator** | **neu** in `config.py` | Harte Ablehnung der *selbstwidersprüchlichen* Konfiguration | stdlib-only, läuft in `sync` **und** `--validate`; Muster `_validate_providers`; kein `jsonschema` nötig (B3) |
 
@@ -270,6 +271,11 @@ zugehörige Zeile dieser Checkliste für die *Position* keine offenen
 `unverified`-Felder mehr hat — außer `prompt-caching` (kein Topologie-Delta)
 und `progress` (Kanal ist topologie-unabhängig). Bis dahin bleibt die
 `topology_verified_state`-Zelle auf `UNVERIFIED` und die Auflösung konservativ.
+**Seit Rev. 4 (OQ-1 = B):** Die fünf Provider-Posten aus §16 Nr. 2–6 werden in
+**P0** per Runtime-/CLI-Probe gemessen und im Evidenz-Dokument
+`docs/spikes/2026-11-03-issue-1077-topology-probe.md` protokolliert. Nur eine
+dort belegte Zeile darf `unverified`-Felder schließen; alles, was die Probe
+nicht belegen kann, bleibt `no` (Upgrade-Prozedur: §7).
 
 ---
 
@@ -363,7 +369,7 @@ Capability-Daten und `providers.py`; `mode` wird ihm übergeben (A2).
 ```yaml
 topology_support:  {primary: bool, subagent: bool, hybrid: bool}
 topology_degrade:  {primary: "subagent"|null, subagent: "sequential-text"|null,
-                    hybrid: "subagent"}   # v1: immer "subagent" (fail-safe, Minor 4)
+                    hybrid: "subagent"}   # vor P0: immer "subagent" (fail-safe, Minor 4)
 orchestrator_instances: {multiple: bool, reason: str|null}
 topology_verified_state: {primary: str, subagent: str, hybrid: str, multiple: str}
 ```
@@ -494,10 +500,10 @@ Registrierungen sind nötig; fehlt eine, rendert der heutige Mechanismus
 | Check-ID | Severity | Bedingung |
 |---|---|---|
 | `orchestrator-topology.degraded` | WARNING | `resolution.degraded_from is not None` (Provider kann den deklarierten Wert nicht ausdrücken **oder** Zelle ist `UNVERIFIED`) |
-| `orchestrator-topology.hybrid-unverified` | WARNING | Deklaration `hybrid` und `topology_verified_state.hybrid == "UNVERIFIED"` (v1: immer) |
+| `orchestrator-topology.hybrid-unverified` | WARNING | Deklaration `hybrid` und `topology_verified_state.hybrid == "UNVERIFIED"` (vor P0: immer; danach nur für unbelegte Zellen) |
 | `orchestrator-topology.main-chat-supersedes` | WARNING | Cross-Scope: Provider-Override `mode: main-chat` bei global/übergeordnet gesetzter Topologie (§4.7 (2)) |
 | `orchestrator-topology.instances-clamped` | WARNING | `max-instances > 1`, aber `orchestrator_instances.multiple == false` **oder** Cross-Scope `topology: primary` + globales N>1 (D3 (4)) |
-| `orchestrator-topology.derived` | INFO | Topologie ist abgeleitet (nur wenn OQ-4 „INFO" gewählt wird) |
+| `orchestrator-topology.derived` | **entfällt** (OQ-4 = A) | Kein INFO-Finding. Die Ableitung erscheint ausschließlich als Sync-Summary-Zeile (§11 P2, D9) |
 | `orchestrator-topology.unresolved-global-flags` | WARNING | Ein `ORCH_TOPOLOGY_*`-Platzhalter wurde provider-los gerendert (A3) |
 
 Signatur (Muster: `consistency/orchestrator_strict.py`):
@@ -667,14 +673,14 @@ orchestrator.max-       |        |                             topology_verified
                          |
       +------------------+-------------------+--------------------+
       v                  v                   v                    v
- ORCH_TOPOLOGY_*   C5a provider_transform  C5b isolation      C6 Konsistenz
- (+ EXPLICIT)           (mode: primary|sub)   (_opencode_entry)   (WARNING/INFO)
-      |                  |                   |                    |
-      v                  v                   v                    v
-  Templates (nur   .opencode/agents/    opencode.json        sync-Report / --check
-  bei EXPLICIT)    orchestrator.md      default_agent
-      |
-      v
+  ORCH_TOPOLOGY_*   C5a provider_transform  C5b isolation      C6 Konsistenz
+  (+ EXPLICIT)           (mode: primary|sub)   (_opencode_entry)   (WARNING)
+       |                  |                   |                    |
+       v                  v                   v                    v
+  Templates (nur   .opencode/agents/    opencode.json        sync-Report
+  bei EXPLICIT)    orchestrator.md      default_agent        (+ Sync-Summary-Zeile,
+       |                                                      kein --check-INFO)
+       v
  [C8 _validate_orchestrator_topology]  (vor jedem Schreiben; hart)
 ```
 
@@ -885,7 +891,8 @@ DECISION
 context: Der Issue-Kommentar fordert eine von der Enum unabhängige
          Multiplizitäts-Achse, mit hartem Konflikt statt stiller Präzedenz.
 choice:
-  - `orchestrator.max-instances`: integer, minimum 1, maximum 8 (OQ-3).
+  - `orchestrator.max-instances`: integer, minimum 1, maximum 8 (**OQ-3 = A**,
+    entschieden 2026-11-04).
     **Einziges Zuhause: P3.** Der Key existiert vor P3 **nicht** — es gibt
     keinen Zwischenschritt mit `maximum: 1` (M3). Obergrenze der
     Orchestrator-Instanzen, die der Main Chat pro Session spawnen darf.
@@ -1019,6 +1026,9 @@ choice:     Die Convention-Boundary-Rahmung bleibt. Keine instanz-aware
             `.claude/hooks/.guard-audit.log`. Der "Bekannte Grenzen"-Text wird
             um den Satz ergänzt: Instanz-Scoping ist nicht durchgesetzt; die
             behauptete ID ist nachträglich auditierbar, nicht verifiziert.
+            **Phase: P3 (OQ-2 = A, entschieden 2026-11-04)** — der Parse-Zweig
+            ist eine P3-only Konsequenz und setzt voraus, dass `orchestrator_id`
+            als Feld existiert (§9.1).
 alternatives:
   - Instanz-aware Check (Guard verweigert Schreibzugriff bei ID-Kollision):
     braucht eine harness-gelieferte Instanz-Identität; kein Provider liefert
@@ -1045,14 +1055,15 @@ context: Kein Projekt darf durch das Upgrade sein Verhalten ändern (§5 AC "no
          behavior change for projects that do not set the key"). Gleichzeitig
          muss ein Projekt, das `topology: subagent` setzt, den Main Chat als
          Default behalten (Nutzer-Intent, B2).
-choice:     Key ungesetzt  =>  Topologie wird exakt wie heute abgeleitet:
+choice:                 Key ungesetzt  =>  Topologie wird exakt wie heute abgeleitet:
             `providers.<P>.primary-role == role` und Rolle im ActiveSet
             =>  `primary` (heute nur Opencode), sonst `subagent`.
             `hybrid` wird NIE abgeleitet (kein Provider deklariert es heute).
-            Der abgeleitete Wert wird sichtbar gemacht über (a) eine
+            Der abgeleitete Wert wird sichtbar gemacht über genau **eine**
             Sync-Summary-Zeile pro Provider (`topology: primary (derived from
-            providers.Opencode.primary-role)`) und (b) optional einen
-            INFO-Finding (OQ-4).
+            providers.Opencode.primary-role)`). **Kein** INFO-Finding in
+            `--check` (**OQ-4 = A**, entschieden 2026-11-04) — unveränderte
+            Projekte erhalten null Output-Delta.
             KEIN neues Rendering in bestehenden Templates, solange
             `ORCH_TOPOLOGY_EXPLICIT != "true"` (S20-Konsequenz).
 
@@ -1108,10 +1119,12 @@ choice:     (a) Die Matrix (§7) wird aus den VORHANDENEN Capability-Keys
                 `default_agent: orchestrator` — genau der Zustand, den §1
                 ausschließt. Damit hängt die Spec nicht an einer unbelegten
                 Annahme.
-            (d) Zell-Upgrades (z. B. `hybrid: true`) sind ausdrücklich
-                NACH v1 und brauchen eine Evidenzzeile in §3.1 + einen
-                `verified_state`-Wechsel; sie sind kein Bestandteil der
-                Freigabe dieses Designs.
+            (d) Zell-Upgrades (`hybrid: true` o. a.) laufen über die
+                P0-Upgrade-Prozedur (§7): fünf Provider-Probes werden **jetzt**
+                als P0-Deliverable ausgeführt und im Spike-Doc protokolliert
+                (OQ-1 = B). Nur eine belegte Zelle wechselt auf `yes`;
+                unbelegte bleiben `no` mit genau einer WARNING. Kein Upgrade
+                ohne Evidenzzeile.
             (e) Jede Degradierung erzeugt (a) einen Sync-WARNING
                 `orchestrator-topology.degraded` mit Provider, deklariertem und
                 effektivem Wert und (b) einen Matrix-Eintrag in der
@@ -1124,8 +1137,10 @@ alternatives:
     auseinander (genau das Muster, das `commands: false` vor #807 erzeugte).
   - Degradierung still (nur Doku): explizit vom Issue verboten.
 consequences:
-  + Keine Zelle der Spec ist eine Behauptung; 40/40 Zellen sind entweder
-    datenabgeleitet oder explizit `UNVERIFIED ⇒ no` (B1).
+  + Keine Zelle der Spec ist eine Behauptung; **25 Basis-Zellen** sind
+    datenabgeleitet, die übrigen **15** sind explizit `UNVERIFIED ⇒ no`, und
+    **N** davon werden in P0 nur mit aufgezeichneter Evidenz auf `yes` gehoben
+    (N gemessen, nicht behauptet; B1/OQ-1 = B).
   + Ein Datenort, maschinell prüfbar, testbar (Invariante AC-15).
   + Neue Provider sind ohne Code-Änderung korrekt eingeordnet (fail-safe).
   - `hybrid` liefert in v1 keinen zusätzlichen Nutzen gegenüber `subagent`
@@ -1144,13 +1159,14 @@ durch Tests.
 
 **Ableitungsregel (B1):** Jede Zelle ist aus den vorhandenen Capability-Keys
 abgeleitet; Zellen ohne Datenbasis sind `UNVERIFIED ⇒ no`. Es gibt in dieser
-Tabelle **keine** unbelegte `yes`-Zelle.
+Tabelle **keine** unbelegte `yes`-Zelle. Die Tabelle zeigt den Stand **vor P0**
+(N = 0); nach den Probes gilt die Zählregel unten mit **N gemessenen** Upgrades.
 
 | Achse | Ableitung | `verified_state`-Quelle |
 |---|---|---|
 | `primary` | `main_agent_selectable == true` | `topology_verified_state.primary` |
 | `subagent` | `subagent_dispatch == true` | `topology_verified_state.subagent` |
-| `hybrid` | **keine Datenbasis** → immer `false`, `degrade` = `"subagent"` (fail-safe, Minor 4) | `topology_verified_state.hybrid = UNVERIFIED` |
+| `hybrid` | **keine Datenbasis** → Zelle `UNVERIFIED ⇒ no`, `degrade` = `"subagent"` (fail-safe, Minor 4). **Seit Rev. 4** dürfen die fünf P0-Probes (§16 Nr. 2–6) eine Zelle auf `yes` heben — nur mit aufgezeichneter Evidenz (Upgrade-Prozedur unten) | `topology_verified_state.hybrid` |
 | `N>1` | `subagent_dispatch == true AND parallel_execution == true` | `topology_verified_state.multiple` |
 
 | Provider | `primary` | `subagent` | `hybrid` | N>1 |
@@ -1174,19 +1190,50 @@ S24/§2 verbieten. Das `no→subagent` in der `hybrid`-Spalte ist das
 — die effektive Topologie eines nicht registrierten Providers bleibt der
 abgeleitete Default aus D9.
 
-**Zählung (B1):**
+**Zählung (Rev. 4 — Regel statt Behauptung):**
 
-- 40 Zellen (10 Zeilen × 4 Spalten).
-- **25 Zellen datenabgeleitet** — Quell-Key vorhanden und nicht UNVERIFIED:
-  `primary` 7 (Claude, Opencode, Gemini, Continue, Copilot, ZCode, Kimi),
-  `subagent` 9 (alle registrierten Provider), `N>1` 9 (alle registrierten
-  Provider). Auch die `no→`-Zellen leiten ihr `no` aus `false`-Daten ab.
-- **15 Zellen `UNVERIFIED ⇒ no`**:
+- **40 Zellen** (10 Zeilen × 4 Spalten).
+- **25 Basis-Zellen** sind ohne Probe datenabgeleitet — Quell-Key vorhanden und
+  nicht UNVERIFIED: `primary` 7 (Claude, Opencode, Gemini, Continue, Copilot,
+  ZCode, Kimi), `subagent` 9 (alle registrierten Provider), `N>1` 9 (alle
+  registrierten Provider). Auch die `no→`-Zellen leiten ihr `no` aus
+  `false`-Daten ab.
+- **15 Basis-Zellen `UNVERIFIED ⇒ no`**:
   - 10× `hybrid` (9 registrierte Provider + custom) — keine Datenbasis,
   - 2× `primary` mit selbst als UNVERIFIED markiertem Quell-Key (Codex
     §16 Nr. 4, Mammouth §16 Nr. 5),
   - 3× custom-Restzellen (`primary`, `subagent`, `N>1`) ohne Registry-Daten.
-- **0 spekulative `yes`-Zellen.**
+- **P0-Upgrade (OQ-1 = B):** Nach den fünf Probes gilt
+  **`25 + N` datenabgeleitet / `15 − N` `UNVERIFIED ⇒ no`**, wobei **N die
+  gemessene Zahl der belegten Zell-Upgrades** ist — **N wird gemessen, nicht
+  behauptet** (`0 ≤ N ≤ 15`, die Zahl der `UNVERIFIED`-Zellen; die fünf Probes
+  aus §16 Nr. 2–6 sind die Evidenzquellen, eine Probe kann 0..k Zellen stützen).
+  **0 spekulative `yes`-Zellen** bleibt
+  die Invariante.
+- **Vor P0** ist N = 0 (der heutige Stand); die Spec nennt deshalb keine
+  konkrete Endzahl, sondern die Regel. AC-16 assertet die Regel
+  (`25 + N`, `N` aus der Evidenzliste), nicht einen geratenen Wert.
+
+**Upgrade-Prozedur (P0, verbindlich — ersetzt den früheren „nicht Teil dieses Designs"-Hinweis):**
+
+Eine Matrix-Zelle darf von `UNVERIFIED ⇒ no` auf `yes` wechseln **nur** wenn
+alle drei Bedingungen gemeinsam erfüllt sind:
+
+1. **Evidenz aufgezeichnet:** Der zugehörige Probe-Lauf (Posten §16 Nr. 2–6)
+   steht mit Befehl, Datum, Provider-Version und beobachtetem Ergebnis
+   (inkl. Fehlerfall) in `docs/spikes/2026-11-03-issue-1077-topology-probe.md`.
+   „Nicht ausgeführt — CLI nicht verfügbar" ist ein **gültiges** Ergebnis und
+   lässt die Zelle auf `no` (genau eine WARNING bleibt).
+2. **State-Wechsel:** `topology_verified_state.<achse>` steht danach auf
+   `DOCUMENTED` oder `VERIFIED-RUNTIME` (nie auf `UNVERIFIED`).
+3. **Invariante grün:** §3.1-Zeile für die Position hat keine offenen
+   `unverified`-Felder mehr (außer `prompt-caching`/`progress`) und der
+   Invariantentest AC-15/AC-16 deckt die Änderung ab.
+
+Zellen, die die Probe **nicht** belegen kann (CLI fehlt, Ausgabe nicht
+eindeutig, Provider nicht installiert), bleiben `no` und degradieren mit
+**genau einer** WARNING pro Provider und Lauf. Ein Zell-Upgrade ohne
+Evidenzzeile ist ein Testfehler (AC-16), kein Datenpunkt.
 
 **Wichtig:** `N>1 = yes` heißt „der Provider kann N Subagenten parallel
 dispatchen" (Capability `parallel_execution`), **nicht** „N Orchestratoren sind
@@ -1195,6 +1242,8 @@ in v1 freigegeben". Die Aktivierung von `max-instances > 1` bleibt bis P3
 `topology_verified_state.multiple` ist für diese Zellen `DOCUMENTED`, nicht
 `VERIFIED-RUNTIME` — die Audit-/Scope-Semantik ist Konventions-Pflicht
 (D7/§9), keine Provider-Zusage.
+**Historische Herleitung (unverändert, nur Kontext):**
+
 - Gegenüber Rev. 1 **6 Zellen abgesenkt**: 3× `hybrid` (Claude `yes`,
   Opencode `degraded`, Kimi `yes` → `no→…`) und 3× `N>1` (Copilot, Mammouth,
   ZCode `yes` → `no`). Die vierte `parallel_execution: false`-Zelle (Continue)
@@ -1204,11 +1253,13 @@ in v1 freigegeben". Die Aktivierung von `max-instances > 1` bleibt bis P3
   Registry-Datum ist genau das, was S24/§2 verbieten. Ebenso zählen Codex und
   Mammouth `primary` **nicht** als datenabgeleitet, weil der Quell-Key selbst
   UNVERIFIED ist.
-- **Resultierende `hybrid`-Zeile:** alle zehn Zeilen `no→subagent` — in **allen**
-  Fällen WARNING `orchestrator-topology.hybrid-unverified`. Der Fail-safe-
-  Zielwert ist bewusst **nicht** „providers eigene Position": auf Claude/
-  Opencode/Continue/Kimi wäre das `primary` und damit `default_agent:
+- **Resultierende `hybrid`-Zeile (vor P0):** alle zehn Zeilen `no→subagent` — in
+  **allen** Fällen WARNING `orchestrator-topology.hybrid-unverified`. Der
+  Fail-safe-Zielwert ist bewusst **nicht** „providers eigene Position": auf
+  Claude/Opencode/Continue/Kimi wäre das `primary` und damit `default_agent:
   orchestrator` auf einer Rolle, die §1 ausdrücklich vermeiden will (Minor 4).
+  **Nach P0** gilt die Upgrade-Prozedur (oben): belegte Zellen dürfen `yes`
+  werden, unbelegte bleiben `no→subagent` mit genau einer WARNING.
 
 **Zehn Zeilen:** Das Briefing nennt „zehn Provider"; die Registry enthält
 **neun** (S18, verifiziert über `providers.registered_provider_names()`). Die
@@ -1222,11 +1273,12 @@ erzeugt beim Sync genau *einen* WARNING pro Provider und Lauf
 Deklaration, effektiven Wert und die Capability, die es verhindert) sowie einen
 Matrix-Eintrag in der Concept-Doc. Kein stilles Absenken, kein stilles Clamping.
 
-**Upgrade-Pfad (nicht Teil dieses Designs):** Eine Zelle darf erst `true`
-werden, wenn (1) §3.1 für die Position keine offenen `unverified`-Felder mehr
-hat, (2) `topology_verified_state` auf `DOCUMENTED`/`VERIFIED-RUNTIME` steht
-und (3) ein Invariantentest die Änderung abdeckt. Das ist die Pre-Approval-
-Evidenz für die *nächste* Revision — nicht für diese.
+**Upgrade-Prozedur (P0, OQ-1 = B):** siehe „Upgrade-Prozedur" oben in diesem
+Abschnitt. Kurz: `yes` nur mit (1) aufgezeichneter Probe-Evidenz im Spike-Doc,
+(2) `topology_verified_state` = `DOCUMENTED`/`VERIFIED-RUNTIME`, (3) grünem
+Invariantentest. Alles andere bleibt `no` mit genau einer WARNING. Die
+Probe-Ausführung selbst ist **P0-Deliverable**, nicht Nacharbeit einer späteren
+Revision.
 
 ---
 
@@ -1390,13 +1442,17 @@ jeweils wortgleich zum heutigen Text.
 2. **Rolle aktiv + Key unset** → `Worker → orchestrator → HARD REJECT`
    (Status quo, Standalone-Fall).
 
-Guard (`hooks/1-generic/orchestrator-guard-impl.sh`):
+Guard (`hooks/1-generic/orchestrator-guard-impl.sh`) — **P3-only (OQ-2 = A)**:
 
 - Sentinel-Grammatik erweitern auf
   `^#agent-meta:agent=([A-Za-z0-9_-]+)(?:\s+id=([A-Za-z0-9._-]+))?$`.
 - Die ID wird **nur** ins Audit-Log geschrieben (`hook_audit_log_append`),
-  niemals in einer Allow/Deny-Entscheidung benutzt.
+  niemals in einer Allow/Deny-Entscheidung benutzt (**audit-only**, nicht
+  Autorisierung).
 - Der bestehende Audit-Log-Redaction-/Rechte-Pfad bleibt unverändert.
+- **Phasenschnitt:** Hook + `tests/test_orchestrator_guard_hook.py` liegen in
+  **P3**, nicht in P4 — die ID existiert erst mit dem Multi-Instanz-Vertrag
+  (§9.1).
 
 ---
 
@@ -1408,24 +1464,32 @@ Größen nach `spec-plan-workflow` (S/M/L/XL, F7-Kriterium).
 
 | Phase | Größe | Dateien | Was sie landet | Warum getrennt mergebar |
 |---|---|---|---|---|
-| **P0 — Capability-Daten & Verified-State** | **S–M** (3) | `config/provider-capabilities.yaml` (+4 Strukturen je Provider, konservative Werte), `tests/test_topology_capability_invariant.py` (neu), `docs/spikes/2026-11-03-issue-1077-topology-probe.md` (Evidenzplan, **kein** Freigabe-Gate) | Die Datenbasis der Matrix (§7): `topology_support`, `topology_degrade`, `orchestrator_instances`, `topology_verified_state` + Invariante | Reine Daten/Doku, keine Emission berührt; die Werte sind bereits konservativ, also ist P0 **keine** Vorbedingung der Spec — die Spec hängt an §7, nicht an einem Spike (B1) |
+| **P0 — Capability-Daten, Verified-State & Probe-Ausführung** | **M (5)** | `config/provider-capabilities.yaml` (+4 Strukturen je Provider, konservative Werte), `docs/spikes/2026-11-03-issue-1077-topology-probe.md` (**Evidenz-Dokument**, nicht nur Evidenzplan), `scripts/topology-probe.py` (Probe-Harness, read-only, je Provider ein Lauf), `tests/test_topology_capability_invariant.py` (neu), `tests/test_topology_probe_evidence.py` (neu: nur belegte Zellen dürfen `yes` sein) | Die Datenbasis der Matrix (§7): `topology_support`, `topology_degrade`, `orchestrator_instances`, `topology_verified_state` + Invariante; **zusätzlich die fünf Provider-Probes (§16 Nr. 2–6) werden jetzt ausgeführt** und im Spike-Doc als Evidenz aufgezeichnet (OQ-1 = B). Nur belegte Zellen wechseln auf `yes`; unbelegte bleiben `no` mit genau einer WARNING | Reine Daten/Doku/Probe, keine Emission berührt (der Probe-Harness schreibt nur ins Spike-Doc). Die Basiswerte sind konservativ, die Upgrades evidenzgebunden; `sync --check` auf Consumer-Projekten bleibt byte-identisch. Probe-Ausführung und Zell-Upgrade sind **ein** Schritt (OQ-1 = B), kein Nachlauf |
 | **P1 — Config-Fläche, Auflöser, Validator, Flags** | **L** (11–12) | `config/project-config.schema.json`, `scripts/lib/topology.py` (neu), `scripts/lib/config.py` (`_validate_orchestrator_topology` (a)–(c), globale Flags), `scripts/lib/variables.py` (`_topology_flags`, Whitelist in `strip_inactive_conditional_blocks`, `_FALSE_DEFAULT_CONDITIONALS`), `scripts/lib/standalone.py` (`_CONDITIONAL_FALSE_FLAGS`), `scripts/lib/consistency/placeholders.py` (`_BUILTIN_VARS`), `scripts/lib/providers.py` (`primary_role`-Accessor), `scripts/lib/active_set.py` (`role_emitted_for_provider`, **nur** Funktion + Unit-Test), `tests/test_orchestrator_topology.py` (neu), `tests/test_orchestrator_topology_schema.py` (neu), `tests/test_orchestrator_topology_validator.py` (neu), Doku-Beispiele | Enum + Defaults, hartes Same-Scope-Validieren (a)–(c), Auflösekette, flache Topologie-Flags, **fail-closed** Conditional-Registrierung, ein `primary-role`-Lesezugriff | Key wird akzeptiert und aufgelöst, aber **noch nicht** in die Emission verdrahtet; `role_emitted_for_provider` ist gelandet, hat aber **keine Call-Site** (A8); unset-Verhalten byte-identisch (fail-closed durch `_FALSE_DEFAULT_CONDITIONALS`); einzeln revertierbar |
-| **P2 — Emission, laute Degradierung, Builder-Default** | **L** (10–11) | `scripts/lib/provider_transform.py`, `scripts/lib/isolation.py`, `scripts/lib/context.py` (`apply_settings_surface_shape`, `_init_provider_settings_json`), `scripts/lib/agent_sync.py` (Call-Site auf `role_emitted_for_provider`), `scripts/lib/consistency/topology.py` (neu), `scripts/consistency-check.py`, `tests/test_provider_transform_topology.py` (neu), `tests/test_topology_consistency.py` (neu), `tests/test_ac01_render_identity.py` (Fälle + Golden-Fixtures), `tests/fixtures/topology-golden/*` (neu), `config/ai-providers.yaml` (Kommentar) | `subagent` auf Opencode funktioniert real; Entry-Point/Gate-Kopplung folgt der Topologie; **kein** `default_agent` bei Topologie ≠ `primary`; `agent_sync.py` nutzt das Prädikat an der zweiten Stelle; WARNING + INFO | Braucht P1 (Auflöser, Validator, Flags); ist der einzige Schritt, der emittierte Bytes ändern kann — und nur bei explizitem Key. Die Call-Site-Umstellung ist bewusst hier, nicht in P1 (A8) |
-| **P3 — Multi-Instanz-Vertrag & Zustands-Namespaces** | **L** (10–12) | `config/project-config.schema.json` (`max-instances` mit `maximum: 8`, `singleton`), `scripts/lib/config.py` (`_validate_orchestrator_topology` (d)/(e)), `scripts/lib/variables.py` (`_instance_flags`: `ORCH_MAX_INSTANCES`, `ORCH_SINGLETON_DECLARED` + Whitelist-/`_FALSE_DEFAULT_CONDITIONALS`-/`_CONDITIONAL_FALSE_FLAGS`-Einträge), `scripts/lib/topology.py` (Instanz-Auflösung), `rules/1-generic/a2a-delegation-gates.md` (Instanz-Wortlaut, §10), `scripts/lib/checkpoint.py`, `schemas/a2a-handoff.schema.json`, `scripts/lib/delegation_syntax.py`, Viz-Emitter (`scripts/viz-logger.py` o. ä.), `tests/test_multi_instance_state.py` (neu), `tests/test_checkpoint_paths.py` (Fälle) | N>1 sicher: presence-only `singleton`, ID, Session-ID-Komposition, Event-Tagging (`scope_id`/`spawned_by`/`spawned_at`), Gate-Wortlaut mit `max {{ORCH_MAX_INSTANCES}}` | Setzt P1 voraus, **nicht** P2 (die Multiplizitäts-Achse ist laut Kommentar unabhängig). `max-instances` **existiert vor P3 nicht**; er wird hier gemeinsam mit `maximum: 8` und der Zustands-Isolation eingeführt (M3, AC-8/AC-9/AC-17 sind P3-only). |
-| **P4 — Regel-, Guard- und Doku-Amendment** | **M** (7–9) | `rules/1-generic/a2a-delegation-gates.md`, `agents/1-generic/orchestrator.md`, `agents/1-generic/_reference-agent.md`, `hooks/1-generic/orchestrator-guard-impl.sh`, `docs/concepts/active/orchestrator-topology.md` (neu, inkl. A1-Deviationssatz), `docs/concepts/active/singleton-orchestrator-architecture.md` (Status-Hinweis), `tests/test_orchestrator_guard_hook.py`, `CHANGELOG.md` | Neue Gate-Formulierung (conditional, else wortgleich, **ohne** Instanz-Platzhalter), Audit-ID, Concept-Doc + Cross-Links | Braucht nur P1 (nutzt `ORCH_TOPOLOGY_EXPLICIT`); der Instanz-Wortlaut kommt mit P3 (§10). Die drei Conditional-Dateien `variables.py`, `standalone.py`, `placeholders.py` sind **P1**-Änderungen und werden in P4 nur konsumiert/verifiziert |
+| **P2 — Emission, laute Degradierung, Builder-Default** | **L** (10–11) | `scripts/lib/provider_transform.py`, `scripts/lib/isolation.py`, `scripts/lib/context.py` (`apply_settings_surface_shape`, `_init_provider_settings_json`), `scripts/lib/agent_sync.py` (Call-Site auf `role_emitted_for_provider`), `scripts/lib/consistency/topology.py` (neu), `scripts/consistency-check.py`, `tests/test_provider_transform_topology.py` (neu), `tests/test_topology_consistency.py` (neu), `tests/test_ac01_render_identity.py` (Fälle + Golden-Fixtures), `tests/fixtures/topology-golden/*` (neu), `config/ai-providers.yaml` (Kommentar) | `subagent` auf Opencode funktioniert real; Entry-Point/Gate-Kopplung folgt der Topologie; **kein** `default_agent` bei Topologie ≠ `primary`; `agent_sync.py` nutzt das Prädikat an der zweiten Stelle; WARNING + Sync-Summary-Zeile (OQ-4 = A, **kein** `--check`-INFO) | Braucht P1 (Auflöser, Validator, Flags); ist der einzige Schritt, der emittierte Bytes ändern kann — und nur bei explizitem Key. Die Call-Site-Umstellung ist bewusst hier, nicht in P1 (A8) |
+| **P3 — Multi-Instanz-Vertrag, Zustands-Namespaces & Guard-Audit** | **L** (12–14) | `config/project-config.schema.json` (`max-instances` mit `maximum: 8` (**OQ-3 = A**), `singleton`), `scripts/lib/config.py` (`_validate_orchestrator_topology` (d)/(e)), `scripts/lib/variables.py` (`_instance_flags`: `ORCH_MAX_INSTANCES`, `ORCH_SINGLETON_DECLARED` + Whitelist-/`_FALSE_DEFAULT_CONDITIONALS`-/`_CONDITIONAL_FALSE_FLAGS`-Einträge), `scripts/lib/topology.py` (Instanz-Auflösung), `rules/1-generic/a2a-delegation-gates.md` (Instanz-Wortlaut, §10), `hooks/1-generic/orchestrator-guard-impl.sh` (**OQ-2 = A**: Sentinel-`id=` audit-only), `tests/test_orchestrator_guard_hook.py`, `scripts/lib/checkpoint.py`, `schemas/a2a-handoff.schema.json`, `scripts/lib/delegation_syntax.py`, Viz-Emitter (`scripts/viz-logger.py` o. ä.), `tests/test_multi_instance_state.py` (neu), `tests/test_checkpoint_paths.py` (Fälle) | N>1 sicher: presence-only `singleton`, ID, Session-ID-Komposition, Event-Tagging (`scope_id`/`spawned_by`/`spawned_at`), Gate-Wortlaut mit `max {{ORCH_MAX_INSTANCES}}`, Guard-Audit-ID | Setzt P1 voraus, **nicht** P2 (die Multiplizitäts-Achse ist laut Kommentar unabhängig). `max-instances` **existiert vor P3 nicht**; er wird hier gemeinsam mit `maximum: 8` und der Zustands-Isolation eingeführt (M3, AC-8/AC-9/AC-17 sind P3-only). OQ-2/OQ-3 sind **P3-only Konsequenzen**. |
+| **P4 — Regel- und Doku-Amendment** | **S–M** (5–7) | `rules/1-generic/a2a-delegation-gates.md`, `agents/1-generic/orchestrator.md`, `agents/1-generic/_reference-agent.md`, `docs/concepts/active/orchestrator-topology.md` (neu, inkl. A1-Deviationssatz), `docs/concepts/active/singleton-orchestrator-architecture.md` (Status-Hinweis), `CHANGELOG.md` | Neue Gate-Formulierung (conditional, else wortgleich, **ohne** Instanz-Platzhalter), Concept-Doc + Cross-Links | Braucht nur P1 (nutzt `ORCH_TOPOLOGY_EXPLICIT`); der Instanz-Wortlaut kommt mit P3 (§10), der Guard-Audit ebenfalls P3 (OQ-2 = A). Die drei Conditional-Dateien `variables.py`, `standalone.py`, `placeholders.py` sind **P1**-Änderungen und werden in P4 nur konsumiert/verifiziert |
 
-**Summe:** 41–48 Datei-Berührungen (mit Doppelzählungen von
+**Summe:** 43–50 Datei-Berührungen (mit Doppelzählungen von
 `project-config.schema.json`, `config.py` und `topology.py`), **XL** (F7:
 öffentliche Config-Contracts + Schema + mehr als eine Subsystemgrenze →
-Architectural unabhängig von der Dateizahl).
+Architectural unabhängig von der Dateizahl). Gegenüber Rev. 3: **+2** durch P0
+(Probe-Harness + Evidenz-Test), **±0** durch die Verschiebung von Guard + Test
+von P4 nach P3.
 
-**Ehrliche Schnittkante (OQ-5, Default: ja):** v1 = **P0–P2 + P4**
+**Ehrliche Schnittkante (OQ-5 = A, entschieden 2026-11-04):** v1 = **P0–P2 + P4**
 (Config-Fläche + Auflöser + laute Degradierung + sichtbare Regel + Doku)
 liefert den Builder-Default und **genau einen** spawnbaren Orchestrator; es ist
 eigenständig nützlich und ohne Zustandsrisiko. Multi-Instanz = **P3** ist der
 riskante Teil und der **unmittelbar nächste Schritt** (kein offenes Ende); er
 kann v1 nicht blockieren, weil v1 keinen `max-instances`-Key und keine
-P3-only-AC referenziert (M3).
+P3-only-AC referenziert (M3). OQ-2 (Guard-Audit) und OQ-3 (`maximum: 8`) sind
+**P3-only** und damit ebenfalls kein v1-Blocker.
+
+**P0 ist v1-Bestandteil, aber keine Spec-Vorbedingung:** Die Probes laufen in
+P0 (nicht vor der Spec-Freigabe); die Spec hängt an der *Upgrade-Regel*, nicht
+an einem bereits gemessenen N. Ergebnisoffen bleibt nur N — die Invariante
+(kein `yes` ohne Evidenz) gilt unabhängig von N.
 
 
 ---
@@ -1446,17 +1510,17 @@ P3-only-AC referenziert (M3).
 
 ### Aus dem Issue-Kommentar (Multi-Instanz-Slice)
 
-> **Phasen-Geltung (M3):** Die mit **(P3-only)** markierten ACs gehören **nicht**
-> zur v1-DoD. v1 (= P0–P2 + P4) prüft AC-1…AC-7, AC-13…AC-16, AC-18 und die
-> P1-Zeilen von AC-17; AC-8…AC-12 und die P3-Zeilen von AC-17 werden mit P3
-> grün (OQ-5, Default: ja).
+> **Phasen-Geltung (M3, OQ-5 = A):** Die mit **(P3-only)** markierten ACs gehören
+> **nicht** zur v1-DoD. v1 (= P0–P2 + P4) prüft AC-1…AC-7, AC-13…AC-16, AC-18 und
+> die P1-Zeilen von AC-17; AC-8…AC-12 und die P3-Zeilen von AC-17 werden mit P3
+> grün (OQ-5 = A, entschieden 2026-11-04).
 
 | ID | Kriterium | Prüfbar durch |
 |---|---|---|
-| **AC-8** | **(P3-only)** Schema akzeptiert `orchestrator.max-instances` (`maximum: 8`, Default 1 — der Key existiert vor P3 nicht) und `singleton` (nur `true`, **kein Schema-`default`**); `singleton` present + `max-instances > 1` ist ein harter Validator-ERROR; `--validate` ist grün bei konsistenten Configs | Schema-Test (beide Richtungen) + Validator-Test |
+| **AC-8** | **(P3-only)** Schema akzeptiert `orchestrator.max-instances` (`maximum: 8` — **OQ-3 = A**, Default 1 — der Key existiert vor P3 nicht) und `singleton` (nur `true`, **kein Schema-`default`**); `singleton` present + `max-instances > 1` ist ein harter Validator-ERROR; `--validate` ist grün bei konsistenten Configs | Schema-Test (beide Richtungen) + Validator-Test |
 | **AC-9** | **(P3-only)** `topology: primary` + `max-instances > 1` im selben Scope ist ein harter ERROR; der Cross-Scope-Fall (Provider-Override `primary`, globales N>1) ist WARNING + effektiv N=1 | Validator-Test + Konsistenz-Test |
 | **AC-10** | **(P3-only)** N=1 erzeugt exakt die heutigen Checkpoint-/Progress-Pfade; N=2 erzeugt `<base>__<id>`-Dateien; `validate_session_id` akzeptiert die Komposition | `tests/test_checkpoint_paths.py`-Erweiterung |
-| **AC-11** | **(P3-only)** Audit-Datensatz vollständig: Viz-Events bei N>1 tragen `orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`; das Log bleibt **eine** Datei; `viz-report` konsumiert unverändert; das Guard-Audit-Log trägt die ID (Reduktion dort dokumentiert) | Event-Fixture + Reader-Test + Hook-Test |
+| **AC-11** | **(P3-only)** Audit-Datensatz vollständig: Viz-Events bei N>1 tragen `orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`; das Log bleibt **eine** Datei; `viz-report` konsumiert unverändert; das Guard-Audit-Log trägt die ID (**OQ-2 = A**: Sentinel-`id=` audit-only, nie Allow/Deny; Reduktion dort dokumentiert) | Event-Fixture + Reader-Test + Hook-Test |
 | **AC-12** | **(P3-only)** `max-instances` und `max-parallel-agents` sind in beiden Schema-descriptions gegeneinander abgegrenzt (Text-Assertion) | Schema-Text-Test |
 | **AC-13** | Jeder registrierte Provider trägt `topology_support`, `topology_degrade`, `orchestrator_instances` **und** `topology_verified_state` (Invariante) | Provider-Invariantentest (Muster `test_provider_three_file_invariant.py`) |
 
@@ -1465,9 +1529,9 @@ P3-only-AC referenziert (M3).
 | ID | Kriterium | Prüfbar durch |
 |---|---|---|
 | **AC-14** | Frisches Opencode-v2-Projekt mit `topology: subagent` enthält **kein** `default_agent` auf der Orchestrator-Rolle; ein verwalteter Wert wird beim Wechsel `primary → subagent` zurückgerollt; ein nutzereigener Wert erzeugt `default-agent-conflict` (WARN, kein Auto-Delete); der ActiveSet-Konjunkt aus `_opencode_entry_point` bleibt wirksam | `tests/test_ac01_render_identity.py` + Isolation-Test |
-| **AC-15** | `topology_support.* == true` ⇒ `topology_verified_state.* != UNVERIFIED`; der Resolver gibt bei `UNVERIFIED` **nie** den deklarierten Wert zurück; in v1 ist `hybrid` auf allen Providern `UNVERIFIED` und effektiv degradiert | Provider-Invariantentest + Resolver-Test |
-| **AC-16** | Die Matrix (§7) hat 40 Zellen: **25 datenabgeleitet**, **15 `UNVERIFIED ⇒ no`** (10× `hybrid` [9 Provider + custom], 2× unverifizierte `primary` [Codex, Mammouth], 3× custom-Restzellen), **0 spekulative `yes`**; jede Degradierung erzeugt genau einen WARNING pro Provider und Lauf | Matrix-Zähl-Test + Konsistenz-Test |
-| **AC-17** | Der harte stdlib-Validator lehnt ab (rc≠0 in `sync` **und** `--validate`, ohne `jsonschema`) mit den in §4.7 gepinnten Teilstrings: **(P1)** Same-Scope `main-chat` × Topologie (auch Same-Object), `enabled: false` × Topologie; **(P3-only)** `singleton: false`, `singleton` present × N>1, `primary` × N>1 im selben Scope | `tests/test_orchestrator_topology_validator.py` (P1-Fälle) + P3-Testerweiterung |
+| **AC-15** | **Invariante (unverändert):** `topology_support.* == true` ⇒ `topology_verified_state.* != UNVERIFIED`; der Resolver gibt bei `UNVERIFIED` **nie** den deklarierten Wert zurück. **Zählung nach P0 gemessen:** eine `yes`-Zelle existiert nur mit aufgezeichneter Probe-Evidenz; `hybrid` bleibt überall dort degradiert, wo die Probe nichts belegt | Provider-Invariantentest + Resolver-Test |
+| **AC-16** | **Matrix (§7) — Regel, keine geratene Zahl:** 40 Zellen = **`25 + N` datenabgeleitet** / **`15 − N` `UNVERIFIED ⇒ no`**; **N wird nach P0 aus der Evidenzliste gemessen** (`0 ≤ N ≤ 15`, Evidenzquellen: die fünf Probes §16 Nr. 2–6; eine Probe kann mehrere Zellen stützen), **0 spekulative `yes`**; jede Degradierung erzeugt genau einen WARNING pro Provider und Lauf. Der Test liest N aus dem Spike-Doc und prüft die Bilanz — er pinnt **keine** konkrete Endzahl | Matrix-Zähl-Test (liest Evidenzliste) + Konsistenz-Test |
+| **AC-17** | Der harte stdlib-Validator lehnt ab (rc≠0 in `sync` **und** `--validate`, ohne `jsonschema`) mit den in §4.7 gepinnten Teilstrings: **(P1)** Same-Scope `main-chat` × Topologie (auch Same-Object), `enabled: false` × Topologie; **(P3-only, OQ-2/OQ-3-Folgen)** `singleton: false`, `singleton` present × N>1, `primary` × N>1 im selben Scope | `tests/test_orchestrator_topology_validator.py` (P1-Fälle) + P3-Testerweiterung |
 | **AC-18** | `ORCH_TOPOLOGY_*` sind in der Whitelist von `strip_inactive_conditional_blocks` registriert **und** `ORCH_TOPOLOGY_EXPLICIT`/`_PRIMARY`/`_SUBAGENT`/`_HYBRID` stehen in `_FALSE_DEFAULT_CONDITIONALS` (**fail-closed:** abwesend ⇒ inaktiv); `_CONDITIONAL_FALSE_FLAGS` und `_BUILTIN_VARS` tragen dieselben Flags; Key unset rendert exakt den heutigen else-Zweig (inkl. verschachteltem `ROLE_ORCHESTRATOR_ACTIVE`); kein Zweig rendert doppelt | Golden-Fixtures + `check_builder_known_set` + Conditional-Test (abwesende Variable ⇒ else) |
 
 ---
@@ -1507,20 +1571,26 @@ P3-only-AC referenziert (M3).
   (D7).
 - **Keine** Änderung an `max-parallel-agents` (Semantik, Default, Grenzen).
 - **Kein** Runtime-Enforcement von N oder von Instanz-Scopes (D8).
-- **Kein** Zell-Upgrade der Matrix in v1: `hybrid` bleibt auf allen Providern
-  `UNVERIFIED ⇒ no`; Upgrades sind die Evidenz-Arbeit der nächsten Revision.
+- **Kein ungebundenes Zell-Upgrade:** Matrix-Zellen wechseln nur über die
+  P0-Upgrade-Prozedur (§7) mit aufgezeichneter Probe-Evidenz; unbelegte Zellen
+  bleiben `UNVERIFIED ⇒ no`. Die Probe-Ausführung selbst ist P0-Bestandteil
+  (OQ-1 = B), nicht "Arbeit der nächsten Revision".
 
 ---
 
-## 15. Offene Fragen (max. 5, je mit Default)
+## 15. Offene Fragen (alle entschieden am 2026-11-04)
 
-| ID | Frage | Empfohlener Default | Warum eine Nutzerentscheidung |
+> **Status:** Keine offene Frage mehr. Alle fünf sind durch den Nutzer
+> entschieden (**RESOLVED (2026-11-04, user)**); die Spec trägt deshalb keinen
+> OQ-Block mehr, sondern nur die Entscheidung und ihre Konsequenz (§17).
+
+| ID | Frage | Entscheidung | Konsequenz (eine Zeile) |
 |---|---|---|---|
-| **OQ-1** | Welche Evidenz hebt eine `hybrid`-Zelle von `UNVERIFIED` auf `DOCUMENTED`/`VERIFIED-RUNTIME` (und damit `topology_support.hybrid: true`)? | **Runtime-Probe je Provider; kein Upgrade vor §3.1-Evidenz + Invariantentest** | Ein vorgezogenes `hybrid: true` kostet Vertrauen; ein dauerhaftes `no` kostet den Enum-Nutzen. Beides ist vertretbar, aber die Entscheidung ist eine Produkt-/Risiko-Entscheidung |
-| **OQ-2** | Soll der Guard die optionale Instanz-ID im Sentinel parsen (Audit-only, Hook-Change + Testumbau) oder unverändert bleiben? | **Parsen, audit-only** | Es ist der einzige Nachweis bei Instanz-Überschreitung, kostet aber einen Hook-Version-Bump |
-| **OQ-3** | Obergrenze für `max-instances` (Schema-`maximum`)? | **8** | Direkte Kosten-/Token-Folge; 5 ist zu knapp für „ein Strang je PR-Linie", >8 ist unrealistisch |
-| **OQ-4** | Soll die *abgeleitete* Topologie als INFO-Finding in `--check` erscheinen (mehr Sichtbarkeit, mehr Output für jedes Projekt) oder nur als Sync-Summary-Zeile? | **Nur Sync-Summary** (kein `--check`-Delta) | Sichtbarkeit gegen „null Output-Delta für unveränderte Projekte" — eine Produktentscheidung |
-| **OQ-5** | Ist der v1-Schnitt akzeptiert: v1 liefert **Builder-Default + genau einen spawnbaren Orchestrator**; **Multi-Instanz ist P3**? | **Ja** — und P3 ist der **unmittelbar nächste Schritt**, kein offenes Ende | Der Schnitt erlaubt ein früh grünes, byte-identisches v1 und entkoppelt zwei Risiken (Byte-Identität vs. Zustands-Isolation). Die Alternative (P3 in v1) macht AC-8/AC-9/AC-17-Singleton zur v1-DoD und koppelt den riskanten Teil an den sicheren |
+| **OQ-1** | Welche Evidenz hebt eine `hybrid`-Zelle von `UNVERIFIED` auf `DOCUMENTED`/`VERIFIED-RUNTIME` (und damit `topology_support.hybrid: true`)? | **RESOLVED (2026-11-04, user) = B:** die fünf Provider-Probes werden **jetzt** ausgeführt; jede belegte Zelle darf `UNVERIFIED ⇒ no` → `yes`, jede nicht belegte bleibt `no` mit genau einer WARNING. *(Ursprüngliche Empfehlung: Runtime-Probe je Provider, kein Upgrade vor §3.1-Evidenz + Invariantentest.)* | Die Probes werden **P0-Deliverable** (nicht Evidenzplan einer späteren Revision); §7/AC-16 zählen `25 + N` mit **gemessenem** N. |
+| **OQ-2** | Soll der Guard die optionale Instanz-ID im Sentinel parsen (Audit-only, Hook-Change + Testumbau) oder unverändert bleiben? | **RESOLVED (2026-11-04, user) = A:** parsen, **audit-only** (nie Allow/Deny). *(Empfehlung war identisch.)* | **P3-only**: Sentinel-`id=` landet mit dem Multi-Instanz-Vertrag (§9.1), nicht in v1; Hook + Test wandern von P4 nach P3. |
+| **OQ-3** | Obergrenze für `max-instances` (Schema-`maximum`)? | **RESOLVED (2026-11-04, user) = A: 8.** *(Empfehlung war identisch.)* | **P3-only**: `maximum: 8` wird gemeinsam mit dem Key in P3 eingeführt; vorher existiert `max-instances` nicht (M3). |
+| **OQ-4** | Soll die *abgeleitete* Topologie als INFO-Finding in `--check` erscheinen oder nur als Sync-Summary-Zeile? | **RESOLVED (2026-11-04, user) = A:** nur Sync-Summary-Zeile, **kein** `--check`-INFO. *(Empfehlung war identisch.)* | Ein Konsistenz-INFO-Finding `orchestrator-topology.derived` entfällt; unveränderte Projekte behalten null `--check`-Delta. |
+| **OQ-5** | Ist der v1-Schnitt akzeptiert: v1 liefert **Builder-Default + genau einen spawnbaren Orchestrator**; **Multi-Instanz ist P3**? | **RESOLVED (2026-11-04, user) = A: ja.** *(Empfehlung war identisch.)* | v1 = **P0–P2 + P4**; P3 (Multi-Instanz) ist der **unmittelbar nächste Schritt**, kein offenes Ende. |
 
 ---
 
@@ -1528,20 +1598,24 @@ P3-only-AC referenziert (M3).
 
 1. **Stand `95756dfe` / clean tree** — BRIEF, nicht selbst geprüft (kein
    Shell-Zugriff in dieser Runde).
-2. **Opencode: ist eine `mode: primary`-Rolle zusätzlich per
-   `task(subagent_type: "orchestrator")` aufrufbar?** Das ist die Umkehrung von
-   #1006 Variante B; nirgends belegt. Entscheidet, ob Opencode `hybrid` echtes
-   `yes` bekommt (v1: nein).
-3. **Claude: Ist `claude --agent orchestrator` wirklich ein "Primary" im Sinne
-   dieser Definition** (gleicher Kontext wie der Main Chat, gleiche
-   Hook-Payload-Semantik, Prompt-Caching)? Nur der Hint-Text belegt den Aufruf,
-   nicht die Kontext-Identität.
-4. **Codex `main_agent_selectable`** ist in `provider-capabilities.yaml` selbst
-   als UNVERIFIED markiert; die Matrix ist deshalb konservativ `no`.
-5. **Mammouth `primary`** (OpenCode-Fork mit `mode: primary`/`default_agent`)
-   ist nicht belegt.
-6. **KimiCode: exakter Auswahlmechanismus** für `main_agent_selectable: true`
-   (CLI-Flag? Config-Feld?) in dieser Runde nicht geprüft.
+2. **P0 zu messen (OQ-1 = B): Opencode — ist eine `mode: primary`-Rolle
+   zusätzlich per `task(subagent_type: "orchestrator")` aufrufbar?** Das ist die
+   Umkehrung von #1006 Variante B; nirgends belegt. Entscheidet, ob Opencode
+   `hybrid` echtes `yes` bekommt (bis zur Probe: nein). Evidenz gehört in das
+   Spike-Doc; „nicht ausgeführt — CLI nicht verfügbar" ist ein gültiges
+   Ergebnis und lässt die Zelle `no`.
+3. **P0 zu messen (OQ-1 = B): Claude — ist `claude --agent orchestrator`
+   wirklich ein "Primary" im Sinne dieser Definition** (gleicher Kontext wie der
+   Main Chat, gleiche Hook-Payload-Semantik, Prompt-Caching)? Nur der Hint-Text
+   belegt den Aufruf, nicht die Kontext-Identität.
+4. **P0 zu messen (OQ-1 = B): Codex `main_agent_selectable`** ist in
+   `provider-capabilities.yaml` selbst als UNVERIFIED markiert; die Matrix ist
+   deshalb bis zur Probe konservativ `no`.
+5. **P0 zu messen (OQ-1 = B): Mammouth `primary`** (OpenCode-Fork mit
+   `mode: primary`/`default_agent`) ist nicht belegt.
+6. **P0 zu messen (OQ-1 = B): KimiCode — exakter Auswahlmechanismus** für
+   `main_agent_selectable: true` (CLI-Flag? Config-Feld?) in dieser Runde nicht
+   geprüft.
 7. **Gemini/Antigravity: können mehrere `define_subagent`-Registrierungen
    derselben Rolle mit unterschiedlichen Instanz-IDs koexistieren?** Für die
    Zustands-Namespaces irrelevant (Identität ist Envelope + Dateiname), für die
@@ -1561,9 +1635,14 @@ P3-only-AC referenziert (M3).
 **Summe: 22 unverifizierte Posten** — 12 Sachverhalte (§16.1–12) + 10
 `hybrid`-Matrix-Zellen (`topology_verified_state.hybrid: UNVERIFIED`). Die zwei
 unverifizierten `primary`-Zellen (Codex, Mammouth) sind in Nr. 4/5 enthalten,
-nicht zusätzlich gezählt. Davon sind 10 durch die konservative Auflösung für v1
-**entschärft** (kein Versprechen, laute Degradierung); die restlichen 12
-blockieren v1 nicht, sind aber vor einem Zell-Upgrade zu belegen.
+nicht zusätzlich gezählt. **Davon sind 5 Posten (Nr. 2–6) kein „für immer
+unverifiziert" mehr, sondern P0-Messauftrag (OQ-1 = B):** nach P0 sinkt die
+Zahl auf höchstens **17** — gemessen, nicht behauptet (jeder belegte Posten
+schließt genau seine Zelle, jeder nicht belegte bleibt `no` mit einer WARNING).
+Die übrigen 7 Sachverhalte (Nr. 1, 7–12) blockieren v1 nicht, sind aber vor
+einem Zell-Upgrade zu belegen. Die 10 `hybrid`-Zellen sind durch die
+konservative Auflösung für v1 **entschärft** (kein Versprechen, laute
+Degradierung).
 
 ---
 
@@ -1572,10 +1651,15 @@ blockieren v1 nicht, sind aber vor einem Zell-Upgrade zu belegen.
 - **Trace-Anker:** `spec-id: SPEC-orchestrator-topology-2026-11-03` (unverändert
   übernehmen).
 - **Spec-Input:** D1–D10 (Entscheidungen), §4 (Interface Contracts), §7
-  (Matrix als normative Tabelle, inkl. Zählung und `UNVERIFIED ⇒ no`), §9
-  (Multi-Instanz-Vertrag inkl. 4-Feld-Audit), §11 (Phasen), §12 (ACs).
+  (Matrix als normative Tabelle, **Upgrade-Prozedur + Zählregel `25 + N`**),
+  §9 (Multi-Instanz-Vertrag inkl. 4-Feld-Audit, **P3-only**), §11 (Phasen,
+  **P0 inkl. Probe-Ausführung**), §12 (ACs, **P3-Tags**).
+- **Entschieden (Rev. 4, 2026-11-04):** OQ-1 = B · OQ-2 = A · OQ-3 = A ·
+  OQ-4 = A · OQ-5 = A. Die Spec übernimmt diese als Fakten und enthält
+  **keine** offenen Fragen (§15).
 - **Nicht** in die Spec zu übernehmen: offene Fragen als Fakten, unverifizierte
-  Matrix-Zellen als `yes`, P0-Evidenz als bereits erbracht.
+  Matrix-Zellen als `yes`, P0-Evidenz als bereits erbracht (die Spec beschreibt
+  die **Abnahme**, nicht das Ergebnis), `N` als konkrete Zahl.
 - **A9 (Governance):** `consistency/spec_plan.py::_classify` ordnet
   `*-design.md` als **spec** ein und verlangt die literalen Überschriften
   (`## Problem`, `## Ziel`, `## Nicht-Ziele`, `## Interface Contracts`,
@@ -1584,8 +1668,9 @@ blockieren v1 nicht, sind aber vor einem Zell-Upgrade zu belegen.
   erzeugt daher ~8 Section-Findings unter `--validate-spec-plan`; das ist
   **WARNING-only**, weil die aktive DoD `rapid-prototyping`
   `spec-plan-required: false` setzt. Die **abgeleitete Spec** (Stage
-  `specify`) MUSS die literalen Überschriften tragen — dann ist
-  `--validate-spec-plan` für sie grün.
+  `specify`) MUSS die literalen Überschriften tragen; ob `_classify` sie als
+  `spec` einordnet, hängt zusätzlich am Dateinamen (`*-design.md` wird als
+  `spec` gelesen, `*-spec.md` derzeit als `plan`).
 - **Freigabe:** `concept-reviewer`; dieses Dokument bleibt `Status: Entwurf`.
 
 
