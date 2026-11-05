@@ -3,13 +3,17 @@
 ## Enforced Gates (aktiv prüfen — HARD REJECT)
 
 1. **No Self-Handoff / No Re-Delegation:** Ein `payload`, der mit "Du bist..." beginnt, ist ein Re-Delegations-/Spec-Dump-Versuch → HARD REJECT.
-{{#if ORCH_TOPOLOGY_EXPLICIT}}2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**
+{{#if ORCH_TOPOLOGY_EXPLICIT}}
+2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**
    G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.
    G2 Unter `subagent`/`hybrid` spawnt NUR `main_chat` den Orchestrator; unter
       `primary` ist der Orchestrator der Session-Einstieg. Genau eine Instanz.
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
-   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).{{else}}2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker{{#if ROLE_ORCHESTRATOR_ACTIVE}} → `orchestrator`{{/if}} → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).{{/if}}
+   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
+{{else}}
+2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker{{#if ROLE_ORCHESTRATOR_ACTIVE}} → `orchestrator`{{/if}} → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
+{{/if}}
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
 
 ## Degradierte Checks (Doku-Pflicht, kein Gate — Issue #346)
