@@ -72,6 +72,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # shrink-only and must not take new entries.
     "ORCH_TOPOLOGY", "ORCH_TOPOLOGY_EXPLICIT", "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT", "ORCH_TOPOLOGY_HYBRID", "ORCH_TOPOLOGY_SOURCE",
+    # Orchestrator multiplicity axis (P3, AC-8): emitted by
+    # variables._instance_flags via config.build_variables. Register here — the
+    # builder ratchet is shrink-only and must not take new entries.
+    "ORCH_MAX_INSTANCES", "ORCH_SINGLETON_DECLARED",
     "A2A_PROTOCOL_ENABLED", "CHECKPOINTING_ENABLED", "AUTO_COMMIT_ENABLED",
     "A2A_HANDOFF_BLOCK", "ANTI_RECURSION_BLOCK", "DOD_REQ_BLOCK", "DOD_TESTS_BLOCK",
     "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT",

@@ -24,6 +24,7 @@ from .context_profile import (
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
+    _instance_flags,
     _orch_mode_flags,
     _resolve_orch_mode,
     _subagent_permission_flags,
@@ -1942,7 +1943,8 @@ def _build_orch_variables(
 
     Parameter contract:
         variables: mutated in place — receives ORCHESTRATOR_*, ORCH_MODE_*,
-            ORCH_TOPOLOGY_*, REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
+            ORCH_TOPOLOGY_*, ORCH_MAX_INSTANCES, ORCH_SINGLETON_DECLARED,
+            REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
             ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
             CHECKPOINTING_ENABLED, NATIVE_EXTENSIONS_*, ANALYSIS_ENABLED,
             FILE_AFFINITY_HINT, UNKNOWN_FALLBACK_*, A2A_HANDOFF_BLOCK and
@@ -1986,6 +1988,16 @@ def _build_orch_variables(
         "" if _project_topology is None else str(_project_topology).strip(),
         explicit=_project_topology is not None,
         source="project" if _project_topology is not None else "derived",
+    ))
+
+    # ORCH_MAX_INSTANCES / ORCH_SINGLETON_DECLARED: provider-LESS (global)
+    # project-scope block (P3, AC-8). The unset count is the single-instance
+    # default "1"; ``ORCH_SINGLETON_DECLARED`` answers presence, never
+    # truthiness. Provider-scoped effective counts are re-resolved in
+    # rules.py (Task 7) and reported by the consistency check (Task 6).
+    variables.update(_instance_flags(
+        orch_config.get("max-instances"),
+        singleton_declared="singleton" in orch_config,
     ))
 
     # REPO_CONTAINMENT_*: base (provider-independent) flags, wired exactly like

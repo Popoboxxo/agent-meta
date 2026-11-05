@@ -62,6 +62,13 @@ _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+    # Orchestrator multiplicity axis (P3, AC-8): opt-in exactly like the
+    # position flags. An absent value must read as inactive so a consumer
+    # project without ``max-instances``/``singleton`` keeps the historic
+    # branch. ``ORCH_MAX_INSTANCES`` carries a count ("1".."8"), never "true",
+    # so it is registered for resolvability but is not a boolean gate (K-2).
+    "ORCH_MAX_INSTANCES",
+    "ORCH_SINGLETON_DECLARED",
 })
 
 #: The four boolean topology flags as a static set. The strip helper builds
@@ -74,6 +81,14 @@ _TOPOLOGY_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+})
+
+#: P3 instance flags registered in the strip whitelist. Unlike the topology
+#: family they have no shared prefix the helper could discover, so the names
+#: must be present statically (absent => inactive, AC-8 fail-closed).
+_INSTANCE_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
+    "ORCH_MAX_INSTANCES",
+    "ORCH_SINGLETON_DECLARED",
 })
 
 # Only these are safe as {{#if}} conditionals: strip_inactive_conditional_blocks
@@ -340,6 +355,34 @@ def _topology_flags(topology: str, *, explicit: bool, source: str) -> dict:
     }
 
 
+def _instance_flags(max_instances, *, singleton_declared: bool) -> dict:
+    """Return the flat ``ORCH_MAX_INSTANCES``/``ORCH_SINGLETON_DECLARED`` flags.
+
+    Pure and provider-agnostic (P3, AC-8). ``max_instances`` is the *declared
+    project* value; ``None`` (unset) is the single-instance default ``"1"``.
+    Anything outside the schema range ``1..8`` — including bools, strings and
+    floats — fails closed to ``"1"``; the hard range error lives in
+    ``config._validate_orchestrator_topology`` and ``topology.resolve_orchestrator_instances``.
+
+    ``singleton_declared`` is the *presence* question, never truthiness:
+    ``"singleton" in orchestrator`` is what the caller passes, so
+    ``singleton: false`` still renders ``"true"`` here (the schema rejects that
+    value; this helper only reports the declaration).
+    """
+    if (
+        isinstance(max_instances, bool)
+        or not isinstance(max_instances, int)
+        or not 1 <= max_instances <= 8
+    ):
+        normalized = "1"
+    else:
+        normalized = str(max_instances)
+    return {
+        "ORCH_MAX_INSTANCES": normalized,
+        "ORCH_SINGLETON_DECLARED": "true" if singleton_declared else "false",
+    }
+
+
 def _repo_containment_block(enabled: bool, sink_active: bool, tmp_path: str) -> str:
     """Render the effective repo-containment policy text (spec §4.5).
 
@@ -497,6 +540,9 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # variables dict does not carry them yet (absent => inactive, AC-18).
     conditional_vars.update({k for k in variables if k.startswith("ORCH_TOPOLOGY_")})
     conditional_vars.update(_TOPOLOGY_CONDITIONAL_FLAGS)
+    # P3 instance flags (AC-8): statically whitelisted so an absent value is
+    # inactive even when the variables dict does not carry it yet.
+    conditional_vars.update(_INSTANCE_CONDITIONAL_FLAGS)
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
