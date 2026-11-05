@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.7] - 2026-11-05
+
 ### Added
 - **Orchestrator topology (`orchestrator.topology`, #1077)**: new optional position axis
   (`primary | subagent | hybrid`), overridable per provider via
@@ -354,6 +356,16 @@
   as a section. `ai-providers` keeps its always-guarded behaviour.
   **behavior change:** an admin save of an anchored `project.yaml` that previously
   succeeded with a lossy full dump now returns 400 unless `__allow_lossy__` is set.
+- **CI job timeouts get headroom (#945)**: the `test` and `subprocess-shard` jobs in
+  `orchestration-test.yml` raise their backstop from 30 to 45 minutes after both were
+  cancelled at 97-99 % on a loaded 3.12 runner (duration, not a failing test; runs
+  41381909910 / 41491331808 and PR #1112). The shard lists and `-n 0` are unchanged;
+  `compat-311` keeps its 30-minute ceiling.
+- **Deferred test-hygiene findings are closed (#945)**: the platform-defaults tests gain
+  an integration round-trip (compute -> `ensure_gitignore_entries` -> read `.gitignore` ->
+  `git check-ignore`) that pins the snapshot inside the managed BEGIN/END block, and the
+  fork-bomb timing tests become generous 40 s hang guards (below `SCRIPT_TIMEOUT`) instead
+  of wall-clock performance assertions that failed on loaded runners.
 
 ## [2.0.0-beta.6] - 2026-10-31
 

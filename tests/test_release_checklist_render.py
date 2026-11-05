@@ -59,7 +59,7 @@ ITEM_B = {
 
 def _write_config(project: Path, block, platforms) -> None:
     config = {
-        "agent-meta-version": "2.0.0-beta.6",
+        "agent-meta-version": "2.0.0-beta.7",
         "ai-providers": ["Claude"],
         "dod-preset": "rapid-prototyping",
         "platforms": list(platforms),
