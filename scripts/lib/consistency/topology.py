@@ -29,14 +29,23 @@ render cannot express as a diff:
     effective topology is not ``primary``. The value is never auto-deleted;
     the finding names the action (AC-14).
 
+``orchestrator-topology.singleton-redundant`` (INFO, P3)
+    ``orchestrator.singleton`` is present while ``max-instances`` is 1. Valid
+    but redundant — the count is already the default (AC-8).
+
+``orchestrator-topology.instances-clamped`` (WARNING, P3)
+    ``max-instances > 1`` was requested but the provider capability
+    (``orchestrator_instances.multiple`` / ``topology_verified_state.multiple``)
+    or a cross-scope ``primary`` override clamps the effective count to 1
+    (AC-9). This is G1's ``(1, reason)`` surfaced loudly.
+
 Contract: no writes, no ``sys.exit``, only :class:`Finding` objects. Each
 check ID is emitted at most once per provider and run; different IDs may fire
 for the same provider in the same run. The checker never raises — malformed
 input degrades to the findings collected so far.
 
-``instances-clamped`` and ``unresolved-global-flags`` are P3/deferred (they
-need ``max-instances`` and provider-less render provenance respectively) and
-are deliberately not implemented in the v1 checker.
+``unresolved-global-flags`` remains deferred (it needs provider-less render
+provenance) and is deliberately not implemented in the checker.
 """
 from __future__ import annotations
 
@@ -44,7 +53,11 @@ from pathlib import Path
 from typing import Optional
 
 from .report import Finding, Severity
-from ..topology import resolve_topology
+from ..topology import (
+    DEFAULT_MAX_INSTANCES,
+    resolve_orchestrator_instances,
+    resolve_topology,
+)
 
 _PROJECT_CONFIG = ".meta-config/project.yaml"
 
@@ -54,6 +67,8 @@ CHECK_HYBRID_UNVERIFIED = "orchestrator-topology.hybrid-unverified"
 CHECK_MAIN_CHAT_SUPERSEDES = "orchestrator-topology.main-chat-supersedes"
 CHECK_GATE_INACTIVE = "orchestrator-topology.gate-inactive"
 CHECK_DEFAULT_AGENT_CONFLICT = "orchestrator-topology.default-agent-conflict"
+CHECK_SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
+CHECK_INSTANCES_CLAMPED = "orchestrator-topology.instances-clamped"
 
 
 def _orchestrator_block(config: dict) -> dict:
@@ -147,14 +162,20 @@ def _user_owned_default_agent(
 
 
 def _append_once(
-    findings: list, seen: set, check: str, file: str, message: str, suggestion: str
+    findings: list,
+    seen: set,
+    check: str,
+    file: str,
+    message: str,
+    suggestion: str,
+    severity: Severity = Severity.WARNING,
 ) -> None:
-    """Append at most one WARNING per (check ID, provider) and run."""
+    """Append at most one finding per (check ID, provider) and run."""
     if check in seen:
         return
     seen.add(check)
     findings.append(Finding(
-        severity=Severity.WARNING,
+        severity=severity,
         check=check,
         file=file,
         message=message,
@@ -238,6 +259,45 @@ def check_orchestrator_topology(
                 validate=False,
             )
             seen: set = set()
+
+            # P3 multiplicity axis (AC-8/AC-9). ``validate=False`` never
+            # raises: a same-scope contradiction returned by the hard
+            # validator as a clamp is reported here, not re-raised.
+            instance_count, clamp_reason = resolve_orchestrator_instances(
+                config,
+                provider,
+                resolution,
+                capabilities=caps,
+                validate=False,
+            )
+            if (
+                "singleton" in orch
+                and instance_count == DEFAULT_MAX_INSTANCES
+                and clamp_reason is None
+            ):
+                _append_once(
+                    findings,
+                    seen,
+                    CHECK_SINGLETON_REDUNDANT,
+                    _PROJECT_CONFIG,
+                    f"orchestrator.singleton is declared for provider "
+                    f"'{provider}' while max-instances is 1; the alias is "
+                    "redundant (max-instances: 1 is the default).",
+                    "Remove orchestrator.singleton; max-instances: 1 already "
+                    "expresses the same intent.",
+                    severity=Severity.INFO,
+                )
+            if clamp_reason is not None:
+                _append_once(
+                    findings,
+                    seen,
+                    CHECK_INSTANCES_CLAMPED,
+                    _PROJECT_CONFIG,
+                    f"orchestrator instances for provider '{provider}' are "
+                    f"clamped to {instance_count}: {clamp_reason}.",
+                    "Raise the provider capability with recorded evidence, or "
+                    "set max-instances: 1 for this scope.",
+                )
 
             if resolution.degraded_from is not None:
                 _append_once(
