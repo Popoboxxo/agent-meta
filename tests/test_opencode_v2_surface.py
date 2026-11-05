@@ -5430,8 +5430,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # provider); `slimming-golden`/`compact-golden` re-pinned frontmatter-only for
 # the same role version pins (manifest §24); the topology goldens are unchanged.
 # Log: `tests/test_ac01_render_identity.py`.
+# Issue #1077 P3 (multi-instance, `feat/orchestrator-topology-p3`):
+# `ac01-baseline` re-pinned — 11 hashes (both `orchestrator-guard-impl.sh` renders
+# at 1.10.0 plus the nine copied `.meta-config/project.yaml` files with the new
+# schema descriptions); `slimming-golden`/`compact-golden` and the topology
+# goldens are unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "a88fca0d0e1e2461830645e0338883d6da117dfe9385150392ba963cfe7bf7c7",
+    "ac01-baseline": "bbcc14a7ef37a9940751f9106363a8a554b27a714cb7266ad7cc03d3c8eaed48",
     "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
     "compact-golden": "badf23628a2a251d424947d53485cdb0355ca795db23fdc170665ce70b97ab4c",
 }

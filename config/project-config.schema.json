@@ -712,7 +712,7 @@
     },
     "max-parallel-agents": {
       "type": "integer",
-      "description": "Maximum number of agents that a coordinator (orchestrator) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",
+      "description": "Maximum number of agents that a coordinator (orchestrator) may run in parallel via run_in_background. This bounds parallelism WITHIN one orchestrator, not the number of orchestrators — that is orchestrator.max-instances. Default: 2. Set to 1 to disable parallelism.",
       "minimum": 1,
       "maximum": 5,
       "default": 2
@@ -2487,6 +2487,20 @@
             "primary",
             "subagent",
             "hybrid"
+          ]
+        },
+        "max-instances": {
+          "type": "integer",
+          "description": "Maximum number of orchestrator instances (orchestrators) the project may run. This bounds HOW MANY orchestrators exist, not parallelism inside one orchestrator — that is max-parallel-agents. Values are 1..8, default 1 (today's single-orchestrator behaviour). Only effective when the provider capability orchestrator_instances.multiple is true and the cell is not UNVERIFIED; multi-instance state is namespaced as <base>__<id>.",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 1
+        },
+        "singleton": {
+          "type": "boolean",
+          "description": "Presence-only alias for exactly one orchestrator instance (enum [true]). There is deliberately NO schema default: the key being present is what distinguishes an explicit declaration from the derived default, and the hard validator rejects 'false' with a hint to use max-instances instead. This bounds the NUMBER of orchestrators, not parallelism within one orchestrator — that is max-parallel-agents. Absence means the count is derived from max-instances.",
+          "enum": [
+            true
           ]
         },
         "enabled": {

@@ -110,6 +110,26 @@
       "default": 0,
       "description": "Depth of this handoff in the delegation chain. 0 = main chat, 1 = orchestrator, 2+ = worker/sub-worker. Depth limits are a documented convention, not a locally enforced gate (issue #346): the platform (e.g. Claude Code) enforces its own subagent depth caps, so the former local max_depth check and the project.yaml configuration (orchestrator.delegation.max_depth, default 10) are documentation-only references — see rules/1-generic/a2a-delegation-gates.md and docs/concepts/a2a-handoff-protocol.md. Self-handoff (source_agent == target_agent) remains a hard reject and cannot be disabled."
     },
+    "orchestrator_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
+      "description": "Optional (P3, N>1 only). Stable instance identity of the orchestrator that owns this handoff. The dispatch target stays the plain role name 'orchestrator' — the identity never becomes a 'orchestrator#<id>' suffix. Omitted at the N=1 default, so the single-instance envelope is unchanged."
+    },
+    "scope_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
+      "description": "Optional (P3, N>1 only). Deterministic scope key (plan/task ref, branch or PR) that makes two orchestrator instances disjoint. May also travel as metadata.scope_id."
+    },
+    "spawned_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional (P3, N>1 only). Spawner of record for this instance (normally 'main_chat'). Part of the four-field audit record {orchestrator_id, scope_id, spawned_by, spawned_at}."
+    },
+    "spawned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional (P3, N>1 only). ISO 8601 spawn timestamp; part of the four-field audit record."
+    },
     "trace_parent": {
       "type": "string",
       "pattern": "^HOFF-\\d{8}-\\d{3,6}$",
@@ -140,7 +160,14 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Optional. Extensible key-value store for provider-specific or workflow-specific metadata. May include 'provider_handoff_format' ('json'|'yaml_text_block'|'file') to indicate the transport format used, and other provider-specific hints.",
+      "description": "Optional. Extensible key-value store for provider-specific or workflow-specific metadata. May include 'provider_handoff_format' ('json'|'yaml_text_block'|'file') to indicate the transport format used, and other provider-specific hints. Since P3 it may also carry 'scope_id' as the documented alternate placement of the instance scope.",
+      "properties": {
+        "scope_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
+          "description": "Optional (P3, N>1 only). Alternate placement of the disjoint instance scope; top-level 'scope_id' wins when both are present."
+        }
+      },
       "additionalProperties": true
     }
   }

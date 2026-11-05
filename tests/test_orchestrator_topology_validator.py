@@ -228,6 +228,115 @@ def test_cross_scope_topology_override_with_global_main_chat_is_not_an_error(
     )
 
 
+# --- (d) singletons x max-instances (P3, AC-8) -----------------------------
+
+
+def test_singleton_present_with_more_than_one_instance_is_a_hard_error(
+    tmp_path, capsys
+):
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            {"orchestrator": {"singleton": True, "max-instances": 2}},
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    assert (
+        "orchestrator.singleton conflicts with orchestrator.max-instances"
+        in capsys.readouterr().err
+    )
+
+
+def test_singleton_false_is_rejected_with_an_actionable_hint(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            {"orchestrator": {"singleton": False, "max-instances": 1}},
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert (
+        "orchestrator.singleton: false is not supported (use max-instances)"
+        in err
+    )
+
+
+def test_singleton_present_with_one_instance_is_not_an_error(tmp_path):
+    """Redundant, not contradictory: the P3 INFO owns this case, not the exit."""
+    _validate(
+        {"orchestrator": {"singleton": True, "max-instances": 1}},
+        tmp_path,
+    )
+
+
+def test_singleton_present_without_max_instances_defaults_to_one(tmp_path):
+    _validate({"orchestrator": {"singleton": True}}, tmp_path)
+
+
+def test_absent_singleton_with_many_instances_is_valid(tmp_path):
+    _validate({"orchestrator": {"max-instances": 8}}, tmp_path)
+
+
+# --- (e) primary x max-instances in the same scope (P3, AC-9) ---------------
+
+
+def test_primary_with_more_than_one_instance_in_the_same_scope_is_a_hard_error(
+    tmp_path, capsys
+):
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            {"orchestrator": {"topology": "primary", "max-instances": 2}},
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    assert (
+        "orchestrator.topology: primary conflicts with "
+        "orchestrator.max-instances" in capsys.readouterr().err
+    )
+
+
+def test_primary_with_one_instance_is_valid(tmp_path):
+    _validate(
+        {"orchestrator": {"topology": "primary", "max-instances": 1}},
+        tmp_path,
+    )
+
+
+def test_cross_scope_primary_override_with_global_instances_is_not_an_error(
+    tmp_path,
+):
+    """AC-9: the provider-scoped ``primary`` is clamped by a WARNING, not here."""
+    _validate(
+        {
+            "orchestrator": {
+                "max-instances": 3,
+                "provider-overrides": {"Opencode": {"topology": "primary"}},
+            }
+        },
+        tmp_path,
+    )
+
+
+# --- max-instances range (P3) -----------------------------------------------
+
+
+@pytest.mark.parametrize("value", [0, 9, -1])
+def test_max_instances_outside_one_to_eight_is_a_hard_error(
+    tmp_path, capsys, value
+):
+    with pytest.raises(SystemExit) as exc:
+        _validate({"orchestrator": {"max-instances": value}}, tmp_path)
+    assert exc.value.code == 1
+    assert "orchestrator.max-instances" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", [1.5, "3", True])
+def test_max_instances_non_integer_is_a_hard_error(tmp_path, capsys, value):
+    with pytest.raises(SystemExit) as exc:
+        _validate({"orchestrator": {"max-instances": value}}, tmp_path)
+    assert exc.value.code == 1
+    assert "orchestrator.max-instances" in capsys.readouterr().err
+
+
 # --- 3x3 matrix (AC-5) ------------------------------------------------------
 
 
@@ -289,5 +398,44 @@ def test_cli_aborts_for_sync_and_validate(tmp_path, mode_flag):
     assert result.returncode != 0
     assert (
         "orchestrator.topology conflicts with orchestrator.mode: main-chat"
+        in result.stderr
+    )
+
+
+_INSTANCE_CONFLICT_CONFIG = """\
+project:
+  name: topology-instance-conflict-test
+  prefix: ti
+  short: ti
+ai-providers: [Claude]
+orchestrator:
+  singleton: true
+  max-instances: 2
+"""
+
+
+@pytest.mark.parametrize("mode_flag", [[], ["--validate"]])
+def test_cli_aborts_for_instance_conflicts_in_sync_and_validate(
+    tmp_path, mode_flag
+):
+    config = tmp_path / ".meta-config" / "project.yaml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(_INSTANCE_CONFLICT_CONFIG, encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "scripts" / "sync.py"),
+            "--config",
+            str(config),
+            *mode_flag,
+        ],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode != 0
+    assert (
+        "orchestrator.singleton conflicts with orchestrator.max-instances"
         in result.stderr
     )

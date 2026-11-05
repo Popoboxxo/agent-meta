@@ -24,6 +24,7 @@ from .context_profile import (
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
+    _instance_flags,
     _orch_mode_flags,
     _resolve_orch_mode,
     _subagent_permission_flags,
@@ -431,6 +432,37 @@ def _topology_error(config_path: Path, message: str) -> None:
     sys.exit(1)
 
 
+#: Hard bounds of ``orchestrator.max-instances`` (OQ-3 = A). The schema mirrors
+#: these; this stdlib path is what actually aborts ``sync`` / ``--validate``.
+_MAX_INSTANCES_LIMIT = 8
+
+
+def _validated_max_instances(orch: dict, config_path: Path) -> int:
+    """Return the declared instance count, defaulting to 1 when unset.
+
+    ``max-instances`` is the canonical multiplicity key; ``singleton`` is only
+    a presence-only alias. Missing => 1 (today's behaviour). A non-integer,
+    boolean or out-of-range value is a hard error, not a silent clamp.
+    """
+    if "max-instances" not in orch:
+        return 1
+    value = orch.get("max-instances")
+    if isinstance(value, bool) or not isinstance(value, int):
+        _topology_error(
+            config_path,
+            "orchestrator.max-instances must be an integer between 1 and "
+            f"{_MAX_INSTANCES_LIMIT} (got {value!r}).",
+        )
+    if not 1 <= value <= _MAX_INSTANCES_LIMIT:
+        _topology_error(
+            config_path,
+            "orchestrator.max-instances must be between 1 and "
+            f"{_MAX_INSTANCES_LIMIT} (got {value}). "
+            "Use 1 for the single-orchestrator default.",
+        )
+    return value
+
+
 def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
     """Hard-reject same-scope ``mode`` x ``topology`` contradictions (IC-8).
 
@@ -444,9 +476,18 @@ def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
     * ``provider-overrides.<P>.topology conflicts with
       provider-overrides.<P>.mode: main-chat``
 
-    Cross-scope (provider override ``mode: main-chat`` with a global topology,
-    or the reverse) is intentionally NOT rejected here: ``main-chat`` is then
-    inert for that provider and the P2 consistency check owns the WARNING.
+    P3 (multi-instance) adds the same-scope multiplicity rules (D5):
+
+    * ``orchestrator.singleton conflicts with orchestrator.max-instances``
+    * ``orchestrator.singleton: false is not supported (use max-instances)``
+    * ``orchestrator.topology: primary conflicts with
+      orchestrator.max-instances``
+    * ``orchestrator.max-instances`` outside ``1..8``
+
+    ``singleton`` is presence-only: key existence, never truthiness, decides
+    whether the alias was declared. A *cross-scope* ``primary`` (provider
+    override) with a global N>1 is deliberately NOT rejected here — it is the
+    ``instances-clamped`` WARNING and effective N=1 (AC-9).
     """
     from .topology import VALID_TOPOLOGIES
 
@@ -456,9 +497,13 @@ def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
 
     valid_values = "'primary', 'subagent', 'hybrid'"
 
+    instance_count = _validated_max_instances(orch, config_path)
+
     project_topology = orch.get("topology")
+    project_topology_value = None
     if project_topology is not None:
         value = str(project_topology).strip()
+        project_topology_value = value
         if value not in VALID_TOPOLOGIES:
             _topology_error(
                 config_path,
@@ -480,6 +525,45 @@ def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
                 "main-chat. main-chat supersedes every topology in the same "
                 "scope; remove one of the two keys.",
             )
+
+    # (d) singleton is a presence-only alias for exactly one orchestrator.
+    # Presence is decided by key existence, never by truthiness; ``false`` is
+    # rejected with a hint because the schema enum [true] is only an
+    # editor/warning channel, not the hard exit.
+    if "singleton" in orch:
+        singleton_value = orch.get("singleton")
+        if singleton_value is not True:
+            if singleton_value is False:
+                _topology_error(
+                    config_path,
+                    "orchestrator.singleton: false is not supported "
+                    "(use max-instances). Omit the key for the derived "
+                    "default, or set max-instances explicitly.",
+                )
+            _topology_error(
+                config_path,
+                "orchestrator.singleton must be true when present "
+                f"(got {singleton_value!r}). 'false' is not supported "
+                "(use max-instances).",
+            )
+        if instance_count > 1:
+            _topology_error(
+                config_path,
+                "orchestrator.singleton conflicts with "
+                "orchestrator.max-instances. singleton means exactly one "
+                "orchestrator; remove the alias or set max-instances: 1.",
+            )
+
+    # (e) primary x N>1 in the SAME scope. A provider-scoped ``primary``
+    # override with a global N>1 is the cross-scope WARNING (clamped to 1),
+    # not a validator error.
+    if project_topology_value == "primary" and instance_count > 1:
+        _topology_error(
+            config_path,
+            "orchestrator.topology: primary conflicts with "
+            "orchestrator.max-instances. primary is a single entry-point "
+            "orchestrator; set max-instances: 1 or leave the topology unset.",
+        )
 
     overrides = orch.get("provider-overrides")
     if not isinstance(overrides, dict):
@@ -1859,7 +1943,8 @@ def _build_orch_variables(
 
     Parameter contract:
         variables: mutated in place — receives ORCHESTRATOR_*, ORCH_MODE_*,
-            ORCH_TOPOLOGY_*, REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
+            ORCH_TOPOLOGY_*, ORCH_MAX_INSTANCES, ORCH_SINGLETON_DECLARED,
+            REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
             ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
             CHECKPOINTING_ENABLED, NATIVE_EXTENSIONS_*, ANALYSIS_ENABLED,
             FILE_AFFINITY_HINT, UNKNOWN_FALLBACK_*, A2A_HANDOFF_BLOCK and
@@ -1903,6 +1988,16 @@ def _build_orch_variables(
         "" if _project_topology is None else str(_project_topology).strip(),
         explicit=_project_topology is not None,
         source="project" if _project_topology is not None else "derived",
+    ))
+
+    # ORCH_MAX_INSTANCES / ORCH_SINGLETON_DECLARED: provider-LESS (global)
+    # project-scope block (P3, AC-8). The unset count is the single-instance
+    # default "1"; ``ORCH_SINGLETON_DECLARED`` answers presence, never
+    # truthiness. Provider-scoped effective counts are re-resolved in
+    # rules.py (Task 7) and reported by the consistency check (Task 6).
+    variables.update(_instance_flags(
+        orch_config.get("max-instances"),
+        singleton_declared="singleton" in orch_config,
     ))
 
     # REPO_CONTAINMENT_*: base (provider-independent) flags, wired exactly like

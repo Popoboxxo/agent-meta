@@ -39,6 +39,8 @@ _HYBRID = "orchestrator-topology.hybrid-unverified"
 _MAIN_CHAT = "orchestrator-topology.main-chat-supersedes"
 _GATE = "orchestrator-topology.gate-inactive"
 _CONFLICT = "orchestrator-topology.default-agent-conflict"
+_SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
+_INSTANCES_CLAMPED = "orchestrator-topology.instances-clamped"
 
 _ACTIVE = SimpleNamespace(
     roles=frozenset({"orchestrator", "developer"}),
@@ -225,3 +227,99 @@ def test_multiple_check_ids_fire_together_without_duplicates(tmp_path):
 def test_repository_without_the_key_produces_zero_findings():
     findings = check_orchestrator_topology(_REPO_ROOT, {})
     assert findings == []
+
+
+# --- P3: singleton-redundant (INFO) ----------------------------------------
+
+
+def test_singleton_with_one_instance_is_exactly_one_info(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "singleton": True}},
+    )
+    redundant = _by_check(findings, _SINGLETON_REDUNDANT)
+    assert len(redundant) == 1
+    assert redundant[0].severity == Severity.INFO
+    assert "Alpha" in redundant[0].message
+    assert "redundant" in redundant[0].message.lower()
+    # Redundant, never an error: rc stays 0.
+    assert all(f.severity != Severity.ERROR for f in findings)
+
+
+def test_singleton_info_is_one_per_provider(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "singleton": True}},
+        providers=["Alpha", "Beta"],
+    )
+    redundant = _by_check(findings, _SINGLETON_REDUNDANT)
+    assert len(redundant) == 2
+    assert {f.severity for f in redundant} == {Severity.INFO}
+
+
+# --- P3: instances-clamped (WARNING) --------------------------------------
+
+
+def test_three_instances_without_capability_warns_once(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "max-instances": 3}},
+        caps={
+            "Alpha": dict(
+                _SUPPORTED,
+                orchestrator_instances={"multiple": False},
+            )
+        },
+    )
+    clamped = _by_check(findings, _INSTANCES_CLAMPED)
+    assert len(clamped) == 1
+    assert clamped[0].severity == Severity.WARNING
+    assert "Alpha" in clamped[0].message
+    assert "1" in clamped[0].message
+    assert all(f.severity != Severity.ERROR for f in findings)
+
+
+def test_cross_scope_primary_override_with_global_multi_warns_once(tmp_path):
+    findings = _check(
+        tmp_path,
+        {
+            "orchestrator": {
+                "mode": "strict",
+                "max-instances": 3,
+                "provider-overrides": {"Alpha": {"topology": "primary"}},
+            }
+        },
+    )
+    clamped = _by_check(findings, _INSTANCES_CLAMPED)
+    assert len(clamped) == 1
+    assert clamped[0].severity == Severity.WARNING
+    assert "Alpha" in clamped[0].message
+    # Effective N is 1: the cross-scope resolution is the G1 clamp.
+    assert "1" in clamped[0].message
+    assert all(f.severity != Severity.ERROR for f in findings)
+
+
+def test_instance_checks_dedup_per_check_id_and_provider(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "max-instances": 3}},
+        providers=["Alpha", "Beta"],
+        caps={
+            "Alpha": dict(
+                _SUPPORTED, orchestrator_instances={"multiple": False}
+            ),
+            "Beta": dict(
+                _SUPPORTED, orchestrator_instances={"multiple": False}
+            ),
+        },
+    )
+    assert len(_by_check(findings, _INSTANCES_CLAMPED)) == 2
+
+
+def test_no_instance_findings_without_the_keys(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict"}},
+    )
+    assert _by_check(findings, _SINGLETON_REDUNDANT) == []
+    assert _by_check(findings, _INSTANCES_CLAMPED) == []

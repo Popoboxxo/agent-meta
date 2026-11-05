@@ -597,5 +597,5 @@ belegt.
 - **Task 18 — A2A-Markerform:** die erste Form nutzte Inline-Marker über Zeilengrenzen und wurde von `test_no_role_routes_in_templates.py` abgelehnt; der Fix `e8ba3414` verwendet Block-Form-Marker und hält den else-Zweig byte-identisch.
 - **Task 16 — Fixture-Registrierung:** die `topology-golden`-Fixtures stehen nicht in `_FIXTURE_TREES`; sie werden durch ihre eigenen Tests abgesichert.
 - **P0 — `hybrid`:** in v1 nirgends gewährt (Evidenz-Gate); die Probes brauchen interaktive Sessions, das Upgrade bleibt ein expliziter Follow-up.
-- **P3 — offen:** Multi-Instanz (AC-8…AC-12) bleibt in Issue #1077 offen.
+- **P3 — delivered:** Multi-Instanz (AC-8…AC-12) ist in Issue #1077 umgesetzt.
 - **Test 16 — P4-Form:** die vier Flag-Kombinationsfälle üben die prospektive P4-Regelform über die reale Conditional-Engine.

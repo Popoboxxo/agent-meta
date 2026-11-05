@@ -271,19 +271,45 @@ def _merged_rule_vars(
     # invents a derived position. Built here (not read from ``variables``) so
     # ``variables=None`` callers get the same contract (S23).
     from .providers import load_provider_capabilities, load_providers_config
-    from .topology import resolve_topology, topology_explicit
+    from .topology import (
+        resolve_orchestrator_instances,
+        resolve_topology,
+        topology_explicit,
+    )
+    from .variables import _instance_flags
 
+    _provider_capabilities = load_provider_capabilities(agent_meta_root).get(provider, {})
     _topology_resolution = resolve_topology(
         config,
         provider,
         provider_config=load_providers_config(agent_meta_root),
-        capabilities=load_provider_capabilities(agent_meta_root).get(provider, {}),
+        capabilities=_provider_capabilities,
         mode=_orch_mode,
     )
     provider_vars.update(_topology_flags(
         _topology_resolution.declared or "",
         explicit=topology_explicit(config, provider),
         source=_topology_resolution.source,
+    ))
+
+    # Orchestrator multiplicity axis (P3, AC-9): re-resolve the EFFECTIVE
+    # provider-scoped N and overwrite the provider-less project value from
+    # ``variables``. A provider that cannot run multiple instances
+    # (``orchestrator_instances.multiple: false``) clamps the rendered limit
+    # back to 1. ``validate=False`` never raises: config validation already
+    # ran, and a render must fail closed to 1 rather than abort mid-sync.
+    _instance_count, _ = resolve_orchestrator_instances(
+        config,
+        provider,
+        _topology_resolution,
+        capabilities=_provider_capabilities,
+        validate=False,
+    )
+    _orchestrator = config.get("orchestrator")
+    _orchestrator = _orchestrator if isinstance(_orchestrator, dict) else {}
+    provider_vars.update(_instance_flags(
+        _instance_count,
+        singleton_declared="singleton" in _orchestrator,
     ))
 
     # Repo-containment ("prison mode") flags for THIS provider: same

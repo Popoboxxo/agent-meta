@@ -13,11 +13,27 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .io import load_yaml_cached
 from .roles import _TIER_SEQUENCE
+
+#: P3 instance identity fields (AC-11). Every field is optional at every N;
+#: at N>1 the four together form the audit record
+#: ``{orchestrator_id, scope_id, spawned_by, spawned_at}``. The dispatch
+#: target stays the plain role name — the identity never becomes a suffix.
+INSTANCE_IDENTITY_FIELDS: tuple[str, ...] = (
+    "orchestrator_id",
+    "scope_id",
+    "spawned_by",
+    "spawned_at",
+)
+
+#: The one instance-identity grammar (D6/IC-10), mirrored from
+#: ``topology.ORCHESTRATOR_ID_RE`` for the stdlib-only error text.
+_INSTANCE_ID_GRAMMAR = "[a-z0-9][a-z0-9._-]{0,39}"
 
 # Known A2A schemas shipped with agent-meta (relative to repo root).
 # These paths are intentionally relative so they remain valid when the repo is
@@ -60,6 +76,15 @@ FANOUT_MECHANISMS: frozenset[str] = frozenset(
 
 # Mechanisms that actually dispatch in parallel (i.e. an async FANOUT exists).
 _ASYNC_FANOUT_MECHANISMS: frozenset[str] = FANOUT_MECHANISMS - {"sequential-fallback"}
+
+
+def _is_iso_datetime(value: str) -> bool:
+    """True when *value* parses as ISO 8601 (``Z`` accepted, Python 3.9-safe)."""
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
 
 
 def _default_t_size_limit() -> int:
@@ -225,6 +250,72 @@ class DelegationSyntaxEngine:
         """
         return _SCHEMA_PATHS.get(schema_name, "")
 
+    # ------------------------------------------------------------------
+    # P3 multi-instance identity (AC-11)
+    # ------------------------------------------------------------------
+
+    def apply_instance_identity(
+        self,
+        envelope: dict[str, Any],
+        *,
+        orchestrator_id: str | None = None,
+        scope_id: str | None = None,
+        spawned_by: str | None = None,
+        spawned_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the id-bearing dispatch form of *envelope* (P3, AC-11).
+
+        The dispatch target remains the plain role name ``orchestrator``; the
+        identity travels exclusively as envelope fields, never as a
+        ``orchestrator#<scope>`` suffix.
+
+        * **N=1** — all four arguments are ``None``: the input envelope is
+          returned **unchanged** (same object, zero new keys). The
+          single-instance dispatch stays byte-identical to today.
+        * **N>1** — a shallow copy receives the fields that were passed;
+          ``orchestrator_id`` / ``scope_id`` are validated against the shared
+          instance grammar ``[a-z0-9][a-z0-9._-]{0,39}`` (``ValueError`` on
+          a violation).
+
+        Emit/parse are inverse operations: see :meth:`parse_instance_identity`.
+        """
+        from .topology import is_valid_orchestrator_id
+
+        provided = {
+            "orchestrator_id": orchestrator_id,
+            "scope_id": scope_id,
+            "spawned_by": spawned_by,
+            "spawned_at": spawned_at,
+        }
+        if all(value is None for value in provided.values()):
+            return envelope
+
+        for field in ("orchestrator_id", "scope_id"):
+            value = provided[field]
+            if value is not None and not is_valid_orchestrator_id(value):
+                raise ValueError(
+                    f"invalid {field} {value!r}: expected "
+                    f"{_INSTANCE_ID_GRAMMAR} (1..40 chars, no '..')"
+                )
+        identity = {key: value for key, value in provided.items() if value is not None}
+        return {**envelope, **identity}
+
+    def parse_instance_identity(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        """Read the four instance fields from an id-bearing envelope.
+
+        Returns ``{orchestrator_id, scope_id, spawned_by, spawned_at}`` with
+        ``None`` for every absent field. ``metadata.scope_id`` is the
+        documented alternate placement; a top-level ``scope_id`` wins.
+        """
+        metadata = envelope.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        return {
+            "orchestrator_id": envelope.get("orchestrator_id"),
+            "scope_id": envelope.get("scope_id", metadata.get("scope_id")),
+            "spawned_by": envelope.get("spawned_by"),
+            "spawned_at": envelope.get("spawned_at"),
+        }
+
     def validate_envelope(
         self,
         envelope: dict[str, Any],
@@ -318,6 +409,50 @@ class DelegationSyntaxEngine:
                     f"got {type(tier_override).__name__}"
                 )
 
+        # Tier 1.7: optional P3 instance identity (AC-11). Stdlib-only, and
+        # optional at every N (the count is unknown to the validator). The
+        # dispatch target never carries the identity as a `#` suffix.
+        target = envelope.get("target_agent")
+        if isinstance(target, str) and "#" in target:
+            errors.append(
+                "target_agent must stay the plain role name (e.g. "
+                f"'orchestrator'); got {target!r}. Instance identity travels in "
+                "orchestrator_id/scope_id, not as a '#' suffix."
+            )
+
+        from .topology import is_valid_orchestrator_id  # lazy: keep import graph flat
+
+        for field in ("orchestrator_id", "scope_id"):
+            value = envelope.get(field)
+            if value is not None and not is_valid_orchestrator_id(value):
+                errors.append(
+                    f"Invalid {field}: expected {_INSTANCE_ID_GRAMMAR} "
+                    "(1..40 chars, no '..'), "
+                    f"got {value!r}"
+                )
+        metadata = envelope.get("metadata")
+        if isinstance(metadata, dict) and "scope_id" in metadata:
+            value = metadata.get("scope_id")
+            if not is_valid_orchestrator_id(value):
+                errors.append(
+                    "Invalid metadata.scope_id: expected "
+                    f"{_INSTANCE_ID_GRAMMAR} (1..40 chars, no '..'), got {value!r}"
+                )
+        spawned_by = envelope.get("spawned_by")
+        if spawned_by is not None and (
+            not isinstance(spawned_by, str) or not spawned_by.strip()
+        ):
+            errors.append(
+                "Invalid spawned_by: must be a non-empty string, "
+                f"got {spawned_by!r}"
+            )
+        spawned_at = envelope.get("spawned_at")
+        if spawned_at is not None:
+            if not isinstance(spawned_at, str) or not _is_iso_datetime(spawned_at):
+                errors.append(
+                    "Invalid spawned_at: must be an ISO 8601 date-time string, "
+                    f"got {spawned_at!r}"
+                )
 
         limit = t_size_limit if t_size_limit is not None else _default_t_size_limit()
         for field_path, task_text in _iter_payload_task_lines(payload):

@@ -1,5 +1,6 @@
 #!/bin/bash
-# version: 1.9.3
+# version: 1.10.0
+# changelog: 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -271,28 +272,51 @@ esac
 
 BASH_CMD=""
 DECLARED_AGENT=""
+DECLARED_ID=""
 if [ "$TOOL_NAME" = "Bash" ]; then
   BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
 
   # Self-declared agent identity (see note above): the first non-blank line
-  # of the command must be exactly '#agent-meta:agent=<name>'. Only
-  # orchestrator and git are recognized delegates for this guard.
+  # of the command must be exactly '#agent-meta:agent=<name>' or
+  # '#agent-meta:agent=<name> id=<instance-id>'. Only orchestrator and git
+  # are recognized delegates for this guard.
   # `head -n1` alone (pre-#503) grabbed a literal empty first line whenever
   # BASH_CMD started with a leading newline before the sentinel -- some
   # delegated agents construct their Bash invocation that way -- so the
   # sentinel was silently missed and the legitimate mutation got blocked.
   # Stripping leading whitespace/blank lines before taking "line 1" makes
   # detection tolerant of that construction.
-  DECLARED_AGENT=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
+  #
+  # P3 audit record (AC-11, OQ-2 = A): the full record is
+  # `{orchestrator_id, scope_id, spawned_by, spawned_at}`; the guard reduces
+  # it to `orchestrator_id` only. That id is AUDIT-ONLY: it is appended to
+  # the audit log and is NEVER read by an allow/deny decision. The id token
+  # uses the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an
+  # invalid id invalidates the whole sentinel (empty role), like a bad role.
+  _DECLARED_RAW=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
 import re, sys
 # Bytes-in (surrogateescape), like hook_json_get: a lone surrogate / invalid
 # UTF-8 byte in the command must not make this read crash and silently drop a
 # legitimate sentinel (issue #943 (k)).
 content = sys.stdin.buffer.read().decode('utf-8', 'surrogateescape').lstrip()
 line = content.split('\n', 1)[0].strip()
-m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)\$', line)
-print(m.group(1) if m else '')
+m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)(?:\s+id=([A-Za-z0-9._-]+))?\$', line)
+if not m:
+    print('')
+else:
+    role, instance_id = m.group(1), m.group(2) or ''
+    if instance_id and not (
+        re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,39}', instance_id)
+        and '..' not in instance_id
+    ):
+        print('')
+    else:
+        print(role + '|' + instance_id)
 " 2>/dev/null || echo "")
+  if [ -n "$_DECLARED_RAW" ]; then
+    DECLARED_AGENT=${_DECLARED_RAW%%|*}
+    DECLARED_ID=${_DECLARED_RAW#*|}
+  fi
 fi
 
 # Determine project root (needed by the audit log, allowlist and config
@@ -414,9 +438,18 @@ except Exception:
     # credential-shaped substrings before writing (issue #596), hardens
     # the log file to 600 permissions on every write (issue #596), and
     # caps unbounded growth via truncate-oldest rotation (issue #597).
+    #
+    # P3 (AC-11, OQ-2 = A): the orchestrator audit line carries the reduced
+    # instance record `orchestrator_id=<id|unset>`. It is logging only -- the
+    # decision above never reads DECLARED_ID -- and the git/allowlist lines
+    # keep their historic shape (no instance field).
+    _AUDIT_INSTANCE=""
+    if [ "$_AUDIT_ROLE" = "orchestrator" ]; then
+      _AUDIT_INSTANCE=" orchestrator_id=${DECLARED_ID:-unset}"
+    fi
     _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
-    _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
-      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_AUDIT_ROLE" \
+    _AUDIT_LINE=$(printf '%s role=%s%s cmd=%s' \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_AUDIT_ROLE" "$_AUDIT_INSTANCE" \
       "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
     hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
   fi

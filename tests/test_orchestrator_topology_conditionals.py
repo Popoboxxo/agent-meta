@@ -40,6 +40,11 @@ _TOPOLOGY_FLAGS = (
     "ORCH_TOPOLOGY_HYBRID",
 )
 
+# P3 instance flags: registered fail-closed in every channel the render path
+# consults. They are not boolean gates (``ORCH_MAX_INSTANCES`` carries the
+# count), but an absent value must still resolve to the historic branch.
+_INSTANCE_FLAGS = ("ORCH_MAX_INSTANCES", "ORCH_SINGLETON_DECLARED")
+
 # The builder emits these six keys via ``_topology_flags`` (IC-4); every one
 # must be registered in the placeholder check (the ratchet is shrink-only).
 _TOPOLOGY_BUILDER_VARS = (
@@ -133,3 +138,43 @@ def test_standalone_and_placeholder_registrations_keep_render_identical():
         _REPO_ROOT / "standalone" / "agents" / "orchestrator.md"
     ).read_text(encoding="utf-8")
     assert rendered == committed
+
+
+# --- P3 instance-flag registrations (AC-8 flags) ---------------------------
+
+_INSTANCE_PROBE = (
+    "Head\n"
+    "{{#if ORCH_SINGLETON_DECLARED}}DECLARED{{else}}UNDECLARED{{/if}}\n"
+    "{{#if ORCH_MAX_INSTANCES}}MANY{{else}}ONE{{/if}}\n"
+    "Tail"
+)
+
+
+def test_instance_flags_are_registered_in_all_static_sets():
+    assert set(_INSTANCE_FLAGS) <= set(_FALSE_DEFAULT_CONDITIONALS)
+    assert _CONDITIONAL_FALSE_FLAGS.get("ORCH_MAX_INSTANCES") == "1"
+    assert _CONDITIONAL_FALSE_FLAGS.get("ORCH_SINGLETON_DECLARED") == "false"
+    assert set(_INSTANCE_FLAGS) <= _BUILTIN_VARS
+
+
+def test_absent_instance_flags_render_the_historic_branch_without_markers():
+    rendered = strip_inactive_conditional_blocks(_INSTANCE_PROBE, {})
+    assert rendered == "Head\nUNDECLARED\nONE\nTail"
+    assert "{{" not in rendered and "}}" not in rendered
+
+
+def test_instance_flags_are_in_the_strip_whitelist():
+    # A present value only activates when the name is in the whitelist; without
+    # it the orphaned-marker cleanup would leave the raw markers in the output.
+    rendered = strip_inactive_conditional_blocks(
+        _INSTANCE_PROBE, {"ORCH_SINGLETON_DECLARED": "true"}
+    )
+    assert rendered == "Head\nDECLARED\nONE\nTail"
+    # ``ORCH_MAX_INSTANCES`` carries "1", never "true": even present it is not a
+    # boolean gate (plan K-2), so the count branch stays closed.
+    assert "MANY" not in rendered
+    assert "{{" not in rendered
+
+
+def test_builder_known_set_has_no_instance_flag_findings():
+    assert check_builder_known_set(_REPO_ROOT) == []

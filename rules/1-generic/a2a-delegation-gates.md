@@ -7,7 +7,10 @@
 2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**
    G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.
    G2 Unter `subagent`/`hybrid` spawnt NUR `main_chat` den Orchestrator; unter
-      `primary` ist der Orchestrator der Session-Einstieg. Genau eine Instanz.
+      `primary` ist der Orchestrator der Session-Einstieg. Höchstens
+      {{ORCH_MAX_INSTANCES}} gleichzeitig (bei 1 gilt der heutige Singleton),
+      jede mit eindeutiger `orchestrator_id` und disjunktem Scope. Fehlende
+      oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
    degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).

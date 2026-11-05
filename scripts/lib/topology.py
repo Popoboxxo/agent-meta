@@ -24,9 +24,15 @@ Contract (spec IC-2):
    (``"sequential-text"``) lives in ``degradation_reason`` only and is never a
    valid ``effective`` value.
 4. ``effective`` is ALWAYS in ``VALID_TOPOLOGIES`` — including ``validate=False``.
+
+P3 adds the orthogonal multiplicity axis (D5/D6): ``resolve_orchestrator_instances``
+returns ``(effective_count, clamp_reason_or_None)`` for a provider and
+``compose_instance_session_id`` namespaces state as ``<base>__<id>``. At N=1 the
+identity is ``None`` and the composition is the unchanged base id.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
@@ -35,7 +41,13 @@ from .providers import explicit_primary_role
 
 VALID_TOPOLOGIES = frozenset({"primary", "subagent", "hybrid"})
 DEFAULT_MAX_INSTANCES = 1
+MAX_INSTANCES = 8
 VERIFIED_STATES = frozenset({"VERIFIED-RUNTIME", "DOCUMENTED", "UNVERIFIED"})
+
+#: Instance-identity grammar (D6, IC-10): ``[a-z0-9][a-z0-9._-]{0,39}``.
+#: The same grammar is used by the guard sentinel (IC-9), the A2A envelope
+#: (IC-10) and the state namespace composed below.
+ORCHESTRATOR_ID_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,39}")
 
 _FAIL_SAFE = "subagent"
 
@@ -259,3 +271,216 @@ def resolve_topology(
             capabilities, "topology_verified_state", declared
         ),
     )
+
+
+# --- P3: multi-instance identity and resolution ----------------------------
+#
+# Logical identity model: ``orchestrator#<scope-id>``.
+#
+# The main chat derives ``<scope-id>`` deterministically from the scope it is
+# working on (plan id / task ref, branch name, PR number), normalizes it to
+# ``[a-z0-9][a-z0-9._-]{0,39}`` and passes it in the A2A envelope. The dispatch
+# target itself stays the plain role name ``orchestrator`` — no ``#`` suffix in
+# file names or ``subagent_type``. At N=1 the id is ``None`` and the state
+# paths are byte-identical to today.
+#
+# Missing id at N>1 is a prompt HARD-REJECT plus a guard audit ``id=unset``.
+# Duplicate ids / overlapping scopes are a HARD ERROR at spawn time; this is
+# the prompt contract (G2), not a runtime registry — P3 deliberately ships no
+# registry, so there is nothing here that could silently last-wins.
+
+
+def is_valid_orchestrator_id(value: Any) -> bool:
+    """True when *value* is a safe orchestrator instance id.
+
+    Grammar ``[a-z0-9][a-z0-9._-]{0,39}`` (1..40 chars, lowercase). ``..`` is
+    rejected explicitly even though it matches the raw character grammar,
+    because the id is later used as a path component (``<base>__<id>.json``).
+    """
+    if not isinstance(value, str) or ".." in value:
+        return False
+    return ORCHESTRATOR_ID_RE.fullmatch(value) is not None
+
+
+def compose_instance_session_id(
+    base_session_id: str, instance_id: Optional[str]
+) -> str:
+    """Compose the state namespace for one orchestrator instance (D6, IC-2).
+
+    * ``instance_id is None`` => *base_session_id* is returned **unchanged**.
+      This is the N=1 identity: no suffix, no validation, no rewrite, so the
+      existing checkpoint/progress paths stay byte-identical (AC-10).
+    * otherwise => ``<base>__<id>``. The id must match
+      :data:`ORCHESTRATOR_ID_RE` and the composed id must pass
+      ``checkpoint.validate_session_id`` (no path separators, no ``..``, no
+      absolute path). Violations raise ``ValueError``.
+
+    The checkpoint import is lazy on purpose: ``checkpoint`` imports this leaf
+    module, a module-level import would close the cycle (plan K-3).
+    """
+    if instance_id is None:
+        return base_session_id
+
+    if not is_valid_orchestrator_id(instance_id):
+        raise ValueError(
+            f"invalid orchestrator instance id {instance_id!r}: expected "
+            "[a-z0-9][a-z0-9._-]{0,39} (1..40 chars, no '..')"
+        )
+
+    composed = f"{base_session_id}__{instance_id}"
+    from .checkpoint import validate_session_id  # lazy: avoid import cycle
+
+    validate_session_id(composed)
+    return composed
+
+
+def _raw_instance_count(
+    orch: Mapping, provider: str, *, validate: bool
+) -> tuple:
+    """Return ``(count, reason)``; ``count`` is 1 on every fail-closed path."""
+    if "max-instances" not in orch:
+        return DEFAULT_MAX_INSTANCES, None
+    value = orch.get("max-instances")
+    if isinstance(value, bool) or not isinstance(value, int):
+        reason = (
+            "orchestrator.max-instances must be an integer between 1 and "
+            f"{MAX_INSTANCES} (got {value!r})"
+        )
+    elif not 1 <= value <= MAX_INSTANCES:
+        reason = (
+            "orchestrator.max-instances must be between 1 and "
+            f"{MAX_INSTANCES} (got {value})"
+        )
+    else:
+        return value, None
+
+    if validate:
+        raise SyncError(
+            f"{reason} (provider {provider!r}). "
+            "Hint: use 1 for the single-orchestrator default."
+        )
+    return DEFAULT_MAX_INSTANCES, f"{reason} (fail-safe 1)"
+
+
+def resolve_orchestrator_instances(
+    config: dict,
+    provider: str,
+    topology: TopologyResolution,
+    *,
+    capabilities: dict,
+    validate: bool = True,
+) -> tuple:
+    """Resolve the effective orchestrator instance count (P3, IC-2).
+
+    Returns ``(effective_count, clamp_reason_or_None)``.
+
+    Rules (D5, AC-8, AC-9):
+
+    * ``max-instances`` unset => 1 (today's behaviour). Same-scope
+      contradictions are hard ``SyncError``s when ``validate=True``; with
+      ``validate=False`` they fail closed to 1 with a reason (consistency
+      checker channel).
+    * ``singleton`` present (key existence, never truthiness) + N>1 =>
+      ``SyncError``; ``singleton: false`` => ``SyncError`` with the
+      "use max-instances" hint; ``singleton`` present + N=1 is redundant but
+      valid (the INFO finding belongs to the consistency check).
+    * Explicit project ``topology: primary`` + N>1 in the same scope =>
+      ``SyncError``. A *provider-scoped* ``primary`` with a global N>1 is the
+      cross-scope case: clamped to 1 with a reason, never an error.
+    * A *derived* primary is not a same-scope declaration (K-1); the count is
+      then governed by the capability cells only.
+    * N>1 requires ``orchestrator_instances.multiple is True`` and
+      ``topology_verified_state.multiple`` not ``UNVERIFIED``; otherwise the
+      count clamps to 1 with a reason.
+    """
+    orch = _orchestrator(config)
+
+    count, invalid_reason = _raw_instance_count(
+        orch, provider, validate=validate
+    )
+    if invalid_reason is not None:
+        return count, invalid_reason
+
+    singleton_declared = "singleton" in orch
+    if singleton_declared:
+        singleton_value = orch.get("singleton")
+        if singleton_value is not True:
+            if singleton_value is False:
+                message = (
+                    "orchestrator.singleton: false is not supported "
+                    "(use max-instances)"
+                )
+            else:
+                message = (
+                    "orchestrator.singleton must be true when present "
+                    f"(got {singleton_value!r}); 'false' is not supported "
+                    "(use max-instances)"
+                )
+            if validate:
+                raise SyncError(message)
+            return DEFAULT_MAX_INSTANCES, f"{message} (fail-safe 1)"
+        if count > DEFAULT_MAX_INSTANCES:
+            message = (
+                "orchestrator.singleton conflicts with "
+                "orchestrator.max-instances"
+            )
+            if validate:
+                raise SyncError(
+                    f"{message} (provider {provider!r}). singleton means "
+                    "exactly one orchestrator; remove the alias or set "
+                    "max-instances: 1."
+                )
+            return DEFAULT_MAX_INSTANCES, f"{message} (fail-safe 1)"
+        # Redundant alias: explicitly one instance, nothing to clamp.
+        return DEFAULT_MAX_INSTANCES, None
+
+    project_topology = orch.get("topology")
+    if (
+        project_topology is not None
+        and str(project_topology).strip() == "primary"
+        and count > DEFAULT_MAX_INSTANCES
+    ):
+        message = (
+            "orchestrator.topology: primary conflicts with "
+            "orchestrator.max-instances"
+        )
+        if validate:
+            raise SyncError(
+                f"{message} (provider {provider!r}). primary is a single "
+                "entry-point orchestrator; set max-instances: 1 or leave the "
+                "topology unset."
+            )
+        return DEFAULT_MAX_INSTANCES, f"{message} (fail-safe 1)"
+
+    if (
+        count > DEFAULT_MAX_INSTANCES
+        and topology.source == "provider-override"
+        and topology.declared == "primary"
+        and topology.effective == "primary"
+    ):
+        return DEFAULT_MAX_INSTANCES, (
+            f"provider-overrides.{provider}.topology: primary clamps global "
+            f"max-instances {count} to 1 (cross-scope; WARNING rule AC-9)"
+        )
+
+    if count > DEFAULT_MAX_INSTANCES:
+        multiple = _capabilities_value(
+            capabilities, "orchestrator_instances", "multiple"
+        )
+        state = _capabilities_value(
+            capabilities, "topology_verified_state", "multiple"
+        )
+        reasons = []
+        if multiple is not True:
+            reasons.append("orchestrator_instances.multiple is not true")
+        if state not in ("VERIFIED-RUNTIME", "DOCUMENTED"):
+            reasons.append(
+                "topology_verified_state.multiple is "
+                f"{state or 'absent'} (UNVERIFIED)"
+            )
+        if reasons:
+            return DEFAULT_MAX_INSTANCES, (
+                f"max-instances {count} clamped to 1: " + ", ".join(reasons)
+            )
+
+    return count, None

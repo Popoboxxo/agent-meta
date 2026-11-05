@@ -520,6 +520,92 @@ def test_elevation_attempts_are_audited(tmp_path):
     assert "git status" in content
 
 
+# --- P3 (AC-11 guard part, OQ-2 = A): sentinel instance id, audit-only -----
+#
+# Sentinel grammar: `#agent-meta:agent=<role> id=<orchestrator-id>`. The id is
+# written to the audit log only; it is NEVER consulted by the allow/deny path
+# (OQ-2 = A). The role parser also accepts the id for the `git` sentinel, but
+# only the orchestrator audit line carries the `orchestrator_id=` field.
+
+def test_orchestrator_sentinel_with_valid_id_is_accepted():
+    """A well-formed `id=` keeps the orchestrator sentinel's strict-mode pass."""
+    command = "#agent-meta:agent=orchestrator id=scope-a\necho test"
+    result = _run_hook(_bash_payload(command))
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+
+
+def test_sentinel_id_does_not_change_allow_or_deny(tmp_path):
+    """The id is audit-only: the verdict is identical with and without it."""
+    cases = [
+        # Strict mode: the orchestrator sentinel exempts the main-chat block.
+        ("#agent-meta:agent=orchestrator\necho test", _PROJECT_ROOT, 0),
+        ("#agent-meta:agent=orchestrator id=scope-a\necho test", _PROJECT_ROOT, 0),
+        # Non-strict git-mutation gate: the git sentinel exempts a plain commit.
+        ("#agent-meta:agent=git\ngit commit -m 'x'", tmp_path, 0),
+        ("#agent-meta:agent=git id=scope-a\ngit commit -m 'x'", tmp_path, 0),
+        # The orchestrator sentinel still does NOT bypass the git-mutation gate,
+        # with or without an id (capability scoping is unchanged).
+        ("#agent-meta:agent=orchestrator\ngit commit -m 'x'", tmp_path, 2),
+        (
+            "#agent-meta:agent=orchestrator id=scope-a\ngit commit -m 'x'",
+            tmp_path,
+            2,
+        ),
+    ]
+    for command, cwd, expected in cases:
+        result = _run_hook({**_bash_payload(command), "cwd": Path(cwd).as_posix()})
+        assert result.returncode == expected, (
+            f"command={command!r}: expected exit {expected}, got "
+            f"{result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+
+def test_sentinel_id_is_written_to_the_orchestrator_audit_line(tmp_path):
+    """Only the orchestrator audit line carries `orchestrator_id=`."""
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+
+    with_id = "#agent-meta:agent=orchestrator id=scope-a\necho test"
+    _run_hook({**_bash_payload(with_id), "cwd": tmp_path.as_posix()})
+    assert "orchestrator_id=scope-a" in audit_file.read_text(encoding="utf-8")
+
+    audit_file.unlink()
+    without_id = "#agent-meta:agent=orchestrator\necho test"
+    _run_hook({**_bash_payload(without_id), "cwd": tmp_path.as_posix()})
+    assert "orchestrator_id=unset" in audit_file.read_text(encoding="utf-8")
+
+    # The git audit line keeps its historic shape: no instance-id field.
+    audit_file.unlink()
+    git_line = "#agent-meta:agent=git id=scope-a\ngit status"
+    _run_hook({**_bash_payload(git_line), "cwd": tmp_path.as_posix()})
+    content = audit_file.read_text(encoding="utf-8")
+    assert "role=git" in content
+    assert "orchestrator_id=" not in content
+
+
+@pytest.mark.parametrize("bad_id", ["scope/a", "Scope-A", "..", "-leading"])
+def test_invalid_sentinel_id_is_unparseable_and_never_crashes(bad_id, tmp_path):
+    """A malformed id invalidates the whole sentinel (empty role), no crash."""
+    command = f"#agent-meta:agent=orchestrator id={bad_id}\necho test"
+
+    # Strict mode: an unparseable sentinel gets no exemption.
+    strict = _run_hook(_bash_payload(command))
+    assert strict.returncode == 2, (
+        f"stdout={strict.stdout!r} stderr={strict.stderr!r}"
+    )
+
+    # Non-strict: the command itself is allowed, but no elevation is audited.
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+    assert not audit_file.exists() or "role=orchestrator" not in audit_file.read_text(
+        encoding="utf-8"
+    )
+
+
 # --- issue #551 F1: --config-env / --attr-source subcommand hiding --------
 
 @pytest.mark.parametrize("command", [

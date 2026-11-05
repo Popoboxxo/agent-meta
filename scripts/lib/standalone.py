@@ -183,6 +183,12 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "ORCH_TOPOLOGY_PRIMARY": "false",
     "ORCH_TOPOLOGY_SUBAGENT": "false",
     "ORCH_TOPOLOGY_HYBRID": "false",
+    # Orchestrator multiplicity axis (P3, AC-8): standalone has no project
+    # config, so the instance count is the single-instance default and the
+    # presence-only alias is undeclared. Registered so an absent/conditional
+    # reference resolves to the historic branch instead of leaking markers.
+    "ORCH_MAX_INSTANCES": "1",
+    "ORCH_SINGLETON_DECLARED": "false",
     # route_intent is a harness-registered callable tool with no standalone
     # counterpart — keep the §3 routing-rules fallback (issue #264).
     "ROUTE_INTENT_CALLABLE": "false",

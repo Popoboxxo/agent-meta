@@ -4,8 +4,9 @@ SPEC-orchestrator-topology-2026-11-03 (issue #1077), Task 17/18. The concept doc
 ``docs/concepts/active/orchestrator-topology.md`` is the single documented home
 of the three positions, the provider support/degradation matrix, the ``mode`` x
 ``topology`` interaction and the P3-only multi-instance contract. The doc must
-never over-promise: ``hybrid`` is granted nowhere in v1 and multi-instance is
-marked ``P3, designed, not shipped``.
+never over-promise: ``hybrid`` is granted nowhere in v1, while multi-instance
+is shipped as P3 (``max-instances``/``singleton``), with the guard id
+remaining audit-only.
 
 The link check mirrors the ``scripts/lib/consistency/docs.py`` pattern: Markdown
 links are extracted with a regex and their targets are resolved against the
@@ -87,20 +88,22 @@ def test_concept_doc_states_the_hybrid_deviation():
     )
 
 
-def test_concept_doc_marks_multi_instance_as_p3_not_shipped():
+def test_concept_doc_marks_multi_instance_as_p3_shipped():
     content = _text(_CONCEPT)
     lowered = _normalized(content)
-    assert "P3, designed, not shipped" in content, (
-        "orchestrator-topology.md must mark the multi-instance contract with "
-        "the literal 'P3, designed, not shipped' (AC-4: no v1 promise)."
+    assert "P3, shipped" in content, (
+        "orchestrator-topology.md must mark the multi-instance contract as "
+        "shipped (P3 delivered, not a design-only promise)."
     )
-    assert "kein v1-versprechen" in lowered or "nicht teil von v1" in lowered, (
-        "orchestrator-topology.md must state that multi-instance is not part "
-        "of the v1 contract."
+    assert "n=1 ist byte-identisch" in lowered, (
+        "orchestrator-topology.md must state that N=1 stays byte-identical."
     )
-    assert "max-instances" in content, (
-        "orchestrator-topology.md must name the P3-only `max-instances` key so "
-        "the reader sees what is deliberately absent in v1."
+    assert "max-instances" in content and "singleton" in content, (
+        "orchestrator-topology.md must name the shipped `max-instances` and "
+        "`singleton` keys."
+    )
+    assert "audit-only" in lowered, (
+        "orchestrator-topology.md must state that the guard id is audit-only."
     )
 
 

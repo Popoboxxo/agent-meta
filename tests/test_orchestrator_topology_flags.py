@@ -28,8 +28,9 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.lib.config import build_variables  # noqa: E402
 from scripts.lib.topology import topology_explicit  # noqa: E402
-from scripts.lib.variables import _topology_flags  # noqa: E402
+from scripts.lib.variables import _instance_flags, _topology_flags  # noqa: E402
 
 _POSITION_FLAGS = (
     "ORCH_TOPOLOGY_PRIMARY",
@@ -90,3 +91,58 @@ def test_unknown_topology_fails_closed_to_empty():
     flags = _topology_flags("hybrid2", explicit=True, source="project")
     assert flags["ORCH_TOPOLOGY"] == ""
     assert all(flags[name] == "false" for name in _POSITION_FLAGS)
+
+
+# --- instance flags (P3, AC-8) ---------------------------------------------
+
+
+def test_instance_flags_unset_is_the_single_instance_default():
+    flags = _instance_flags(None, singleton_declared=False)
+    assert flags == {
+        "ORCH_MAX_INSTANCES": "1",
+        "ORCH_SINGLETON_DECLARED": "false",
+    }
+
+
+@pytest.mark.parametrize(
+    "count,singleton,expected_count,expected_flag",
+    [
+        (1, False, "1", "false"),
+        (3, True, "3", "true"),
+        (8, True, "8", "true"),
+    ],
+)
+def test_instance_flags_carry_the_declared_values(
+    count, singleton, expected_count, expected_flag
+):
+    flags = _instance_flags(count, singleton_declared=singleton)
+    assert flags["ORCH_MAX_INSTANCES"] == expected_count
+    assert flags["ORCH_SINGLETON_DECLARED"] == expected_flag
+
+
+@pytest.mark.parametrize("value", [0, 9, -1, "3", True, 2.5, [3]])
+def test_out_of_range_or_non_int_instance_count_fails_closed(value):
+    flags = _instance_flags(value, singleton_declared=True)
+    assert flags["ORCH_MAX_INSTANCES"] == "1"
+    assert flags["ORCH_SINGLETON_DECLARED"] == "true"
+
+
+def test_build_variables_emits_instance_flags_from_the_project_scope():
+    unset, _warnings = build_variables({}, _REPO_ROOT)
+    assert unset["ORCH_MAX_INSTANCES"] == "1"
+    assert unset["ORCH_SINGLETON_DECLARED"] == "false"
+
+    declared, _warnings = build_variables(
+        {"orchestrator": {"max-instances": 3, "singleton": True}}, _REPO_ROOT
+    )
+    assert declared["ORCH_MAX_INSTANCES"] == "3"
+    assert declared["ORCH_SINGLETON_DECLARED"] == "true"
+
+
+def test_singleton_presence_not_truthiness_sets_the_declared_flag():
+    # ``singleton: false`` is rejected by the schema/validator, but the flag
+    # answers "was the key declared?" — never "is the value truthy?".
+    variables, _warnings = build_variables(
+        {"orchestrator": {"singleton": False}}, _REPO_ROOT
+    )
+    assert variables["ORCH_SINGLETON_DECLARED"] == "true"
