@@ -33,13 +33,19 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-from lib.context import apply_settings_surface_shape
+from lib.context import (
+    _init_provider_settings_json,
+    apply_settings_surface_shape,
+    init_settings_json,
+)
 from lib.isolation import sync_provider_isolation
 from lib.log import SyncLog
 from lib.providers import load_provider_capabilities, load_providers_config
@@ -154,3 +160,104 @@ def test_agents_md_deny_kept_without_reader_capability(tmp_path):
     )
     denied = _denied_globs(_read_opencode(tmp_path))
     assert "**/AGENTS.md" in denied
+
+
+# ---------------------------------------------------------------------------
+# #1090/D16: settings init uses the per-provider emitted-role predicate.
+# ---------------------------------------------------------------------------
+
+
+def _init_pc() -> dict:
+    """v2 settings surface with an explicit primary role."""
+    return {
+        "settings_file": "opencode.json",
+        "surface-version": "v2",
+        "primary-role": "orchestrator",
+        "mcp-config": {"format": "opencode-json-v2"},
+    }
+
+
+def test_init_omits_default_agent_for_provider_scoped_main_chat(tmp_path):
+    """Global strict + provider-scoped main-chat must NOT write an entry point.
+
+    The old predicate read the global ``ORCH_MODE_MAIN_CHAT`` variable and
+    ignored ``orchestrator.provider-overrides``; the init function now resolves
+    the mode through ``role_emitted_for_provider``.
+    """
+    project = tmp_path / "project"
+    config = {
+        "orchestrator": {
+            "mode": "strict",
+            "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+        }
+    }
+
+    _init_provider_settings_json(
+        project, _init_pc(), _REPO_ROOT, {"ORCH_MODE_MAIN_CHAT": "false"},
+        SyncLog(), False, provider="Opencode", config=config,
+    )
+
+    doc = json.loads((project / "opencode.json").read_text(encoding="utf-8"))
+    assert "default_agent" not in doc
+
+
+def test_init_keeps_default_agent_for_provider_scoped_strict(tmp_path):
+    """Global main-chat + provider-scoped strict still writes the entry point."""
+    project = tmp_path / "project"
+    config = {
+        "orchestrator": {
+            "mode": "main-chat",
+            "provider-overrides": {"Opencode": {"mode": "strict"}},
+        }
+    }
+
+    _init_provider_settings_json(
+        project, _init_pc(), _REPO_ROOT, {"ORCH_MODE_MAIN_CHAT": "true"},
+        SyncLog(), False, provider="Opencode", config=config,
+    )
+
+    doc = json.loads((project / "opencode.json").read_text(encoding="utf-8"))
+    assert doc["default_agent"] == "orchestrator"
+
+
+def test_init_omits_default_agent_when_role_is_not_in_active_set(tmp_path):
+    """The active-set allowlist is honoured too (not just the mode)."""
+    project = tmp_path / "project"
+    active = SimpleNamespace(
+        roles=frozenset({"developer"}), known_roles=frozenset({"orchestrator", "developer"})
+    )
+
+    _init_provider_settings_json(
+        project, _init_pc(), _REPO_ROOT, {}, SyncLog(), False,
+        provider="Opencode", config={"orchestrator": {"mode": "strict"}},
+        active_set=active,
+    )
+
+    doc = json.loads((project / "opencode.json").read_text(encoding="utf-8"))
+    assert "default_agent" not in doc
+
+
+def test_init_settings_json_reads_provider_mode_from_project_config(tmp_path):
+    """The real sync-stage entry point (no config argument) resolves the mode."""
+    project = tmp_path / "project"
+    config_dir = project / ".meta-config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "project.yaml").write_text(
+        yaml.safe_dump({
+            "orchestrator": {
+                "mode": "strict",
+                "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+            }
+        }),
+        encoding="utf-8",
+    )
+
+    init_settings_json(
+        _REPO_ROOT, project, SyncLog(), False,
+        providers=["Opencode"],
+        provider_config={"Opencode": _init_pc()},
+        variables={"ORCH_MODE_MAIN_CHAT": "false"},
+    )
+
+    doc = json.loads((project / "opencode.json").read_text(encoding="utf-8"))
+    assert "default_agent" not in doc

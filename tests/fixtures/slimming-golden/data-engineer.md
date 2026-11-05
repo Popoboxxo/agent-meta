@@ -1,10 +1,10 @@
 ---
 name: data-engineer
-version: 0.6.1
+version: 0.7.0
 description: ETL/ELT pipeline design, data-layer schema migration, data quality checks,
   lineage analysis, pipeline monitoring and streaming/batch design. Produces pipeline
   specs, data quality reports, lineage diagrams and migration scripts. Distinct from
-  database-engineer query/index work.
+  query/index tuning work.
 hint: 'Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage,
   Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer'
 prompt_mode: modern
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/data-engineer.md@0.6.1
+generated-from: 1-generic/data-engineer.md@0.7.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -108,7 +108,7 @@ On `correction_hints` from a critic → fix ONLY the named findings. Track "roun
 **Languages:** Python, Markdown, YAML
 
 **Code conventions:** - Python: PEP 8, snake_case, klare Funktionsnamen
-- Keine externen Python-Dependencies außer Stdlib
+- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)

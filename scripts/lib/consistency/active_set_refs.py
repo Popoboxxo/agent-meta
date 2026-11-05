@@ -8,6 +8,12 @@ checks stay WARN/INFO. The scan covers per provider the agents, the rules
 no ``rules_dir``), the commands (``commands_dir``), the pipeline-details files
 and the context file.
 
+Frontmatter mentions (``active-set.dangling-mention-frontmatter``, WARNING,
+issue #1083) are reported separately from body mentions (INFO): an inactive
+role named in the generated frontmatter ``description`` reaches routing and
+display before any body text, so it is not a pure prose reference. Frontmatter
+is metadata, not a dispatch (decision D7): the dispatch check skips it.
+
 Dispatch patterns are derived from ``config/delegation-syntax.yaml`` (per active
 provider, nothing hardcoded) plus the shared ``dispatch_phrases`` of
 ``config/active-set-references.yaml``. When no pattern can be derived for a
@@ -44,6 +50,7 @@ MANAGED_INDEX = ".agent-meta-managed"
 
 CHECK_DANGLING_DISPATCH = "active-set.dangling-dispatch"
 CHECK_DANGLING_MENTION = "active-set.dangling-mention"
+CHECK_DANGLING_MENTION_FM = "active-set.dangling-mention-frontmatter"
 CHECK_GATE_DROPPED = "active-set.gate-dropped"
 CHECK_UNKNOWN_ROLE = "active-set.unknown-role"
 CHECK_UNRESOLVED = "active-set.unresolved-placeholder"
@@ -147,6 +154,39 @@ def _read_lines(path: Path) -> list:
         return path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError):
         return []
+
+
+def _frontmatter_end(lines: list) -> int:
+    """1-based line number of the closing ``---``; ``0`` without a frontmatter."""
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for i, line in enumerate(lines[1:], start=2):
+        if line.strip() == "---":
+            return i
+    return 0
+
+
+def _non_code_lines(lines: list) -> list:
+    """Lines with fenced blocks blanked and inline code spans stripped.
+
+    Documentation examples such as ``{{VAR}}`` are escaped placeholders, not
+    unresolved variables (issue #1082): a fence line (````` ``` ````/``~~~``)
+    toggles the block state, everything inside it becomes ``""``, and inline
+    spans (`` `…` ``, `` ``…`` ``) are removed from the remaining lines. The
+    line count stays stable so a finding can still be traced to its line
+    number; ``variables.substitute`` already catches real unresolved
+    placeholders before rendering.
+    """
+    out = []
+    in_fence = False
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            out.append("")
+            continue
+        out.append("" if in_fence else re.sub(r"(`+)[^`\n]*?\1", "", line))
+    return out
 
 
 def _rel(path: Path, project_root: Path) -> str:
@@ -260,10 +300,27 @@ def _collect(project_root, providers, active_set, kind: str) -> list:
             rel = _rel(path, project_root)
             if kind == "mention" and any(fnmatch.fnmatch(rel, g) for g in mention_allow):
                 continue
+            lines = _read_lines(path)
+            fm_end = _frontmatter_end(lines)
             per_role: dict = {}
-            for lineno, dispatch, mentions in _line_hits(_read_lines(path), pats, dangling):
+            per_frontmatter: dict = {}
+            for lineno, dispatch, mentions in _line_hits(lines, pats, dangling):
+                if 0 < lineno <= fm_end:
+                    # Decision D7: frontmatter is metadata, not a dispatch. Only
+                    # the mention scan reports it (as the #1083 WARNING); a
+                    # dispatch-shaped phrase in the frontmatter is never a route.
+                    if kind == "mention":
+                        for role in mentions:
+                            per_frontmatter.setdefault(role, []).append(lineno)
+                    continue
                 for role in (dispatch if kind == "dispatch" else mentions):
                     per_role.setdefault(role, []).append(lineno)
+            for role, linenos in sorted(per_frontmatter.items()):
+                findings.append(Finding(
+                    Severity.WARNING, CHECK_DANGLING_MENTION_FM, rel,
+                    f"mention of inactive role '{role}' in frontmatter ({len(linenos)}x, "
+                    f"first line {linenos[0]})",
+                    "Name the role conditionally or neutrally in the description"))
             for role, linenos in sorted(per_role.items()):
                 if kind == "dispatch":
                     findings.append(Finding(
@@ -289,6 +346,20 @@ def check_dangling_dispatch(project_root: Path, active_providers: Sequence[str],
 def check_dangling_mention(project_root: Path, active_providers: Sequence[str],
                            capabilities: Mapping[str, Mapping], active_set) -> list:
     return _collect(Path(project_root), active_providers, active_set, "mention")
+
+
+def check_dangling_mention_frontmatter(project_root: Path, active_providers: Sequence[str],
+                                       capabilities: Mapping[str, Mapping],
+                                       active_set) -> list:
+    """Frontmatter-only subset of :func:`check_dangling_mention` (issue #1083).
+
+    Same scan, filtered to ``active-set.dangling-mention-frontmatter``: the
+    doctor registry resolves one check id to one ``check_<id>`` function, and
+    this WARNING is a distinct contract from the body-mention INFO.
+    """
+    return [f for f in check_dangling_mention(project_root, active_providers,
+                                              capabilities, active_set)
+            if f.check == CHECK_DANGLING_MENTION_FM]
 
 
 def check_gate_dropped(project_root: Path, active_providers: Sequence[str],
@@ -322,7 +393,7 @@ def check_unresolved_placeholder(project_root: Path, active_providers: Sequence[
     for provider in active_providers:
         for path in _scan_files(project_root, provider):
             counts: dict = {}
-            for line in _read_lines(path):
+            for line in _non_code_lines(_read_lines(path)):
                 for ph in _PLACEHOLDER_RE.findall(line):
                     if ph not in allow:
                         counts[ph] = counts.get(ph, 0) + 1

@@ -24,9 +24,11 @@ from .context_profile import (
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
+    _instance_flags,
     _orch_mode_flags,
     _resolve_orch_mode,
     _subagent_permission_flags,
+    _topology_flags,
     _VALID_SUBAGENT_PERMISSION_MODES,
     derive_agent_meta_repo,
     normalize_subagent_permission_mode,
@@ -40,6 +42,10 @@ from .subagent_permissions import (
     missing_tools_roles,
     render_subagent_permission_block,
     resolve_effective_subagent_permission_mode,
+)
+from .test_environments import (
+    build_test_environment_variables,
+    validate_test_environments,
 )
 from .pipelines import (
     PIPELINES_EFFECTIVE_KEY,
@@ -167,6 +173,22 @@ _CONFIG_FIELD_DESCRIPTIONS: dict = {
 # cascade on every later sync -- the resolver already has a clean runtime
 # fallback and needs no persisted value (PR #709 finding 1).
 _CASCADE_MANAGED_PRESET_KEYS = frozenset({"dod-preset", "conventions-preset"})
+
+# Preset/flag defaults that only an explicit `--fill-defaults`/`--init` may
+# materialize. A plain sync auto-fill leaves them virtual: they resolve
+# through the runtime fallbacks (`config_field_defaults`, platforms cascade),
+# and persisting them on every sync would rewrite third-party project.yaml
+# files (issues #1074, #1092). `repo_containment` and `project.short` are
+# deliberately NOT in this set — they are structural and must be visible.
+_SYNC_SKIPPED_DEFAULT_KEYS = frozenset({
+    "rules-preset",
+    "speech-mode",
+    "tier-preset",
+    "se-focus",
+    "max-parallel-agents",
+    "debug-mode",
+    "allow-committed-secrets",
+})
 
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
 _DOD_FIELD_DEFAULTS: dict = {
@@ -324,6 +346,8 @@ def load_config(config_path: Path) -> dict:
     _normalize_null_blocks(config)
     _normalize_auto_commit_mode(config)
     _normalize_subagent_permissions_mode(config)
+    from .release_checklist import normalize_release_checklist_mode
+    normalize_release_checklist_mode(config)
     _validate_config(config, config_path)
     return config
 
@@ -364,10 +388,218 @@ def _normalize_subagent_permissions_mode(config: dict) -> None:
                 entry["mode"] = "off"
 
 
+#: Normative ``mode`` x ``topology`` interaction matrix (spec section
+#: "mode × topology-Interaktionsmatrix"). Row = effective orchestrator mode,
+#: column = declared topology. The values are cell semantics, not a second
+#: resolver: ``primary`` puts the orchestrator at the entry point, ``subagent``
+#: has the main chat spawn 1..N, ``hybrid`` is position-agnostic by declaration
+#: (v1 degrades every hybrid cell to ``subagent`` via the capability fallback).
+#: ``main-chat`` is the only dominance cell; ``orchestrator_topology_cell``
+#: maps it to ``error`` (same scope) or ``inert`` (cross scope, P2 WARNING).
+ORCHESTRATOR_TOPOLOGY_MATRIX: dict[tuple[str, str], str] = {
+    ("strict", "primary"): "entry",
+    ("strict", "subagent"): "spawned",
+    ("strict", "hybrid"): "position-agnostic",
+    ("advisory", "primary"): "entry",
+    ("advisory", "subagent"): "spawned",
+    ("advisory", "hybrid"): "position-agnostic",
+    ("main-chat", "primary"): "error",
+    ("main-chat", "subagent"): "error",
+    ("main-chat", "hybrid"): "error",
+}
+
+
+def orchestrator_topology_cell(
+    mode: str, topology: str, *, same_scope: bool = True
+) -> str:
+    """Return the normative 3x3 cell for *mode* x *topology* (AC-5).
+
+    ``same_scope`` distinguishes the hard validator error from the cross-scope
+    P2 WARNING (``inert``): ``mode: main-chat`` in the same object as a
+    topology is a contradiction, while a provider override ``main-chat`` under
+    a global topology merely makes the topology inert.
+
+    Raises ``KeyError`` for an unknown mode/topology — the matrix is data, not
+    a normalizer.
+    """
+    if mode == "main-chat":
+        return "error" if same_scope else "inert"
+    return ORCHESTRATOR_TOPOLOGY_MATRIX[(mode, topology)]
+
+
+def _topology_error(config_path: Path, message: str) -> None:
+    print(f"ERROR: {config_path}: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+#: Hard bounds of ``orchestrator.max-instances`` (OQ-3 = A). The schema mirrors
+#: these; this stdlib path is what actually aborts ``sync`` / ``--validate``.
+_MAX_INSTANCES_LIMIT = 8
+
+
+def _validated_max_instances(orch: dict, config_path: Path) -> int:
+    """Return the declared instance count, defaulting to 1 when unset.
+
+    ``max-instances`` is the canonical multiplicity key; ``singleton`` is only
+    a presence-only alias. Missing => 1 (today's behaviour). A non-integer,
+    boolean or out-of-range value is a hard error, not a silent clamp.
+    """
+    if "max-instances" not in orch:
+        return 1
+    value = orch.get("max-instances")
+    if isinstance(value, bool) or not isinstance(value, int):
+        _topology_error(
+            config_path,
+            "orchestrator.max-instances must be an integer between 1 and "
+            f"{_MAX_INSTANCES_LIMIT} (got {value!r}).",
+        )
+    if not 1 <= value <= _MAX_INSTANCES_LIMIT:
+        _topology_error(
+            config_path,
+            "orchestrator.max-instances must be between 1 and "
+            f"{_MAX_INSTANCES_LIMIT} (got {value}). "
+            "Use 1 for the single-orchestrator default.",
+        )
+    return value
+
+
+def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
+    """Hard-reject same-scope ``mode`` x ``topology`` contradictions (IC-8).
+
+    Runs after ``_validate_providers`` and before the warn-only schema block,
+    so both ``sync`` and ``sync --validate`` abort (rc != 0) without requiring
+    ``jsonschema``. Pinned P1 substrings (AC-17):
+
+    * ``unknown orchestrator.topology``
+    * ``orchestrator.topology conflicts with orchestrator.mode: main-chat``
+    * ``orchestrator.topology conflicts with orchestrator.enabled: false``
+    * ``provider-overrides.<P>.topology conflicts with
+      provider-overrides.<P>.mode: main-chat``
+
+    P3 (multi-instance) adds the same-scope multiplicity rules (D5):
+
+    * ``orchestrator.singleton conflicts with orchestrator.max-instances``
+    * ``orchestrator.singleton: false is not supported (use max-instances)``
+    * ``orchestrator.topology: primary conflicts with
+      orchestrator.max-instances``
+    * ``orchestrator.max-instances`` outside ``1..8``
+
+    ``singleton`` is presence-only: key existence, never truthiness, decides
+    whether the alias was declared. A *cross-scope* ``primary`` (provider
+    override) with a global N>1 is deliberately NOT rejected here — it is the
+    ``instances-clamped`` WARNING and effective N=1 (AC-9).
+    """
+    from .topology import VALID_TOPOLOGIES
+
+    orch = config.get("orchestrator")
+    if not isinstance(orch, dict):
+        return
+
+    valid_values = "'primary', 'subagent', 'hybrid'"
+
+    instance_count = _validated_max_instances(orch, config_path)
+
+    project_topology = orch.get("topology")
+    project_topology_value = None
+    if project_topology is not None:
+        value = str(project_topology).strip()
+        project_topology_value = value
+        if value not in VALID_TOPOLOGIES:
+            _topology_error(
+                config_path,
+                f"unknown orchestrator.topology value {value!r}. "
+                f"Valid values are: {valid_values}. "
+                "Hint: omit the key to keep the provider-derived default.",
+            )
+        if orch.get("enabled") is False:
+            _topology_error(
+                config_path,
+                "orchestrator.topology conflicts with "
+                "orchestrator.enabled: false. The role does not exist when "
+                "the orchestrator is disabled; remove one of the two keys.",
+            )
+        if _resolve_orch_mode(orch, validate=False) == "main-chat":
+            _topology_error(
+                config_path,
+                "orchestrator.topology conflicts with orchestrator.mode: "
+                "main-chat. main-chat supersedes every topology in the same "
+                "scope; remove one of the two keys.",
+            )
+
+    # (d) singleton is a presence-only alias for exactly one orchestrator.
+    # Presence is decided by key existence, never by truthiness; ``false`` is
+    # rejected with a hint because the schema enum [true] is only an
+    # editor/warning channel, not the hard exit.
+    if "singleton" in orch:
+        singleton_value = orch.get("singleton")
+        if singleton_value is not True:
+            if singleton_value is False:
+                _topology_error(
+                    config_path,
+                    "orchestrator.singleton: false is not supported "
+                    "(use max-instances). Omit the key for the derived "
+                    "default, or set max-instances explicitly.",
+                )
+            _topology_error(
+                config_path,
+                "orchestrator.singleton must be true when present "
+                f"(got {singleton_value!r}). 'false' is not supported "
+                "(use max-instances).",
+            )
+        if instance_count > 1:
+            _topology_error(
+                config_path,
+                "orchestrator.singleton conflicts with "
+                "orchestrator.max-instances. singleton means exactly one "
+                "orchestrator; remove the alias or set max-instances: 1.",
+            )
+
+    # (e) primary x N>1 in the SAME scope. A provider-scoped ``primary``
+    # override with a global N>1 is the cross-scope WARNING (clamped to 1),
+    # not a validator error.
+    if project_topology_value == "primary" and instance_count > 1:
+        _topology_error(
+            config_path,
+            "orchestrator.topology: primary conflicts with "
+            "orchestrator.max-instances. primary is a single entry-point "
+            "orchestrator; set max-instances: 1 or leave the topology unset.",
+        )
+
+    overrides = orch.get("provider-overrides")
+    if not isinstance(overrides, dict):
+        return
+    for provider, entry in overrides.items():
+        if not isinstance(entry, dict):
+            continue
+        override_topology = entry.get("topology")
+        if override_topology is None:
+            continue
+        value = str(override_topology).strip()
+        if value not in VALID_TOPOLOGIES:
+            _topology_error(
+                config_path,
+                f"unknown orchestrator.topology value {value!r} in "
+                f"provider-overrides.{provider}. "
+                f"Valid values are: {valid_values}.",
+            )
+        override_mode = entry.get("mode")
+        if (
+            override_mode is not None
+            and str(override_mode).strip().lower() == "main-chat"
+        ):
+            _topology_error(
+                config_path,
+                f"provider-overrides.{provider}.topology conflicts with "
+                f"provider-overrides.{provider}.mode: main-chat. main-chat "
+                "supersedes every topology in the same scope; remove one of "
+                "the two keys.",
+            )
+
+
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Four kinds of checks:
+    Five kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -380,20 +612,29 @@ def _validate_config(config: dict, config_path: Path) -> None:
        'ai-provider'/'ai-providers'/'default-provider' names abort the sync
        instead of silently falling back to Claude (issue #732).
 
-    3. Hard-fatal repo-containment checks (_validate_repo_containment):
+    3. Hard-fatal orchestrator topology checks
+       (_validate_orchestrator_topology): unknown enum values and same-scope
+       ``main-chat`` x topology contradictions abort the sync (stderr +
+       exit 1). stdlib only, no jsonschema.
+
+    4. Hard-fatal repo-containment checks (_validate_repo_containment):
        wrong types and unsafe tmp-sink paths abort the sync (stderr + exit 1).
        Structure/path checks always run, even when the mode is disabled, so a
        later opt-in never surfaces a dormant misconfiguration.
 
-    4. Schema validation against agent-meta.schema.json if jsonschema is
+    5. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
     """
     _validate_model_inheritance(config, config_path)
     _validate_providers(config, config_path)
+    _validate_orchestrator_topology(config, config_path)
     _validate_repo_containment(config, config_path)
     _validate_subagent_permissions(config, config_path)
+    validate_test_environments(config, config_path)
+    from .release_checklist import validate_release_checklist
+    validate_release_checklist(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
         # Explicit, correctly-worded pointer: jsonschema ENABLES this check
@@ -1030,6 +1271,7 @@ def fill_defaults(
     log: SyncLog,
     dry_run: bool,
     silent: bool = False,
+    materialize_presets: bool = True,
 ) -> None:
     """Write missing config fields with their default values into project.yaml.
 
@@ -1040,6 +1282,11 @@ def fill_defaults(
       Only reported as [WARN] — no empty strings written (no sensible default).
 
     If silent=True, only the summary line is logged (for auto-fill during sync).
+
+    If materialize_presets=False (plain sync auto-fill), the seven
+    preset/flag defaults in ``_SYNC_SKIPPED_DEFAULT_KEYS`` and the nested
+    ``dod.*`` fill are skipped; they stay virtual through the runtime
+    fallbacks. ``--fill-defaults``/``--init`` keep the default True.
     """
     config = load_config(config_path)
     changed = False
@@ -1062,6 +1309,8 @@ def fill_defaults(
             continue  # nested fields handled below
         if field in _CASCADE_MANAGED_PRESET_KEYS:
             continue  # resolved via platforms: cascade at runtime -- never persist
+        if not materialize_presets and field in _SYNC_SKIPPED_DEFAULT_KEYS:
+            continue  # only --fill-defaults/--init may persist these
         if field not in config:
             config[field] = default
             desc = effective_descriptions.get(field, "")
@@ -1089,7 +1338,7 @@ def fill_defaults(
     # dod.* values then would re-freeze the resolved DoD via the `dod:` block,
     # the same failure mode finding 1 fixes for the preset key itself. ---
     active_preset = config.get("dod-preset")
-    if active_preset in ("full", "strict"):
+    if materialize_presets and active_preset in ("full", "strict"):
         dod_block = config.get("dod", {})
         for field_path, (default, desc) in schema_defaults.items():
             if not field_path.startswith("dod."):
@@ -1172,14 +1421,34 @@ def fill_defaults(
 def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[str, str]]) -> None:
     """Write YAML with auto-filled field comments.
 
-    Since PyYAML does not support comments, we dump to text and inject
-    #-style comment lines before each auto-filled top-level key.
+    Prefers a top-level segment patch (``yaml_patch.patch_top_level``): only
+    the segments that changed are re-rendered, so every untouched comment,
+    blank line and key order in the user's project.yaml survives (issues
+    #1074, #1092). If the patch refuses the document (anchors, multi-doc,
+    tabs, self-check mismatch, …), the historical full-dump path runs and
+    injects ``#`` comment lines before the auto-filled top-level keys.
     """
     from .io import yaml_dump_preserving_multiline
-    buf = io.StringIO()
-    yaml_dump_preserving_multiline(_yaml, data, buf, allow_unicode=True,
-                                   default_flow_style=False, sort_keys=False, indent=2)
-    text = buf.getvalue()
+    from .yaml_patch import patch_top_level
+
+    def _dump(payload: dict) -> str:
+        buf = io.StringIO()
+        yaml_dump_preserving_multiline(_yaml, payload, buf, allow_unicode=True,
+                                       default_flow_style=False, sort_keys=False, indent=2)
+        return buf.getvalue()
+
+    # ``newline=""`` keeps CRLF byte-for-byte; ``read_text`` would normalise
+    # the document to LF before the patcher ever sees it.
+    with path.open("r", encoding="utf-8", newline="") as f:
+        original = f.read()
+    descriptions = {name: desc for name, desc in auto_filled if "." not in name}
+    patched = patch_top_level(original, data, _dump, comments=descriptions)
+    if patched is not None:
+        with path.open("w", encoding="utf-8", newline="") as f:
+            f.write(patched)
+        return
+
+    text = _dump(data)
 
     auto_filled_keys = {name.split(".")[0] for name, _ in auto_filled}
     descriptions = {name: desc for name, desc in auto_filled}
@@ -1439,8 +1708,22 @@ def _build_core_variables(
     # render a misleading trailing-slash path instead of omitting the clause.
     # A derived <VAR>_SET boolean lets templates wrap the whole clause in
     # {{#if <VAR>_SET}}...{{/if}} (see strip_inactive_conditional_blocks).
-    for _optional_var in ("DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START"):
-        variables[f"{_optional_var}_SET"] = "true" if variables.get(_optional_var) else "false"
+    for _optional_var in (
+        "DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START",
+        "GIT_REMOTE_URL",
+    ):
+        _optional_value = variables.get(_optional_var)
+        if _optional_var == "GIT_REMOTE_URL":
+            # Issue #1093 residual: the git agent interpolates the URL inside
+            # literal parentheses, so a non-string YAML value (list/dict) or a
+            # whitespace-only string must count as absent — otherwise it
+            # renders a Python repr or ``(   )``. Scoped to GIT_REMOTE_URL on
+            # purpose: the sibling paths are never wrapped, so their plain
+            # truthiness semantics stay unchanged.
+            _is_set = isinstance(_optional_value, str) and bool(_optional_value.strip())
+        else:
+            _is_set = bool(_optional_value)
+        variables[f"{_optional_var}_SET"] = "true" if _is_set else "false"
         variables.setdefault(_optional_var, "")
     # REQ category placeholders: guarantee substitution so generated context
     # files never keep a literal {{REQ_CATEGORIES_LIST}} / {{REQ_CATEGORIES}}.
@@ -1477,18 +1760,49 @@ def _build_core_variables(
     # eligibility itself is resolved again, per-provider, by Task 6's
     # sync-pipeline stage (this variable only needs mode-level content,
     # not the per-role allowlist).
-    from .auto_commit import render_auto_commit_block
+    from .auto_commit import (
+        INVALID_CONFIG_MARKER,
+        auto_commit_violations,
+        render_auto_commit_block,
+    )
 
     _auto_commit_cfg = config.get("auto_commit", {}) or {}
-    _auto_commit_resolved = {
-        "mode": _auto_commit_cfg.get("mode", "off"),
-        "triggers": _auto_commit_cfg.get("triggers", []),
-        "file_count_threshold": _auto_commit_cfg.get("file_count_threshold", 5),
-        "custom_script": _auto_commit_cfg.get("custom_script"),
-        "secret_scan": _auto_commit_cfg.get("secret_scan", True),
-    }
+    if auto_commit_violations(config):
+        # Issue #1091 (PR #1118 blocking finding): the same fail-safe as
+        # resolve_auto_commit_config -- an invalid block is treated as
+        # ``mode: off`` with an empty effective block. The marker makes
+        # render_auto_commit_block emit an explicit "off" notice instead of
+        # an empty section: on hookless providers (has_hooks: false) no guard
+        # hook enforces the allowlist, so the rendered prose is the only
+        # place the fail-safe can reach the agent.
+        _auto_commit_resolved = {
+            "mode": "off",
+            "triggers": [],
+            "file_count_threshold": 5,
+            "custom_script": None,
+            "secret_scan": True,
+            INVALID_CONFIG_MARKER: True,
+        }
+    else:
+        _threshold = _auto_commit_cfg.get("file_count_threshold", 5)
+        if isinstance(_threshold, float) and _threshold.is_integer():
+            # schema type: integer -- 5.0 is valid, render it as 5.
+            _threshold = int(_threshold)
+        _auto_commit_resolved = {
+            "mode": _auto_commit_cfg.get("mode", "off"),
+            "triggers": _auto_commit_cfg.get("triggers", []),
+            "file_count_threshold": _threshold,
+            "custom_script": _auto_commit_cfg.get("custom_script"),
+            "secret_scan": _auto_commit_cfg.get("secret_scan", True),
+        }
+    # ``AUTO_COMMIT_ENABLED`` gates the {{#if}} block. The fail-safe notice
+    # must render, so the gate stays "true" even though the effective mode is
+    # "off" -- the notice itself tells the agent not to commit.
     variables["AUTO_COMMIT_ENABLED"] = (
-        "true" if _auto_commit_resolved["mode"] != "off" else "false"
+        "true"
+        if _auto_commit_resolved["mode"] != "off"
+        or _auto_commit_resolved.get(INVALID_CONFIG_MARKER)
+        else "false"
     )
     # Global fallback rendered at the default "direct" authority, for paths
     # outside the per-role overlay (e.g. standalone/skill rendering). The
@@ -1629,6 +1943,7 @@ def _build_orch_variables(
 
     Parameter contract:
         variables: mutated in place — receives ORCHESTRATOR_*, ORCH_MODE_*,
+            ORCH_TOPOLOGY_*, ORCH_MAX_INSTANCES, ORCH_SINGLETON_DECLARED,
             REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
             ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
             CHECKPOINTING_ENABLED, NATIVE_EXTENSIONS_*, ANALYSIS_ENABLED,
@@ -1658,6 +1973,32 @@ def _build_orch_variables(
     # can reuse the same logic in scripts/sync.py.
     _orch_mode = _resolve_orch_mode(orch_config)
     variables.update(_orch_mode_flags(_orch_mode))
+
+    # ORCH_TOPOLOGY_*: provider-LESS (global) block, wired exactly like the
+    # ORCH_MODE_* flags above. IC-4 pins its value to the PROJECT declaration:
+    # ``orchestrator.topology`` or "" — never a provider-derived resolution and
+    # never a provider override (``ORCH_TOPOLOGY_EXPLICIT`` is "true" only for
+    # the project scope). With the key unset all four boolean gates stay
+    # "false", so every consumer project renders its historic branch
+    # byte-identically (AC-6/AC-18). The provider-scoped render paths
+    # (context.py::_build_managed_block, rules.py::_merged_rule_vars) re-resolve
+    # the *declared* value with provider=... and overwrite these.
+    _project_topology = orch_config.get("topology")
+    variables.update(_topology_flags(
+        "" if _project_topology is None else str(_project_topology).strip(),
+        explicit=_project_topology is not None,
+        source="project" if _project_topology is not None else "derived",
+    ))
+
+    # ORCH_MAX_INSTANCES / ORCH_SINGLETON_DECLARED: provider-LESS (global)
+    # project-scope block (P3, AC-8). The unset count is the single-instance
+    # default "1"; ``ORCH_SINGLETON_DECLARED`` answers presence, never
+    # truthiness. Provider-scoped effective counts are re-resolved in
+    # rules.py (Task 7) and reported by the consistency check (Task 6).
+    variables.update(_instance_flags(
+        orch_config.get("max-instances"),
+        singleton_declared="singleton" in orch_config,
+    ))
 
     # REPO_CONTAINMENT_*: base (provider-independent) flags, wired exactly like
     # the ORCH_MODE_* flags above. The per-provider render paths
@@ -2349,6 +2690,10 @@ def _build_convention_variables(
         if _blocks:
             variables.update(_blocks)
 
+    from .release_checklist import build_release_checklist_variables
+
+    variables.update(build_release_checklist_variables(config))
+
 
 def build_variables(
     config: dict, agent_meta_root: Path, project_root: Path | None = None,
@@ -2461,6 +2806,9 @@ def build_variables(
 
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root, active_set)
+    # Test-environment block + gate flag (SPEC-TEST-ENVIRONMENTS-2026-10-31).
+    # project_root is needed for the project-layer platform URL fallback.
+    variables.update(build_test_environment_variables(config, project_root))
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
 
     return variables, unmapped

@@ -285,10 +285,21 @@ def _antigravity_adapter_command(
     Every mirrored hook is executed THROUGH the translating adapter (payload
     keys, tool names and deny-JSON semantics differ from the Claude contract
     the hook scripts are written against — see config/ai-providers.yaml,
-    issue #674 Phase 3.1). The command path is relative to the hooks.json
-    directory: Antigravity resolves relative command paths against the
-    location of the hooks.json that declares them (verified AGY IDE behavior
-    — third-party empirical report, P6 real-repo re-check).
+    issue #674 Phase 3.1).
+
+    The command path is relative to the hooks.json directory because that is
+    the documented cwd: AGY runtime documentation (embedded in the binary,
+    static evidence) states that ``command`` runs via ``sh -c`` with the
+    working directory set to the directory containing hooks.json —
+    docs/analysis/evidence/2026-09-30-runtime-claude-antigravity.md §2.1.
+    Neither that documentation nor the binary's loader strings name an
+    environment variable that exposes the project root, so no
+    ``hook-command-anchor``-style prefix can be used here (issue #1032).
+    Runtime verification of the cwd is still pending (#860). If runtime
+    evidence shows a different cwd, add a provider key analogous to
+    ``hook-command-anchor`` (config/ai-providers.yaml:34) instead of changing
+    this function — the relative-command pin in
+    tests/test_antigravity_hooks_registration.py documents the contract.
     """
     config_dir = posixpath.dirname(config_path_rel.rstrip("/")) or "."
     rel = posixpath.relpath(posixpath.normpath(hooks_dir_rel), posixpath.normpath(config_dir))

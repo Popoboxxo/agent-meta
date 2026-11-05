@@ -7,7 +7,10 @@ definition ("``refilled-by-defaults``", spec line 504 ff.).
 
 ``refill_keys`` is derived from the *same* helpers that ``fill_defaults`` calls
 (``config_field_defaults``, the schema top-level defaults, the special blocks
-``repo_containment``/``project.short``/``dod.*``). Keys in that set never get a
+``repo_containment``/``project.short``). It models the plain-sync variant
+(``materialize_presets=False``), so it deliberately excludes the seven
+preset/flag defaults and the nested ``dod.*`` fill that only
+``--fill-defaults``/``--init`` persist. Keys in that set never get a
 removal hunk: the production guard turns them into an ``info-only`` candidate
 with the Mark ``refilled-by-defaults`` and the mandatory warning text. Applying
 every applicable candidate and running a regular sync afterwards must leave
@@ -34,7 +37,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import meta_optimizer as mo  # noqa: E402
 from lib.active_set import compute_active_set  # noqa: E402
-from lib.config import config_field_defaults  # noqa: E402
+from lib.config import (  # noqa: E402
+    _SYNC_SKIPPED_DEFAULT_KEYS,
+    config_field_defaults,
+)
 
 CASCADE_KEYS = {"dod-preset", "conventions-preset"}
 REFILL_MARK = "refilled-by-defaults"
@@ -110,16 +116,22 @@ def test_refill_keys_comes_from_fill_defaults_sources():
     """AC-82/IC-24: same sources as ``fill_defaults``, no copied default tables."""
     keys = mo.refill_keys(REPO_ROOT, {"dod-preset": "rapid-prototyping"})
 
-    expected_fields = set(config_field_defaults(REPO_ROOT)) - CASCADE_KEYS
+    expected_fields = (
+        set(config_field_defaults(REPO_ROOT))
+        - CASCADE_KEYS
+        - _SYNC_SKIPPED_DEFAULT_KEYS
+    )
     assert expected_fields <= keys, expected_fields - keys
 
     assert "repo_containment" in keys
-    assert "debug-mode" in keys               # schema top-level default
     assert "agent-meta-version" in keys       # derived from VERSION
 
     assert "dod.req-traceability" not in keys
-    full_keys = mo.refill_keys(REPO_ROOT, {"dod-preset": "full"})
-    assert "dod.req-traceability" in full_keys
+    # ``refill_keys`` models the plain-sync variant (materialize_presets=False):
+    # the nested dod.* fill runs only for --fill-defaults/--init, so a removed
+    # dod.req-traceability really stays removed after the next sync.
+    assert "dod.req-traceability" not in mo.refill_keys(
+        REPO_ROOT, {"dod-preset": "full"})
 
     assert "project.short" not in keys
     with_project = mo.refill_keys(
@@ -132,6 +144,22 @@ def test_refill_keys_comes_from_fill_defaults_sources():
 
     assert "dod-preset" not in keys
     assert "conventions-preset" not in keys
+
+
+def test_sync_skipped_defaults_are_not_refill_keys():
+    """D14/#1074: plain sync (``materialize_presets=False``) never re-adds the
+    seven preset/flag defaults, so a removal is not undone by the next sync.
+
+    ``refill_keys`` must mirror that plain-sync behaviour instead of the
+    ``--fill-defaults``/``--init`` variant, otherwise every one of those keys
+    is reported as ``refilled-by-defaults`` although it stays removed.
+    """
+    keys = mo.refill_keys(REPO_ROOT, {})
+    assert keys.isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
+    # A rigorous preset does not resurrect the skipped top-level keys either:
+    # the nested dod.* branch only runs for --fill-defaults/--init.
+    assert mo.refill_keys(
+        REPO_ROOT, {"dod-preset": "full"}).isdisjoint(_SYNC_SKIPPED_DEFAULT_KEYS)
 
 
 # --- Case B: the guard neuters a removal candidate -------------------------

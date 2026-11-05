@@ -15,7 +15,7 @@
 
 **Besondere Patterns:**
 - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
-- Platzhalter {{VARIABLE}} werden von sync.py substituiert
+- Platzhalter in doppelten geschweiften Klammern (GROSS_NAME) werden von sync.py substituiert
 - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
 - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
 
@@ -23,7 +23,7 @@
 ## Code-Konventionen
 
 - Python: PEP 8, snake_case, klare Funktionsnamen
-- Keine externen Python-Dependencies außer Stdlib
+- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
@@ -44,7 +44,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- agent-meta:managed-begin -->
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v2.0.0-beta.5` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v2.0.0-beta.7` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 

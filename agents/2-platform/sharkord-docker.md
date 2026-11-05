@@ -1,7 +1,7 @@
 ---
 name: sharkord-docker
-version: "1.2.4"
-based-on: "1-generic/docker.md@1.9.1"
+version: "1.2.5"
+based-on: "1-generic/docker.md@1.10.0"
 description: "Sharkord-spezifischer Docker-Agent. Plugin-Mount, Access-Token, Mediasoup-Ports, SYS_NICE, Port-Register."
 hint: "Sharkord Dev-Stack: Plugin-Mount, Access-Token, Mediasoup-Ports, Compose"
 tools:
@@ -175,5 +175,9 @@ Platzhalter ausfüllen:
 - KEIN falscher Plugin-Verzeichnisname
 - NIEMALS `localhost` als `ANNOUNCED_ADDRESS`
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+Deploy auf eine Remote-Umgebung nur bei `access: deploy` und erfülltem Freigabeprotokoll.
+{{/if}}
 ## Sprache
 Kommentare → {{CODE_LANGUAGE}} | Nutzer → {{COMMUNICATION_LANGUAGE}} | Input → {{USER_INPUT_LANGUAGE}}

@@ -37,7 +37,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Provider-specific paths/files (injected per provider in sync_agents_for_provider)
     "CONTEXT_FILE", "SKILLS_DIR", "PENDING_TASKS_FILE", "FILE_BASED_AGENTS",
     # Git / platform
-    "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_MAIN_BRANCH",
+    "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_REMOTE_URL_SET", "GIT_MAIN_BRANCH",
     # Requirements
     "REQ_CATEGORIES", "REQ_CATEGORIES_LIST",
     # Knowledge Domain
@@ -67,6 +67,15 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Orchestrator (injected by build_variables)
     "ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "DIRECT_DISPATCH_SECTION", "ORCHESTRATOR_OUTCOME_CACHING",
     "ORCHESTRATOR_CACHE_TTL", "ORCHESTRATOR_CACHE_MAX_ENTRIES",
+    # Orchestrator topology axis (IC-4): emitted by config.build_variables via
+    # variables._topology_flags. Register here — the builder ratchet is
+    # shrink-only and must not take new entries.
+    "ORCH_TOPOLOGY", "ORCH_TOPOLOGY_EXPLICIT", "ORCH_TOPOLOGY_PRIMARY",
+    "ORCH_TOPOLOGY_SUBAGENT", "ORCH_TOPOLOGY_HYBRID", "ORCH_TOPOLOGY_SOURCE",
+    # Orchestrator multiplicity axis (P3, AC-8): emitted by
+    # variables._instance_flags via config.build_variables. Register here — the
+    # builder ratchet is shrink-only and must not take new entries.
+    "ORCH_MAX_INSTANCES", "ORCH_SINGLETON_DECLARED",
     "A2A_PROTOCOL_ENABLED", "CHECKPOINTING_ENABLED", "AUTO_COMMIT_ENABLED",
     "A2A_HANDOFF_BLOCK", "ANTI_RECURSION_BLOCK", "DOD_REQ_BLOCK", "DOD_TESTS_BLOCK",
     "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT",
@@ -105,6 +114,11 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Convention blocks (rendered from config/conventions-presets.yaml by build_variables)
     "RELEASE_VERSIONING_BLOCK", "RELEASE_CHANGELOG_BLOCK", "GIT_ISSUE_NAMING_BLOCK",
     "RELEASE_CUSTOM_CHECKLIST_BLOCK", "RELEASE_CUTOFF_BLOCK",
+    # Test environments (build_test_environment_variables): the rendered block
+    # and its {{#if}} gate flag
+    "TEST_ENVIRONMENT_BLOCK", "TEST_ENVIRONMENTS_SET",
+    # Structured release checklist (opt-in, release-checklist block)
+    "RELEASE_CHECKLIST_MODE", "RELEASE_CHECKLIST_ENABLED", "RELEASE_CHECKLIST_BLOCK",
     # Issue language for feedback-created GitHub issues (issue #579)
     "ISSUE_LANGUAGE",
     # SE cascade variables (from role-defaults.yaml se_variables)

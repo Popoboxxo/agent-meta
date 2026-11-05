@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.8.1"
+version: "4.9.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
@@ -146,6 +146,11 @@ Delegation:
 **Language:** Communication → {{COMMUNICATION_LANGUAGE}}. Code comments and commit messages → {{CODE_LANGUAGE}}.
 </constraints>
 
+{{#if TEST_ENVIRONMENTS_SET}}
+{{TEST_ENVIRONMENT_BLOCK}}
+
+Develop and test locally first; touch a remote environment only as the rules above allow.
+{{/if}}
 {{OUTPUT_GUARD_BLOCK}}
 
 Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):

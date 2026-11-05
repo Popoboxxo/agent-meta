@@ -81,6 +81,32 @@
 #   mcp-remote-transport — how the provider discriminates a remote MCP
 #     transport: url (default) | transport | type. Consumed by the MCP format
 #     writer; no provider-name branch.
+#
+# Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0; issue #1077).
+# Every registered provider MUST carry all four structures — the invariant test
+# tests/test_topology_capability_invariant.py enforces AC-13/AC-15/AC-16:
+#   topology_support        {primary, subagent, hybrid} bool — conservative,
+#     derived from main_agent_selectable (primary) and subagent_dispatch
+#     (subagent). `hybrid` is false for EVERY provider in v1: there is no data
+#     basis anywhere (fail-safe target `subagent`).
+#   topology_degrade        mechanism word per axis that degrades:
+#     primary | subagent | sequential-text; null for a supported axis. A
+#     mechanism word is NEVER a valid topology value (it lives in
+#     degradation_reason, see spec IC-2).
+#   orchestrator_instances  {multiple: bool, reason: str|null} — multiple mirrors
+#     parallel_execution; v1 never activates max-instances > 1 (P3).
+#   topology_verified_state {primary, subagent, hybrid, multiple} in
+#     {VERIFIED-RUNTIME, DOCUMENTED, UNVERIFIED}. DOCUMENTED only for cells
+#     derived from an existing capability key, UNVERIFIED everywhere the repo
+#     has no evidence. Invariants: topology_support.* == true implies
+#     topology_verified_state.* != UNVERIFIED (`UNVERIFIED => no`, 0 speculative
+#     yes) and orchestrator_instances.multiple == true implies
+#     topology_verified_state.multiple != UNVERIFIED.
+# Pre-P0 matrix (spec "Provider-Matrix (Stand vor P0)"): 40 cells =
+# 25 data-derived / 15 `UNVERIFIED => no`; a `custom`/unregistered provider has
+# NO registry entry and is counted as 4 UNVERIFIED cells, never as a generic
+# default. Probe-driven upgrades change these values only through the three
+# P0-gate conditions (evidence row, verified-state change, invariant test).
 
 capabilities:
   Claude:
@@ -117,6 +143,12 @@ capabilities:
     skills_discovery_dirs: [".claude/skills"]
     main_agent_selectable: true
     agents_md_precedence: concatenate  # irrelevant; AGENTS.md ignored
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # derived: main_agent_selectable/subagent_dispatch/parallel_execution; hybrid UNVERIFIED.
+    topology_support: {primary: true, subagent: true, hybrid: false}
+    topology_degrade: {primary: null, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: true, reason: null}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     required_depth: 2
     strips_html_comments: true
     rules_required_suffix: null
@@ -169,6 +201,12 @@ capabilities:
     rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: lazy rules as <skills_dir>/<rule>/SKILL.md (study 3.3)
     skills_discovery_dirs: [".opencode/skills"]
     main_agent_selectable: true
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # derived: main_agent_selectable/subagent_dispatch/parallel_execution; hybrid UNVERIFIED.
+    topology_support: {primary: true, subagent: true, hybrid: false}
+    topology_degrade: {primary: null, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: true, reason: null}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: nearest
     required_depth: 2
     strips_html_comments: false
@@ -220,6 +258,12 @@ capabilities:
     rules_read_channels: [embedded, skills]  # IC-15 Nr. 8: rules embedded in AGENTS.md (read via context.fileName, see ai-providers.yaml context_filename_settings_key); IC-15 Nr. 2: .gemini/skills discovered (study 3.7)
     skills_discovery_dirs: [".gemini/skills"]
     main_agent_selectable: false
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # primary degrades to subagent (main_agent_selectable=false); hybrid UNVERIFIED.
+    topology_support: {primary: false, subagent: true, hybrid: false}
+    topology_degrade: {primary: subagent, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: true, reason: null}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: concatenate
     required_depth: 2
     strips_html_comments: false
@@ -277,6 +321,12 @@ capabilities:
     rules_read_channels: [native-rules-dir, skills]  # skills: .continue/skills is a real runtime surface (study 3.8, H9)
     skills_discovery_dirs: [".continue/skills"]
     main_agent_selectable: true
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # subagent has no isolation (text mention only) => sequential-text; hybrid UNVERIFIED.
+    topology_support: {primary: true, subagent: false, hybrid: false}
+    topology_degrade: {primary: null, subagent: sequential-text, hybrid: subagent}
+    orchestrator_instances: {multiple: false, reason: "parallel_execution: false"}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: nearest
     required_depth: 2
     strips_html_comments: false
@@ -336,6 +386,12 @@ capabilities:
     required_depth: 2
     strips_html_comments: false
     rules_required_suffix: ".instructions.md"
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # primary degrades to subagent (main_agent_selectable=false); hybrid UNVERIFIED.
+    topology_support: {primary: false, subagent: true, hybrid: false}
+    topology_degrade: {primary: subagent, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: false, reason: "parallel_execution: false"}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     subagent_allowlist_required: false
     read_only_enforcement: none
     surface_verified_state:
@@ -395,6 +451,12 @@ capabilities:
     rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .mammouth/skills discovered (study 3.4, VERIFIED-RUNTIME)
     skills_discovery_dirs: [".mammouth/skills"]
     main_agent_selectable: false
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # primary source key itself UNVERIFIED (probe P0-5) => UNVERIFIED => no; hybrid UNVERIFIED.
+    topology_support: {primary: false, subagent: true, hybrid: false}
+    topology_degrade: {primary: subagent, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: false, reason: "parallel_execution: false"}
+    topology_verified_state: {primary: UNVERIFIED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: nearest
     required_depth: 2
     strips_html_comments: false
@@ -463,6 +525,12 @@ capabilities:
     rules_read_channels: [embedded, skills]
     skills_discovery_dirs: [".agents/skills"]
     main_agent_selectable: false
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # primary source key itself UNVERIFIED (probe P0-4) => UNVERIFIED => no; hybrid UNVERIFIED.
+    topology_support: {primary: false, subagent: true, hybrid: false}
+    topology_degrade: {primary: subagent, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: true, reason: null}
+    topology_verified_state: {primary: UNVERIFIED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: concatenate
     required_depth: 2
     strips_html_comments: false
@@ -530,6 +598,12 @@ capabilities:
     rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .zcode/skills (study 3.6)
     skills_discovery_dirs: [".zcode/skills"]
     main_agent_selectable: false
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # primary degrades to subagent (main_agent_selectable=false); hybrid UNVERIFIED.
+    topology_support: {primary: false, subagent: true, hybrid: false}
+    topology_degrade: {primary: subagent, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: false, reason: "parallel_execution: false"}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: nearest
     required_depth: 2
     strips_html_comments: false
@@ -592,6 +666,12 @@ capabilities:
     rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .kimi-code/skills (study 3.5)
     skills_discovery_dirs: [".kimi-code/skills"]
     main_agent_selectable: true
+    # --- Orchestrator topology (SPEC-orchestrator-topology-2026-11-03, P0).
+    # derived: main_agent_selectable/subagent_dispatch/parallel_execution; hybrid UNVERIFIED.
+    topology_support: {primary: true, subagent: true, hybrid: false}
+    topology_degrade: {primary: null, subagent: null, hybrid: subagent}
+    orchestrator_instances: {multiple: true, reason: null}
+    topology_verified_state: {primary: DOCUMENTED, subagent: DOCUMENTED, hybrid: UNVERIFIED, multiple: DOCUMENTED}
     agents_md_precedence: concatenate
     required_depth: 2
     strips_html_comments: false

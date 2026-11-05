@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Dynamic Routing + Template Slimming — Implementation Plan
 
-> Status: geplant
+> Status: complete (umgesetzt, PR #833 gemergt; alle 68 Checkboxen gesetzt)
 > Trace-Anker: `spec-id: SPEC-dynamic-routing-template-slimming`
 
 **Goal:** Block A — Routing-Ziele deterministisch aus `config/role-defaults.yaml` ableiten (Single Source `activation_groups`, ein kanonischer Aktiv-Resolver, explizite `addressability`, `name_index` im nicht-callable Fallback). Block B — wiederkehrende Template-Blöcke über den bestehenden `*_BLOCK`-Inlining-Mechanismus zentralisieren und die 21-fach inline duplizierte Anti-Recursion-Prosa entfernen — ohne Semantikverlust und ohne den Route-Guard zu unterlaufen.

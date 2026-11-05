@@ -1,6 +1,6 @@
 # Opencode-Einstiegspunkt (#1006) — Implementation Plan
 
-> Status: APPROVED (2026-10-22)
+> Status: complete (APPROVED 2026-10-22; umgesetzt, PR #1010 gemergt)
 >
 > **Freigabevermerk:** Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Die zugehörige Spec trägt `Status: APPROVED (2026-10-22)`. Der Plan ist ausführbar; der Approval-Marker wird nur vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Planer.
 

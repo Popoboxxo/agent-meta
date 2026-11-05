@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
+from .gitignore import GITIGNORE_BLOCK_BEGIN, GITIGNORE_BLOCK_END
 from .io import (
     SyncError,
     content_hash,
@@ -28,6 +29,7 @@ from .rule_index import (
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
+    _topology_flags,
     repo_containment_variables,
     strip_inactive_conditional_blocks,
     substitute,
@@ -324,9 +326,6 @@ def _regenerate_static_context(
         config=config, provider_config=provider_config, dry_run=dry_run,
     )
     _record_static_hash(project_root, rel_label, norm_new, dry_run)
-GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
-GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
-
 # sync_claude_md_managed was removed because it is dead code.
 
 
@@ -883,7 +882,8 @@ def _sync_managed_block_context(
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if not has_dedicated:
         _init_provider_settings_json(
-            project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+            project_root, pc, agent_meta_root, variables, log, dry_run,
+            provider=provider, config=config,
         )
 
 
@@ -1021,7 +1021,8 @@ def _sync_opencode_context(
     if pc.get("personal_agents_file", True):
         init_opencode_personal(agent_meta_root, project_root, log, dry_run)
     _init_provider_settings_json(
-        project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+        project_root, pc, agent_meta_root, variables, log, dry_run,
+        provider=provider, config=config,
     )
 
 
@@ -1653,7 +1654,11 @@ def sync_context_for_provider(
 
 
 def apply_settings_surface_shape(
-    content: str, pc: dict, capabilities: dict | None = None
+    content: str,
+    pc: dict,
+    capabilities: dict | None = None,
+    *,
+    emit_default_agent: bool = True,
 ) -> str:
     """Apply the resolved settings-surface shape to a settings template body.
 
@@ -1665,6 +1670,12 @@ def apply_settings_surface_shape(
     ``subagent_depth``) and ``default_agent`` is emitted from the
     ``primary-role`` data key (OQ-4/AC-5). Every other format returns
     ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+
+    ``emit_default_agent=False`` (#1090/D16) suppresses that one key: the init
+    writer sets it when the primary role is not emitted for the provider
+    (``orchestrator.mode: main-chat``), so a fresh project never gets a
+    dangling entry point. Default ``True`` keeps the historical call sites
+    unchanged.
 
     **Single ownership (spec Amendment B2):** this initial-template transform
     does NOT write ``experimental.subagent_depth``. That path is owned solely by
@@ -1698,9 +1709,32 @@ def apply_settings_surface_shape(
     # managed-merge writer (Amendment B2, single ownership).
     document.pop("subagent_depth", None)
     primary_role = pc.get("primary-role")
-    if isinstance(primary_role, str) and primary_role:
+    if emit_default_agent and isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+
+
+def _project_config_for_init(project_root: Path) -> dict:
+    """Re-read the canonical project config for the settings-init stage (#1090).
+
+    ``sync_pipeline`` calls :func:`init_settings_json` without the already
+    resolved config, so the per-provider orchestrator mode (needed to decide
+    whether the primary role is emitted) would otherwise be unavailable and the
+    init stage would fall back to the global variable. Fail-soft: a missing or
+    unreadable project file yields ``{}`` (historical behaviour).
+    """
+    from .config import load_config
+
+    for name in ("project.yaml", "project.json"):
+        path = project_root / ".meta-config" / name
+        if not path.exists():
+            continue
+        try:
+            loaded = load_config(path)
+        except SystemExit:
+            return {}
+        return loaded if isinstance(loaded, dict) else {}
+    return {}
 
 
 def _init_provider_settings_json(
@@ -1711,8 +1745,19 @@ def _init_provider_settings_json(
     log: SyncLog,
     dry_run: bool,
     provider: str | None = None,
+    config: dict | None = None,
+    active_set=None,
 ) -> None:
-    """Create provider settings skeleton once if it does not exist yet."""
+    """Create provider settings skeleton once if it does not exist yet.
+
+    ``config``/``active_set`` feed the #1090/D16 entry-point invariant: the
+    init surface must omit ``default_agent`` exactly when
+    ``active_set.role_emitted_for_provider`` says the primary role is not
+    emitted for *this* provider (active-set allowlist or a provider-scoped
+    ``orchestrator.mode: main-chat``). ``config=None`` re-reads the canonical
+    project config; ``active_set=None`` is fail-open only for the allowlist
+    (the provider mode is still resolved).
+    """
 
     settings_file = pc.get("settings_file")
     if not settings_file:
@@ -1752,7 +1797,72 @@ def _init_provider_settings_json(
             ).get(provider)
         except Exception:
             capabilities = None
-    content = apply_settings_surface_shape(content, pc, capabilities)
+    # #1090/D16: a fresh project must not get an entry point that this sync
+    # will not emit. Single source: ``active_set.role_emitted_for_provider``
+    # resolves the active-set allowlist AND the effective orchestrator mode for
+    # this provider (provider override first) — never a global variable, which
+    # ignores provider-scoped modes and is passed before they exist.
+    primary_role = pc.get("primary-role")
+    emit_default_agent = True
+    if isinstance(primary_role, str) and primary_role:
+        if config is None:
+            config = _project_config_for_init(project_root)
+        if active_set is None and config:
+            # Function-local import: ``active_set`` -> ``roles``/``variables``
+            # and must not become a top-level context import.
+            from .active_set import compute_active_set
+
+            try:
+                active_set = compute_active_set(
+                    config, agent_meta_root, project_root, warn_sink=[]
+                )
+            except Exception:  # noqa: BLE001 - settings init is fail-soft
+                active_set = None
+        from .active_set import role_emitted_for_provider
+
+        emit_default_agent = role_emitted_for_provider(
+            primary_role, active_set, config, provider
+        )
+        # IC-7: fold the resolved topology into the SAME bool — no second
+        # control parameter on ``apply_settings_surface_shape``. The role may be
+        # emitted (as a subagent) while the position withholds the entry point.
+        if emit_default_agent and provider and config is not None:
+            from .providers import load_providers_config
+            from .topology import resolve_topology, topology_explicit
+
+            orch_config = config.get("orchestrator", {})
+            if not isinstance(orch_config, dict):
+                orch_config = {}
+            provider_override = orch_config.get("provider-overrides", {})
+            provider_override = (
+                provider_override.get(provider)
+                if isinstance(provider_override, dict) else None
+            )
+            if not isinstance(provider_override, dict):
+                provider_override = None
+            try:
+                registry = load_providers_config(agent_meta_root) or {}
+            except Exception:  # noqa: BLE001 - init is fail-soft
+                registry = {}
+            resolution = resolve_topology(
+                config,
+                provider,
+                provider_config=registry,
+                capabilities=capabilities or {},
+                mode=_resolve_orch_mode(
+                    orch_config, provider_override, validate=False
+                ),
+                active_set=active_set,
+            )
+            emit_default_agent = resolution.effective == "primary"
+            if not topology_explicit(config, provider) and active_set is None:
+                # No active-set information and no declared position: the
+                # resolver cannot derive anything but its fail-safe. Keep the
+                # historic emission instead of demoting on missing information.
+                emit_default_agent = True
+    content = apply_settings_surface_shape(
+        content, pc, capabilities, emit_default_agent=emit_default_agent
+    )
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2455,6 +2565,26 @@ def _build_managed_block(
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
     local_vars.update(_orch_mode_flags(_orch_mode))
 
+    # Orchestrator topology axis (IC-4): same provider-scoped re-resolution as
+    # the ORCH_MODE_* flags above (provider-override > project). Only the
+    # DECLARED position is rendered; an unset key stays "" => all position flags
+    # "false" (fail-closed, AC-18), never a derived provider value.
+    from .providers import load_provider_capabilities
+    from .topology import resolve_topology, topology_explicit
+
+    _topology_resolution = resolve_topology(
+        config,
+        provider,
+        provider_config=provider_config or {},
+        capabilities=load_provider_capabilities(agent_meta_root).get(provider, {}),
+        mode=_orch_mode,
+    )
+    local_vars.update(_topology_flags(
+        _topology_resolution.declared or "",
+        explicit=topology_explicit(config, provider),
+        source=_topology_resolution.source,
+    ))
+
     # Repo-containment ("prison mode") flags for THIS provider — same
     # provider-scoped wiring as the ORCH_MODE_* flags above (provider-override
     # > project > framework default, spec §2.3/§4.5).
@@ -2793,15 +2923,42 @@ def init_settings_json(
     providers: list[str] | None = None,
     provider_config: dict | None = None,
     variables: dict | None = None,
+    config: dict | None = None,
+    active_set=None,
 ):
     """Create provider settings files if they do not exist yet.
 
     Iterates over all active providers (or every configured provider if no
     explicit list is given) and initializes the committed settings file once.
     The hooks section for Claude is managed separately by sync_hooks().
+
+    ``config``/``active_set`` feed the #1090/D16 entry-point invariant. The
+    sync stage passes neither, so the canonical project config is re-read once
+    here; that keeps provider-scoped ``orchestrator.mode: main-chat`` visible
+    instead of falling back to the global mode variable.
     """
     pc = provider_config or {}
     active = providers if providers is not None else list(pc.keys())
+    # The active set is only needed while a settings file is still to be
+    # created and could carry an entry point; do not pay for it on every sync.
+    needs_entry_point_check = any(
+        pc[provider].get("settings_file")
+        and pc[provider].get("primary-role")
+        and not safe_path(project_root, pc[provider]["settings_file"]).exists()
+        for provider in active
+        if provider in pc
+    )
+    if config is None and needs_entry_point_check:
+        config = _project_config_for_init(project_root)
+    if active_set is None and config and needs_entry_point_check:
+        from .active_set import compute_active_set
+
+        try:
+            active_set = compute_active_set(
+                config, agent_meta_root, project_root, warn_sink=[]
+            )
+        except Exception:  # noqa: BLE001 - settings init is fail-soft
+            active_set = None
     for provider in active:
         _init_provider_settings_json(
             project_root,
@@ -2811,6 +2968,8 @@ def init_settings_json(
             log,
             dry_run,
             provider=provider,
+            config=config,
+            active_set=active_set,
         )
 
 

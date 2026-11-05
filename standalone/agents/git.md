@@ -1,6 +1,6 @@
 # Git — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.5 (role: `git`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.7 (role: `git`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -110,7 +110,7 @@ Report the candidates (local + remote) to the user.
 <context>
 **Project context:** (not provided — ask the user for a short project description if you need it)
 
-**Git platform:** [GIT_PLATFORM — not available outside a full agent-meta install] ([GIT_REMOTE_URL — not available outside a full agent-meta install])
+**Git platform:** [GIT_PLATFORM — not available outside a full agent-meta install]
 
 **Main branch:** [GIT_MAIN_BRANCH — not available outside a full agent-meta install]
 

@@ -16,6 +16,40 @@ zentral in `config/role-defaults.yaml` definiert und provider-optimiert injizier
 | `loop` | Generator/Critic-Schleife | developer ↔ code-reviewer (max 3x) |
 | `conditional` | Bedingte Ausführung | termination: leaf or recurse |
 
+## Verfügbare Pipelines (8)
+
+Quelle: `quality_pipelines` in `config/role-defaults.yaml` (Stages dort maßgeblich).
+
+| Pipeline | Stages | Zweck |
+|----------|--------|-------|
+| `feature-lifecycle` | branch → requirement → tests → implement (plan-driven) → verify → validate+document (parallel) → commit | Voller Feature-Lifecycle mit optionalem Plan-Input, REQ, TDD, Review, PR |
+| `quick-fix` | root-cause → fix → commit | Schneller Bugfix ohne Review |
+| `bugfix` | triage → root-cause → fix → review (Loop) → document | Bugfix mit Review-Loop; FANOUT-fähig für unabhängige Bugs |
+| `concept-development` | research → concept (Loop, ideation) → handoff (requirements) | Vorfeld-/Designarbeit ohne Code |
+| `concept-driven-dev` | explore → classify → specify → review (Loop, max 3) → approve → plan → implement → review-req/review-quality (Loops) → validate | Entwicklung gegen freigegebene Spec; classify/approve/plan an das spec-plan-Gate gebunden |
+| `refactor` | analyze (senior-developer) → implement → review (Loop) → commit | Cross-cutting Refactoring |
+| `docs-update` | update → commit | Reine Doku-Änderungen |
+| `se-cascade` | l0-stakeholder → l1..l3 requirements/architecture (Loops) → l2-interface → termination → l3-component-requirements → implementation → validation (12 Stages) | Systems Engineering, siehe [SE-Kaskade](../se-cascade/se-workflow.md) |
+
+Beispiel `feature-lifecycle` (Stages aus `config/role-defaults.yaml`): Die Stages `requirement`, `tests` und `verify` laufen nur bei den DoD-Flags `req-traceability` bzw. `tests-required`. `validate-and-document` ist eine `parallel_group`. Bei Fehlern greift `on_error: escalate_to_orchestrator`.
+
+```mermaid
+flowchart TD
+    B["branch (git): Feature-Branch anlegen"]
+    RQ["requirement (requirements): REQ-ID, nur bei req-traceability"]
+    T1["tests (tester): TDD Red, nur bei tests-required"]
+    I["implement (developer): plan-driven, Plan über plan_ref"]
+    V["verify (tester): Tests grün, nur bei tests-required"]
+    VA["validator: DoD-Check"]
+    DO["documenter: CODEBASE_OVERVIEW aktualisieren"]
+    C["commit (git): Commit und PR"]
+    B --> RQ --> T1 --> I --> V
+    V --> VA
+    V --> DO
+    VA --> C
+    DO --> C
+```
+
 ## Zentrale Konfiguration
 
 ### Base-Pipelines: `config/role-defaults.yaml`

@@ -100,9 +100,20 @@ def _apply_role_auto_commit_overrides(
     wins: AUTO_COMMIT_ENABLED is forced to "false" and the block emptied, so
     the output stays byte-identical to a sync without an auto_commit key.
     """
-    from .auto_commit import render_auto_commit_block, role_commit_authority
+    from .auto_commit import (
+        INVALID_CONFIG_MARKER,
+        render_auto_commit_block,
+        role_commit_authority,
+    )
 
     resolved = variables.get("_AUTO_COMMIT_RESOLVED") or {"mode": "off"}
+    if resolved.get(INVALID_CONFIG_MARKER):
+        # Issue #1091 fail-safe: the invalid block resolves to "off", but the
+        # explicit disabled notice must still render -- on hookless providers
+        # it is the only enforcement path.
+        merged_vars["AUTO_COMMIT_ENABLED"] = "true"
+        merged_vars["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(resolved)
+        return
     if resolved.get("mode", "off") == "off":
         merged_vars["AUTO_COMMIT_ENABLED"] = "false"
         merged_vars["AUTO_COMMIT_BLOCK"] = ""
@@ -611,15 +622,22 @@ def _should_skip_role(
     if active_set is not None and not active_set.has(role):
         return _skip_not_in_roles()
 
-    # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
-    # is spawned; the main chat acts as router + worker. Not added to
+    # Single emission predicate (R1): the orchestrator file is skipped in
+    # main-chat mode — no orchestrator subagent is spawned; the main chat acts
+    # as router + worker. ``role_emitted_for_provider`` owns that decision and
+    # also knows the provider-scoped mode override; reading ORCH_MODE_MAIN_CHAT
+    # here would be a second, independent decision point. Not added to
     # expected_filenames so any stale orchestrator.md gets pruned.
-    if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+    from .active_set import role_emitted_for_provider
+
+    if role == "orchestrator" and not role_emitted_for_provider(
+        role, active_set, config, provider
+    ):
         if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
-            log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
+            log.skip(rel, "orchestrator skipped — orchestrator mode is main-chat")
         return True, filename
 
     return False, filename

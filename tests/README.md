@@ -100,11 +100,21 @@ Performance-Zusicherung):
 | `SYNC_TIMEOUT` | 180 s | `AGENT_META_SYNC_TIMEOUT` |
 | `SYNC_VALIDATE_TIMEOUT` | 180 s (fällt auf `SYNC_TIMEOUT` zurück) | `AGENT_META_SYNC_VALIDATE_TIMEOUT` |
 | `SCRIPT_TIMEOUT` | 60 s | `AGENT_META_SCRIPT_TIMEOUT` |
+| `SLOW_TIMEOUT` | 900 s (langlaufende Helper-CLIs der `meta_optimizer`-Familie, Laufzeit > `SYNC_TIMEOUT`) | `AGENT_META_SLOW_TIMEOUT` |
 
 `SYNC_VALIDATE_TIMEOUT=180` gilt für den repo-weiten `sync.py --validate`-Lauf.
 Ein nicht-ganzzahliger, leerer oder nicht-positiver Env-Wert fällt auf den
 Default zurück; der Import wirft nie. Neue Subprozess-Tests importieren die
 Konstanten, statt eigene Timeouts zu setzen.
+
+## CI-Job-Timeouts
+
+Jeder CI-Job trägt `timeout-minutes` (AC2 von #945) — manuelle Prüfung, kein
+automatisierter Test; nach jedem neuen Job erneut ausführen (erwartet 9 Zeilen):
+
+```bash
+python3 -c "import re,pathlib; [print(f'{p.name}: {b[0]} -> timeout-minutes: {b[1]}') for p in map(pathlib.Path,['.github/workflows/orchestration-test.yml','.github/workflows/validate.yml','.github/workflows/scorecard.yml']) for b in re.findall(r'(?m)^  ([a-z0-9_-]+):\n(?:    .*\n)*?    timeout-minutes: (\d+)',p.read_text().split('jobs:',1)[1])]"
+```
 
 Weitere Heavy-Module nutzen noch modul-lokale Obergrenzen; Vereinheitlichung
 ist ein Follow-up.
@@ -125,8 +135,8 @@ prüfbar. Inhaltliche Abdeckung je Szenario: `tests/scenarios/registry.md`.
 
 | Workflow / Job | Was läuft | Parallelität |
 |----------------|-----------|--------------|
-| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12 | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
-| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 30 min | `-n 0` |
+| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12, Timeout 45 min | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
+| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 45 min | `-n 0` |
 | `orchestration-test.yml` → `compat-311` | TOML-Boundary + Code-Hygiene-Dateien sowie zwei subprozess-lastige Sync-Module (`test_provider_matrix_sync.py`, `test_sync_validation_gate.py`) auf Python 3.11 | `-n 0` |
 | `validate.yml` → `scenarios` | `tests/scenarios/run.sh` in 4 Shards | kein pytest |
 | `validate.yml` → `validate` | Sync-Output erzeugen, Drift-Gate, `--validate`, Frontmatter-Lint | kein pytest |

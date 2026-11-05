@@ -43,17 +43,24 @@ exit code.
 Run: python -m pytest tests/test_orchestrator_guard_hook.py -v
 """
 
-import atexit
 import json
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 
 import pytest
+
+from tests.timeouts import SCRIPT_TIMEOUT
+
+#: Wall-clock hang guard for the scan-timing test below. This is NOT a
+#: performance assertion (see tests/timeouts.py): a loaded CI runner must stay
+#: green, while a genuinely quadratic/wedged scan still blows past it before
+#: SCRIPT_TIMEOUT (60 s) kills the subprocess.
+_HANG_GUARD_SECONDS = 40.0
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
@@ -63,11 +70,11 @@ _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard-impl.sh"
 # relative to the project it runs in. Running it against the real checkout
 # polluted that gitignored log with test lines on every local run (#945);
 # every test now runs against a throw-away copy of the real project config.
-_PROJECT_ROOT = Path(tempfile.mkdtemp(prefix="guard-test-project-"))
-(_PROJECT_ROOT / ".meta-config").mkdir()
-shutil.copy(_REPO_ROOT / ".meta-config" / "project.yaml", _PROJECT_ROOT / ".meta-config" / "project.yaml")
-(_PROJECT_ROOT / ".claude" / "hooks").mkdir(parents=True)
-atexit.register(shutil.rmtree, _PROJECT_ROOT, ignore_errors=True)
+# The root comes from the shared `hook_project_root` fixture (tests/conftest.py)
+# and is bound below, so importing this module has no filesystem side effect.
+# `Optional[Path]` rather than `Path | None`: this module has no
+# `from __future__ import annotations` and must stay Python 3.9 compatible.
+_PROJECT_ROOT: Optional[Path] = None
 
 # On Windows, plain ["bash", ...] can resolve to System32\bash.exe (the WSL
 # launcher) instead of Git Bash, depending on CreateProcess search order
@@ -79,6 +86,15 @@ _BASH = shutil.which("bash") or "bash"
 pytestmark = pytest.mark.skipif(
     sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bind_project_root(hook_project_root):
+    """Bind the shared project fixture to the module global for this module."""
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = hook_project_root
+    yield
+    _PROJECT_ROOT = None
 
 
 def _clean_env() -> dict:
@@ -99,6 +115,7 @@ def _run_hook(payload: dict) -> subprocess.CompletedProcess:
         text=True,
         cwd=str(_PROJECT_ROOT),
         env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -503,6 +520,92 @@ def test_elevation_attempts_are_audited(tmp_path):
     assert "git status" in content
 
 
+# --- P3 (AC-11 guard part, OQ-2 = A): sentinel instance id, audit-only -----
+#
+# Sentinel grammar: `#agent-meta:agent=<role> id=<orchestrator-id>`. The id is
+# written to the audit log only; it is NEVER consulted by the allow/deny path
+# (OQ-2 = A). The role parser also accepts the id for the `git` sentinel, but
+# only the orchestrator audit line carries the `orchestrator_id=` field.
+
+def test_orchestrator_sentinel_with_valid_id_is_accepted():
+    """A well-formed `id=` keeps the orchestrator sentinel's strict-mode pass."""
+    command = "#agent-meta:agent=orchestrator id=scope-a\necho test"
+    result = _run_hook(_bash_payload(command))
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+
+
+def test_sentinel_id_does_not_change_allow_or_deny(tmp_path):
+    """The id is audit-only: the verdict is identical with and without it."""
+    cases = [
+        # Strict mode: the orchestrator sentinel exempts the main-chat block.
+        ("#agent-meta:agent=orchestrator\necho test", _PROJECT_ROOT, 0),
+        ("#agent-meta:agent=orchestrator id=scope-a\necho test", _PROJECT_ROOT, 0),
+        # Non-strict git-mutation gate: the git sentinel exempts a plain commit.
+        ("#agent-meta:agent=git\ngit commit -m 'x'", tmp_path, 0),
+        ("#agent-meta:agent=git id=scope-a\ngit commit -m 'x'", tmp_path, 0),
+        # The orchestrator sentinel still does NOT bypass the git-mutation gate,
+        # with or without an id (capability scoping is unchanged).
+        ("#agent-meta:agent=orchestrator\ngit commit -m 'x'", tmp_path, 2),
+        (
+            "#agent-meta:agent=orchestrator id=scope-a\ngit commit -m 'x'",
+            tmp_path,
+            2,
+        ),
+    ]
+    for command, cwd, expected in cases:
+        result = _run_hook({**_bash_payload(command), "cwd": Path(cwd).as_posix()})
+        assert result.returncode == expected, (
+            f"command={command!r}: expected exit {expected}, got "
+            f"{result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+
+def test_sentinel_id_is_written_to_the_orchestrator_audit_line(tmp_path):
+    """Only the orchestrator audit line carries `orchestrator_id=`."""
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+
+    with_id = "#agent-meta:agent=orchestrator id=scope-a\necho test"
+    _run_hook({**_bash_payload(with_id), "cwd": tmp_path.as_posix()})
+    assert "orchestrator_id=scope-a" in audit_file.read_text(encoding="utf-8")
+
+    audit_file.unlink()
+    without_id = "#agent-meta:agent=orchestrator\necho test"
+    _run_hook({**_bash_payload(without_id), "cwd": tmp_path.as_posix()})
+    assert "orchestrator_id=unset" in audit_file.read_text(encoding="utf-8")
+
+    # The git audit line keeps its historic shape: no instance-id field.
+    audit_file.unlink()
+    git_line = "#agent-meta:agent=git id=scope-a\ngit status"
+    _run_hook({**_bash_payload(git_line), "cwd": tmp_path.as_posix()})
+    content = audit_file.read_text(encoding="utf-8")
+    assert "role=git" in content
+    assert "orchestrator_id=" not in content
+
+
+@pytest.mark.parametrize("bad_id", ["scope/a", "Scope-A", "..", "-leading"])
+def test_invalid_sentinel_id_is_unparseable_and_never_crashes(bad_id, tmp_path):
+    """A malformed id invalidates the whole sentinel (empty role), no crash."""
+    command = f"#agent-meta:agent=orchestrator id={bad_id}\necho test"
+
+    # Strict mode: an unparseable sentinel gets no exemption.
+    strict = _run_hook(_bash_payload(command))
+    assert strict.returncode == 2, (
+        f"stdout={strict.stdout!r} stderr={strict.stderr!r}"
+    )
+
+    # Non-strict: the command itself is allowed, but no elevation is audited.
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+    assert not audit_file.exists() or "role=orchestrator" not in audit_file.read_text(
+        encoding="utf-8"
+    )
+
+
 # --- issue #551 F1: --config-env / --attr-source subcommand hiding --------
 
 @pytest.mark.parametrize("command", [
@@ -607,6 +710,7 @@ def test_fails_closed_without_python(tmp_path):
         text=True,
         cwd=str(tmp_path),
         env={"PATH": str(minimal_bin)},
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "python" in result.stderr.lower()
@@ -632,6 +736,7 @@ def test_fails_closed_without_lib_common(tmp_path):
         capture_output=True,
         text=True,
         cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "hook_common.sh" in result.stderr
@@ -668,6 +773,7 @@ def test_broken_impl_blocks_bash_calls(tmp_path):
     result = subprocess.run(
         [_BASH, str(isolated_hook)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "syntax error" in result.stderr.lower()
@@ -683,6 +789,7 @@ def test_broken_impl_allows_edit_under_own_hooks_dir(tmp_path):
     result = subprocess.run(
         [_BASH, str(isolated_hook)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
 
@@ -699,6 +806,7 @@ def test_broken_impl_still_blocks_edit_outside_hooks_dir(tmp_path):
     result = subprocess.run(
         [_BASH, str(isolated_hook)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
 
@@ -710,6 +818,7 @@ def test_missing_impl_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(isolated_hook)], input=json.dumps(_bash_payload("git status")),
         capture_output=True, text=True, cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "impl script" in result.stderr.lower()
@@ -759,6 +868,7 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
         text=True,
         cwd=str(_PROJECT_ROOT),
         env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0
     lines = audit_file.read_text(encoding="utf-8").splitlines()
@@ -1248,6 +1358,7 @@ def _run_hook_in(tmp_path, payload: dict, hide_yaml: bool) -> subprocess.Complet
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps({**payload, "cwd": tmp_path.as_posix()}),
         capture_output=True, text=True, cwd=str(tmp_path), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -1335,6 +1446,7 @@ def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
     result = subprocess.run(
         [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
         capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert f"impl crashed rc={crash_rc}" in result.stderr
@@ -1347,6 +1459,7 @@ def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
     result = subprocess.run(
         [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
         capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
     assert "impl crashed" not in result.stderr
@@ -1368,6 +1481,7 @@ def _run_with(payload: dict, cwd: Path, extra_env=None) -> subprocess.CompletedP
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=json.dumps({**payload, "cwd": cwd.as_posix()}),
         capture_output=True, text=True, cwd=str(cwd), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -1543,6 +1657,7 @@ def test_unparseable_payload_fails_closed(raw):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=raw, capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "not valid JSON" in result.stderr
@@ -1560,6 +1675,7 @@ def test_empty_payload_fails_closed():
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input="", capture_output=True, text=True,
         cwd=str(_PROJECT_ROOT), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "empty PreToolUse payload" in result.stderr
@@ -1597,6 +1713,7 @@ def test_garbage_python_interpreter_fails_closed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "does not behave like a Python interpreter" in result.stderr
@@ -1611,16 +1728,15 @@ def test_unknown_tool_name_fails_closed(tool):
 
 
 @pytest.mark.parametrize("payload", [
-    {"tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},                    # missing
-    {"tool_name": None, "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()}, # null
-    {"tool_name": ["Bash"], "tool_input": {}, "cwd": _PROJECT_ROOT.as_posix()},  # array
-    {"tool_name": {"name": "Bash"}, "tool_input": {},
-     "cwd": _PROJECT_ROOT.as_posix()},                                      # object
+    {"tool_input": {}},                    # missing
+    {"tool_name": None, "tool_input": {}}, # null
+    {"tool_name": ["Bash"], "tool_input": {}},  # array
+    {"tool_name": {"name": "Bash"}, "tool_input": {}},  # object
 ])
 def test_missing_or_non_scalar_tool_name_fails_closed(payload):
     """hook_json_get reports null/object/array as "missing"; all of them, and
     an absent key, are unclassifiable payloads and must block (M2)."""
-    result = _run_hook(payload)
+    result = _run_hook({**payload, "cwd": _PROJECT_ROOT.as_posix()})
     assert result.returncode == 2, result.stderr
     assert "no usable tool_name" in result.stderr
 
@@ -1660,6 +1776,7 @@ def test_outdated_helper_lib_fails_closed(tmp_path):
         [_BASH, str(hooks_dir / "orchestrator-guard.sh")],
         input=json.dumps(_bash_payload("git status")),
         capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "outdated" in result.stderr
@@ -1680,14 +1797,20 @@ _SENTINEL = "#agent-meta:agent=git\n"
 
 def test_fork_bomb_scan_does_not_hang_on_a_300kb_command(tmp_path):
     """(a) The old regex was quadratic (20 KB ~ 5 s -> hook timeout = allow).
-    The pure-Python 100 ms bound is pinned in test_hook_common_lib.py; here we
-    prove the whole hook still returns promptly for a 300 KB command."""
+    The pure-Python equivalent is pinned in test_hook_common_lib.py; here we
+    prove the whole hook still returns promptly for a 300 KB command.
+
+    The bound is a HANG GUARD, not a performance assertion (see
+    tests/timeouts.py): a loaded runner stays green, a quadratic scan does not.
+    """
     command = "echo " + "a" * 300_000
     started = time.perf_counter()
     result = _run_with(_bash_payload(command), tmp_path)
     elapsed = time.perf_counter() - started
     assert result.returncode == 0, result.stderr
-    assert elapsed < 5.0, f"300 KB command took {elapsed:.1f}s (quadratic scan?)"
+    assert elapsed < _HANG_GUARD_SECONDS, (
+        f"300 KB command took {elapsed:.1f}s (hang guard "
+        f"{_HANG_GUARD_SECONDS:.0f}s, quadratic scan?)")
 
 
 def test_fork_bomb_window_block_names_scan_limits(tmp_path):
@@ -1873,6 +1996,7 @@ def test_lone_surrogate_payload_is_classified_not_dropped(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=json.dumps(payload).encode(),
         capture_output=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr[:200]
     assert b"user approval" in result.stderr
@@ -1886,6 +2010,7 @@ def test_lone_surrogate_benign_command_is_allowed(tmp_path):
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=json.dumps(payload).encode(),
         capture_output=True, cwd=str(tmp_path), env=_clean_env(),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, result.stderr[:200]
 
@@ -1919,6 +2044,7 @@ def test_classifier_crash_fails_closed(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_bash_payload("git status")),
         capture_output=True, text=True, cwd=str(tmp_path), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "classifier exited rc=1" in result.stderr
@@ -1932,6 +2058,7 @@ def test_classifier_garbage_output_fails_closed(tmp_path):
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_bash_payload("git status")),
         capture_output=True, text=True, cwd=str(tmp_path), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, result.stderr
     assert "malformed output" in result.stderr
@@ -2229,3 +2356,12 @@ def test_header_names_the_exact_residual_gaps():
     assert "never hide the command list" not in header, (
         "F-DOC-1: the disproven 'never hide' claim is still in the header"
     )
+
+
+def test_toolsearch_is_allowed_and_unknown_tool_still_blocked():
+    """Issue #1078: ToolSearch is a legitimate built-in and must pass the
+    shared allow-list (exit 0); an unknown name must still fail closed."""
+    ok = _run_hook({"tool_name": "ToolSearch", "tool_input": {"query": "x"}})
+    assert ok.returncode == 0, ok.stderr
+    bad = _run_hook({"tool_name": "Bogus", "tool_input": {}})
+    assert bad.returncode == 2

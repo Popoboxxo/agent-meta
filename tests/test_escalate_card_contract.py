@@ -184,6 +184,23 @@ def test_homeassistant_override_satisfies_intake_rule():
     assert "RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>" in rendered
 
 
+def _render_senior_inactive() -> str:
+    """Render the senior template with ``ROLE_PRINCIPAL_DEVELOPER_ACTIVE=false``."""
+    from scripts.lib.config import build_variables, load_config
+    from scripts.lib.log import SyncLog
+    from scripts.lib.variables import strip_inactive_conditional_blocks, substitute
+
+    config = load_config(_ROOT / ".meta-config" / "project.yaml")
+    variables, _warnings = build_variables(
+        config, _ROOT, Path("/tmp/am-escalate-render-inactive"))
+    # build_variables follows this repo's allowlist (principal active); the
+    # contract under test is the branch a project without principal renders.
+    variables["ROLE_PRINCIPAL_DEVELOPER_ACTIVE"] = "false"
+    rendered = substitute(
+        _read("senior-developer.md"), variables, "senior-developer.md", SyncLog())
+    return strip_inactive_conditional_blocks(rendered, variables)
+
+
 def _gate_lines_without_reason_metric(text: str) -> list[str]:
     bad = []
     for line in text.splitlines():
@@ -202,10 +219,18 @@ def test_orchestrator_gate_descriptions_name_reason_and_metric():
 
 
 def test_senior_escalation_prose_names_reason_and_metric():
+    """Render the *inactive*-principal branch and scan the contract it emits.
 
-    text = _read("senior-developer.md")
-    bad = [
-        line for line in _gate_lines_without_reason_metric(text)
-        if "Compile a failure log" not in line
-    ]
-    assert bad == []
+    The prose test must not depend on a phrase heuristic over both template
+    branches (the previous version only looked for "task summary"/"failure
+    log"): a persona branch that reported ``STATUS: failed`` could dodge it.
+    Rendering the branch the project actually uses makes the persona statement
+    part of the scanned contract and fails on the old ``failed`` wording.
+    """
+    rendered = _render_senior_inactive()
+    assert "There is no higher developer tier active in this project." in rendered
+    persona = rendered.split("<persona>", 1)[1].split("</persona>", 1)[0]
+    assert "STATUS: failed" not in persona
+    assert "STATUS: escalate" in persona
+    assert "ESCALATE_REASON:" in persona and "ESCALATE_METRIC:" in persona
+    assert _gate_lines_without_reason_metric(rendered) == []

@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.25.0"
+version: "1.27.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 reference_standards:
@@ -68,6 +68,8 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 | Change DoD preset | Project-wide quality requirements |
 | Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
 | Enable `auto_commit.mode` (`suggest`/`auto`/`custom`) | Changes commit behavior — `auto`/`custom` let agents commit without any confirmation step at all |
+| Enable remote test environments (`kind: remote\|both`, `remote-access: allow`, `access: deploy`) | Behavior change — agents may contact or deploy to a remote target |
+| Enable `release-checklist.mode` → `strict` | Behavior change: mandatory items stop the release (prompt convention only, no hook) |
 | Run `sync.py` | Overwrites generated files |
 | Fill values in `project.yaml` | Wrong values corrupt the project |
 | Upgrade to major version | Breaking changes |
@@ -417,6 +419,47 @@ conventions:
 Re-sync (`sync.py`) is required after any `conventions:` change — the release
 agent template only picks up the new blocks on regeneration.
 
+### 14d. Structured release checklist (opt-in)
+
+Extends the release agent with project-specific, machine-readable checklist
+items (`mode: off | advisory | strict`, default `off`). At `off` the generated
+`release.md` is byte-identical to today's output. The block is additive to the
+prose items from 14c and is validated by `config/project-config.schema.json`.
+
+Recipe:
+1. Read the current block in `.meta-config/project.yaml` (it is optional — absent, empty or `mode: "off"` means disabled).
+2. Ask the user for the desired mode (`off` | `advisory` | `strict`) — `strict` requires confirmation (see §3).
+3. Collect the items: each needs `id`, `task`, `verification`; optional `check` (`agent`|`script`, default `agent`), `script` (only for `check: script`, exit 0 = pass, must be side-effect free), `phase` (`precondition`|`step`), `required` and `applies-when`.
+4. Edit `project.yaml` — write the mode **quoted** (`mode: "off"`; an unquoted `off` is parsed as YAML boolean `false`), mirroring the schema's example:
+
+```yaml
+release-checklist:
+  mode: advisory            # off | advisory | strict   (Default: off)
+  items:
+    - id: changelog-unreleased
+      task: "CHANGELOG [Unreleased] hat Einträge"
+      verification: "Abschnitt [Unreleased] nicht leer"
+      check: agent          # agent | script   (Default: agent)
+      phase: precondition   # precondition | step   (Default: precondition)
+      required: true        # Default: true; nur strict wertet aus
+    - id: schema-valid
+      task: "Konfiguration validiert"
+      verification: "python3 scripts/sync.py --validate"
+      check: script
+      script: "python3 scripts/sync.py --validate"   # nur bei check: script; Exit 0 = pass; MUSS seiteneffektfrei sein
+      required: true
+    - id: docker-image-pushed
+      task: "Docker-Image gepusht"
+      verification: "docker manifest inspect <image>:<version>"
+      check: agent
+      phase: step           # wird erst NACH Ausführung des Release-Schritts bestätigt
+      required: false
+      applies-when: "Projekt liefert ein Docker-Image aus"   # Freitext, vom Agenten ausgewertet
+```
+
+5. Re-sync and validate: `python3 {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml --validate`; then explain any `[WARN]` from `sync.log`.
+6. Explain the semantics: `strict` is a **prompt convention only** — there is no hook and no runtime enforcement, so gates stay hard in every mode (`pre-release-check.sh` step 0 aborts with `STATUS: failed` regardless of the checklist mode). Point to `config/project-config.schema.json` as the authority (§15) and to `/set-release-checklist` for the guided variant.
+
 ## 15. Which options exist — schema is the authority, not memory
 
 `project.yaml` has 50+ top-level keys (`config/project-config.schema.json`
@@ -485,6 +528,49 @@ Neue Features oder neue `project.yaml`-Optionen bekommen ein eigenes
 Szenario dort (siehe `rules/2-platform/agent-meta-conventions.md` → Change
 Checklist) — nicht nur die eigenen Unit-Tests des Frameworks laufen lassen,
 sondern auch gegen realistische Consumer-Configs.
+## 18. Test environments (test-environments)
+
+Set up project-level test targets: local dev stack, a remote test/dev server,
+or both. Two blocks in `.meta-config/project.yaml` belong together but are
+not the same thing:
+
+- `environments:` (env-var definitions) — names, `secret: true`, no value.
+- `test-environments:` (targets) — `kind`, optional `url`, `token-env`,
+  `access`, `remote-access`, `notes`.
+
+**Ask which kind: local, remote or both.** Then:
+
+1. If a `token-env` is needed, create or verify the referenced `environments:`
+   entry **first** (`secret: true`, without a value — never a `default`).
+2. Write the block into `.meta-config/project.yaml`. Use `token-env: NAME`
+   — only the NAME, never the token value itself.
+3. Tell the user to provide the value via the shell environment or
+   `source .meta-config/env.sh` — never post the value in the chat.
+4. Re-sync with `python3 {{AGENT_META_REL_PATH}}scripts/sync.py` and verify
+   with `--validate`.
+5. Enabling remote access (see section 3) needs confirmation before the write.
+
+```yaml
+# .meta-config/project.yaml
+environments:
+  HA_DEV_TOKEN:
+    description: Long-lived access token of the HA dev server
+    secret: true
+test-environments:
+  ha-dev:
+    kind: both
+    url: http://ha-dev.lan:8123
+    token-env: HA_DEV_TOKEN
+    access: deploy
+    remote-access: ask
+    notes: Integration erst lokal testen, dann auf den Dev-Server.
+```
+
+`python3 scripts/sync.py --validate` fails on unknown keys, invalid enums, a
+URL with userinfo, or a `token-env` that does not reference an `environments:`
+entry with `secret: true`. The Admin UI runs the same check before a save is
+written.
+
 </workflow>
 
 <context>

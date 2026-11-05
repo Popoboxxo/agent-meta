@@ -86,6 +86,7 @@ from lib.sync_pipeline import (
     _sync_stage_external_skills_check,
     _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
+    _sync_stage_generated_file_drift_resolve,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
     _sync_stage_knowledge_and_isolation,
@@ -93,6 +94,7 @@ from lib.sync_pipeline import (
     _sync_stage_per_provider,
     _sync_stage_platform_defaults_snapshot,
     _sync_stage_tmp_sink,
+    _track_writer_targets,
 )
 from lib.viz import cleanup_old_sessions, generate_viz
 
@@ -1427,6 +1429,15 @@ def _handle_validate(ctx: _SyncContext) -> None:
     if _unpaired_tags:
         consistency_errors += len(_unpaired_tags)
 
+    # Schema-invalid auto_commit block (issue #1091): sync stays rc=0 and
+    # disables commit authority fail-safe, but `--validate` must surface the
+    # misconfiguration as a hard error so CI catches it before it rots.
+    from lib.auto_commit import auto_commit_violations
+
+    for _ac_violation in auto_commit_violations(config):
+        log.warning(f"config-audit [ERROR] auto_commit: {_ac_violation}")
+        consistency_errors += 1
+
     # Tool-privilege / role-name mismatch (issue #575): warns only, does not
     # block validation -- a role claiming "read-only" in its persona but
     # carrying Write/Edit is a smell worth a human look, not a hard failure.
@@ -1537,37 +1548,64 @@ def _handle_sync(ctx: _SyncContext) -> None:
                                providers, ctx.args, ctx.log)
     # Stage 5b: generated-file drift scan -- MUST run before stage 6
     # overwrites anything (see docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md).
-    _sync_stage_generated_file_drift_scan(ctx.agent_meta_root, ctx.project_root,
-                                          config, provider_config, ctx.args, ctx.log)
-    # Stage 5c: write the resolved platform-preset snapshot -- AFTER the drift
-    # scan (it is a hash-tracked generated file) and before the hash capture.
-    _sync_stage_platform_defaults_snapshot(ctx.agent_meta_root, ctx.project_root,
-                                           ctx.platforms, ctx.args, ctx.log)
-    # Stage 6: per-provider main loop; mcp_gitignore_extras crosses the
-    # stage boundary by reference.
-    _sync_stage_per_provider(ctx.agent_meta_root, ctx.project_root, config,
-                             provider_config, providers, ctx.variables,
-                             platform_vars, debug_mode, allow_committed_secrets,
-                             mcp_gitignore_extras, ctx.args, ctx.log,
-                             ctx.active_set)
-    # Stage 7: injection-drift governance + plugin probe.
-    _sync_stage_drift_and_plugins(ctx.agent_meta_root, ctx.project_root, config,
-                                  provider_config, ctx.args, ctx.log)
-    # Stages 8+9: knowledge engine + provider isolation.
-    _sync_stage_knowledge_and_isolation(ctx.agent_meta_root, ctx.project_root,
-                                        config, providers, provider_config,
-                                        ctx.variables, ctx.args, ctx.log)
-    # Stage 10: pinned-commit check + unknown/unapproved-skill warnings;
-    # ext_config feeds the gitignore stage.
-    ext_config = _sync_stage_external_skills_check(ctx.agent_meta_root, config, ctx.log)
-    # Stage 11: .gitignore managed-block assembly; the accumulators built
-    # above cross the stage boundary by reference.
-    _sync_stage_gitignore(ctx.project_root, config, provider_config, providers,
-                          ext_config, is_claude, gitignore_cfg,
-                          base_gitignore_entries, mcp_gitignore_extras,
-                          env_gitignore, ctx.args, ctx.viz_cfg, ctx.log)
-    # Stage 12: lightweight config-audit summary.
-    _sync_stage_config_audit(ctx.agent_meta_root, ctx.config_path, ctx.log)
+    drift_findings = _sync_stage_generated_file_drift_scan(
+        ctx.agent_meta_root, ctx.project_root, config, provider_config,
+        ctx.args, ctx.log)
+    # Stages 5c-12 run under the writer-target tracker: every path a writer
+    # handles (including a write_checked skip because the generated content is
+    # already on disk) is recorded, so the drift resolve below can tell a stale
+    # baseline from an edit no writer regenerated.
+    written_paths: set[str] = set()
+    all_stages_completed = False
+    try:
+        with _track_writer_targets(ctx.project_root, written_paths):
+            # Stage 5c: write the resolved platform-preset snapshot -- AFTER the drift
+            # scan (it is a hash-tracked generated file) and before the hash capture.
+            _sync_stage_platform_defaults_snapshot(ctx.agent_meta_root, ctx.project_root,
+                                                   ctx.platforms, ctx.args, ctx.log)
+            # Stage 6: per-provider main loop; mcp_gitignore_extras crosses the
+            # stage boundary by reference.
+            _sync_stage_per_provider(ctx.agent_meta_root, ctx.project_root, config,
+                                     provider_config, providers, ctx.variables,
+                                     platform_vars, debug_mode, allow_committed_secrets,
+                                     mcp_gitignore_extras, ctx.args, ctx.log,
+                                     ctx.active_set)
+            # Stage 7: injection-drift governance + plugin probe.
+            _sync_stage_drift_and_plugins(ctx.agent_meta_root, ctx.project_root, config,
+                                          provider_config, ctx.args, ctx.log)
+            # Stages 8+9: knowledge engine + provider isolation.
+            _sync_stage_knowledge_and_isolation(ctx.agent_meta_root, ctx.project_root,
+                                                config, providers, provider_config,
+                                                ctx.variables, ctx.args, ctx.log)
+            # Stage 10: pinned-commit check + unknown/unapproved-skill warnings;
+            # ext_config feeds the gitignore stage.
+            ext_config = _sync_stage_external_skills_check(ctx.agent_meta_root, config, ctx.log)
+            # Stage 11: .gitignore managed-block assembly; the accumulators built
+            # above cross the stage boundary by reference.
+            _sync_stage_gitignore(ctx.project_root, config, provider_config, providers,
+                                  ext_config, is_claude, gitignore_cfg,
+                                  base_gitignore_entries, mcp_gitignore_extras,
+                                  env_gitignore, ctx.args, ctx.viz_cfg, ctx.log)
+            # Stage 12: lightweight config-audit summary.
+            _sync_stage_config_audit(ctx.agent_meta_root, ctx.config_path, ctx.log)
+        all_stages_completed = True
+    finally:
+        # Stage 12b: generated-file drift decision -- the writers have run, so
+        # only findings whose file actually changed (or that no writer handled)
+        # are real manual edits (issues #1081/#1123); backup + WARN happen here,
+        # before the hash capture. Running it from ``finally`` keeps the backup
+        # safety net alive when a stage above raises, calls sys.exit or is
+        # interrupted after stage 6 has already overwritten edited files.
+        try:
+            _sync_stage_generated_file_drift_resolve(
+                ctx.project_root, drift_findings, ctx.args, ctx.log, written_paths)
+        except Exception as exc:  # noqa: BLE001 - never mask the original abort
+            if all_stages_completed:
+                raise
+            ctx.log.debug(
+                "generated-file-drift",
+                f"backup resolve on abort failed: {type(exc).__name__}: {exc}",
+            )
     # Stage 13: generated-file hash-baseline capture -- MUST run last, after
     # every writer above, so it captures fully post-write state.
     _sync_stage_generated_file_hash_capture(ctx.agent_meta_root, ctx.project_root,

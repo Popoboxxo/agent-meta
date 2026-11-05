@@ -22,14 +22,32 @@ from typing import Optional
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _LIB_PATH = _REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh"
 
 _BASH = shutil.which("bash") or "bash"
 
+#: Wall-clock hang guard for the scan-timing tests below. These are NOT
+#: performance assertions (see tests/timeouts.py): a loaded CI runner must stay
+#: green, while a genuinely quadratic/wedged scan still blows past this long
+#: before SCRIPT_TIMEOUT (60 s) kills the subprocess.
+_HANG_GUARD_SECONDS = 40.0
+
+_PROJECT_ROOT: Optional[Path] = None
+
 pytestmark = pytest.mark.skipif(
     sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bind_project_root(hook_project_root):
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = hook_project_root
+    yield
+    _PROJECT_ROOT = None
 
 
 def _call(func_call: str, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -46,6 +64,8 @@ def _call(func_call: str, env: dict | None = None) -> subprocess.CompletedProces
         capture_output=True,
         text=True,
         env=full_env,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -107,7 +127,8 @@ def test_hook_json_get_lone_surrogate_is_not_dropped(locale, escape):
     payload = '{"tool_input": {"command": "git push origin main' + escape + '"}}'
     r = subprocess.run(
         [_BASH, "-c", f'source "{_LIB_PATH}"\nhook_json_get "$1" tool_input.command', _BASH, payload],
-        capture_output=True, env=dict(os.environ, LC_ALL=locale))
+        capture_output=True, env=dict(os.environ, LC_ALL=locale),
+        cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push origin main"), (locale, r.stdout, r.stderr)
 
 
@@ -117,7 +138,8 @@ def test_hook_json_get_invalid_utf8_input_is_not_dropped(locale):
               'IN=$(printf \'{"tool_input": {"command": "git push \\377"}}\')\n'
               'hook_json_get "$IN" tool_input.command\n')
     r = subprocess.run([_BASH, "-c", script], capture_output=True,
-                       env=dict(os.environ, LC_ALL=locale))
+                       env=dict(os.environ, LC_ALL=locale),
+                       cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT)
     assert r.stdout.startswith(b"git push "), (locale, r.stdout, r.stderr)
 
 
@@ -333,6 +355,19 @@ def test_hook_known_tool_name_accepts_known_tools(name):
 
 
 @pytest.mark.parametrize("name", [
+    "ToolSearch", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "Monitor",
+    "ScheduleWakeup", "CronCreate", "CronDelete", "CronList", "EnterPlanMode",
+    "PushNotification", "RemoteTrigger", "SendUserFile", "Artifact",
+    "ArtifactComments", "ArtifactData",
+])
+def test_hook_known_tool_name_accepts_1078_builtins(name):
+    """Issue #1078: the allow-list had fallen behind the current built-ins, so
+    ToolSearch and the task/cron/artifact surface failed closed and blocked
+    normal operation. EnterWorktree/ExitWorktree stay rejected below."""
+    assert _known(name) == "known"
+
+
+@pytest.mark.parametrize("name", [
     "",            # missing tool_name (or unparseable payload)
     "garbage",     # what a broken python3 shim used to return as tool_name
     "bash",        # raw provider-native spelling, not the hook contract
@@ -384,11 +419,12 @@ def _shell_scan_source() -> str:
     return r.stdout
 
 
-def _scan(code: str, timeout: Optional[float] = None) -> subprocess.CompletedProcess:
+def _scan(code: str, timeout: Optional[float] = SCRIPT_TIMEOUT) -> subprocess.CompletedProcess:
     """Run `code` with the emitted scanner definitions in scope."""
     return subprocess.run(
         [sys.executable, "-c", _shell_scan_source() + "\n" + code],
         capture_output=True, text=True, timeout=timeout,
+        cwd=str(_PROJECT_ROOT),
     )
 
 
@@ -406,6 +442,8 @@ def test_shell_scan_py_emits_compilable_source():
         [sys.executable, "-c",
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=_shell_scan_source(), capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -439,8 +477,13 @@ def test_split_shell_statements_semantics(command, expected):
 
 def test_fork_bomb_detection_is_linear_on_a_300kb_identifier():
     """Issue #943 (a): the old regex was quadratic on long identifier chains
-    (20 KB ~ 5 s), so the hook timeout silently disabled the gate. The shared
-    scanner must classify 300 KB well under the 100 ms acceptance bound."""
+    (20 KB ~ 5 s), so the hook timeout silently disabled the gate. The scan
+    must classify 300 KB without hanging.
+
+    The bound is a HANG GUARD, not a performance assertion (see
+    tests/timeouts.py): tens of seconds on a loaded runner stay green, while a
+    quadratic regression still blows past it.
+    """
     r = _scan(
         "import time\n"
         "command = 'echo ' + 'a' * 300000\n"
@@ -452,7 +495,9 @@ def test_fork_bomb_detection_is_linear_on_a_300kb_identifier():
     assert r.returncode == 0, r.stderr
     result, elapsed_ms = r.stdout.split()
     assert result == "0"
-    assert float(elapsed_ms) < 100.0, f"fork-bomb scan took {elapsed_ms} ms"
+    assert float(elapsed_ms) < _HANG_GUARD_SECONDS * 1000.0, (
+        f"fork-bomb scan took {elapsed_ms} ms (hang guard "
+        f"{_HANG_GUARD_SECONDS:.0f} s)")
 
 
 @pytest.mark.parametrize("command", [
@@ -523,14 +568,37 @@ def test_fork_bomb_closed_body_within_window_is_scanned(expr, expected):
 
 
 @pytest.mark.parametrize("expr,expected", [
+    # Issue #1050: the body ends at the DEPTH-MATCHING '}' inside the
+    # 512-character window, so a brace or '${...}' before the self-call no
+    # longer hides the bomb behind the first '}'.
+    ('"f(){ : ${x}; f|f& };f"', 1),
+    ('"f(){ { :; }; f|f& };f"', 1),
+    # ... while nested braces/expansions without a self-call stay clean.
+    ('"f(){ { :; }; };f"', 0),
+    ('"f(){ : ${x}; }"', 0),
+    # An exhausted window still fails closed (block) under the depth scan,
+    # even when the preceding '${...}' is balanced.
+    ('"f(){ ${x}; " + "x"*520 + " f|f& };f"', 1),
+], ids=["bomb-after-expansion", "bomb-after-nested-braces",
+        "nested-braces-no-call", "expansion-no-call",
+        "nested-body-past-window"])
+def test_fork_bomb_ends_body_at_depth_matching_brace(expr, expected):
+    r = _fork_bomb_verdict(expr)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == str(expected)
+
+
+@pytest.mark.parametrize("expr,expected", [
     # AC-A.5: the unlimited backward name scan stays linear (one scan per
-    # '()' pair, they never overlap), so a 300 KB header is not a timeout.
+    # '()' pair, they never overlap), so a 300 KB header does not hang.
     ('"a"*20000 + "(){ :; }"', 0),
     ('"a"*300000 + "(){ :; }"', 0),
     # A header with no closing '}' in the body window fails closed.
     ('"f(){ " * 60000', 1),
 ], ids=["20k-char-name", "300k-char-name", "brace-chain"])
 def test_fork_bomb_scan_stays_linear_on_long_header_names(expr, expected):
+    """Hang guard, not a performance assertion (see tests/timeouts.py): a
+    quadratic scan would hit the generous bound, a loaded runner would not."""
     code = (
         "import time\n"
         f"command = {expr}\n"
@@ -540,14 +608,16 @@ def test_fork_bomb_scan_stays_linear_on_long_header_names(expr, expected):
         "print(int(result), elapsed_ms)\n"
     )
     try:
-        r = _scan(code, timeout=5)
+        r = _scan(code, timeout=SCRIPT_TIMEOUT)
     except subprocess.TimeoutExpired:
-        pytest.fail("watchdog: the fork-bomb scan did not finish within 5 s")
+        pytest.fail(
+            f"watchdog: the fork-bomb scan did not finish within {SCRIPT_TIMEOUT} s")
     assert r.returncode == 0, r.stderr
     result, elapsed_ms = r.stdout.split()
     assert result == str(expected)
-    assert float(elapsed_ms) < 1000.0, (
-        f"fork-bomb scan of the {expr!r} command took {elapsed_ms} ms"
+    assert float(elapsed_ms) < _HANG_GUARD_SECONDS * 1000.0, (
+        f"fork-bomb scan of the {expr!r} command took {elapsed_ms} ms "
+        f"(hang guard {_HANG_GUARD_SECONDS:.0f} s)"
     )
 
 
@@ -690,6 +760,8 @@ def _resolve(command: str) -> list[tuple[str, list[str]]]:
     r = subprocess.run(
         [sys.executable, "-c", _resolver_source() + "\n" + code],
         capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     return [(word, args) for word, args in eval(r.stdout)]  # noqa: S307 - test data
@@ -701,6 +773,8 @@ def test_shell_resolver_py_emits_compilable_source():
         [sys.executable, "-c",
          "import sys; compile(sys.stdin.read(), 'p', 'exec')"],
         input=source, capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
 
@@ -765,6 +839,8 @@ def test_command_start_skips_pure_assignment_statements(command):
         [sys.executable, "-c",
          "import json\n" + _resolver_source() + "\n" + code],
         capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT),
+        timeout=SCRIPT_TIMEOUT,
     )
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "true"

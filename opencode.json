@@ -30,7 +30,7 @@
       "type": "local",
       "enabled": true,
       "command": [
-        "python",
+        "python3",
         "scripts/viz-logger.py",
         "--mcp"
       ]

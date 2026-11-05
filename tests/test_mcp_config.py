@@ -1056,3 +1056,85 @@ def test_sync_mcp_artifacts_warn_on_undeclared_connection_var(tmp_path):
     assert any(
         "MCP_UNDEFINED_URL" in w and "secrets:" in w for w in log.warnings
     ), log.warnings
+
+
+# --- #1080 / D17: python3 for repo-owned stdio servers + interpreter fallback
+
+
+def test_catalog_stdio_commands_use_python3():
+    from scripts.lib.registry_query import load_mcp_registry
+
+    repo_root = Path(__file__).resolve().parents[1]
+    for name, server in load_mcp_registry(repo_root).items():
+        conn = server.get("connection") or {}
+        if conn.get("type") == "stdio":
+            assert conn.get("command") != "python", name
+
+
+def _entry():
+    return {"type": "stdio", "command": "python3", "args": ["a.py"]}
+
+
+def test_stdio_command_falls_back_when_python3_missing(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: "/x/python" if c == "python" else None)
+    entry = mpc._build_connection_entry(_entry(), None, resolve_interpreter=True)
+    assert entry["command"] == "python"
+
+
+def test_stdio_command_unchanged_when_python3_present(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: "/x/" + c)
+    entry = mpc._build_connection_entry(_entry(), None, resolve_interpreter=True)
+    assert entry["command"] == "python3"
+
+
+def test_stdio_command_unchanged_when_nothing_resolves(monkeypatch):
+    import scripts.lib.mcp_provider_config as mpc
+
+    monkeypatch.setattr(mpc.shutil, "which", lambda c: None)
+    entry = mpc._build_connection_entry(_entry(), None, resolve_interpreter=True)
+    assert entry["command"] == "python3"
+
+
+def test_committed_config_keeps_catalog_command_independent_of_host(monkeypatch, tmp_path):
+    """#1080/D17: a committed provider config is byte-stable across hosts.
+
+    ``_resolve_stdio_command`` is host-local, so it must never reach a tracked
+    output (``opencode.json``): a host without ``python3`` would otherwise
+    rewrite the committed file to ``python`` and ``sync.py --check`` would drift
+    on every platform. The local/gitignored secrets path still resolves.
+    """
+    import scripts.lib.mcp_provider_config as mpc
+
+    agent_meta_root = tmp_path / "agent-meta"
+    _write_mcp_catalog(agent_meta_root, {
+        "viz": {
+            "connection": {"type": "stdio", "command": "python3", "args": ["viz.py"]},
+        }
+    })
+    config = {"mcp-servers": ["viz"], "platforms": []}
+    provider_config = {
+        "Opencode": {
+            "mcp-config": {
+                "committed-file": "opencode.json",
+                "secrets-file": ".opencode/mcp.local.json",
+                "format": "opencode-json",
+            }
+        }
+    }
+
+    renders = []
+    for which in (lambda c: None, lambda c: "/x/" + c):
+        project_root = tmp_path / ("project-" + ("python" if which("python3") is None else "python3"))
+        monkeypatch.setattr(mpc.shutil, "which", which)
+        generate_provider_configs(
+            agent_meta_root, project_root, config, provider_config, SyncLog(),
+            dry_run=False, provider="Opencode",
+        )
+        renders.append((project_root / "opencode.json").read_text(encoding="utf-8"))
+
+    assert renders[0] == renders[1], "the committed config must not depend on host PATH"
+    assert json.loads(renders[0])["mcp"]["viz"]["command"] == ["python3", "viz.py"]

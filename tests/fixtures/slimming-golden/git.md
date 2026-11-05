@@ -1,6 +1,6 @@
 ---
 name: git
-version: 2.1.0
+version: 2.1.2
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@2.1.0
+generated-from: 1-generic/git.md@2.1.2
 model: claude-haiku-5-5
 ---
 

@@ -1927,3 +1927,252 @@ Anti-Recursion-Block) und bleiben unverändert.
 **Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
 `pytest tests/test_ac01_render_identity.py -q` → **3 passed**; `scripts/sync.py --validate` rc `0`
 (nur vorbestehende Warnungen).
+
+## 18. Re-Baseline der Golden-Baseline für 6 Rollen (PyYAML-Konventionshinweis, ADR 0001)
+
+> **Anlass:** `CODE_CONVENTIONS` in `.meta-config/project.yaml:237` nennt jetzt die dokumentierte
+> PyYAML-Runtime-Ausnahme (ADR `docs/adr/0001-pyyaml-runtime-ausnahme.md`). Die Variable rendert
+> über `{{CODE_CONVENTIONS}}` in die Agenten-Bodies; das Gate meldet die Drift als „diff not
+> attributable to declared normalizations".
+
+**Geändert (6 Fixtures):** `data-engineer`, `developer`, `junior-developer`,
+`principal-developer`, `refactoring-specialist`, `senior-developer` — je genau eine Zeile in
+`**Code conventions:**`:
+
+```diff
+-- Keine externen Python-Dependencies außer Stdlib
++- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
+```
+
+**Ursache:** Der Satz ist projektspezifischer Render-Inhalt (`CODE_CONVENTIONS`), kein migrierter
+Block. Keine `_NORMALIZATIONS`-Variante, `_LOCATORS`-Region oder Template-Version ist betroffen;
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und `_GOLDEN_ROLE_COUNT` (58) bleiben unverändert.
+
+**Herkunft:** Gegen den echten Sync-Render verifiziert
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`); je
+Fixture bleibt nur die eine `CODE_CONVENTIONS`-Zeile als Änderung, die eingefrorenen `model:`-Pins
+und Meta-Tokens bleiben unangetastet (dokumentierte inverse Ports des Gates).
+`git diff --numstat`: je Datei `1/1`.
+
+**Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
+`pytest tests/test_compact_matrix.py -q` → **121 passed**;
+`pytest tests/test_ac01_render_identity.py -q` → **5 passed** (kein AC-01-Drift, keine
+AC-01-Rebaseline); `scripts/sync.py --validate` rc `0`.
+
+---
+
+## 19. Re-Baseline der Golden-Baseline für 2 Rollen (Structured Release Checklist, Issue #1089)
+
+> **Anlass:** Die Release-Checklist-Feature (`feat/release-checklist`, Plan
+> `docs/plans/2026-10-31-release-checklist-plan.md`, Task 11) hebt
+> `agents/1-generic/agent-meta-manager.md` auf `1.26.0` (Rezept 14d, §3-Zeile) und
+> `agents/1-generic/release.md` auf `1.13.0`. Das Gate meldet die Drift als „diff not
+> attributable to declared normalizations".
+
+**Geändert (2 Fixtures):** `agent-meta-manager.md` (+45/−3: Frontmatter-Version,
+`generated-from`-Pin, `model`-Zeile, eine §3-Tabellenzeile und der neue Abschnitt 14d) und
+`release.md` (+3/−3: nur Frontmatter-Version, `generated-from`-Pin, `model`-Zeile — der
+Checklist-Block ist im Default-Projekt inaktiv und rendert nicht). Die übrigen 56 Goldens
+bleiben unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58.
+
+**Ursache:** Feature-Drift der Rollen-Templates, kein migrierter Block. `_NORMALIZATIONS`,
+`_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht
+betroffen — nach dem Update läuft die deklarierte Normalisierung unverändert über die
+goldene Baseline.
+
+**Herkunft:** Beide Fixtures wurden über den echten Sync-Pfad erzeugt
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`)
+und dabei mit den dokumentierten inversen Ports des Gates eingefroren: die release-volatilen
+Meta-Tokens `2.0.0-beta.6`/`2026-10-31` wurden auf die eingefrorenen Werte
+`1.2.0-beta.2`/`2026-09-13` zurückportiert (`_GOLDEN_META_VERSION`/`_GOLDEN_META_DATE`), und
+der `{{AUTO_COMMIT_BLOCK}}`-Tail wurde entfernt, weil die Golden-Baseline mit
+`auto_commit.mode: off` eingefroren wurde (`_strip_auto_commit_tail`). Keine Handpflege der
+Rollen-Inhalte.
+
+**Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
+`pytest tests/test_compact_matrix.py -q` → **121 passed**, rc `0`;
+`pytest tests/test_ac01_render_identity.py -q` → **5 passed**, rc `0`;
+`pytest tests/test_opencode_v2_surface.py -q` → **130 passed**, rc `0`;
+`pytest tests/test_standalone_export_in_sync.py tests/test_context_budgets.py -q` → **13 passed**,
+rc `0`; `scripts/sync.py --validate` rc `0`; `scripts/sync.py --render-standalone --check` rc `0`;
+`scripts/sync.py --check` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`.
+
+---
+
+## 20. Re-Baseline der Golden-Baseline für 7 Rollen (Test Environments, SPEC-TEST-ENVIRONMENTS-2026-10-31)
+
+> **Anlass:** Die Test-Environments-Feature (`feat/test-environments`, Plan
+> `docs/plans/2026-10-31-test-environments-plan.md`, Task 15) hebt sechs Rollen-Templates
+> minor (`tester` 2.9.0, `e2e-tester` 1.7.0, `developer` 4.9.0, `docker` 1.10.0,
+> `devops-engineer` 1.8.0, `test-executor` 1.3.0) und `agent-meta-manager` auf `1.27.0`
+> (Rezept „Test environments“ plus §3-Zeile). Das Gate meldet die Drift als „diff not
+> attributable to declared normalizations“.
+
+**Geändert (7 Fixtures):** `agent-meta-manager.md` (+46/−2: Frontmatter-Version,
+`generated-from`-Pin, eine §3-Tabellenzeile und der neue Abschnitt 18) sowie die sechs
+Rollen-Goldens `developer.md` (+3/−3), `tester.md`, `docker.md`, `devops-engineer.md`,
+`e2e-tester.md`, `test-executor.md` (je +2/−2: **nur** Frontmatter-`version:` und
+`generated-from:`; bei `developer` zusätzlich `based-on:`). Die übrigen 51 Goldens bleiben
+unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58.
+
+**Ursache:** Feature-Drift der Rollen-Templates, kein migrierter Block. Bei den sechs
+Rollen ist der Rot-Lauf ausschließlich die Frontmatter-Pins — die gerenderten Bodies sind
+byte-identisch, weil der Gate-Block ohne `test-environments`-Konfiguration nicht rendert
+(belegt durch `test_unset_render_matches_baseline`, dessen Baseline
+`tests/fixtures/test-env-baseline/hashes.json` unverändert bleibt). `_NORMALIZATIONS`,
+`_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht
+betroffen.
+
+**Herkunft:** `agent-meta-manager.md` wurde über den echten Sync-Pfad erzeugt
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`)
+und mit den dokumentierten inversen Ports eingefroren (Meta-Tokens `2.0.0-beta.6`/`2026-10-31`
+→ `1.2.0-beta.2`/`2026-09-13`, `{{AUTO_COMMIT_BLOCK}}`-Tail entfernt); der Diff gegen das
+vorherige Golden wurde zeilenweise geprüft (nur Version, §3-Zeile, Abschnitt 18). Die sechs
+Rollen-Goldens wurden **frontmatter-only** neu gepinnt — der Rot-Lauf wies genau die
+`version:`/`based-on:`/`generated-from:`-Zeilen aus, alles andere blieb byte-identisch. Die
+`model:`-Pins bleiben auf ihren eingefrorenen Werten (`_GOLDEN_MODEL_MAP`), `compact-golden`
+wurde nicht angefasst.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py tests/test_opencode_v2_surface.py
+tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → **265 passed**,
+rc `0` (5 AC-01, 130 Opencode, 9 Slimming, 121 Compact); `scripts/sync.py --validate` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 63 von 1099 Hashes
+geändert, 0 added/removed, per Entry gepatcht (kein `--write`).
+
+---
+
+## 21. Re-Baseline der Golden-Baseline für `git` (Issue #1093-Rest, Blank-Remote-URL)
+
+> **Anlass:** Der Follow-up zu Issue #1093 (`fix/git-remote-url-set-hardening`) härte die
+> Ableitung von `GIT_REMOTE_URL_SET` in `scripts/lib/config.py`: nur ein nicht-leerer
+> String gilt als gesetzt. Das Template `agents/1-generic/git.md` bleibt byte-identisch,
+> erhält aber den Patch-Bump `2.1.1 → 2.1.2`, weil sich die Guard-Semantik des gerenderten
+> Agenten ändert. Das Gate meldet die Drift als „diff not attributable to declared
+> normalizations".
+
+**Geändert (1 Fixture):** `git.md` (+2/−2: ausschließlich Frontmatter-`version:` und
+`generated-from:`-Pin). Die übrigen 57 Goldens bleiben unverändert; `_GOLDEN_ROLE_COUNT`
+bleibt 58. `compact-golden` wurde nicht angefasst.
+
+**Ursache:** Reiner Versions-Pin der Rolle, kein migrierter Block und keine Body-Änderung —
+der Rot-Lauf wies exakt die zwei Frontmatter-Zeilen aus, alles andere blieb byte-identisch.
+`_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die
+B2a/B2b-Klassifikation sind nicht betroffen. Die `model:`-Pins bleiben auf ihren
+eingefrorenen Werten (`_GOLDEN_MODEL_MAP`).
+
+**Herkunft:** Frontmatter-only neu gepinnt; keine Handpflege des Rollen-Bodys, keine
+Neuerzeugung des Goldens nötig, weil der Template-Body unverändert ist.
+
+**Verifikation:** `pytest tests/test_git_section_variables.py
+tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py
+tests/test_opencode_v2_surface.py -q` → **alle passed**, rc `0`; `scripts/sync.py
+--validate` rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest:
+9 von 1099 Hashes geändert, 0 added/removed, per Entry gepatcht (kein `--write`).
+
+---
+
+## 22. Re-Baseline der Golden-Baseline für 5 Rollen (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Der Bug-Batch PR B (`fix/consistency-false-positives`) schließt drei
+> Konsistenz-Falsch-Positive: #1071 (Dispatch-Tabellen folgen dem ActiveSet via
+> `ROLE_<R>_ACTIVE`), #1083 (Frontmatter-Rollen-Mention ist nur noch ein
+> `active-set.dangling-mention-frontmatter`-WARNING; `tester`/`data-engineer`-Beschreibungen
+> rollenneutral) und #1082 (Code-Spans/-Fences werden vom Platzhalter-Check ignoriert).
+> Fünf Templates wurden minor gebumpt (`orchestrator` 8.9.0, `senior-developer` 1.11.0,
+> `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0). Das Gate meldet die
+> Drift als „diff not attributable to declared normalizations" (bzw. bei `orchestrator`
+> als „unexpected diff on an unmigrated role").
+
+**Geändert (5 Fixtures):** `orchestrator.md` (+2/−2), `senior-developer.md` (+2/−2),
+`meta-feedback.md` (+2/−2), `tester.md` (+4/−4) und `data-engineer.md` (+3/−3) — jeweils
+**nur** Frontmatter-Pins (`version:`, `generated-from:`); bei `tester` und `data-engineer`
+zusätzlich die #1083-Beschreibungszeilen. Die übrigen 53 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+
+**Ursache:** Rollen-Template-Versionierung plus zwei Beschreibungstext-Korrekturen, kein
+migrierter Block. Der Rot-Lauf wies ausschließlich diese Frontmatter-Zeilen aus; der
+echte Sync-Render (`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-regen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz entweder der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist oder innerhalb einer deklarierten B2b-Normalisierung
+liegt (bei `meta-feedback` die `PI-BLANK`-Region). `_NORMALIZATIONS`, `_LOCATORS`,
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation sind nicht betroffen;
+die eingefrorenen Meta-Tokens und die `model:`-Pins bleiben unverändert
+(`_GOLDEN_MODEL_MAP`).
+
+**Herkunft:** Der reale Sync-Render diente als Referenz; da alle Bodies byte-identisch
+bzw. normalisierungsgedeckt sind, wurden die fünf Goldens **frontmatter-only** neu
+gepinnt — die eingefrorenen Inline-Regionen der B2b-Goldens bleiben dadurch erhalten.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py
+tests/test_compact_matrix.py -q` → **alle passed**, rc `0`; `scripts/sync.py --validate`
+rc `0`; `scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 36 von 1099
+Hashes geändert (die vier Matrix-Rollen `data-engineer`/`meta-feedback`/`orchestrator`/
+`tester` × 9 Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
+
+## 23. Review-Nachbesserung PR #1122 (Bug-Batch PR B, #1071/#1083/#1082)
+
+> **Anlass:** Die Review-Auflagen zu PR #1122 schließen die AC-38-Lücke
+> (`dangling-role-mention-frontmatter` ohne Doctor-Fixtures), richten die
+> Senior-Eskalations-Persona am tatsächlichen `STATUS: escalate`-Vertrag aus,
+> überspringen Frontmatter im Dispatch-Check (D7), gaten die `developer`-Zeile
+> der Tier-Tabelle (#1071) und neutralisieren zwei weitere Frontmatter-Texte
+> (`code-reviewer`-Hint, `ux-researcher`-Description), die im Default-Render
+> unvermeidbares WARNING-Rauschen erzeugten.
+
+**Geändert (3 Fixtures):** `orchestrator.md`, `code-reviewer.md` und
+`senior-developer.md` — `orchestrator` und `senior-developer` **nur**
+Frontmatter-Pins (`version:`, `generated-from:`); `code-reviewer` zusätzlich die
+neutralisierte `hint:`-Zeile. Die übrigen 55 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. `compact-golden` wurde nicht angefasst.
+`ux-researcher` ist in diesem Repo nicht aktiv und hat kein Golden.
+
+**Ursache:** Rollen-Template-Versionierung plus die `code-reviewer`-Hint-Korrektur,
+kein migrierter Block. Die Senior-Persona-Änderung liegt ausschließlich im
+`ROLE_PRINCIPAL_DEVELOPER_ACTIVE=false`-Zweig; dieses Repo rendert den aktiven
+Zweig, daher bleibt der Golden-Body unverändert. Der echte Sync-Render
+(`AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py
+--validate`) bestätigte, dass jede Body-Differenz der entfernte
+`{{AUTO_COMMIT_BLOCK}}`-Tail ist (Gate-Schritt `_strip_auto_commit_tail`) und
+die `model:`-Zeilen der `_GOLDEN_MODEL_MAP`-Portierung unterliegen. Die Goldens
+wurden deshalb **frontmatter-/hint-only** neu gepinnt, nicht aus dem Render
+kopiert; `_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`, `_KIND_REGISTRY`
+und die B2a/B2b-Klassifikation bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q`
+→ alle passed, rc `0`; `scripts/sync.py --validate` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. AC-01-Manifest: 28 von 1099
+Hashes geändert (die Matrix-Rollen `code-reviewer`/`orchestrator`/
+`ux-researcher` × 9 Provider plus `Copilot/.github/copilot-instructions.md`,
+das den `code-reviewer`-Hint einbettet), 0 added/removed, per Entry gepatcht
+(kein `--write`). `AC01_EXCEPTIONS` wurde nicht erweitert.
+
+## 24. Re-Baseline der Golden-Baseline für `orchestrator` (Orchestrator-Topologie v1, #1077)
+
+> **Anlass:** Task 18 der Orchestrator-Topologie v1
+> (`SPEC-orchestrator-topology-2026-11-03`) stellt die Singleton-Zeile der
+> A2A-Rule und der beiden Singleton-tragenden Agent-Templates auf den
+> bedingten `ORCH_TOPOLOGY_EXPLICIT`-Zweig um. Der else-Zweig bleibt wortgleich,
+> damit ein ungesetzter Key byte-identisch rendert (AC-6).
+
+**Geändert (2 Fixtures):** `orchestrator.md` in `slimming-golden` und
+`compact-golden` — **nur** Frontmatter-Pins (`version: 8.9.1 -> 8.10.0`,
+`generated-from: 1-generic/orchestrator.md@8.10.0`). Die übrigen Goldens
+bleiben unverändert; `_GOLDEN_ROLE_COUNT` bleibt 58. `_reference-agent` ist
+nicht Teil der Matrix und hat kein Golden.
+
+**Ursache:** Rein die Minor-Version des `orchestrator`-Templates. Der neue
+Topologie-Zweig rendert bei ungesetztem Key nicht; die Golden-Bodies sind
+deshalb byte-identisch. Die Goldens wurden frontmatter-only neu gepinnt, nicht
+aus dem Render kopiert; `_NORMALIZATIONS`, `_LOCATORS`, `_MIGRATED_PATHS`,
+`_KIND_REGISTRY` und die B2a/B2b-Klassifikation bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_ac01_render_identity.py
+tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q`
+→ alle passed, rc `0`; `python3 scripts/sync.py --check` rc `0`;
+`scripts/consistency-check.py` → `[PASS]` rc `0`. Die beiden
+`tests/fixtures/topology-golden/*`-Fixtures blieben **unverändert**. AC-01:
+9 von 1099 Hashes geändert (der `orchestrator`-Agent-Render aller neun
+Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
+`AC01_EXCEPTIONS` wurde nicht erweitert.

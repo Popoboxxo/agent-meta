@@ -180,7 +180,7 @@ Aufwand: **S** (< 0,5 Tag), **M** (0,5-2 Tage), **L** (> 2 Tage).
 | G12 | Partitionierung manuell gepflegt (15/17 Dateilisten); kein `.test_durations` | `pytest-split` mit committed Durations oder `least_duration` | `orchestration-test.yml` Z.66-104, Z.34-38 | **P2** | M |
 | G13 | Keine Coverage-Messung, kein Gate | Coverage-Report als Artefakt, Ratchet-Gate | `tests/requirements.txt` ohne pytest-cov; alter `--cov-fail-under 20` in `2b4effc8` entfernt | **P2** | M |
 | G14 | Keine JUnit-/Durations-Artefakte, keine Flake-Erkennung | JUnit XML als Artefakt, Flake-Report | nur `--durations=10` in Logs | **P2** | S |
-| G15 | Stdlib-only-Konflikt: PyYAML in Runtime, dokumentiert als Stdlib-only | Doku und Code konsistent | `requirements.txt`; 33 Dateien mit `import yaml`; `CLAUDE.md` | **P2** | M (Entscheidung) |
+| G15 (entschieden 2026-10-30: PyYAML-Ausnahme, ADR 0001) | Stdlib-only-Konflikt: PyYAML in Runtime, dokumentiert als Stdlib-only | Doku und Code konsistent | `requirements.txt`; 33 Dateien mit `import yaml`; `CLAUDE.md` | **P2** | M (Entscheidung) |
 | G16 | Lokale Hermetik: `~/.local`-Plugins leaken in Testlauf | `PYTHONNOUSERSITE=1` / Venv, lokal = CI | pytest-asyncio-Warnung im Lauf | **P2** | S |
 | G17 | Lokal-Befehl abweichend (`-n 8` in `tests/README.md` vs. CI `-n 2`) und kein `make ci` / Skript | Eine Quelle für Lokal = CI | `tests/README.md` Z.12 vs. `orchestration-test.yml` Z.256 | **P2** | S |
 | G18 | `sync.py --validate` dreifach ausgeführt, teuer | Einmal pro Stufe mit klarer Verantwortung | validate.yml Z.79; orchestration-test.yml Z.267 | **P3** | S |
@@ -293,11 +293,23 @@ Repo-Settings-Änderungen (G1, G5-Settings, G8) sind **Admin-Aktionen** und werd
 ## 7. Offene Entscheidungen für den Maintainer
 
 - Python-3.9-Floor beibehalten oder anheben? (G7, R6)
-- PyYAML-Runtime-Abhängigkeit als Ausnahme dokumentieren oder entfernen? (G15)
+- PyYAML-Runtime-Abhängigkeit als Ausnahme dokumentieren oder entfernen? (G15) — **entschieden 2026-10-30**, siehe unten
 - Browser-E2E als required Check oder optionaler Job? (G3, R5)
 - Security-Scanner: CodeQL plus gitleaks oder nur GitHub-natives Secret Scanning? (G2)
 - `strict_required_status_checks_policy` (Branch muss up-to-date sein) ja/nein? (W1-A)
 - Merge Queue einsetzen? Falls ja, brauchen alle Workflows mit Required Checks den Trigger `merge_group`. (W1-A)
+
+---
+
+## 7a. Entscheidungen 2026-10-30
+
+1. **Secret-Scan:** gitleaks-Action (SHA-pinned) im Security-Job plus pip-audit; Fixtures über `.gitleaks.toml`-Allowlist.
+2. **Python-Floor wird auf 3.10 angehoben:** CI-Matrix 3.10/3.12, W1-E nutzt `feature_version (3,10)`, eigener Floor-PR vor W1-E, `tomli` bleibt bis 3.11.
+3. **PyYAML:** dokumentierte Runtime-Ausnahme (`docs/adr/0001-pyyaml-runtime-ausnahme.md`); G15 damit entschieden.
+4. **Browser-E2E:** eigener Job, nicht required; Hochstufen nach ca. 2 Wochen ohne Flake.
+5. **`strict_required_status_checks_policy`:** `false`.
+6. **Keine Merge Queue**, kein `merge_group`-Trigger.
+7. **Trailer #1045/#1046:** unverändert.
 
 ---
 

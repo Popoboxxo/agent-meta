@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Bugfix-Welle 3 (Rest-Welle) — Implementation Plan
 
-> Status: **DONE (2026-10-30)** — PR A #1047 (Merge `6f52326a`), PR B #1048 (Merge `3294c7e5`), `main` = `3294c7e5`; volle Suite grün in CI (18/18 Checks je PR); Erweiterungen Task 4b/4c ausgeführt (vom User freigegeben). Alle Checkboxen gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`).
+> Status: complete (2026-10-30) — PR A #1047 (Merge `6f52326a`), PR B #1048 (Merge `3294c7e5`), `main` = `3294c7e5`; volle Suite grün in CI (18/18 Checks je PR); Erweiterungen Task 4b/4c ausgeführt (vom User freigegeben). Alle Checkboxen gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`).
 >
 > **Freigabevermerk:** Die zugehörige Spec trägt `Status: APPROVED (2026-10-29)` (Freigabe durch den User per Auftrag vom 2026-10-29; offene Fragen mit Default: Default gilt). Der Approval-Marker wird nie vom Planer gesetzt.
 

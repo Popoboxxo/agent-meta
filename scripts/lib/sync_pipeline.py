@@ -29,13 +29,14 @@ Only stdlib + lib imports at top level (guard:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sys
 from pathlib import Path
 
 from lib.agent_sync import sync_agents_for_provider
-from lib.auto_commit import resolve_auto_commit_config
+from lib.auto_commit import auto_commit_violations, resolve_auto_commit_config
 from lib.commands import sync_commands_for_provider
 from lib.config import (
     _orch_mode_flags,
@@ -73,6 +74,7 @@ from lib.generated_file_drift import (
     migrate_managed_artifact,
     prune_sync_backups,
     remove_managed_artifact,
+    resolve_drift_findings,
     scan_generated_file_drift,
 )
 from lib.gitignore import (
@@ -80,6 +82,7 @@ from lib.gitignore import (
     collect_provider_roots,
     compute_base_gitignore_entries,
     filter_redundant_provider_entries,
+    framework_baseline_entries,
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
@@ -96,6 +99,7 @@ from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
     sync_opencode_v2_managed_keys,
@@ -133,6 +137,11 @@ from lib.rules import (
     sync_speech_mode,
 )
 from lib.runtime_gate import sync_runtime_gate_plugins
+from lib.settings_dirs import (
+    STATUS_WRITTEN,
+    basetemp_dirs,
+    sync_allowed_directories,
+)
 from lib.skill_channel import sweep_orphan_skill_channel_rules
 from lib.skills import (
     check_pinned_commits,
@@ -163,8 +172,11 @@ def _sync_stage_config_and_presets(
     orchestrator's final write-back (the original rebind of the local
     ``config`` variable, sync.py L1276).
     """
-    # Auto-fill missing config fields with defaults (silent mode — only logs additions)
-    fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
+    # Auto-fill missing config fields with defaults (silent mode — only logs additions).
+    # A plain sync leaves the preset/flag defaults virtual (runtime fallbacks +
+    # platforms cascade); only --init / --fill-defaults persist them (#1074).
+    fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True,
+                  materialize_presets=bool(getattr(args, "init", False)))
     # Reload config after auto-fill to pick up newly written defaults
     config = load_config(config_path)
 
@@ -361,6 +373,8 @@ def _sync_stage_claude_base(
     env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
                      ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
     sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+    # #1080/D17: advisory MCP health — one WARN per unstartable active server.
+    check_mcp_health(agent_meta_root, project_root, config, log)
     return is_claude, gitignore_cfg, base_gitignore_entries, env_gitignore
 
 
@@ -925,8 +939,9 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
-# OQ-2 (frozen): bounded backup retention. Both thresholds must be exceeded;
-# the newest backup of a source is never pruned.
+# OQ-2 (revised #1081): bounded backup retention, count-only. The newest
+# `SYNC_BACKUP_MAX_PER_SOURCE` backups of a source survive; the age value is
+# still passed through for API stability but no longer drives pruning.
 SYNC_BACKUP_MAX_AGE_DAYS = 30
 SYNC_BACKUP_MAX_PER_SOURCE = 3
 
@@ -1000,40 +1015,135 @@ def _prune_managed_sync_backups(
         )
 
 
+def _project_relative(path, project_root: Path) -> str:
+    """Best-effort project-relative posix string for a writer target."""
+    try:
+        return Path(path).relative_to(project_root).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
+@contextlib.contextmanager
+def _track_writer_targets(project_root: Path, sink: set[str]):
+    """Record every path a writer handles while the context is active.
+
+    The drift decision (``resolve_drift_findings``) must distinguish a stale
+    hash baseline from a manual edit no writer regenerated. The only reliable
+    signal is whether a writer handled the path in this run. Writers funnel
+    through ``lib.io.write_checked`` / ``lib.io.write_atomic``; wrapping both
+    here records the path even when ``write_checked`` skips the write because
+    the generated content is already on disk (the stale-baseline case).
+
+    The wrapper is installed on ``lib.io`` and on every already-imported
+    module that bound the function directly (``from lib.io import ...``), so
+    existing writer modules are covered. Modules imported lazily during the
+    stage pick up the wrapper from ``lib.io``. Always restored in ``finally``.
+    """
+    from lib import io as io_mod
+
+    originals = {
+        "write_atomic": io_mod.write_atomic,
+        "write_checked": io_mod.write_checked,
+    }
+
+    def _make_wrapper(name: str, original):
+        def tracked(path, *args, **kwargs):
+            sink.add(_project_relative(path, project_root))
+            return original(path, *args, **kwargs)
+
+        tracked.__name__ = f"tracked_{name}"
+        tracked.__doc__ = f"Tracking wrapper around lib.io.{name}."
+        return tracked
+
+    wrapped = {name: _make_wrapper(name, orig) for name, orig in originals.items()}
+
+    for name, wrapper in wrapped.items():
+        setattr(io_mod, name, wrapper)
+    # Patch direct `from lib.io import ...` bindings already in module globals.
+    for module in list(sys.modules.values()):
+        if module is None:
+            continue
+        for name, original in originals.items():
+            if getattr(module, name, None) is original:
+                setattr(module, name, wrapped[name])
+    try:
+        yield sink
+    finally:
+        for module in list(sys.modules.values()):
+            if module is None:
+                continue
+            for name, wrapper in wrapped.items():
+                if getattr(module, name, None) is wrapper:
+                    setattr(module, name, originals[name])
+        for name, original in originals.items():
+            setattr(io_mod, name, original)
+
+
 def _sync_stage_generated_file_drift_scan(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, args: argparse.Namespace, log: SyncLog,
-) -> None:
+) -> list[dict]:
     """Early drift scan -- runs BEFORE _sync_stage_per_provider overwrites
-    anything, so it can still see a manual edit made since the last sync.
-    Warn-only for the drift signal itself: the edit is still overwritten
-    (skip-overwrite is an explicit non-goal), but a timestamped
-    `.sync-backup-<ts>` sibling of every drifted file is written first as a
-    safety net (issue #734)."""
+    anything, so it can still capture the pre-overwrite content of a
+    manually edited file.
+
+    The scan itself only collects findings (each carrying ``pre_text``); the
+    real-vs-stale decision, the backup and the warning happen in
+    _sync_stage_generated_file_drift_resolve() AFTER the writers ran
+    (issue #1081: a stale hash baseline is not a manual edit)."""
+    findings: list[dict] = []
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
     else:
         findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
-        backups = backup_drifted_files(findings, project_root, log, args.dry_run)
-        backup_name_by_source = {
-            backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
-        }
-        for finding in findings:
-            backup_name = backup_name_by_source.get(finding["path"])
-            backup_note = f" Backup written to {backup_name}." if backup_name else ""
-            log.warning(
-                f"generated-file-drift: '{finding['path']}' was manually edited "
-                f"since the last sync (provider '{finding['provider']}') -- this "
-                f"sync will overwrite it.{backup_note} Add it to "
-                ".meta-config/drift-allowlist.yaml if this edit should be "
-                "preserved going forward."
-            )
 
     # AC-09/OQ-2 (R-02): the backup pruner runs **unconditionally** -- also when
     # drift detection is disabled -- because cleanup backups (IC-05) are written
     # outside this stage. Gating it behind the drift-enabled guard left the
     # `.sync-backup-*` growth unbounded with `drift-detection.enabled: false`.
     _prune_managed_sync_backups(project_root, config, provider_config, args, log)
+    return findings
+
+
+def _sync_stage_generated_file_drift_resolve(
+    project_root: Path, findings: list[dict], args: argparse.Namespace, log: SyncLog,
+    written_paths: set[str] | None = None,
+) -> None:
+    """Post-writer drift decision: back up and warn only for real edits.
+
+    Runs after _sync_stage_per_provider, so it can compare the now-written
+    file against the ``pre_text`` captured by the scan. Equal content *and* a
+    writer that handled the path means the baseline was stale, not that the
+    user edited the file -- no backup, no warning (issue #1081). Equal content
+    on a path no writer handled is a real edit the sync did not overwrite;
+    it is warned about and backed up all the same (advisory: written-paths).
+
+    This stage is also called from the abort path (``_handle_sync`` finally),
+    so the backup safety net is written even when a later stage raises or
+    exits before the normal stage-12b position.
+    """
+    if not findings:
+        return
+    real = resolve_drift_findings(
+        findings, project_root, log, args.dry_run, written_paths=written_paths)
+    backups = backup_drifted_files(real, project_root, log, args.dry_run)
+    backup_name_by_source = {
+        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+    }
+    for finding in real:
+        backup_name = backup_name_by_source.get(finding["path"])
+        backup_note = f" Backup written to {backup_name}." if backup_name else ""
+        if finding.get("overwritten", True):
+            outcome = "this sync overwrote it"
+        else:
+            outcome = "no writer rewrote it in this run, so the edit is still on disk"
+        log.warning(
+            f"generated-file-drift: '{finding['path']}' was manually edited "
+            f"since the last sync (provider '{finding['provider']}') -- {outcome}."
+            f"{backup_note} Add it to "
+            ".meta-config/drift-allowlist.yaml if this edit should be "
+            "preserved going forward."
+        )
 
 
 def _sync_stage_platform_defaults_snapshot(
@@ -1127,6 +1237,99 @@ def _cleanup_retired_rules_dirs(
             (".agent-meta-managed", MCP_MANAGED_INDEX_FILENAME, TOOLS_MANAGED_INDEX_FILENAME),
             log, dry_run, "rules dir is not read by the provider (IC-15 Nr. 9)",
         )
+
+
+def emit_topology_summary(
+    config: dict,
+    provider_config: dict,
+    providers,
+    log: SyncLog,
+    *,
+    mode: str,
+    capabilities: dict | None = None,
+    active_set=None,
+) -> None:
+    """Emit the derived orchestrator topology as ONE INFO line per provider.
+
+    SPEC-orchestrator-topology-2026-11-03, IC-11 / AC-19.
+
+    The derivation is the only invisible part of the topology axis (an unset
+    key renders byte-identically to the historic output). This function is its
+    single producer:
+
+        topology: <effective> (derived from providers.<P>.primary-role)
+        topology: subagent (derived: active-set default)
+
+    Contract: ``mode == "sync"`` only — ``--check``/``--validate`` never call
+    it (the caller gates too), so their output stays byte-identical. A provider
+    whose resolution source is explicit (project key or provider override)
+    produces no line. At most one line per provider and run. Writes nothing,
+    changes no rendered bytes and never affects the exit code.
+    """
+    if mode != "sync":
+        return
+
+    from lib.providers import explicit_primary_role
+    from lib.topology import resolve_topology
+
+    if capabilities is None:
+        try:
+            capabilities = load_provider_capabilities(
+                Path(__file__).resolve().parents[2]
+            )
+        except Exception:  # noqa: BLE001 — the summary must never break a sync
+            capabilities = {}
+    if not isinstance(capabilities, dict):
+        capabilities = {}
+
+    orch = config.get("orchestrator") if isinstance(config, dict) else None
+    orch = orch if isinstance(orch, dict) else {}
+
+    # Fail-open role view when the caller has no ActiveSet: the declared
+    # primary roles count as active (the same convention
+    # ``role_emitted_for_provider`` uses for ``active_set is None``).
+    active_view = active_set
+    if active_view is None:
+        roles = set()
+        for provider in providers:
+            role = explicit_primary_role(provider_config, provider)
+            if role:
+                roles.add(role)
+        active_view = frozenset(roles)
+
+    seen: set = set()
+    for provider in providers:
+        if provider in seen:
+            continue
+        seen.add(provider)
+        pc = provider_config.get(provider) if isinstance(provider_config, dict) else None
+        pc = pc if isinstance(pc, dict) else {}
+        caps = capabilities.get(provider)
+        caps = caps if isinstance(caps, dict) else {}
+        overrides = orch.get("provider-overrides")
+        override = overrides.get(provider) if isinstance(overrides, dict) else None
+        override = override if isinstance(override, dict) else None
+        provider_mode = _resolve_orch_mode(orch, override, validate=False)
+        resolution = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=caps,
+            mode=provider_mode,
+            active_set=active_view,
+        )
+        if resolution.source != "derived":
+            continue
+        if resolution.derived_from and resolution.derived_from.startswith(
+            "providers."
+        ):
+            line = (
+                f"topology: {resolution.effective} "
+                f"(derived from {resolution.derived_from})"
+            )
+        else:
+            line = f"topology: {resolution.effective} (derived: active-set default)"
+        log.note("topology", line)
 
 
 def _sync_stage_per_provider(
@@ -1340,6 +1543,23 @@ def _sync_stage_per_provider(
         else:
             log.note("hooks", f"skipped for {provider} — not supported")
 
+        if pc.get("settings-allow-dirs-key"):
+            # Issue #1079 / D20: grant the external pytest basetemp to the
+            # provider's gitignored local settings — additively, never into the
+            # committed settings.json. Providers without the key are a no-op.
+            allowed_dirs = basetemp_dirs(project_root, config)
+            if allowed_dirs:
+                status = sync_allowed_directories(
+                    project_root, pc, allowed_dirs, log, args.dry_run,
+                )
+                if status == STATUS_WRITTEN:
+                    for directory in allowed_dirs:
+                        log.note(
+                            "settings-dirs",
+                            f"pytest basetemp {directory} allowed via "
+                            f"{pc.get('settings_local_file')}",
+                        )
+
         # IC-13: dispatch the two runtime-gate writers independent of the hook
         # branch and of the provider-isolation >=2 guard. Both key off config
         # capability (has_plugins) / the IC-03 resolver, never a provider literal
@@ -1419,6 +1639,20 @@ def _sync_stage_per_provider(
             [p for p in providers if is_provider_active(config, p)],
             log, dry_run=args.dry_run, migrations=_migration_map,
         )
+
+    # IC-11 / AC-19: one factual INFO line per derived provider, after the
+    # provider loop. NEVER in --check/--validate: their output must stay
+    # byte-identical (the function itself also early-returns on mode != sync).
+    if not getattr(args, "check", False):
+        try:
+            emit_topology_summary(
+                config, provider_config, providers, log,
+                mode="sync",
+                capabilities=load_provider_capabilities(agent_meta_root),
+                active_set=active_set,
+            )
+        except Exception as exc:  # noqa: BLE001 — a summary must not break sync
+            log.debug("topology-summary", f"skipped: {type(exc).__name__}: {exc}")
 
 
 def _sync_stage_drift_and_plugins(
@@ -1565,7 +1799,7 @@ def _sync_stage_gitignore(
         # still be ignored (generated env scripts may hold secret defaults,
         # sync.log / backups are machine-local, viz + skill entries) -- these
         # used to be emitted only on the dedicated-context path.
-        framework_baseline = ["sync.log", "*.sync-backup-*"]
+        framework_baseline = framework_baseline_entries()
         skill_gitignore_entries = _collect_skill_gitignore_entries(
             config, ext_config, provider_config)
         ensure_gitignore_entries(
@@ -1672,6 +1906,13 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     commit authority. The allowlist comes from the sanctioned
     ``ActiveSet.raw_roles`` (``None`` == no ``roles:`` key -> empty list)."""
     active_roles = sorted(active_set.raw_roles) if active_set.raw_roles is not None else []
+    # Issue #1091: an invalid block must not break sync (existing projects
+    # keep syncing, rc=0), but commit authority is disabled fail-safe and the
+    # user is told loudly. No time-based grace.
+    for _violation in auto_commit_violations(config):
+        log.warn(
+            f"auto_commit is invalid ({_violation}); "
+            "commit authority disabled (mode: off)")
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
     resolved["eligible_roles"] = [
         role for role in resolved["eligible_roles"] if active_set.has(role)

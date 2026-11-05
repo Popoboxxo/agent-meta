@@ -285,6 +285,11 @@ Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ers
 | `{{AI_PROVIDER}}` | Aktive Provider aus `ai-providers` (kommagetrennt) |
 | `{{PREFIX}}` | Aus `project.prefix` |
 | `{{PROMPT_INJECTION_DEFENSE_BLOCK}}` | Kanonischer Prompt-Injection-Defense-Hinweis aus `snippets/security/prompt-injection-defense.md`, injiziert in Rollen die externe/Drittanbieter-Inhalte lesen |
+| `{{RELEASE_CHECKLIST_MODE}}` | Modus der Release-Checkliste (`off`, `advisory`, `strict`), Default `off` |
+| `{{RELEASE_CHECKLIST_ENABLED}}` | `true`, sobald der Modus nicht `off` ist — steuert den Checklisten-Block in `release.md` |
+| `{{%RELEASE_CHECKLIST_BLOCK%}}` | Gerenderter Prosa-Block der Release-Checkliste, leer bei `off` (escaped, Issue #1082) |
+| `{{%TEST_ENVIRONMENT_BLOCK%}}` | Markdown-Block der deklarierten Test-Umgebungen aus `test-environments`, leer wenn nicht konfiguriert |
+| `{{%TEST_ENVIRONMENTS_SET%}}` | `true`/`false`; steuert das Gate um den Block in den Rollen-Templates |
 
 Unbekannte Variablen (kein Wert in Config) — Grace-Fenster bis `2.1.0` (`63b12bde`):
 - bis `2.1.0`: Platzhalter bleibt unverändert sichtbar, Eintrag im Logfile unter `WARNINGS`; die Warnung nennt den künftigen Fehler wörtlich

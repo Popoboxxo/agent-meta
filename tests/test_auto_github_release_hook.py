@@ -21,6 +21,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "auto-github-release.sh"
 _BASH = shutil.which("bash") or "bash"
@@ -167,6 +169,7 @@ def _run_hook(proj: Path, command: str, gh_log: Path, view_exit: int) -> subproc
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(payload),
         capture_output=True, text=True, cwd=str(proj), env=env,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 

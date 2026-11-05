@@ -36,7 +36,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from lib.hook_plugins import sync_hook_lib  # noqa: E402
-from lib.hooks import sync_hooks  # noqa: E402
+from lib.hooks import _antigravity_adapter_command, sync_hooks  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
 from lib.providers import load_providers_config  # noqa: E402
 
@@ -116,6 +116,31 @@ def test_hooks_json_written_in_antigravity_schema(agent_meta_root, project_root)
     # Every hook is routed through the translating adapter, path relative to
     # the hooks.json directory.
     assert handler["command"] == "bash ./hooks/antigravity-json-adapter.sh test-guard.sh"
+
+
+# ---------------------------------------------------------------------------
+# #1032 — pin the documented cwd contract of the hook command
+#
+# AGY runtime documentation (in-binary, static evidence): the command runs via
+# `sh -c` with the working directory set to the directory containing
+# hooks.json (docs/analysis/evidence/2026-09-30-runtime-claude-antigravity.md
+# §2.1). There is no documented env variable exposing the project root, so the
+# command stays relative to hooks.json. This is documentation + pin, not a code
+# fix: the tests are expected to pass unchanged today and to fail loudly if
+# that contract ever changes.
+# ---------------------------------------------------------------------------
+
+def test_command_is_relative_to_hooks_json_dir():
+    assert _antigravity_adapter_command("x.sh", ".agents/hooks", ".agents/hooks.json") == (
+        "bash ./hooks/antigravity-json-adapter.sh x.sh")
+
+
+def test_command_follows_hooks_json_location():
+    # hooks.json at the repo root: relpath from "." already starts with a dot
+    # segment (".agents/..."), so no extra "./" prefix is added. The command is
+    # still anchored at the hooks.json directory, just expressed without "./".
+    assert _antigravity_adapter_command("x.sh", ".agents/hooks", "hooks.json") == (
+        "bash .agents/hooks/antigravity-json-adapter.sh x.sh")
 
 
 def test_hook_scripts_and_adapter_are_mirrored(agent_meta_root, project_root):

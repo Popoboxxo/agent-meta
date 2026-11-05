@@ -105,6 +105,14 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # referenced inside {{#if SUBAGENT_PERMISSIONS_ENABLED}} — an empty string
     # is the correct standalone fallback (no policy outside a project install).
     "SUBAGENT_PERMISSIONS_BLOCK": "",
+    # RELEASE_CHECKLIST_BLOCK: the structured release checklist is project
+    # config only — the {{#if RELEASE_CHECKLIST_ENABLED}} gate stays closed
+    # standalone, so an empty string is the correct fallback.
+    "RELEASE_CHECKLIST_BLOCK": "",
+    # TEST_ENVIRONMENT_BLOCK: only ever referenced inside
+    # {{#if TEST_ENVIRONMENTS_SET}} — an empty string is the correct standalone
+    # fallback (no test-environment targets outside a project install).
+    "TEST_ENVIRONMENT_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -133,6 +141,13 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
+    # No project config in standalone mode, so there is no remote URL either —
+    # the parenthesised "(<url>)" clause in git.md stays closed.
+    "GIT_REMOTE_URL_SET": "false",
+    # Test-environment targets are project config only: standalone has none,
+    # so the gate stays closed and TEST_ENVIRONMENT_BLOCK is empty in
+    # _ORCHESTRATION_FALLBACKS.
+    "TEST_ENVIRONMENTS_SET": "false",
     "README_WARNINGS_ENABLED": "false",
     "AUTO_COMMIT_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
@@ -143,6 +158,10 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "SUBAGENT_PERMISSIONS_WARN": "false",
     "SUBAGENT_PERMISSIONS_OFF": "false",
     "SUBAGENT_PERMISSIONS_ENABLED": "false",
+    # Release checklist is project config only: standalone has none, so the
+    # gate stays closed and RELEASE_CHECKLIST_BLOCK is empty in
+    # _ORCHESTRATION_FALLBACKS.
+    "RELEASE_CHECKLIST_ENABLED": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no
     # project-specific config").
@@ -155,6 +174,21 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     # The roster gate is opt-in too: standalone has no harness roster, so the
     # compact agent table keeps its names list (the gate stays closed).
     "ROSTER_IN_HARNESS": "false",
+    # Orchestrator topology axis (IC-4): standalone has no project config, so
+    # the position is undeclared — the four boolean gates stay closed and the
+    # string fallback is empty (AC-18 fail-closed; no new branch may leak into
+    # the exported persona).
+    "ORCH_TOPOLOGY": "",
+    "ORCH_TOPOLOGY_EXPLICIT": "false",
+    "ORCH_TOPOLOGY_PRIMARY": "false",
+    "ORCH_TOPOLOGY_SUBAGENT": "false",
+    "ORCH_TOPOLOGY_HYBRID": "false",
+    # Orchestrator multiplicity axis (P3, AC-8): standalone has no project
+    # config, so the instance count is the single-instance default and the
+    # presence-only alias is undeclared. Registered so an absent/conditional
+    # reference resolves to the historic branch instead of leaking markers.
+    "ORCH_MAX_INSTANCES": "1",
+    "ORCH_SINGLETON_DECLARED": "false",
     # route_intent is a harness-registered callable tool with no standalone
     # counterpart — keep the §3 routing-rules fallback (issue #264).
     "ROUTE_INTENT_CALLABLE": "false",

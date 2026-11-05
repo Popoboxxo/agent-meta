@@ -38,6 +38,7 @@ Unified entry-point:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import hmac
 import logging
@@ -240,12 +241,18 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "provider-isolation", "environments", "model-source-preference",
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
     "context_file", "context-profile", "plugins", "repo_containment",
+    # Test environments (issue #1089): validated by
+    # _guard_test_environments_write so a bad payload never reaches disk.
+    "test-environments",
     # WP3 (#730): newly exposed project.yaml sections.
     "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
     # Feature: subagent permissions + git repo settings + auto-commit (Admin UI).
     # The whitelist is mode-independent -- both super_admin and project_admin
     # may write these sections (they are project-instance settings).
     "subagent_permissions", "git", "auto_commit",
+    # Feature: release checklist (Admin UI). Guarded by
+    # _guard_release_checklist_write so a bad payload never reaches disk.
+    "release-checklist",
     # Written internally by the fixed-section endpoints
     # (_write_submodule_protection).
     "submodule-protection",
@@ -1062,6 +1069,15 @@ class ConfigManager:
         # Always allow reading both so project_admin mode can view framework defaults
         return {**PROJECT_FILES, **SUPER_ADMIN_FILES}
 
+    @staticmethod
+    def _is_relative_to(path: Path, base: Path) -> bool:
+        """True if ``path`` lives under ``base`` (no ``None`` sentinel)."""
+        try:
+            path.relative_to(base)
+        except ValueError:
+            return False
+        return True
+
     def resolve_path(self, key: str) -> Path:
         """Translate a logical config key (e.g. ``role-defaults``) to its
         absolute path on disk.
@@ -1075,6 +1091,13 @@ class ConfigManager:
         (``_build_agent_hierarchy``, ``_find_schema_path``). Otherwise the
         primary path is returned (the file may not exist yet).
 
+        Issue #1095: ``.agent-meta`` is frequently a symlink to a framework
+        checkout, so the fallback target resolves outside ``root``. Only the
+        framework link's ``config/`` subtree is allowed to escape; the
+        containment check keeps blocking everything else (including a
+        framework ``config`` that is itself a symlink pointing elsewhere).
+        Writes through the framework symlink are rejected in :py:meth:`write`.
+
         Deliberately mode-agnostic: ``_allowed_keys()`` always returns both
         ``PROJECT_FILES`` and ``SUPER_ADMIN_FILES`` so project_admin mode can
         still *view* framework defaults (e.g. ``role-defaults``). The write
@@ -1085,6 +1108,16 @@ class ConfigManager:
             SecurityError: if ``key`` is unknown, or the resolved path would
                 escape ``root`` (path traversal protection). Does NOT raise
                 for mode restrictions -- see :py:meth:`write`.
+        """
+        return self._resolve_path_with_flag(key)[0]
+
+    def _resolve_path_with_flag(self, key: str) -> tuple[Path, bool]:
+        """Resolve ``key`` and report whether the framework fallback was used.
+
+        ``write`` needs the flag: a fallback target can still live *inside*
+        ``root`` (``.agent-meta`` symlinked to an in-root checkout), so
+        containment alone is not enough to keep the vendored framework config
+        read-only (D15, PR #1118 advisory 1).
         """
         if not isinstance(key, str) or not key:
             raise SecurityError("invalid config key")
@@ -1101,21 +1134,28 @@ class ConfigManager:
         # submodule layout (``.agent-meta/config/``) if the primary path does
         # not exist there. Project-admin files (.meta-config/...) never get a
         # fallback (they are always at the project root).
+        used_fallback = False
         if rel.startswith("config/") and not primary.exists():
             fallback = (self.root / ".agent-meta" / rel).resolve()
             if fallback.exists():
                 target = fallback
+                used_fallback = True
             else:
                 target = primary
         else:
             target = primary
 
-        # Ensure the resolved path stays within the project root.
-        try:
-            target.relative_to(self.root)
-        except ValueError as exc:  # pragma: no cover - defence in depth
-            raise SecurityError(f"resolved path escapes root: {target}") from exc
-        return target
+        # Ensure the resolved path stays within the project root. Issue #1095:
+        # ``.agent-meta`` may be a symlink to a framework checkout, so the
+        # fallback target resolves outside ``root``. That is allowed only for
+        # the ``config/`` subtree of the framework link; ``config`` itself is
+        # deliberately NOT resolved, so a framework ``config`` that is itself a
+        # symlink pointing elsewhere stays blocked (containment unchanged).
+        if not self._is_relative_to(target, self.root):
+            fw_config = (self.root / ".agent-meta").resolve() / "config"
+            if not (used_fallback and self._is_relative_to(target, fw_config)):
+                raise SecurityError(f"resolved path escapes root: {target}")
+        return target, used_fallback
 
     # ------------------------------------------------------------------ #
     # Read / write                                                       #
@@ -1150,7 +1190,15 @@ class ConfigManager:
         # A valid config document is always a mapping or a sequence.
         if not isinstance(data, (dict, list)):
             raise ValueError("Invalid payload type: expected object")  # noqa: TRY004
-        path = self.resolve_path(key)
+        path, used_fallback = self._resolve_path_with_flag(key)
+        # Issue #1095 / D15: reading framework defaults through a symlinked
+        # ``.agent-meta`` is fine, writing through it is not. The fallback flag
+        # matters even when the target is INSIDE ``root`` (a symlink to an
+        # in-root vendored checkout passes containment but must stay read-only
+        # -- PR #1118 advisory 1). A path that escapes ``root`` is rejected for
+        # the same reason.
+        if used_fallback or not self._is_relative_to(path, self.root):
+            raise SecurityError("framework symlink is read-only via Admin UI")
         path.parent.mkdir(parents=True, exist_ok=True)
 
         # Preserve block-literal (`|`) style for multi-line string values so an
@@ -1158,22 +1206,51 @@ class ConfigManager:
         # writes (issue #717) — plain yaml.dump() folds embedded newlines away.
         from lib.io import yaml_dump_preserving_multiline
 
-        new_text = yaml_dump_preserving_multiline(
-            yaml,
-            data,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
+        def _dump(payload: dict) -> str:
+            return yaml_dump_preserving_multiline(
+                yaml,
+                payload,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
 
-        # issue #847: PyYAML cannot round-trip comments. Refuse to silently
-        # strip the (heavily commented) provider registry — abort by default,
-        # warn + proceed only on explicit ``allow_lossy``.
-        if key == "ai-providers" and path.exists():
+        # issues #1074/#1092 (D14): prefer a top-level segment patch for
+        # project.yaml so only the changed blocks are re-rendered — every
+        # comment, blank line and unrelated byte survives an admin save.
+        # ``None`` means the document cannot be patched safely (anchors,
+        # multi-doc, tabs, self-check mismatch, …): fall back to the full dump
+        # below, which is where the round-trip guard applies.
+        original_text: str | None = None
+        patched: str | None = None
+        if key == "project" and path.exists():
+            try:
+                # ``newline=""`` keeps CRLF byte-for-byte; ``read_text`` would
+                # normalise it to LF before the patcher ever sees it.
+                with path.open("r", encoding="utf-8", newline="") as fh:
+                    original_text = fh.read()
+            except OSError:  # pragma: no cover - unreadable file, let dumps handle it
+                original_text = None
+            if original_text is not None and isinstance(data, dict):
+                from lib.yaml_patch import patch_top_level
+
+                patched = patch_top_level(original_text, data, _dump)
+
+        new_text = patched if patched is not None else _dump(data)
+
+        # issue #847 / D14: PyYAML cannot round-trip comments, so the guard
+        # protects the full-dump FALLBACK only. A successfully patched
+        # project.yaml keeps its comments by construction and must not be
+        # rejected for a changed section. ai-providers keeps its historical
+        # always-guarded behaviour (no segment patch is attempted for it).
+        guarded_key = key == "ai-providers" or (key == "project" and patched is None)
+        if guarded_key and path.exists():
             from lib.yaml_roundtrip import assert_roundtrip_preserved
 
+            if original_text is None:
+                original_text = path.read_text(encoding="utf-8")
             assert_roundtrip_preserved(
-                path.read_text(encoding="utf-8"),
+                original_text,
                 new_text,
                 context=f"config/{path.name}",
                 allow_lossy=allow_lossy,
@@ -1186,8 +1263,15 @@ class ConfigManager:
 
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         try:
-            with tmp_path.open("w", encoding="utf-8") as fh:
-                fh.write(new_text)
+            # A patched document is written byte-for-byte (``newline=""``) so
+            # its CRLF line endings and missing final newline survive; the full
+            # dump keeps the historical platform-newline behaviour.
+            if patched is not None:
+                with tmp_path.open("w", encoding="utf-8", newline="") as fh:
+                    fh.write(new_text)
+            else:
+                with tmp_path.open("w", encoding="utf-8") as fh:
+                    fh.write(new_text)
             os.replace(tmp_path, path)
         except Exception:
             # Never leave an orphaned .tmp behind if yaml.dump or os.replace
@@ -3542,6 +3626,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ValueError as exc:
+            self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except FileNotFoundError as exc:
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
         except ConnectionError:
@@ -3919,6 +4005,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if key in ("plugin-catalog", "project-plugin-catalog") and isinstance(body, dict):
             self._validate_permitted_injections_overrides(body.get("plugins", {}))
         if key == "project":
+            if isinstance(body, dict):
+                # D14: a caller may explicitly accept a lossy full-dump
+                # fallback; consume the flag so it never becomes a section.
+                from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
+                body = dict(body)
+                allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))
             existing = self.__class__.config_manager.read("project")
             if not isinstance(existing, dict):
                 existing = {}
@@ -3938,8 +4031,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     "context-profile", body.get("context-profile"))
                 self._guard_context_profile_write(
                     "provider-overrides", body.get("provider-overrides"))
+                # RF5: the full-document save must not smuggle in a
+                # test-environments/environments combination that would abort
+                # the next sync — check the merge result before writing.
+                if "test-environments" in body or "environments" in body:
+                    self._guard_test_environments_config(
+                        self._deep_merge(existing, body))
             result = self.__class__.config_manager.write(
-                "project", self._deep_merge(existing, body))
+                "project", self._deep_merge(existing, body),
+                allow_lossy=allow_lossy)
         else:
             result = self.__class__.config_manager.write(
                 key, body, allow_lossy=allow_lossy)
@@ -5176,6 +5276,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _write_project_section(self) -> None:
         """Partial update of one top-level section of ``project.yaml``."""
         body = self._read_body()
+        allow_lossy = False
+        if isinstance(body, dict):
+            # D14: consume the explicit lossy opt-in on a shallow copy so it is
+            # never interpreted as (or persisted as) a section.
+            from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
+            body = dict(body)
+            allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))
         if isinstance(body, dict) and "section" in body and "data" in body:
             section = body["section"]
             data = body["data"]
@@ -5196,8 +5304,48 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             existing = {}
         self._guard_model_block_write(section, data, existing)
         self._guard_context_profile_write(section, data)
+        self._guard_test_environments_write(section, data, existing)
+        data = self._guard_release_checklist_write(section, data)
         existing[section] = data
-        return self._send_json(self.__class__.config_manager.write("project", existing))
+        return self._send_json(self.__class__.config_manager.write(
+            "project", existing, allow_lossy=allow_lossy))
+
+    def _guard_release_checklist_write(self, section: str, data: Any) -> Any:
+        """Normalise/validate a ``release-checklist`` write before it is stored.
+
+        Two YAML-1.1 footguns and one hard config error are handled here so an
+        Admin-UI save gets the same guarantee as a hand-edited ``project.yaml``:
+
+        1. ``mode: false`` (an unquoted ``off`` parsed as a boolean) is
+           normalised to the string ``"off"`` — the safe side, identical to the
+           sync-side normalizer.
+        2. ``mode: true`` (an unquoted ``on``) is genuine user intent that the
+           validator cannot resolve; it is rejected with the "quote the value"
+           hint instead of being silently downgraded.
+        3. Every payload that would abort the next ``sync.py`` run is rejected
+           with ``ValueError`` (mapped to HTTP 400) *before* any disk write.
+
+        The caller's payload is never mutated: the guard works on a deep copy
+        and returns the normalised copy. Other sections pass through
+        unchanged.
+        """
+        if section != "release-checklist":
+            return data
+
+        from lib.release_checklist import (  # noqa: PLC0415 - lazy lib import
+            collect_release_checklist_errors,
+            normalize_release_checklist_mode,
+        )
+
+        payload = copy.deepcopy(data)
+        wrapper = {"release-checklist": payload}
+        normalize_release_checklist_mode(wrapper)
+        errors = collect_release_checklist_errors(wrapper)
+        if errors:
+            raise ValueError(
+                "invalid 'release-checklist': " + "; ".join(errors)
+            )
+        return wrapper["release-checklist"]
 
     def _guard_model_block_write(self, section: str, data: Any, existing: dict) -> None:
         """Reject section writes that would break the next ``sync.py`` run.
@@ -5283,6 +5431,45 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise ValueError(
                 "context-profile.invalid: " + ", ".join(invalid)
                 + f" (allowed: {', '.join(VALID_PROFILES)})")
+
+    def _guard_test_environments_config(self, candidate: dict) -> None:
+        """Reject a config that would break the next ``sync.py`` run (RF5).
+
+        ``test-environments`` is a hard config error on the sync side (see
+        ``lib.test_environments.validate_test_environments``). The Admin API
+        runs the same check *before* any disk write so a bad payload yields
+        HTTP 400 instead of being persisted and aborting the next sync.
+        ``None``/``{}`` count as "unconfigured" and pass. The shared entry
+        point is ``collect_test_environment_errors`` — the guard deliberately
+        reuses it rather than duplicating rules.
+        """
+        _ensure_scripts_on_path(self.__class__.root)
+        from lib.test_environments import (  # noqa: PLC0415 - lazy lib import
+            collect_test_environment_errors,
+        )
+
+        errors = collect_test_environment_errors(candidate)
+        if errors:
+            raise ValueError(
+                "invalid test-environments config: " + "; ".join(errors)
+            )
+
+    def _guard_test_environments_write(
+        self, section: str, data: Any, existing: dict
+    ) -> None:
+        """Validate ``test-environments``/``environments`` partial writes (RF5).
+
+        Writes to either section are checked against the *resulting* document,
+        not just the payload: deleting an ``environments`` entry that a
+        surviving ``test-environments.token-env`` still references must fail
+        with HTTP 400, and a ``test-environments: null`` write (delete the
+        section) must pass as "unconfigured". Every other section passes
+        through untouched, so a pre-existing invalid block cannot block
+        unrelated writes.
+        """
+        if section not in ("test-environments", "environments"):
+            return
+        self._guard_test_environments_config({**existing, section: data})
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
         """Reject a plugin-override write whose ``permitted-injections`` would
@@ -5488,6 +5675,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise FileNotFoundError(f"environment variable '{name}' not found")
         del envs[name]
         project_config["environments"] = envs
+        # Deleting an env var that a surviving ``test-environments.token-env``
+        # still references would persist a broken reference and abort the next
+        # sync (issue #1089). Validate the resulting document before the write
+        # so the request fails with HTTP 400 and the file stays untouched.
+        self._guard_test_environments_config(project_config)
         result = self.__class__.config_manager.write("project", project_config)
         return {"ok": True, "deleted": name, "result": result}
 

@@ -1630,6 +1630,7 @@ function buildSidebar() {
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
         { route: "/project/auto-commit",          label: "Auto-Commit",          icon: "⏱" },
+        { route: "/project/release-checklist",     label: "Release Checklist",    icon: "☑" },
 
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
         { route: "/project/debug-mode", label: "Debug Mode", icon: "🐞" },
@@ -1642,6 +1643,7 @@ function buildSidebar() {
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
+        { route: "/project/test-environments", label: "Test Environments", icon: "🧪" },
         { route: "/project/plugins", label: "Verfügbare Plugins", icon: "🧭" },
         { route: "/project/plugin-overrides", label: "Plugin Overrides", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
@@ -7763,6 +7765,249 @@ async function viewProjectAutoCommit() {
   return wrap;
 }
 
+/* --------------------------- Release Checklist --------------------------- */
+async function viewProjectReleaseChecklist() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Release Checklist"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Optional release checklist for the generated release templates. The release agent evaluates a " +
+    "prose block rendered from this section — Prompt convention only, no hook; gates stay hard in " +
+    "every mode (pre-release-check.sh, step 0). mode off = zero behaviour change, advisory reports " +
+    "findings without blocking, strict requires every required item to pass. Script items run as " +
+    "plain shell commands (exit 0 = pass), must be side-effect free because they also run in " +
+    "check-only mode — and this UI never executes them.",
+  ]));
+
+  const data = await loadProject();
+  const rc = (data["release-checklist"] && typeof data["release-checklist"] === "object")
+    ? clone(data["release-checklist"]) : {};
+  const items = Array.isArray(rc.items) ? clone(rc.items) : [];
+  let mode = typeof rc.mode === "string" ? rc.mode : "off";
+
+  const status = el("p", {
+    id: "release-checklist-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const setError = (msg) => {
+    toast(msg, "error");
+    status.textContent = msg;
+    status.style.color = "var(--accent-red)";
+  };
+
+  // ── Mode ─────────────────────────────────────────────────────────────────
+  const modePanel = el("div", { class: "panel" });
+  modePanel.appendChild(el("h2", {}, ["Mode"]));
+  modePanel.appendChild(dropdownField(
+    "Mode",
+    ["off", "advisory", "strict"],
+    mode,
+    v => { mode = v; },
+    {
+      off: "off — no generated output changes (default)",
+      advisory: "advisory — report findings, never block",
+      strict: "strict — require every required item to pass",
+    },
+    "Prompt convention only, no hook; gates stay hard in every mode. " +
+    "Keep the value quoted in project.yaml — an unquoted off is a YAML boolean."
+  ));
+  wrap.appendChild(modePanel);
+
+  // ── Items ────────────────────────────────────────────────────────────────
+  const itemsPanel = el("div", { class: "panel" });
+  itemsPanel.appendChild(el("h2", {}, ["Items"]));
+  itemsPanel.appendChild(el("p", { class: "muted" }, [
+    "Custom items extend the built-in defaults (tests-green, dod-met, changelog-updated, " +
+    "readme-current, version-bumped, build-created, git-tag-push). Those ids are reserved and " +
+    "cannot be redefined here.",
+  ]));
+
+  const table = el("table", { class: "data", style: "margin-top:var(--space-2);" });
+  table.appendChild(el("thead", {}, [el("tr", {}, [
+    el("th", {}, ["ID"]),
+    el("th", {}, ["Task"]),
+    el("th", {}, ["Verification"]),
+    el("th", {}, ["Check"]),
+    el("th", {}, ["Phase"]),
+    el("th", {}, ["Required"]),
+    el("th", {}, ["Actions"]),
+  ])]));
+  const tbody = el("tbody");
+  table.appendChild(tbody);
+  itemsPanel.appendChild(table);
+
+  const renderItems = () => {
+    tbody.replaceChildren();
+    if (items.length === 0) {
+      tbody.appendChild(el("tr", {}, [
+        el("td", { colspan: "7", class: "empty" }, ["No custom items — the default items apply."]),
+      ]));
+    }
+    items.forEach((item, index) => {
+      tbody.appendChild(el("tr", {}, [
+        el("td", {}, [el("code", {}, [item.id || ""])]),
+        el("td", {}, [item.task || ""]),
+        el("td", {}, [item.verification || ""]),
+        el("td", {}, [item.check === "script" ? `script: ${item.script || ""}` : "agent"]),
+        el("td", {}, [item.phase || "precondition"]),
+        el("td", {}, [item.required === false ? "no" : "yes"]),
+        el("td", {}, [
+          el("button", { class: "btn btn-sm", onclick: () => openItemModal(index) }, ["Edit"]),
+          el("button", {
+            class: "btn btn-danger btn-sm",
+            onclick: () => confirmDestructive(
+              `Delete checklist item “${item.id || "?"}”?`,
+              () => { items.splice(index, 1); renderItems(); }),
+          }, ["Delete"]),
+        ]),
+      ]));
+    });
+  };
+
+  const openItemModal = (index) => {
+    const isEdit = index >= 0;
+    const draft = isEdit
+      ? clone(items[index])
+      : { id: "", task: "", verification: "", check: "agent", phase: "precondition", required: true };
+
+    const idInput = textInputEl("item-id", draft.id || "", "my-check", v => { draft.id = v; });
+    const taskInput = textInputEl("item-task", draft.task || "", "What has to be done", v => { draft.task = v; });
+    const verificationInput = textInputEl("item-verification", draft.verification || "", "How it is verified", v => { draft.verification = v; });
+    const scriptInput = textInputEl("item-script", draft.script || "", "python3 scripts/check.py", v => { draft.script = v; });
+    const appliesInput = textInputEl("item-applies-when", draft["applies-when"] || "", "e.g. hacs", v => { draft["applies-when"] = v; });
+
+    const scriptField = a11yField({
+      id: "item-script", label: "Script",
+      help: "Command line, exit 0 = pass. Scripts must be side-effect free (they also run in " +
+        "check-only mode); the Admin UI never executes them.",
+      control: scriptInput,
+    });
+    const syncScriptVisibility = () => {
+      scriptField.style.display = draft.check === "script" ? "" : "none";
+    };
+
+    const requiredCb = el("input", { type: "checkbox", id: "item-required" });
+    requiredCb.checked = draft.required !== false;
+    requiredCb.addEventListener("change", () => { draft.required = requiredCb.checked; });
+
+    const body = el("div", {}, [
+      a11yField({
+        id: "item-id", label: "ID",
+        help: "Lowercase slug (^[a-z0-9][a-z0-9-]*$), unique within the checklist.",
+        control: idInput,
+      }),
+      a11yField({
+        id: "item-task", label: "Task",
+        help: "What has to be done for this checklist item.",
+        control: taskInput,
+      }),
+      a11yField({
+        id: "item-verification", label: "Verification",
+        help: "How the release agent verifies the item passed.",
+        control: verificationInput,
+      }),
+      dropdownField(
+        "Check",
+        ["agent", "script"],
+        draft.check || "agent",
+        v => { draft.check = v; syncScriptVisibility(); },
+        {
+          agent: "agent — the release agent judges it",
+          script: "script — run the command, exit 0 = pass",
+        },
+        "Scripts must be side-effect free (they also run in check-only mode)."
+      ),
+      scriptField,
+      dropdownField(
+        "Phase",
+        ["precondition", "step"],
+        draft.phase || "precondition",
+        v => { draft.phase = v; },
+        {
+          precondition: "precondition — checked before the release",
+          step: "step — confirmed while working through it",
+        },
+        "precondition items gate the release start; step items are confirmed after execution."
+      ),
+      a11yField({
+        id: "item-applies-when", label: "Applies when",
+        help: "Optional free-text condition describing when the item is relevant (e.g. a target platform).",
+        control: appliesInput,
+      }),
+      a11yField({
+        id: "item-required", label: "Required",
+        help: "A required item must pass in strict mode.",
+        control: requiredCb,
+      }),
+    ]);
+
+    const saveItemBtn = el("button", { class: "btn btn-primary", onclick: () => {
+      const id = idInput.value.trim();
+      const task = taskInput.value.trim();
+      const verification = verificationInput.value.trim();
+      if (!id || !task || !verification) {
+        setError("An item needs an id, a task and a verification.");
+        return;
+      }
+      draft.id = id;
+      draft.task = task;
+      draft.verification = verification;
+      if (draft.check === "script") {
+        const script = scriptInput.value.trim();
+        if (!script || script.includes("\n") || script.includes("\r")) {
+          setError("check “script” requires a single-line script.");
+          scriptInput.focus();
+          return;
+        }
+        draft.script = script;
+      } else {
+        delete draft.script;
+      }
+      const applies = appliesInput.value.trim();
+      if (applies) draft["applies-when"] = applies;
+      else delete draft["applies-when"];
+      draft.phase = draft.phase || "precondition";
+      draft.required = requiredCb.checked;
+      if (isEdit) items[index] = draft;
+      else items.push(draft);
+      renderItems();
+      hideModal();
+    } }, ["Save item"]);
+
+    syncScriptVisibility();
+    showModal(
+      isEdit ? "Edit checklist item" : "Add checklist item",
+      body,
+      [saveItemBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]
+    );
+  };
+
+  itemsPanel.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => openItemModal(-1) }, ["Add item"]),
+  ]));
+  wrap.appendChild(itemsPanel);
+  renderItems();
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      for (const item of items) {
+        if (item.check === "script" && !(item.script || "").trim()) {
+          setError(`Item “${item.id || "?"}”: check “script” requires a script.`);
+          return;
+        }
+      }
+      // mode is always sent as a string; items only when non-empty, so an
+      // untouched section keeps project.yaml clean.
+      const out = { mode };
+      if (items.length > 0) out.items = items;
+      try { await saveProjectSection("release-checklist", out, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------------- Prompt Modes ----------------------------- */
 
 
@@ -8635,6 +8880,7 @@ async function viewProjectEnvironments() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Define environment variables that sync generates as platform scripts (.ps1/.sh). ",
     "Set defaults, mark as required, or flag secrets for masking in logs.",
+    "Test targets are configured under Test Environments; `token-env` there must reference a variable here with Secret enabled.",
   ]));
 
   const data = await loadProject();
@@ -8790,6 +9036,167 @@ async function viewProjectEnvironments() {
     } catch (err) {
       toast(`Failed to load scripts: ${err.message}`, "error");
     }
+  }
+
+  render();
+  return wrap;
+}
+
+/* ------------------------------ Test Environments ------------------------ */
+async function viewProjectTestEnvironments() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Test Environments"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Test targets for this project (local, remote or both). ",
+    "Not to be confused with Environment Variables: this section holds no values. ",
+    "A token-env entry only names a variable defined under Environment Variables with Secret enabled; ",
+    "the value itself comes from the shell or `source .meta-config/env.sh` — never enter it here.",
+  ]));
+
+  const data = await loadProject();
+  const block = (data["test-environments"] && typeof data["test-environments"] === "object")
+    ? data["test-environments"] : {};
+
+  const statusEl = el("span");
+  const topBar = el("div", { style: "display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center;" });
+  topBar.appendChild(el("button", { class: "btn", onclick: () => openTestEnvModal(null) }, ["+ Add Target"]));
+  topBar.appendChild(statusEl);
+  wrap.appendChild(topBar);
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  function render() {
+    tableWrap.replaceChildren();
+    const names = Object.keys(block).sort();
+    if (!names.length) {
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No test environments configured. Click '+ Add Target' to start."]));
+      return;
+    }
+    const table = el("table", { class: "data" });
+    const th = (t) => el("th", {}, [t]);
+    table.appendChild(el("thead", {}, [el("tr", {}, [
+      th("Name"), th("kind"), th("URL"), th("access"), th("remote-access"),
+      th("token-env"), th("notes"), th(""),
+    ])]));
+    const tbody = el("tbody");
+    for (const name of names) {
+      const cfg = block[name] || {};
+      const tr = el("tr", { style: "cursor:pointer;", onclick: () => openTestEnvModal(name) });
+      const editBtn = el("button", {
+        type: "button", class: "btn btn-sm", "aria-label": `Edit ${name}`,
+        style: "margin-right:var(--space-2);",
+        onclick: (ev) => { ev.stopPropagation(); openTestEnvModal(name); },
+      }, ["✎"]);
+      tr.appendChild(el("td", {}, [editBtn, el("code", {}, [name])]));
+      tr.appendChild(el("td", {}, [cfg["kind"] || "local"]));
+      tr.appendChild(el("td", { class: "mono" }, [cfg["url"] || "—"]));
+      tr.appendChild(el("td", {}, [cfg["access"] || "read"]));
+      tr.appendChild(el("td", {}, [cfg["remote-access"] || "ask"]));
+      tr.appendChild(el("td", { class: "mono" }, [cfg["token-env"] || "—"]));
+      tr.appendChild(el("td", {}, [cfg["notes"] || "—"]));
+      const delCell = el("td");
+      delCell.appendChild(el("button", {
+        class: "btn btn-sm btn-danger",
+        onclick: (ev) => { ev.stopPropagation(); deleteTestEnv(name); },
+      }, ["×"]));
+      tr.appendChild(delCell);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    statusEl.textContent = `${names.length} target(s).`;
+  }
+
+  function deleteTestEnv(name) {
+    confirmDestructive(`Delete test environment "${name}"?`, async () => {
+      delete block[name];
+      await saveProjectSection("test-environments", block, statusEl);
+      render();
+    });
+  }
+
+  function openTestEnvModal(name) {
+    const isNew = name == null;
+    const cfg = isNew ? {} : (clone(block[name]) || {});
+    const TOKEN_ENV_RE = /^[A-Z][A-Z0-9_]*$/;
+    const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+    let kind = cfg["kind"] || "local";
+    let access = cfg["access"] || "read";
+    let remoteAccess = cfg["remote-access"] || "ask";
+
+    const nameInput = el("input", { type: "text", placeholder: "ha-dev", value: isNew ? "" : name, class: "field" });
+    const urlInput = el("input", { type: "text", placeholder: "http://ha-dev.lan:8123", value: cfg["url"] || "", class: "field" });
+    const tokenInput = el("input", { type: "text", placeholder: "HA_DEV_TOKEN", value: cfg["token-env"] || "", class: "field" });
+    const notesInput = el("input", { type: "text", placeholder: "Integration erst lokal, dann remote.", value: cfg["notes"] || "", class: "field" });
+    const kindSel = selectField(["local", "remote", "both"], kind, (v) => { kind = v; });
+    const accessSel = selectField(["read", "deploy"], access, (v) => { access = v; });
+    const remoteSel = selectField(["deny", "ask", "allow"], remoteAccess, (v) => { remoteAccess = v; });
+
+    const field = (labelText, control, hint) => {
+      const box = el("div", { style: "display:flex;flex-direction:column;gap:var(--space-1);" });
+      box.appendChild(el("label", { style: "font-weight:600;" }, [labelText]));
+      box.appendChild(control);
+      if (hint) box.appendChild(el("span", { class: "muted", style: "font-size:0.85em;" }, [hint]));
+      return box;
+    };
+
+    const body = el("div", { style: "display:flex;flex-direction:column;gap:var(--space-3);" });
+    body.appendChild(field("Name", nameInput, "Lowercase, digits and hyphens (^[a-z0-9][a-z0-9-]*$)"));
+    body.appendChild(field("kind", kindSel, "local = dev stack only, remote = remote target, both = local first then remote"));
+    body.appendChild(field("URL", urlInput, "Optional; may fall back to the platform URL"));
+    body.appendChild(field("token-env", tokenInput, "Name of an Environment Variables entry with Secret enabled; the value comes from the shell or `source .meta-config/env.sh` — nie hier eintragen (never enter the value here)"));
+    body.appendChild(field("access", accessSel, "read = query only, deploy = may change the remote target"));
+    body.appendChild(field("remote-access", remoteSel, "deny = never contact, ask = approval per action, allow = within access level"));
+    body.appendChild(field("notes", notesInput, "Free text, shown in the generated agent block"));
+
+    const isRemoteKind = (k) => k === "remote" || k === "both";
+    const prevKind = cfg["kind"] || "local";
+    const prevAccess = cfg["access"] || "read";
+    const prevRemote = cfg["remote-access"] || "ask";
+
+    async function persist() {
+      const newName = nameInput.value.trim();
+      if (!NAME_RE.test(newName)) { toast("Name must match ^[a-z0-9][a-z0-9-]*$", "error"); return; }
+      const oldName = isNew ? null : name;
+      if (newName !== oldName && Object.prototype.hasOwnProperty.call(block, newName)) {
+        toast(`Test environment "${newName}" already exists.`, "error");
+        return;
+      }
+      const token = tokenInput.value.trim();
+      if (token && !TOKEN_ENV_RE.test(token)) {
+        toast("token-env must be the NAME of a variable (^[A-Z][A-Z0-9_]*$), never a value", "error");
+        return;
+      }
+      const entry = { kind, access, "remote-access": remoteAccess };
+      if (urlInput.value.trim()) entry["url"] = urlInput.value.trim();
+      if (token) entry["token-env"] = token;
+      if (notesInput.value.trim()) entry["notes"] = notesInput.value.trim();
+      if (oldName && oldName !== newName) delete block[oldName];
+      block[newName] = entry;
+      await saveProjectSection("test-environments", block, statusEl);
+      hideModal();
+      render();
+    }
+
+    const activatesRemote = (isRemoteKind(kind) && !isRemoteKind(prevKind))
+      || (access === "deploy" && prevAccess !== "deploy")
+      || (remoteAccess === "allow" && prevRemote !== "allow");
+
+    const saveBtn = el("button", { class: "btn btn-primary", onclick: () => {
+      if (activatesRemote) {
+        confirmDestructive(
+          "This enables remote access for the test environment. Agents may then contact or deploy to the remote target.",
+          persist,
+          { title: "Confirm remote access", confirmLabel: "Enable" });
+      } else {
+        persist();
+      }
+    } }, ["Save"]);
+
+    showModal(isNew ? "Add Test Environment" : `Edit: ${name}`, body,
+      [saveBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]);
   }
 
   render();
@@ -10855,6 +11262,7 @@ async function init() {
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
   router.register("/project/auto-commit",          viewProjectAutoCommit);
+  router.register("/project/release-checklist",    viewProjectReleaseChecklist);
 
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/debug-mode",      viewProjectDebugMode);
@@ -10866,6 +11274,7 @@ async function init() {
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/conventions-overrides", viewProjectConventionsOverrides);
   router.register("/project/environments",   viewProjectEnvironments);
+  router.register("/project/test-environments", viewProjectTestEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
   router.register("/project/gitignore",       viewProjectGitignore);
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
@@ -10970,6 +11379,8 @@ init();
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",
+    "project/release-checklist": "project_instance-release_checklist",
+    "project/test-environments": "project_instance-test_environments",
 
     "project/viz-admin": "project_instance-viz_admin",
     "project/model-overrides": "project_instance-model_overrides",

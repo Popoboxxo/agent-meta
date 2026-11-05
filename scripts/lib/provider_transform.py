@@ -450,9 +450,45 @@ def _apply_agent_transform(
             content = _update_frontmatter_dict(content, {'tools': _valid_tools})
         # Entry point (#1006, OQ-8 amendment A2): only an EXPLICIT `primary-role`
         # yields `mode: primary`, on v1 and v2 alike; there is no code default.
+        # IC-6: the explicit role is necessary but not sufficient — the RESOLVED
+        # orchestrator topology is a second, independent condition. Topology is
+        # not a second "emitted" term: `subagent` still emits the role (as a
+        # subagent); it only withholds `mode: primary`. The effective value is
+        # used, never the declared word (`hybrid` degrades to `subagent` on the
+        # evidence-gated cell). The unset key keeps the historic emission when
+        # no active-set information exists; with an active set the resolver
+        # derives `primary` from the provider's `primary-role` anyway, so the
+        # output stays byte-identical to today (AC-6).
+        from .topology import resolve_topology, topology_explicit
+        from .variables import _resolve_orch_mode
+
+        _orch_config = config.get('orchestrator', {}) if isinstance(config, dict) else {}
+        if not isinstance(_orch_config, dict):
+            _orch_config = {}
+        _provider_override = _orch_config.get('provider-overrides', {})
+        _provider_override = (
+            _provider_override.get(provider)
+            if isinstance(_provider_override, dict) else None
+        )
+        if not isinstance(_provider_override, dict):
+            _provider_override = None
+        _topology = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=_caps,
+            mode=_resolve_orch_mode(_orch_config, _provider_override, validate=False),
+            active_set=active_set,
+        )
+        topology_allows_primary = _topology.effective == 'primary'
+        if not topology_explicit(config, provider) and active_set is None:
+            # No active-set information and no declared position: the resolver
+            # cannot derive anything but its fail-safe `subagent`. Preserve the
+            # pre-topology emission instead of demoting on missing information.
+            topology_allows_primary = True
         mode = None
         primary_role = explicit_primary_role(provider_config, provider)
-        if primary_role is not None and role == primary_role:
+        if primary_role is not None and role == primary_role and topology_allows_primary:
             mode = 'primary'
         elif mechanism == 'opencode-native-v2':
             mode = 'subagent'

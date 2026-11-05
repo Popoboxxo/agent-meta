@@ -1,9 +1,8 @@
 #!/bin/bash
 # lib: hook_common
-# version: 1.7.0
-# changelog: v1.7.0: hook_known_tool_name knows SubagentHandback (subagent report channel; blocking it lost every subagent result) and ToolSearch
+# version: 1.8.1
 # description: Shared helper functions sourced by other hook scripts (issue #601 dedup)
-# changelog: v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
+# changelog: v1.8.1: hook_known_tool_name also knows SubagentHandback (subagent report channel; blocking it lost every subagent result); v1.8.0: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData) — the closed allow-list blocked the whole task/cron/artifact surface, #1078; EnterWorktree/ExitWorktree stay blocked on purpose; v1.7.0: hook_shell_scan_py — is_fork_bomb ends a function body at the depth-matching '}' inside the 512-character window instead of the first unquoted one, so bombs with a brace or ${...} before the self-call are detected (#1050); an exhausted window still fails closed; v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
 #
 # NOT a hook itself — no `event`/`matcher` header, sync.py never registers it
 # in settings.json. Deployed verbatim to <hooks_dir>/lib/hook_common.sh
@@ -147,7 +146,12 @@ hook_json_usable() {
 # unknown case fails closed. What is deliberately allowed:
 #   * Claude Code's built-in tool set — the `claude-code-json` contract these
 #     hooks are written against (Write/Edit/Bash are the intercepted ones;
-#     every other name is a pass-through tool in both guards),
+#     every other name is a pass-through tool in both guards). That includes
+#     the task board (TaskCreate/TaskUpdate/TaskList/TaskGet), scheduling
+#     (Monitor, ScheduleWakeup, CronCreate/CronDelete/CronList), plan mode
+#     (EnterPlanMode), notifications (PushNotification, RemoteTrigger,
+#     SendUserFile), the artifact tools (Artifact, ArtifactComments,
+#     ArtifactData) and ToolSearch (#1078),
 #   * Claude Code's MCP namespace `mcp__<server>__<tool>`: open-ended by
 #     design and never classified as a write tool by either guard, so
 #     blocking it would break every MCP call without protecting anything.
@@ -173,7 +177,12 @@ hook_known_tool_name() {
     Agent|Bash|BashOutput|Edit|ExitPlanMode|Glob|Grep|KillBash|KillShell|LS) return 0 ;;
     ListMcpResources|MultiEdit|NotebookEdit|NotebookRead|Read|ReadMcpResource) return 0 ;;
     SendMessage|Skill|SlashCommand|Task|TaskOutput|TaskStop|TodoWrite|WebFetch|WebSearch) return 0 ;;
-    Write|AskUserQuestion|SubagentHandback|ToolSearch) return 0 ;;
+    # Current built-ins: task board, scheduling/cron, plan mode, notifications
+    # and the artifact surface (#1078). Grouped for readability; order within
+    # a line carries no meaning.
+    Artifact|ArtifactComments|ArtifactData|CronCreate|CronDelete|CronList|EnterPlanMode|Monitor) return 0 ;;
+    PushNotification|RemoteTrigger|ScheduleWakeup|SendUserFile|TaskCreate|TaskGet|TaskList|TaskUpdate|ToolSearch) return 0 ;;
+    Write|AskUserQuestion|SubagentHandback) return 0 ;;
   esac
   return 1
 }
@@ -438,14 +447,13 @@ hook_is_meta_submodule_dir() {
 #     ends at that '(', so the scans of two '()' pairs never overlap (O(n)
 #     overall). The former 64-character cap skipped longer names, a second
 #     fail-open (issue #943);
-#   * the body is bounded at 512 characters: no unquoted '}' inside that
-#     window FAILS CLOSED (block instead of allow). A long inline function
-#     body without braces in it is thereby blocked -- the accepted
-#     false-alarm class (spec RK-1);
-#   * the body still ends at the first unquoted '}', with no brace nesting, so
-#     a bomb carrying '${...}' or '{ ...; }' before its self-call is not
-#     detected: known gap, documented in rules/1-generic/branch-guard.md and
-#     tracked as a follow-up issue (spec Q10).
+#   * the body ends at the DEPTH-MATCHING '}' (brace nesting counted, so
+#     '{ ...; }' and '${...}' before the self-call do not cut the body short),
+#     and is detected even when such a brace precedes the self-call (#1050);
+#   * the body search is bounded at 512 characters: a body that exhausts that
+#     window without a depth-matching '}' FAILS CLOSED (block instead of
+#     allow). A long inline function body without closing braces in it is
+#     thereby blocked -- the accepted false-alarm class (spec RK-1).
 # No exception is swallowed: a failure propagates as a non-zero hook exit
 # (which the guards treat as a block) instead of silently returning False.
 hook_shell_scan_py() {
@@ -769,11 +777,30 @@ def is_fork_bomb(command):
             j += 1
         if j >= n or command[j] != '{':
             continue
-        close = command.find('}', j + 1, j + 1 + _MAX_FUNC_BODY)
+        # End the body at the DEPTH-MATCHING '}' inside the window: count the
+        # braces (so '{ ...; }' and '${...}' before the self-call do not cut
+        # the body short). One forward pass over at most _MAX_FUNC_BODY
+        # characters per candidate keeps the scan linear (#1050).
+        close = -1
+        depth = 1
+        end = j + 1 + _MAX_FUNC_BODY
+        if end > n:
+            end = n
+        k = j + 1
+        while k < end:
+            c = command[k]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    close = k
+                    break
+            k += 1
         if close < 0:
-            # No unquoted '}' in the first _MAX_FUNC_BODY characters: the body
-            # cannot be inspected, so fail closed (block) instead of skipping
-            # the header -- a skip is an allow (issue #943).
+            # No depth-matching '}' in the first _MAX_FUNC_BODY characters: the
+            # body cannot be inspected, so fail closed (block) instead of
+            # skipping the header -- a skip is an allow (issue #943).
             return True
         body = command[j + 1:close]
         if name in body and _body_calls_itself_piped(body, name):

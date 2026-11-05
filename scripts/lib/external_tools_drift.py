@@ -11,6 +11,7 @@ the other way around), so there is no import cycle.
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from .deactivation import get_active_providers
@@ -31,6 +32,13 @@ from .rule_index import read_managed_index
 
 DRIFT_FILENAME = "external-tools-drift.md"
 _DRIFT_CAP = 10
+
+# Runtime output written by agent-meta's own hooks (not by a sync writer):
+# orchestrator-guard-impl.sh appends its audit trail to
+# `<hooks_dir>/.guard-audit.log`. It carries no managed marker/index entry, so
+# the generic managed-artifact check cannot excuse it -- without this constant
+# it reads as a foreign hook on every sync (issue #1084).
+_AGENT_META_RUNTIME_ARTIFACTS = frozenset({".guard-audit.log"})
 
 
 def _read_managed_index(dir_path: Path) -> set[str]:
@@ -54,7 +62,8 @@ def _generate_drift_content(findings: list[dict]) -> str:
     shown = findings[:_DRIFT_CAP]
     for f in shown:
         tool_label = f["tool"] or "keinem registrierten Tool zugeordnet"
-        lines.append(f"- `{f['path']}` ({f['kind']}) — {tool_label}")
+        provider_tag = f" [{f['provider']}]" if f.get("provider") else ""
+        lines.append(f"- `{f['path']}` ({f['kind']}){provider_tag} — {tool_label}")
     remaining = len(findings) - len(shown)
     if remaining > 0:
         lines.append(f"- … {remaining} weitere, siehe sync.log")
@@ -76,7 +85,28 @@ def render_injection_drift_artifacts(
     findings exist, delete the file if present. Warnings are logged for all
     findings regardless of has_rules setting. Uses write_checked for
     idempotence.
+
+    Findings of providers WITHOUT has_rules have no rules dir to be reported
+    in; they are merged — tagged with their source provider — into the first
+    has_rules provider's report (issue #1084). If no provider has rules at
+    all, the findings stay in sync.log and a note says so.
     """
+    rules_providers = [
+        provider for provider in findings_by_provider
+        if provider_config.get(provider, {}).get("has_rules")
+    ]
+    extras = [
+        {**finding, "provider": provider}
+        for provider, findings in findings_by_provider.items()
+        if provider not in rules_providers
+        for finding in findings
+    ]
+    if extras and not rules_providers:
+        log.note(
+            "external-tools-drift",
+            f"{len(extras)} findings only in sync.log (no provider with has_rules)",
+        )
+
     for provider, findings in findings_by_provider.items():
         pc = provider_config.get(provider, {})
 
@@ -90,6 +120,9 @@ def render_injection_drift_artifacts(
         # Skip file rendering for providers without has_rules capability.
         if not pc.get("has_rules"):
             continue
+
+        if rules_providers and provider == rules_providers[0]:
+            findings = findings + extras
 
         rules_dir = project_root / pc.get("rules_dir", DEFAULT_RULES_DIR)
         target_path = rules_dir / DRIFT_FILENAME
@@ -220,12 +253,17 @@ def _dir_is_fully_managed(directory: Path) -> bool:
     except OSError:
         return False
     saw_managed = False
+    saw_backup = False
     for entry in entries:
         name = entry.name
         if name == ".agent-meta-managed" or name.startswith(".agent-meta-managed-"):
             saw_managed = True
             continue
         if _is_sync_backup_name(name):
+            # A directory reduced to agent-meta's own retention artifacts (all
+            # roles removed) is still agent-meta's output, not a foreign
+            # injection (issue #1084).
+            saw_backup = True
             continue
         if entry.is_dir():
             if not _dir_is_fully_managed(entry):
@@ -238,7 +276,31 @@ def _dir_is_fully_managed(directory: Path) -> bool:
         else:
             # symlink / socket / fifo — provenance unknown, never assume managed
             return False
-    return saw_managed
+    return saw_managed or saw_backup
+
+
+def _infra_known_names(pc: dict, provider: str) -> set[str]:
+    """Basenames declared under the optional ``infra_known_names`` provider key.
+
+    Must be a list/tuple/set of non-empty strings; a scalar (e.g. a bare
+    ``package.json``) would otherwise iterate character-by-character and
+    excuse nonsense names. A wrong type/shape is warned about and ignored
+    (fail-soft: the key is optional; an undeclared artifact stays a finding).
+    """
+    raw = pc.get("infra_known_names")
+    if raw is None:
+        return set()
+    if isinstance(raw, (list, tuple, set)) and all(
+        isinstance(name, str) and name.strip() for name in raw
+    ):
+        return {Path(name).name for name in raw}
+    warnings.warn(
+        f"provider '{provider}': 'infra_known_names' must be a list of "
+        f"non-empty strings (got {type(raw).__name__}); ignoring it",
+        UserWarning,
+        stacklevel=2,
+    )
+    return set()
 
 
 def scan_injection_drift(
@@ -341,6 +403,10 @@ def scan_injection_drift(
                 # skips them in its managed-file iterators.
                 if _is_sync_backup_name(child.name):
                     continue
+                # agent-meta's own runtime output (not sync-written) lives in
+                # this directory too -- see _AGENT_META_RUNTIME_ARTIFACTS.
+                if kind == "hook" and child.name in _AGENT_META_RUNTIME_ARTIFACTS:
+                    continue
                 if child.name in managed:
                     continue
                 if context_file_path is not None and child.resolve() == context_file_path:
@@ -389,6 +455,20 @@ def scan_injection_drift(
                     val = pc.get(key)
                     if val:
                         known_names.add(Path(val).name)
+                # MCP config files are written by the mcp writer; their
+                # basenames come from provider DATA (e.g. Opencode's
+                # .opencode/mcp.local.json), never a hardcoded provider map
+                # (issue #1084).
+                for mcp_key in ("committed-file", "secrets-file"):
+                    mcp_val = (pc.get("mcp-config") or {}).get(mcp_key)
+                    if mcp_val:
+                        known_names.add(Path(mcp_val).name)
+                # Optional provider key: runtime artifacts the provider's own
+                # toolchain creates inside the infra root (e.g. Opencode's
+                # package.json / node_modules). Data-driven, so no provider
+                # name appears in code (issue #1084). Type-guarded: a scalar
+                # must not iterate character-by-character (advisory #1123).
+                known_names.update(_infra_known_names(pc, provider))
                 # Capability-gated fallback: the key may be absent from
                 # ai-providers.yaml (Claude's hooks_dir/rules_dir/
                 # commands_dir, Continue's commands_dir) with sync code

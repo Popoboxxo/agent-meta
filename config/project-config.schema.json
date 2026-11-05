@@ -712,7 +712,7 @@
     },
     "max-parallel-agents": {
       "type": "integer",
-      "description": "Maximum number of agents that a coordinator (orchestrator) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",
+      "description": "Maximum number of agents that a coordinator (orchestrator) may run in parallel via run_in_background. This bounds parallelism WITHIN one orchestrator, not the number of orchestrators — that is orchestrator.max-instances. Default: 2. Set to 1 to disable parallelism.",
       "minimum": 1,
       "maximum": 5,
       "default": 2
@@ -1071,7 +1071,7 @@
         },
         "topology": {
           "type": "string",
-          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
+          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis AND NOT the agent topology: this key describes the context-file layout, while orchestrator.topology describes where the orchestrator agent lives. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
           "enum": [
             "unified",
             "per-provider"
@@ -1646,6 +1646,90 @@
               }
             },
             "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "release-checklist": {
+      "type": "object",
+      "description": "Structured release checklist. Absent block or mode 'off' = zero behavior change. Script items MUST be side-effect free (they also run in check-only mode). Not to be confused with 'release-gates'.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "advisory",
+            "off"
+          ],
+          "description": "Quote the value: unquoted off/on are YAML booleans."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "task",
+              "verification"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "task": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification": {
+                "type": "string",
+                "minLength": 1
+              },
+              "check": {
+                "type": "string",
+                "enum": [
+                  "agent",
+                  "script"
+                ]
+              },
+              "script": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Command line, exit 0 = pass. Must be side-effect free."
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "precondition",
+                  "step"
+                ],
+                "description": "precondition = evaluated before the release; step = confirmed after its execution."
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "applies-when": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false,
+            "if": {
+              "properties": {
+                "check": {
+                  "const": "script"
+                }
+              },
+              "required": [
+                "check"
+              ]
+            },
+            "then": {
+              "required": [
+                "script"
+              ]
+            }
           }
         }
       },
@@ -2396,6 +2480,29 @@
           ],
           "default": "strict"
         },
+        "topology": {
+          "type": "string",
+          "description": "Orchestrator position, i.e. WHERE the orchestrator lives. 'primary' = the role is the session entry point (one orchestrator, no spawn channel); 'subagent' = the role is never the entry point and the main chat spawns 1..N; 'hybrid' = position-agnostic (either/or, never two simultaneous positions). This is a different axis from orchestrator.mode, which describes HOW STRICTLY the gate is enforced ('strict', 'advisory', 'main-chat'). Optional: omitting the key preserves today's derivation (primary when providers.<P>.primary-role names the role and it is in the active set, otherwise subagent; hybrid is never derived). Not context_file.topology, which describes the file layout.",
+          "enum": [
+            "primary",
+            "subagent",
+            "hybrid"
+          ]
+        },
+        "max-instances": {
+          "type": "integer",
+          "description": "Maximum number of orchestrator instances (orchestrators) the project may run. This bounds HOW MANY orchestrators exist, not parallelism inside one orchestrator — that is max-parallel-agents. Values are 1..8, default 1 (today's single-orchestrator behaviour). Only effective when the provider capability orchestrator_instances.multiple is true and the cell is not UNVERIFIED; multi-instance state is namespaced as <base>__<id>.",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 1
+        },
+        "singleton": {
+          "type": "boolean",
+          "description": "Presence-only alias for exactly one orchestrator instance (enum [true]). There is deliberately NO schema default: the key being present is what distinguishes an explicit declaration from the derived default, and the hard validator rejects 'false' with a hint to use max-instances instead. This bounds the NUMBER of orchestrators, not parallelism within one orchestrator — that is max-parallel-agents. Absence means the count is derived from max-instances.",
+          "enum": [
+            true
+          ]
+        },
         "enabled": {
           "type": "boolean",
           "default": true,
@@ -2493,7 +2600,7 @@
         },
         "provider-overrides": {
           "type": "object",
-          "description": "Override orchestrator.mode per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without 'mode' set) inherit the global orchestrator.mode default.",
+          "description": "Override orchestrator.mode and/or orchestrator.topology per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without the respective property set) inherit the global orchestrator value.",
           "additionalProperties": {
             "type": "object",
             "description": "Per-provider orchestrator overrides.",
@@ -2505,6 +2612,15 @@
                   "strict",
                   "advisory",
                   "main-chat"
+                ]
+              },
+              "topology": {
+                "type": "string",
+                "description": "Orchestrator position for this provider only. Same enum and semantics as orchestrator.topology. Precedence: provider override > orchestrator.topology > derivation. When unset, inherits the project value. No schema default: the fallback is the existing derivation.",
+                "enum": [
+                  "primary",
+                  "subagent",
+                  "hybrid"
                 ]
               }
             },
@@ -2551,6 +2667,57 @@
         }
       },
       "additionalProperties": false
+    },
+    "test-environments": {
+      "type": "object",
+      "description": "Test/dev targets per project. NOT to be confused with 'environments' (env-var definitions); token-env must reference an 'environments' entry with secret: true.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "remote",
+              "both"
+            ],
+            "description": "Quote the value. Default: local."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "token-env": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "Name of an 'environments' entry with secret: true. Never a value."
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "read",
+              "deploy"
+            ],
+            "description": "Default: read."
+          },
+          "remote-access": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "ask",
+              "allow"
+            ],
+            "description": "Default: ask."
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "repo_containment": {
       "type": "object",

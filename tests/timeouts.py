@@ -15,6 +15,7 @@ them without editing tests:
 * ``AGENT_META_SYNC_VALIDATE_TIMEOUT``  -> :data:`SYNC_VALIDATE_TIMEOUT`
   (falls back to ``AGENT_META_SYNC_TIMEOUT``)
 * ``AGENT_META_SCRIPT_TIMEOUT``         -> :data:`SCRIPT_TIMEOUT`
+* ``AGENT_META_SLOW_TIMEOUT``           -> :data:`SLOW_TIMEOUT`
 
 A non-integer, empty or non-positive value falls back to the default; importing
 this module must never raise.
@@ -61,3 +62,8 @@ SYNC_VALIDATE_TIMEOUT: int = _env_seconds(
 #: Helper scripts (eval wrappers, hook adapters, ``git status``): unchanged
 #: 60 s semantics -- none of them carries the repo-wide consistency suite.
 SCRIPT_TIMEOUT: int = _env_seconds("AGENT_META_SCRIPT_TIMEOUT", _DEFAULT_SCRIPT_TIMEOUT)
+
+#: Long-running helper CLI whose measured runtime exceeds SYNC_TIMEOUT
+#: (the meta_optimizer family). Env: AGENT_META_SLOW_TIMEOUT.
+#: Absorbs the six former local `RUN_TIMEOUT = 900` definitions.
+SLOW_TIMEOUT: int = _env_seconds("AGENT_META_SLOW_TIMEOUT", 900)

@@ -1767,6 +1767,57 @@ def test_v2_gate_permissions_empty_without_entry_point(tmp_path):
     )
 
 
+def test_v2_gate_permissions_empty_under_provider_scoped_main_chat(tmp_path):
+    """#1090/D16: ``_opencode_entry_point(..., config)`` resolves the mode.
+
+    A provider-scoped ``main-chat`` hides the primary role for this provider
+    only, so the v2 builder must return no triples even though the role is in
+    the active set (``_GENERATED``) and the global mode is strict.
+    """
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    capabilities = load_provider_capabilities(framework)
+    config = {
+        "orchestrator": {
+            "mode": "strict",
+            "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+        }
+    }
+
+    entries = isolation._opencode_v2_gate_permissions(
+        config, "Opencode", framework, {"Opencode": _v2_pc()}, capabilities,
+        "observe", active_set=_GENERATED,
+    )
+
+    assert entries == [], "a main-chat provider has no entry point, so no deny triples"
+
+    # Positive control: the same config without the override still yields them.
+    assert isolation._opencode_v2_gate_permissions(
+        _gate_config(), "Opencode", framework, {"Opencode": _v2_pc()},
+        capabilities, "observe", active_set=_GENERATED,
+    ) == [_EDIT_DENY, _SHELL_DENY]
+
+
+def test_reconcile_removes_triples_under_provider_scoped_main_chat(tmp_path):
+    """The reconciler drops recorded triples when the provider mode hides the role."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v2_triples(project)
+    config = {
+        "orchestrator": {
+            "mode": "strict",
+            "provider-overrides": {"Opencode": {"mode": "main-chat"}},
+        }
+    }
+    log = SyncLog()
+
+    _reconcile(project, config, {"Opencode": _v2_pc()}, framework, log=log)
+
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+    # On the ``permission`` tier Spec A owns the coupling warning (row 6), so
+    # the reconciler stays silent — it must simply not re-add the triples.
+
+
 def test_v2_runtime_gate_skips_permission_map_step(tmp_path):
     """AC-C3 (Spec-A step 4 skipped): v2 gets ``default_agent`` only."""
     project = tmp_path / "project"
@@ -3477,8 +3528,8 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
     entry_point_calls = []
     real_entry_point = isolation._opencode_entry_point
 
-    def _spy(provider, provider_config, active_set):
-        role = real_entry_point(provider, provider_config, active_set)
+    def _spy(provider, provider_config, active_set, config=None):
+        role = real_entry_point(provider, provider_config, active_set, config)
         entry_point_calls.append(role)
         return role
 
@@ -5309,10 +5360,89 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1085) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# PyYAML runtime-exception note (PR #1076, rebaselined under the rule above):
+# `slimming-golden` re-derived from the real sync render for the six touched
+# developer-role goldens; `ac01-baseline`/`compact-golden` unchanged.
+# Release 2.0.0-beta.6 (VERSION bump 2.0.0-beta.5 -> 2.0.0-beta.6): version
+# strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1085) and
+# `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
+# trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1050 (fork-bomb brace nesting: `lib/hook_common.sh` 1.6.0 -> 1.7.0
+# plus the dropped `}`-gap entry in the branch-guard rule): `ac01-baseline`
+# re-pinned — 11 hashes (2 `hook_common.sh` renders, 3 branch-guard rule
+# renders, 6 `AGENTS.md`); `slimming-golden`/`compact-golden` unchanged.
+# Log: `tests/test_ac01_render_identity.py`.
+# Issue #1089 (structured release checklist, `feat/release-checklist`):
+# `ac01-baseline` re-pinned — 45 entries (31 changed + 14 added command
+# renders; new `release-check`/`set-release-checklist` commands, release
+# template versions, manager 1.26.0). `slimming-golden` re-derived for the two
+# touched goldens (`agent-meta-manager.md`, `release.md`; manifest §19);
+# `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Review follow-up on issue #1089 (command wording of `/set-release-checklist`):
+# `ac01-baseline` re-pinned — 7 hashes (the command render of the seven
+# command-writing providers); `slimming-golden`/`compact-golden` unchanged.
+# Log: `tests/test_ac01_render_identity.py`.
+# Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): `ac01-baseline`
+# re-pinned — 63 hashes (the six bumped base roles plus `agent-meta-manager`
+# × 9 providers); `slimming-golden` re-derived for the manager recipe and
+# re-pinned for the six role version pins (manifest §20); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issues #1078/#1041 (hook fixes: `lib/hook_common.sh` 1.8.0,
+# `dod-push-check.sh` 2.3.0): `ac01-baseline` re-pinned — 3 hashes (the two
+# `hook_common.sh` renders plus the only `dod-push-check.sh` render);
+# `slimming-golden`/`compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
+# Issue #1041 (PR A review follow-up: `dod-push-check.sh` 2.3.0 -> 2.4.0):
+# `ac01-baseline` re-pinned — 1 hash (the `dod-push-check.sh` render);
+# `slimming-golden`/`compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
+# Issues #1072/#1073 (gitignore managed block): `ac01-baseline` re-pinned — 9 hashes
+# (the `<Provider>/.gitignore` render of every provider); `slimming-golden`/
+# `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1093 (conditional remote-URL parens): `ac01-baseline` re-pinned — 9 hashes
+# (the `git` agent render of every provider); `slimming-golden` re-pinned for the
+# `git.md` version pin (2.1.0 -> 2.1.1, frontmatter only); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1093 residual (blank/non-string remote URL): `ac01-baseline` re-pinned — 9
+# hashes (the `git` agent render of every provider); `slimming-golden` re-pinned for
+# the `git.md` version pin (2.1.1 -> 2.1.2, frontmatter only); `compact-golden`
+# unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Bug batch PR B (#1071 dispatch gating, #1083 frontmatter-mention warning,
+# #1082 code-span placeholder skip): `ac01-baseline` re-pinned — 36 hashes
+# (`data-engineer`, `meta-feedback`, `orchestrator` and `tester` × 9 providers);
+# `slimming-golden` re-pinned for the five touched role goldens (`data-engineer`,
+# `meta-feedback`, `orchestrator`, `senior-developer`, `tester`; frontmatter incl.
+# the two #1083 descriptions); `compact-golden` unchanged. Log:
+# Review follow-up PR #1122 (Bug-Batch PR B): `ac01-baseline` re-pinned — 28
+# hashes (`code-reviewer`, `orchestrator`, `ux-researcher` × 9 providers plus
+# `Copilot/.github/copilot-instructions.md`, which embeds the `code-reviewer`
+# hint); `slimming-golden` re-pinned for `orchestrator`, `code-reviewer` and
+# `senior-developer` (version/generated-from pins, plus the neutralized
+# `code-reviewer` hint; manifest §23); `compact-golden` unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
+# Compact-golden catch-up for the same PR #1122: the orchestrator template bump
+# (8.8.1 -> 8.9.1) regenerated the slimming golden but not the compact one, so
+# the frozen compact render still carried the old version/generated-from pins.
+# Re-derived from the real compact render (two version lines only); digest
+# re-pinned 44148ea7 -> 416cd520. `ac01-baseline`/`slimming-golden` unchanged.
+# Issue #1077 (orchestrator topology v1, `orchestrator` 8.9.1 -> 8.10.0):
+# `ac01-baseline` re-pinned — 9 hashes (the `orchestrator` agent render of every
+# provider); `slimming-golden`/`compact-golden` re-pinned frontmatter-only for
+# the same role version pins (manifest §24); the topology goldens are unchanged.
+# Log: `tests/test_ac01_render_identity.py`.
+# Issue #1077 P3 (multi-instance, `feat/orchestrator-topology-p3`):
+# `ac01-baseline` re-pinned — 11 hashes (both `orchestrator-guard-impl.sh` renders
+# at 1.10.0 plus the nine copied `.meta-config/project.yaml` files with the new
+# schema descriptions); `slimming-golden`/`compact-golden` and the topology
+# goldens are unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Release 2.0.0-beta.7 (VERSION bump 2.0.0-beta.6 -> 2.0.0-beta.7): version
+# strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
+# `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
+# trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "be785ef9af84aae07c4e98d3d68991a2a359a685dbd5d05adaec390656cc4806",
-    "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
-    "compact-golden": "24afd5ebeb6573a84cfa0f61e7fd82d069593b707fe0efb782af788c02b176bb",
+    "ac01-baseline": "3acc668ea8f1f58452e973f76a023358ff91d25f584eab16ef831d184335f411",
+    "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
+    "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
 }
 
 

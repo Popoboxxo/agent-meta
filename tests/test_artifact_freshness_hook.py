@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "release-gates" / "artifact-freshness.sh"
 
@@ -37,7 +39,8 @@ pytestmark = pytest.mark.skipif(
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, check=True)
+    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True,
+                   check=True, timeout=SCRIPT_TIMEOUT)
 
 
 @pytest.fixture
@@ -58,6 +61,7 @@ def _run_gate(repo: Path) -> subprocess.CompletedProcess:
         cwd=str(repo),
         env={"PROJECT_ROOT": str(repo), "PRE_RELEASE_GATE_ENABLED": "true",
              "PATH": "/usr/bin:/bin:/usr/local/bin"},
+        timeout=SCRIPT_TIMEOUT,
     )
 
 

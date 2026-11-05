@@ -60,8 +60,11 @@ def _legacy_base_entries(
     provider_config: dict,
     gitignore_cfg: dict,
 ) -> list[str]:
-    """Reference implementation of the historical inline sync.py logic
-    (pre-issue-#557) — used to pin the default-off behavior exactly."""
+    """Reference implementation of the non-toggle baseline (sub-path allowlist).
+
+    Mirrors the CURRENT default-off output of the production code — it is a
+    living oracle for behavior-equivalence, not a frozen pre-issue-#557
+    snapshot. Keep it in sync when the baseline intentionally changes."""
     if "Claude" not in providers:
         return []
     claude_pc = provider_config.get("Claude", {})
@@ -106,6 +109,11 @@ def _legacy_base_entries(
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
         base.extend(custom_entries)
+    # Issue #1073: the resolved platform-defaults snapshot is a pure syncer
+    # artifact and always ignored, independent of the category toggles.
+    _snapshot = ".meta-config/platform-defaults.resolved.yaml"
+    if _snapshot not in base:
+        base.append(_snapshot)
     # IC-15 Nr. 26: tmp-sink entry is default ON even without a block.
     if ".tmp/" not in base:
         base.append(".tmp/")

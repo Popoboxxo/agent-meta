@@ -1,6 +1,6 @@
 ---
 name: e2e-tester
-version: 1.6.1
+version: 1.7.0
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit
@@ -30,7 +30,7 @@ tools:
 - mcp__playwright__browser_network_requests
 - mcp__playwright__browser_network_request
 - mcp__playwright__browser_console_messages
-generated-from: 1-generic/e2e-tester.md@1.6.1
+generated-from: 1-generic/e2e-tester.md@1.7.0
 model: claude-sonnet-5
 ---
 

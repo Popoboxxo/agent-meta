@@ -1,7 +1,7 @@
 ---
 name: developer
-version: 2.0.2
-based-on: 1-generic/developer.md@4.8.1
+version: 2.0.3
+based-on: 1-generic/developer.md@4.9.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 2-platform/agent-meta-developer.md@2.0.2
+generated-from: 2-platform/agent-meta-developer.md@2.0.3
 model: claude-sonnet-5
 ---
 
@@ -79,7 +79,7 @@ beim nächsten sync.py-Lauf. Daher:
 
 **Code conventions:**
 - Python: PEP 8, snake_case, klare Funktionsnamen
-- Keine externen Python-Dependencies außer Stdlib
+- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)

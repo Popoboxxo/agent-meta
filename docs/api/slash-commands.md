@@ -19,8 +19,10 @@ Slash Commands are chat shortcuts that allow you to trigger specific workflows w
 | `/merge` | Create PR for current branch and merge into main |
 | `/open-docs` | Open docs/ folder or specific analysis document |
 | `/pipelines` | Show all quality pipelines — active/disabled status |
+| `/release-check` | Run the release checklist as a check-only dry run (no tag, push or commit) |
 | `/report-bug` | Report a bug via feedback agent |
 | `/set-preset` | Change DoD preset or speech mode |
+| `/set-release-checklist` | Change the release checklist mode (off, advisory, strict) |
 | `/test-orchestration` | Run orchestration dry-run and validate functions |
 | `/update-extensions` | Update managed blocks in project extension files |
 | `/update-meta` | Re-sync all agents without upgrading version |

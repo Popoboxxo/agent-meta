@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v2.0.0-beta.5 — `2026-10-30`
+> Generiert von agent-meta v2.0.0-beta.7 — `2026-11-05`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -37,7 +37,7 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 
 **Besondere Patterns:**
 - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
-- Platzhalter {{VARIABLE}} werden von sync.py substituiert
+- Platzhalter in doppelten geschweiften Klammern (GROSS_NAME) werden von sync.py substituiert
 - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
 - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
 
@@ -45,7 +45,7 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 ## Code-Konventionen
 
 - Python: PEP 8, snake_case, klare Funktionsnamen
-- Keine externen Python-Dependencies außer Stdlib
+- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
@@ -71,7 +71,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 
-Generiert von agent-meta v2.0.0-beta.5 — `2026-10-30`
+Generiert von agent-meta v2.0.0-beta.7 — `2026-11-05`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 

@@ -2,6 +2,413 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.7] - 2026-11-05
+
+### Added
+- **Orchestrator topology (`orchestrator.topology`, #1077)**: new optional position axis
+  (`primary | subagent | hybrid`), overridable per provider via
+  `orchestrator.provider-overrides.<P>.topology`, with **no default** — an unset key derives
+  `primary` only when `providers.<P>.primary-role` names a role in the active set, otherwise
+  `subagent`; `hybrid` is never derived. A hard stdlib validator (no `jsonschema`) rejects an
+  unknown enum value, `orchestrator.enabled: false` and a same-scope `mode: main-chat`
+  contradiction. The single resolver (`scripts/lib/topology.py`) falls back to
+  `topology_degrade.<axis>` and finally to `subagent` whenever `topology_support` is false or
+  `topology_verified_state` is `UNVERIFIED`, and reports that downgrade loudly.
+- **Topology consistency checks and sync summary (#1077)**: the new
+  `orchestrator-topology.*` checks (`degraded`, `hybrid-unverified`, `main-chat-supersedes`,
+  `gate-inactive`, `default-agent-conflict`) surface cross-scope contradictions, and each sync
+  prints one derived `topology: <effective> (derived from …)` INFO line per provider.
+- **Conditional A2A rule and concept doc (#1077)**: `a2a-delegation-gates` states the orchestrator
+  position only behind `ORCH_TOPOLOGY_EXPLICIT` (word-identical else branch), and
+  `docs/concepts/active/orchestrator-topology.md` documents the three topologies, the degradation
+  matrix and the `hybrid` deviation.
+- **Topology evidence state (#1077)**: five read-only provider probes are documented (0 evidence,
+  3 inconclusive, 2 not run), so **no matrix cell was upgraded**: the 40-cell matrix stays at
+  **25 data-derived / 15 `UNVERIFIED ⇒ no`**, `hybrid` is granted nowhere and deferred in v1, and
+  P3 (multi-instance, `max-instances`/`singleton`) is not part of this change.
+- **Multi-instance orchestrators (`orchestrator.max-instances`, `orchestrator.singleton`,
+  #1077 P3)**: new `max-instances` key (integer 1..8, default 1) as the canonical
+  multiplicity, plus the presence-only `singleton` alias (`enum: [true]`, no schema default) for
+  exactly one instance; `singleton: false`, `singleton` × N>1 and `primary` × N>1 are hard
+  config errors, while `singleton` × N=1 is the redundant INFO
+  `orchestrator-topology.singleton-redundant` and a cross-scope `primary` at global N>1 the
+  WARNING `orchestrator-topology.instances-clamped` (effective N=1). Logical identity is
+  `orchestrator#<scope-id>`: the main chat derives `orchestrator_id` deterministically from the
+  scope key (plan/task ref, branch, PR) and normalizes it to `[a-z0-9][a-z0-9._-]{0,39}`; the
+  dispatch target stays the plain role name and the identity travels only in the A2A envelope
+  (`orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`, `metadata.scope_id`). State is
+  namespaced per instance: checkpoint `<base>__<id>.json`, human-only progress
+  `progress-<id>.md` (`current.md` stays the single machine-read root progress), and the shared
+  `.meta-viz/events.jsonl` carries the four audit fields (no file shards). The guard audit
+  reduces the record to `orchestrator_id=<id|unset>` (**audit-only** — never read by an
+  allow/deny decision). **N=1 is byte-identical**: without the keys no role name, file name,
+  session id or render changes.
+- **Structured release checklist (`release-checklist`, #1089)**: new opt-in block with
+  `mode: off|advisory|strict` (default `off`) and project items that are either `check: agent` or
+  `check: script`, each with `phase` (`precondition`/`step`), `required` and `applies-when`. A
+  missing block or `mode: off` leaves every generated `release.md` byte-identical; an unquoted
+  YAML `off` is normalized to `"off"`, while `on`/`true` fails with "quote the value".
+- **Checklist schema, normalizer and validator (`config/project-config.schema.json`,
+  `scripts/lib/release_checklist.py`, #1089)**: the schema is the structural authority (enums,
+  `check: script` requires `script`, `additionalProperties: false`); the Python validator enforces
+  unique and non-reserved ids, unknown keys, `phase`, and the `script`/`agent` rules, and is also
+  exposed as a non-exiting error collector for the admin server. The reserved default ids live in
+  `RESERVED_DEFAULT_ITEMS`, with `na_allowed_with_reason` true only for `dod-met` and
+  `readme-current`.
+- **Resolver, renderer and placeholders (`RELEASE_CHECKLIST_MODE`, `RELEASE_CHECKLIST_ENABLED`,
+  `RELEASE_CHECKLIST_BLOCK`, #1089)**: the rendered prose block documents the phase classes, the
+  script rules (exit 0 = pass, side-effect free), the approval protocol
+  (`APPROVAL_REQUEST`/`APPROVED`, stop before the first mutation), the `CHECKLIST*` result
+  contract with `not_run`, and the `MODE: check-only` dry run. `strict` is documented as a
+  Prompt-/Konventions-Boundary, not a hook or a security guarantee — the pre-release gates stay
+  hard in every mode. The three variables are registered in `config.py`, the placeholder set,
+  the `standalone.py` fallbacks, the conditional-block whitelist and the sync-concept doc.
+- **Release template support (`release.md` 1.13.0, `hacs-release.md`, `sharkord-release.md`,
+  #1089)**: the base template renders the block after the existing custom-checklist rows, and
+  both platform overrides adopt the new base version — the Sharkord standalone override gets an
+  explicit copy because it does not extend the base.
+- **Commands `/release-check` and `/set-release-checklist` (#1089)**: `/release-check` dispatches
+  the `release` agent with `MODE: check-only` and forbids every side effect (bump, build, edit,
+  commit, tag, push, `gh release`); `/set-release-checklist` changes the mode through
+  `project.yaml` and re-runs the sync/validation.
+- **`agent-meta-manager` recipe 14d (#1089)**: version 1.26.0 gains the "Structured release
+  checklist" recipe (read the block, ask for the mode, add items, quote the value, sync,
+  validate) and a §3 confirmation row in which enabling `strict` is a behavior change — with no
+  wording that the gates become softer.
+- **Admin server and UI for the release checklist (#1089)**: `"release-checklist"` joins
+  `PROJECT_WRITABLE_SECTIONS`, a new section guard reuses the non-exiting validator and rejects
+  invalid payloads (bad mode, `true`, unknown keys, duplicate ids) with HTTP 400 without writing,
+  and the Admin UI gains a "Release Checklist" section (mode select, item table/modal, script
+  field only for `check: script`, same YAML fragment as the CLI/manager path). The UI never runs
+  a script.
+- **Release-checklist scenarios 88-90 (#1089)**: `off` (byte-identical render), `advisory`
+  (mode prose, approval request, `n/a (nicht ausgeführt)`, all item ids) and `strict` (a failing
+  required precondition yields `STATUS: failed`, Prompt-/Konventions-Boundary).
+
+### Changed
+- **Orchestrator emission follows the resolved topology (#1077)**: **behavior change:** for
+  projects that set `orchestrator.topology` or a provider override, `subagent` withholds the
+  managed Opencode `default_agent` entry point (the role is emitted as a subagent only), and the
+  builder default is gated on the **effective** topology instead of the emitted role alone; a
+  user-set `default_agent` is preserved with a WARN, never overwritten. Projects that leave the
+  key unset are unaffected: the derivation keeps the historic behaviour and `sync --check` stays
+  **byte-identical**. The provider matrix is unchanged in this release (25 data-derived /
+  15 `UNVERIFIED ⇒ no`); no cell was upgraded by the probes.
+- **Multi-instance keys are accepted instead of rejected (#1077 P3)**: **behavior change:** a
+  project that already carried `orchestrator.max-instances` or `orchestrator.singleton` under the
+  v1 contract saw a hard validator error; those declarations now validate and take effect. With
+  `max-instances: 1` (the default, key absent) **N=1 stays byte-identical** in every render — no
+  role name, file name or session id changes. The orchestrator guard audit line gains
+  `orchestrator_id=<id|unset>` for every N — a log-format addition only: the id is **audit-only**,
+  it is never read by an allow/deny decision and nothing enforces N or scopes at runtime.
+- **Submodule push targets are checked instead of blocking `--recurse-submodules` (#1051)**:
+  `dod-push-check.sh` resolves, for `--recurse-submodules=on-demand|only`, each
+  submodule's own push destination (`remote.<name>.push`, then `push.default` /
+  `branch.<n>.merge`) and runs the existing protected-branch test on it; the
+  blanket block on any repository with a `.gitmodules` (#953) is gone. A protected
+  or undeterminable destination still fails closed, and the message names the
+  submodule path, its destination, and — when undeterminable — the way out (push
+  the superproject without the flag, then push each submodule explicitly).
+  Repositories without `.gitmodules` and the `check`/`no` values are unchanged.
+- **CI robustness (#945, residual)**: residual of the wave-4 P1 test-hygiene work —
+  `tests/timeouts.py` adds the shared `SLOW_TIMEOUT` (900 s,
+  `AGENT_META_SLOW_TIMEOUT`) for the long-running `meta_optimizer` helper CLIs whose
+  runtime exceeds `SYNC_TIMEOUT`; the nine hook test modules now run their subprocess
+  calls against `tmp_path` projects via `cwd=`, including a decoy project for the
+  `repo_containment` guard (ADR-3); all 66 hook-subprocess sites pass `timeout=`; and
+  the new static guard `tests/test_hook_test_isolation.py` enforces `cwd=`/`timeout=`
+  through an AST scan.
+- **Test environments (`test-environments`, #1089)**: new optional project block that
+  declares local/remote test targets with `kind` (`local|remote|both`), optional `url`,
+  `token-env`, `access` (`read|deploy`) and `remote-access` (`deny|ask|allow`, default
+  `ask`). The block is distinct from `environments:` (env-var definitions): `token-env`
+  only names an `environments:` entry with `secret: true`, never a value.
+- **Validator, resolver and renderer (`scripts/lib/test_environments.py`, #1089)**: hard
+  config-load validation (names, enums, quoted values, unknown keys, URL userinfo, token
+  reference) plus a non-exiting collector for the admin server; the resolver applies the
+  documented defaults and the restricted platform fallback URL (`dev_instance_url` before
+  `ha_url`, project layer only). The rendered block and the `TEST_ENVIRONMENTS_SET` gate
+  are registered in `config.py`, the placeholder set, the `standalone.py` fallbacks and
+  the sync-concept table; unconfigured projects stay byte-identical.
+- **Six base templates and seven overrides (#1089)**: `tester`, `e2e-tester`, `developer`,
+  `docker`, `devops-engineer` and `test-executor` render the block after `</constraints>`
+  behind the gate; all platform overrides adopt the new base version and the standalone
+  `sharkord-docker` carries the block manually. Remote approval is documented as a prompt
+  convention (`APPROVAL_REQUEST`/`APPROVED`), not a `permissions` mechanism (follow-up F6).
+- **Admin server, Admin UI and manager recipe (#1089)**: `"test-environments"` joins
+  `PROJECT_WRITABLE_SECTIONS`, a new section guard rejects invalid payloads (including a
+  broken `token-env` reference) with HTTP 400 without writing; the UI section and
+  `agent-meta-manager` 1.27.0 write the same fragment and never accept a secret value.
+  Scenarios 91-93 cover local, remote-ask and unconfigured projects.
+- **Documentation (#1089)**: new guide `docs/guides/features/test-environments.md`, a
+  commented example block in `howto/configs/project.yaml.example`, and the AC-ENV-19
+  sentence in `docs/RELEASE_GATES.md` (a dry-check against a test environment only runs
+  `access: read` actions).
+
+### Fixed
+- **Generated-file drift is judged after the writers, backup retention is count-only
+  (#1081)**: a scan finding now carries `pre_text` — the content read before the sync
+  writers run — and `resolve_drift_findings` compares the post-write disk state against
+  it. A real manual edit is therefore backed up from `pre_text` even though the writers
+  already overwrote the file, while a merely stale hash baseline is refreshed silently
+  (no backup, no warning). **behavior change:** `prune_sync_backups` keeps the 3 newest
+  backups per source regardless of age; `max_age_days` stays in the signature for API
+  stability but is ignored, because the old age-AND-count policy let hundreds of backups
+  accumulate.
+- **Agent-meta's own runtime output and backup-only directories are no longer
+  external-tool drift (#1084)**: `.guard-audit.log` (written by
+  `orchestrator-guard-impl.sh`) is excused as a known runtime artifact, a directory
+  holding only sync backups plus the managed index still counts as managed, and MCP
+  config basenames come from the provider's `mcp-config` data rather than a hardcoded
+  map. The new optional provider key `infra_known_names` lists toolchain files such as
+  Opencode's `package.json` and `node_modules`. **behavior change:** findings of
+  providers without `has_rules` no longer disappear — they are merged, tagged with their
+  source provider as `[provider]`, into the first `has_rules` provider's report (or, if
+  there is none, stay in `sync.log` with a note).
+- **The pytest basetemp is allowed through the gitignored local settings (#1079,
+  option C/D20)**: the new provider key `settings-allow-dirs-key` names the list that
+  receives the external basetemp **additively** in `settings.local.json` (Claude:
+  `permissions.additionalDirectories`); the committed `settings.json` is never touched,
+  a provider without the key is a no-op, and ADR-03 still forbids an in-repo basetemp.
+  The effect on the Claude Code permission dialog is unverified.
+  Because that basetemp carries the host temp path and username, the gitignored local
+  settings overlay is now excluded from the AC-01 render-identity key set on both
+  sides instead of being re-pinned — the manifest stays untouched, so no
+  machine-specific digest is baked into `hashes.json`.
+- **Antigravity hooks cwd semantics are documented and pinned (#1032)**: the
+  `_antigravity_adapter_command` docstring now records the static evidence — AGY runs
+  `command` through `sh -c` with the working directory set to the directory containing
+  `hooks.json`, and no documented environment variable exposes the project root, so the
+  relative command stays. No code change: two tests pin the contract (relative to the
+  `hooks.json` directory, and for a root-level `hooks.json`) and fail loudly if it ever
+  changes; runtime verification of the cwd remains open (#860).
+- **A schema-invalid `auto_commit` block is surfaced by `--validate` and fails safe in
+  `sync` (#1091, deliberate asymmetry)**: `auto_commit_violations` in
+  `scripts/lib/auto_commit.py` checks the block with stdlib only (unknown `mode` or
+  trigger values, duplicate triggers, triggers without `mode: auto`, a missing or
+  non-string `custom_script`, unknown keys, a non-boolean `secret_scan`, a
+  non-integer `file_count_threshold`; an integral float such as `5.0` is accepted, as
+  the JSON schema does). **behavior change:** `sync.py --validate` reports each
+  violation as an `[ERROR]` and exits 1 so CI catches the drift; a plain `sync.py`
+  stays rc 0 and resolves the block to the fail-safe allowlist (`mode: off`,
+  `eligible_roles: []`) with a WARN — existing projects keep syncing, but commit
+  authority is fully disabled with no time-based grace. The fail-safe now also reaches
+  the render path: the generated agent prose explicitly says commit authority is off
+  (instead of the previous enabled wording), including on hookless providers
+  (`has_hooks: false`) where no guard hook enforces the allowlist. A valid or absent
+  block is unchanged.
+- **Admin server reads framework `config/` through a symlinked `.agent-meta` (#1095)**:
+  `ConfigManager.resolve_path` in `scripts/admin-server.py` now accepts a fallback
+  target outside the project root only when it lies in the framework link's `config/`
+  subtree — a framework `config` that is itself a symlink pointing elsewhere stays
+  blocked, as does every other path and the `..`-traversal. Writes stay forbidden:
+  `write()` re-checks containment and rejects a save through the framework symlink with
+  "framework symlink is read-only via Admin UI", so the subtree is readable but never
+  mutable. Covered by `tests/test_admin_server.py`.
+- **`git` agent renders no empty remote-URL parentheses (#1093)**:
+  `agents/1-generic/git.md` (2.1.1) keeps the platform name unconditional and puts only
+  the `({{GIT_REMOTE_URL}})` suffix behind `GIT_REMOTE_URL_SET`, so a project without a
+  remote URL renders `**Git platform:** <platform>` instead of
+  `**Git platform:** <platform> ()`. The no-remote and remote renders are both covered
+  by `tests/test_git_section_variables.py`. Follow-up (`git.md` 2.1.2): the derivation
+  now requires a non-blank string, so a whitespace-only value (`remote-url: '   '`) and
+  a non-string YAML value (list/dict) also count as absent and render neither `(   )`
+  nor a Python repr.
+- **Gitignore shadowing warning skips managed-block rules (#1072)**:
+  `scripts/lib/gitignore.py` no longer reports a provider directory as shadowed when
+  the matching rule lives *inside* the agent-meta managed block — the sync itself
+  maintains that block, so the warning fired on every provider directory with a
+  managed rule. Rules outside the managed block still produce the warning.
+- **Resolved platform-defaults snapshot is always ignored (#1073)**:
+  `.meta-config/platform-defaults.resolved.yaml` is written into the managed block of
+  every generated `.gitignore`, in both the exact and additive paths, so
+  the local platform-resolution snapshot no longer shows up as an untracked file.
+  Files already tracked in existing projects (including this repo) stay tracked —
+  git ignores do not untrack them; use `git rm --cached` if that is desired.
+- **Fork-bomb scan ends a function body at the depth-matching `}` (#1050)**:
+  `is_fork_bomb` in `hooks/1-generic/lib/hook_common.sh` now counts brace nesting
+  (including `${...}`) inside the existing 512-character window instead of cutting
+  the body at the first unquoted `}`, so bombs such as `f(){ : ${x}; f|f& };f` and
+  `f(){ { :; }; f|f& };f` are detected instead of passing the destructive gate; a
+  body that exhausts the window still fails closed. The matching known-gap entry
+  (item 5) is removed from `rules/1-generic/branch-guard.md`.
+- **Guard allow-list knows the current tool names (#1078, behavior change)**:
+  `hook_known_tool_name` in `hooks/1-generic/lib/hook_common.sh` (1.8.0) adds the
+  17 built-ins that postdate the closed list — `ToolSearch`, `TaskCreate`,
+  `TaskUpdate`, `TaskList`, `TaskGet`, `Monitor`, `ScheduleWakeup`, `CronCreate`,
+  `CronDelete`, `CronList`, `EnterPlanMode`, `PushNotification`, `RemoteTrigger`,
+  `SendUserFile`, `Artifact`, `ArtifactComments`, `ArtifactData` — so the
+  task/cron/plan-mode/notification/artifact surface no longer fails closed and
+  blocks normal operation. `EnterWorktree`/`ExitWorktree` stay blocked on purpose
+  (no-worktree isolation).
+- **`dod-push-check` honours `push.recurseSubmodules` from the effective config
+  (#1041, behavior change)**: `hooks/1-generic/dod-push-check.sh` (2.4.0) resolves
+  the value from config, `-c`/`--config-env` and `GIT_CONFIG_*` like the explicit
+  flag: `on-demand`/`only` blocks when the repository declares submodules, using the
+  same per-submodule destination check as #1051. The value is parsed where the
+  command line carries it (`-c`/`--config`, `GIT_CONFIG_VALUE_n`), so the inert
+  values `check`/`no`/`false` stay inert even when `.gitmodules` exists;
+  `--config-env` names the variable and not the value, so it stays value-blind and
+  is conservatively treated as recursing. The tag-only shortcut is skipped only
+  when the config recurses **and** the same submodule gate as the destination
+  check applies, so a release tag push in a repo without `.gitmodules` stays
+  allowed. An explicit `--recurse-submodules`/`--no-recurse-submodules` still wins
+  over the config. The config of a foreign repository (`-C`/`GIT_DIR`) remains a
+  documented gap.
+- **Opencode entry point only names an emitted role (#1090, behavior change)**:
+  the new `active_set.role_emitted_for_provider` predicate backs
+  `_opencode_entry_point` **and** the settings-init surface, so a fresh project
+  no longer gets a `default_agent` when the role is not emitted **for that
+  provider** — either because it is missing from the active set or because the
+  orchestration mode for this provider is `main-chat` (including a
+  provider-scoped `orchestrator.provider-overrides.<provider>` override while
+  the global mode stays strict; the init stage no longer reads the global
+  `ORCH_MODE_MAIN_CHAT` variable). The resolver is provider-agnostic: the only
+  provider input is `orchestrator.provider-overrides.<provider>`, never a name
+  comparison. A managed `default_agent` left over from an earlier sync is
+  rolled back in the same run when the role is no longer emitted; a
+  **user-written** `default_agent` that names a role this sync does not generate
+  is never deleted — the user value wins and the sync emits one
+  `opencode.default-agent.dangling` WARN, restricted to `known_roles` so a
+  foreign agent name is not flagged. The gate-suspension hint names the
+  main-chat cause instead of asking for a role that is in fact active. Covered
+  by `tests/test_opencode_main_chat_entry_point.py`,
+  `tests/test_settings_depth_and_deny.py` and the v2 surface tests.
+- **MCP commands resolve `python3` and the sync reports MCP health (#1080)**:
+  `config/plugin-catalog.yaml` names `python3` for the repo-owned viz-logger stdio
+  servers, and `_resolve_stdio_command` in `scripts/lib/mcp_provider_config.py`
+  falls back to the first interpreter that resolves on the host (`python`, then
+  `py`) so a host without the alias still starts the server. The fallback is
+  applied **only to gitignored/local outputs** (`.mcp.json`, secrets files):
+  committed provider configs such as `opencode.json` keep the catalog value
+  verbatim, so they are byte-stable across hosts and `sync.py --check` does not
+  drift. Every other command is passed through unchanged and an unresolvable one
+  keeps its catalog name. The new `scripts/lib/mcp_health.py` emits one advisory
+  WARN per active server — `mcp.secret-empty` (a required secret is set neither
+  non-empty in `secrets.local.yaml` nor in the environment) and
+  `mcp.command-unresolved` (a stdio command does not resolve after the
+  fallback) — and never an error; a malformed catalog override (a non-dict
+  `connection`) is skipped instead of aborting the sync. The ReqogniLoom agent
+  hint now documents the two parallel variable names (`REQOGNILOOM_MCP_URL` and
+  `MCP_REQOGNILOOM_URL`) for the case where the external plugin and the catalog
+  server are both enabled.
+- **Hermes export matches the registered skill name, description and tier
+  (#1094)**: `scripts/hermes_export.py` writes each skill into
+  `roles/agent-meta-<role>/`, so the directory equals the `name:` in that `SKILL.md`
+  — Hermes registers skills by name, so the previous `roles/<role>/` path stayed
+  invisible under the registered name (the `agent-meta-` prefix keeps the namespace
+  collision-free). The template frontmatter `description` now wins over
+  `config/role-defaults.yaml` (role-defaults `description`/`short_desc` are the
+  fallbacks, the role name the last resort), because base templates such as the
+  provider experts have no role-defaults entry at all. A missing role-defaults
+  entry is the expected state and resolves to tier `balanced` without a warning;
+  only an existing entry with an empty or unknown `model` still warns.
+- **Dispatch tables follow the active set instead of naming inactive roles (#1071)**:
+  the worker dispatch/NEXT lines are gated on their target role (`ROLE_<R>_ACTIVE`), so
+  a project that deactivates a role no longer renders a dangling hand-off to it. The
+  touched templates are bumped (`orchestrator` 8.9.1, `senior-developer`
+  1.11.1, `meta-feedback` 2.7.0, `tester` 2.10.0, `data-engineer` 0.7.0,
+  `code-reviewer` 1.9.3, `ux-researcher` 1.0.2);
+  `hacs-tester` follows `tester@2.10.0`. **behavior change:** the consistency check
+  stops reporting dangling-dispatch false positives for routes whose target is simply
+  inactive, and the generated tables only list renderable targets.
+- **A frontmatter role mention is a WARNING, not an error (#1083)**:
+  `active-set.dangling-mention-frontmatter` is a dedicated WARNING for a role mention
+  that only appears in a template's frontmatter (`description`/`hint`). A
+  description-only mention was previously reported as the body-mention INFO; it is now
+  a WARNING. It was never a hard error — the dispatch check never applied to
+  frontmatter (decision D7: frontmatter is metadata, not a dispatch). The `tester`,
+  `data-engineer`, `code-reviewer` and `ux-researcher` frontmatter texts are rewritten
+  role-neutrally (no hard reference to `se-test-engineer`, `database-engineer`,
+  `validator` or `se-requirements`), so they stay accurate in projects where those
+  roles are inactive. **behavior change:** projects that previously saw a
+  description-only mention as INFO now get a WARNING.
+- **Code spans and fences are ignored by the placeholder check (#1082)**:
+  the consistency check skips `{{PLACEHOLDER}}`-shaped text inside inline code spans
+  and fenced code blocks, so escaped documentation examples (for example the
+  `{{VAR}}` → renders-as-`{{VAR}}` convention) are no longer flagged as unknown
+  placeholders. **behavior change:** a real unknown placeholder in running text is
+  still reported; only code-context occurrences are exempt.
+- **Plain sync no longer materializes the preset/flag defaults (#1074, behavior change)**:
+  `fill_defaults` gains `materialize_presets`, which the sync auto-fill passes only
+  for `--init`, so `rules-preset`, `speech-mode`, `tier-preset`, `se-focus`,
+  `max-parallel-agents`, `debug-mode` and `allow-committed-secrets` stay virtual
+  through the runtime fallbacks and the `platforms:` cascade instead of being written
+  into third-party `project.yaml` files. Only `repo_containment`, the derived
+  `project.short` and the remaining structural fields are still materialized;
+  `--fill-defaults`/`--init` keep the full set. `meta_optimizer.refill_keys` excludes
+  the same seven keys (and the nested `dod.*` fill, which is likewise `--init`-only),
+  so deleting one is no longer reported — and undone — as a re-materialization on
+  the next sync. **behavior change:** a plain sync no longer adds or restores those
+  seven keys; only `--fill-defaults`/`--init` do.
+- **Admin and sync config writes keep the comments in `project.yaml` (#1092)**:
+  the new `lib.yaml_patch.patch_top_level` re-renders only the changed top-level
+  segments, so **unchanged blocks keep their comments**, blank lines, key order,
+  inline comments and CRLF line endings across `ConfigManager.write`, the
+  full-document `PUT` and the partial-section route. A changed block is re-rendered
+  through the YAML dumper, so an inline comment on that key is still dropped, and
+  trailing document comments are kept as a tail (new keys are inserted before them).
+  When the document cannot be patched safely (anchors/aliases, tabs, multi-document
+  streams, a splitter/parse mismatch, or a dump failure) the patch falls back to the
+  historical **lossy full dump**. The round-trip guard now protects that full-dump
+  fallback only, so a commented file is no longer rejected for a changed section, and
+  the `__allow_lossy__` opt-in is consumed by the handler instead of being persisted
+  as a section. `ai-providers` keeps its always-guarded behaviour.
+  **behavior change:** an admin save of an anchored `project.yaml` that previously
+  succeeded with a lossy full dump now returns 400 unless `__allow_lossy__` is set.
+- **CI job timeouts get headroom (#945)**: the `test` and `subprocess-shard` jobs in
+  `orchestration-test.yml` raise their backstop from 30 to 45 minutes after both were
+  cancelled at 97-99 % on a loaded 3.12 runner (duration, not a failing test; runs
+  41381909910 / 41491331808 and PR #1112). The shard lists and `-n 0` are unchanged;
+  `compat-311` keeps its 30-minute ceiling.
+- **Deferred test-hygiene findings are closed (#945)**: the platform-defaults tests gain
+  an integration round-trip (compute -> `ensure_gitignore_entries` -> read `.gitignore` ->
+  `git check-ignore`) that pins the snapshot inside the managed BEGIN/END block, and the
+  fork-bomb timing tests become generous 40 s hang guards (below `SCRIPT_TIMEOUT`) instead
+  of wall-clock performance assertions that failed on loaded runners.
+
+## [2.0.0-beta.6] - 2026-10-31
+
+### Added
+- **Parallel scenario shards (#1075)**: `tests/scenarios/run.sh` gains `SCENARIO_JOBS`
+  (default `1` = unchanged behaviour); with `N > 1` each of the N workers gets one
+  round-robin batch and the per-scenario blocks are replayed in selection order, so a
+  parallel run produces the same PASS/FAIL list as a serial one (no `wait -n`/`mapfile`,
+  bash 3.2-safe). `validate.yml` sets `SCENARIO_JOBS=2`; measured 246 s -> 150 s (six
+  scenarios, factor 1.64) with identical failure output and exit code.
+- **ADR 0001 documents PyYAML as the single runtime exception (#1076)**: new
+  `docs/adr/0001-pyyaml-runtime-ausnahme.md` records that PyYAML is the only documented
+  non-stdlib runtime dependency (every further runtime dependency needs its own ADR), and
+  `CODE_CONVENTIONS` names it explicitly, so the generated `CLAUDE.md`/`AGENTS.md` no
+  longer contradict the code. Six role renders (`data-engineer`, `developer`,
+  `junior-developer`, `principal-developer`, `refactoring-specialist`,
+  `senior-developer`) drift by that one line; the six `slimming-golden` fixtures, the
+  diff-manifest section 18 and the AC-T4 tree digest were rebaselined.
+
+### Changed
+- **PyYAML requirement `>=6.0.3` (#1057)**: `requirements.txt` and
+  `tests/requirements.txt` move the floor from `>=6.0` to the current release.
+- **Conditional pytest/jsonschema pins for the Python 3.9 CI floor (#1070)**: pytest
+  9.1.1 and jsonschema 4.26.0 declare `Requires-Python >=3.10`, so `tests/requirements.txt`
+  keeps the previous floors on 3.9 and takes the newer releases from 3.10 on via
+  `python_version` markers (mirroring the existing `tomli` marker). This superseded and
+  closed four red Dependabot PRs.
+- **GitHub Actions bumps (#1061)**: `actions/checkout` v4 -> v7 and
+  `actions/setup-python` v5 -> v7 in `orchestration-test.yml` and `validate.yml`.
+- **`project.yaml` cleanup (#1087)**: dead SE defaults (`SE_MIN_DEPTH`, `SE_MAX_DEPTH`,
+  `SE_MAX_CELLS`, `SE_MAX_CRITIC_ITERATIONS`, `SE_MAX_PARALLEL_CELLS` -- already provided
+  by `role-defaults.yaml`) and `se_output.per_*_dirs` (no consumers) are removed, the
+  `KEY_PATTERNS` text is reworded so rendered entry files contain no literal
+  `{{VARIABLE}}`, `SYSTEM_DEPENDENCIES` pins Python `>=3.9`, the graphify read/search
+  guard hooks are enabled, and `.gitignore` is simplified to whole provider directories.
+  The fixtures the SE locks assert on (`variables.SE_BASE_DIR`, the
+  `se-component-requirements` role entry, the top-level `se-export:` block) are kept
+  verbatim.
+
+### Fixed
+- **`timeout-minutes` on the scorecard `analysis` job (#1088)**: the last CI job without
+  a timeout now declares one, so AC2 of #945 (timeout on every job) is 9/9.
+
 ## [2.0.0-beta.5] - 2026-10-30
 
 ### Added

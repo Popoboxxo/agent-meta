@@ -22,6 +22,14 @@ mit einzelnen **security-boundary**-Eigenschaften für spezifische Fälle (z.B. 
 Destructive-Gate aus #516/#809, das auch bei gültigem `git`-Sentinel blockt). `dod-push-check.sh`
 ist als **security boundary** gegen fehlendes/kaputtes `python3` fail-closed (#595).
 
+## Submodule-Pushes (`--recurse-submodules=on-demand|only`)
+
+Bei `=on-demand`/`=only` prüft der DoD-Push-Check jedes Submodul gegen sein
+eigenes Push-Ziel (#1051). Ein geschütztes **oder** unbestimmbares Ziel
+blockiert (fail closed); die Meldung nennt Submodul, Ziel und Ausweg (ohne
+`--recurse-submodules` pushen, dann auf einen Feature-Branch). Ohne
+`.gitmodules` unverändert.
+
 ## Bekannte Grenzen
 
 Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen über eine tokenisierte Analyse des Bash-Befehls (gemeinsamer Tokenizer für Destructive- und Mutation-Gate, Issue #551), kein vollständiger Shell-Parser. Das Destructive-Gate deckt zusätzlich die kanonischen Shell-Katastrophen ab (Issue #809): rekursives `rm` auf einem gefährlichen Root (`/`, `~`/`$HOME`, Top-Level-Systemverzeichnisse wie `/etc`) sowie eine rekursive Fork-Bomb (`` :(){ :|:& };: ``). Benigne In-Repo-Löschungen (`rm -rf .tmp/...`) bleiben erlaubt. Bekannte Lücken:
@@ -30,6 +38,5 @@ Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen üb
 2. Direkte Schreibzugriffe auf `.git/` werden nicht geprüft.
 3. Andere Git-Tools (`hub`, `gh repo ...`) sind nicht erfasst.
 4. Command-Substitution und Indirektion (`$(...)`, Backticks, `xargs`, `eval`) können eine Git-Mutation am Tokenizer vorbeischleusen, weil der Hook den Befehl weder ausführt noch die Shell vollständig parst (Issue #592). Ein echter Shell-Interpreter wäre unverhältnismäßig für ein Konventions-Tool. Für das FS-Destructive-Gate (#809) gilt dasselbe: nur direkte `rm`-Aufrufe (ggf. hinter `sudo`/`env`/KEY=VALUE) werden erkannt; indirekte Löschungen (`find ... -delete`, `xargs rm`, Variablen-/`$(...)`-Expansion eines Pfads, gequoteter ANSI-C-Pfad, `rm` über einen Wrapper-Alias), Pfad-Traversal (`rm -rf /var/tmp/../etc`) sowie eine als String-Literal gequotete `:(){ :|:& };:`-Definition bzw. indirekte Fork-Bombs (`eval`, base64) bleiben möglich — ein Tippfehler-/Akzident-Netz, kein Ersatz für Backups.
-5. Der Fork-Bomb-Scan des Destructive-Gates beendet den Funktionskörper am ersten ungequoteten `}` (keine Verschachtelung): Bomben mit `${…}` oder `{ …; }` vor dem Selbstaufruf (z. B. `f(){ : ${x}; f|f& };f`) werden nicht erkannt. Ein Funktionskörper ohne ungequotetes `}` in den ersten 512 Zeichen wird dagegen geblockt (fail-closed, mögliche Fehlalarme). Fix: Folge-Issue.
 
 Bewusster Trade-off, kein Bug (siehe Kommentar-Header in `.claude/hooks/orchestrator-guard.sh`) — nur relevant für Nutzer, die sich vollständig auf den Schutz statt auf die Konvention verlassen.

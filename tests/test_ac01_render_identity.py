@@ -9,6 +9,14 @@ produced on the pre-feature ``main`` state.
 Differences are only tolerated for paths matching ``AC01_EXCEPTIONS`` (the
 AC-01 exception list (i)-(v) of SPEC-CONTEXT-PROFILES-2026-10-11, kept as data).
 
+Host-local files are not part of the key set at all: ``settings.local.json`` is
+written into a gitignored path in every real project and may legitimately embed
+absolute host paths -- the machine-specific pytest basetemp in
+``permissions.additionalDirectories`` (#1079). Its content is therefore not part
+of the shipped render contract; pinning it would bake a username/temp path into
+this manifest and drift on every other machine. The exclusion applies on both
+sides (rendered key set and manifest), so a future rebaseline cannot re-pin it.
+
 Regenerate the manifest (only for a justified rebaseline; ``--write`` is only
 allowed on a clean, unmodified ``main`` state, rebaseline only with a documented
 reason, Spec AC-01):
@@ -257,6 +265,28 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   extended. The two embedded fixture-tree digests in ``tests/test_opencode_v2_surface.py``
   were re-pinned to the rebaselined trees (``ac01-baseline``, ``compact-golden``);
   ``slimming-golden`` stayed unchanged. `--write` was a version-only no-op apart from those.
+- Release 2.0.0-beta.6 (VERSION bump 2.0.0-beta.5 -> 2.0.0-beta.6): only version strings in the
+  rendered entry files, agent headers and the dependent sidecars changed (82 of 1085 hashes;
+  0 added/removed; the seven role templates that embed ``AGENT_META_VERSION``, the nine copied
+  ``project.yaml`` files whose ``agent-meta-version`` the sync rewrites, the entry files and
+  ``context-hashes.json``; ``generated-file-hashes.json`` follows the version it embeds).
+  No substantive render change; ``AC01_EXCEPTIONS`` is NOT extended. The manifest was patched
+  **per entry** (82 single-line replacements, 1003 lines untouched) — not via ``--write`` —
+  after recomputing every digest with the harness's own ``_hash_file``. The two embedded
+  fixture-tree digests in ``tests/test_opencode_v2_surface.py`` were re-pinned to the
+  rebaselined trees (``ac01-baseline``, ``compact-golden``); ``slimming-golden`` stayed
+  unchanged.
+- Release 2.0.0-beta.7 (VERSION bump 2.0.0-beta.6 -> 2.0.0-beta.7): only version strings in the
+  rendered entry files, agent headers and the dependent sidecars changed (82 of 1099 hashes;
+  0 added/removed; the seven role templates that embed ``AGENT_META_VERSION``, the nine copied
+  ``project.yaml`` files whose ``agent-meta-version`` the sync rewrites, the entry files and
+  ``context-hashes.json``; ``generated-file-hashes.json`` follows the version it embeds).
+  No substantive render change; ``AC01_EXCEPTIONS`` is NOT extended. The manifest was patched
+  **per entry** (82 single-line replacements, 1019 lines untouched) — not via ``--write`` —
+  after recomputing every digest with the harness's own ``_hash_file``. The two embedded
+  fixture-tree digests in ``tests/test_opencode_v2_surface.py`` were re-pinned to the
+  rebaselined trees (``ac01-baseline``, ``compact-golden``); ``slimming-golden`` stayed
+  unchanged.
 - PR #1003 (user decision: model data never flows into AC-01): the hash is now model
   independent. ``_hash_file`` replaces every column-0 ``model:``/``model =`` frontmatter
   line with ``model: <MODEL>`` and reduces ``generated-file-hashes.json`` to its managed-path
@@ -494,6 +524,374 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` were re-verified as unchanged (``5642151d…``/``9d854180…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1050 (fork-bomb brace nesting, 2026-10-31, ``fix/fork-bomb-brace-nesting``):
+  ``hook_common.sh`` 1.6.0 -> 1.7.0 ends the bomb body at the depth-matching ``}``
+  instead of the first one, and ``rules/1-generic/branch-guard.md`` drops its
+  »Bekannte Lücken« item 5 (the ``}``-gap entry the fix closes). Exactly
+  **11 of 1085 hashes moved; 0 added/removed**: the two ``hook_common.sh``
+  renders (``Claude/.claude/hooks/lib/hook_common.sh`` ``d9331ffe…`` ->
+  ``bcdf8b16…``, ``Gemini/.agents/hooks/lib/hook_common.sh`` ``d9331ffe…`` ->
+  ``bcdf8b16…``; one identical render for both providers, the lib carries no
+  ``{{AGENT_META_PROVIDER}}``), the three branch-guard rule renders
+  (``Claude/.claude/rules/branch-guard.md`` ``ec2e891a…`` -> ``97f6467d…``,
+  ``Continue/.continue/rules/branch-guard.md`` ``2fe5c3d9…`` -> ``2a3816a8…``,
+  ``Copilot/.github/instructions/branch-guard.instructions.md`` ``b72f7c89…`` ->
+  ``7a3aaa71…``; the removed gap entry restores the pre-gap rule text) and the
+  six ``AGENTS.md`` files that embed the rule (``Codex/AGENTS.md`` ``65bcde7a…``
+  -> ``f12c1325…``, ``Gemini/AGENTS.md`` ``77ce5928…`` -> ``8e646aa8…``,
+  ``KimiCode/AGENTS.md`` ``23d2fce9…`` -> ``cf8d7493…``, ``Mammouth/AGENTS.md``
+  ``19b910c6…`` -> ``ac1d8c70…``, ``Opencode/AGENTS.md`` ``d661b343…`` ->
+  ``2dba68d2…``, ``ZCode/AGENTS.md`` ``1f473667…`` -> ``ce271150…``). No agent
+  artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (11 single-line replacements, 1076 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``6a063942…`` -> ``e3c25b31…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Issue #1051 (submodule push destinations, ``dod-push-check.sh`` 2.1.7 -> 2.2.0,
+  2026-10-31, ``feat/submodule-push-targets``): the hook no longer blocks every
+  repository that declares submodules just because ``--recurse-submodules`` is passed;
+  it resolves each submodule's own push destination (``remote.<name>.push``, then
+  ``push.default``/``branch.<n>.merge``, mirroring git's recursive push which forwards
+  only the remote name) and still fails closed on a protected or undeterminable
+  destination — the blanket ``--recurse-submodules`` block from #953 is replaced.
+  ``rules/1-generic/branch-guard.md`` gains the matching section »Submodule-Pushes
+  (--recurse-submodules=on-demand|only)«. Exactly **10 of 1085 hashes moved; 0
+  added/removed**: the only ``dod-push-check.sh`` render
+  (``Claude/.claude/hooks/dod-push-check.sh`` ``5c0cf724…`` -> ``e7458463…``), the
+  three branch-guard rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``97f6467d…`` -> ``c42b4025…``, ``Continue/.continue/rules/branch-guard.md``
+  ``2a3816a8…`` -> ``7d6e9e10…``, ``Copilot/.github/instructions/branch-guard.instructions.md``
+  ``7a3aaa71…`` -> ``2f62fe16…``) and the six ``AGENTS.md`` files that embed the rule
+  (``Codex/AGENTS.md`` ``f12c1325…`` -> ``2c0836ce…``, ``Gemini/AGENTS.md``
+  ``8e646aa8…`` -> ``4b3c4701…``, ``KimiCode/AGENTS.md`` ``cf8d7493…`` -> ``85ca568a…``,
+  ``Mammouth/AGENTS.md`` ``ac1d8c70…`` -> ``93561dfb…``, ``Opencode/AGENTS.md``
+  ``2dba68d2…`` -> ``a8aff59f…``, ``ZCode/AGENTS.md`` ``ce271150…`` -> ``9f3b48ae…``).
+  No agent artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (10 single-line replacements, 1077 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``e3c25b31…`` -> ``f366a90a…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- AC-07 fix on the same branch (2026-10-31, ``feat/submodule-push-targets``):
+  the #1051 section »Submodule-Pushes« overflowed all 12 AC-07 context ceilings
+  (e.g. ``Claude/rules`` 18,463 B vs. 18,003 B), so it was compressed from
+  1,195 B to 383 B. The ceilings were **not** touched. This rebaseline
+  **supersedes** the one in ``a7eb545d``: the rule text changed again, so the
+  same 9 renders move a second time — **9 of 1085 hashes moved; 0 added/removed**
+  — the three branch-guard rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``c42b4025…`` -> ``504c5ceb…``, ``Continue/.continue/rules/branch-guard.md``
+  ``7d6e9e10…`` -> ``ba868b11…``, ``Copilot/.github/instructions/branch-guard.instructions.md``
+  ``2f62fe16…`` -> ``f533e9cb…``) and the six ``AGENTS.md`` files that embed the rule
+  (``Codex/AGENTS.md`` ``2c0836ce…`` -> ``3a7de4f2…``, ``Gemini/AGENTS.md``
+  ``4b3c4701…`` -> ``8e87388a…``, ``KimiCode/AGENTS.md`` ``85ca568a…`` -> ``20bd56f8…``,
+  ``Mammouth/AGENTS.md`` ``93561dfb…`` -> ``f0e74eed…``, ``Opencode/AGENTS.md``
+  ``a8aff59f…`` -> ``add79f31…``, ``ZCode/AGENTS.md`` ``9f3b48ae…`` -> ``cbcc4578…``).
+  No agent artifact, command render, ``context-hashes.json`` or golden
+  (``slimming-golden``/``compact-golden``) content changed. The manifest was
+  patched **per entry** (9 single-line replacements, 1078 of the 1087 lines
+  untouched) -- not via ``--write`` -- after independently recomputing each
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest
+  in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``f366a90a…`` -> ``d4771400…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``6b0c5724…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Structured release checklist (issue #1089, ``feat/release-checklist``, 2026-11-01):
+  the feature adds the provider command renders ``release-check`` and
+  ``set-release-checklist`` (two new commands × the seven command-writing
+  providers = 14 new files), bumps the release templates
+  (``release.md`` 1.13.0, ``hacs-release.md`` 1.1.1, ``sharkord-release.md``
+  1.3.3; the checklist block itself is inert in the default matrix config) and
+  ``agent-meta-manager`` to 1.26.0 (recipe 14d plus the §3 row). **31 of 1085
+  hashes moved; 14 added (1085 -> 1099 render entries)**: 9 release agent
+  renders, 9 manager renders, the 7 command ``.agent-meta-managed`` indexes and
+  the 6 ``generated-file-hashes.json`` that gain the new command keys (Claude,
+  Copilot, Gemini, Mammouth, Opencode, ZCode; Continue renders the commands but
+  carries no ``.meta-config/generated-file-hashes.json`` in the baseline, and
+  Codex/KimiCode have no command surface). No rule artifact, ``AGENTS.md`` or
+  ``context-hashes.json`` changed. The 31 changed entries were patched per entry
+  and the 14 added entries inserted at their sorted position -- not via
+  ``--write`` -- after independently recomputing each digest from the rendered
+  bytes with the harness's own ``_hash_file``. Because ``hashes.json`` is the
+  only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``d4771400…`` -> ``c49564db…``).
+  ``slimming-golden`` was re-derived for the two touched goldens
+  (``agent-meta-manager.md`` 1.26.0 + recipe 14d, ``release.md`` 1.13.0; both
+  through the real sync path, documented in the slimming diff manifest §19) and
+  its AC-T4 digest moved (``6b0c5724…`` -> ``5cbe9ea4…``); ``compact-golden``
+  stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Review follow-up on issue #1089 (``feat/release-checklist``, 2026-11-01): the
+  ``/set-release-checklist`` command now states the YAML bool rule correctly -
+  an unquoted ``off`` is parsed as a boolean by YAML 1.1 and the loader
+  normalizes it back to ``"off"``; only an unquoted ``on``/``true`` is rejected
+  with "quote the value". The command is a rendered source, so exactly **7 of
+  1099 hashes moved; 0 added/removed** - the ``set-release-checklist`` render of
+  the seven command-writing providers (``Claude/.claude/commands``,
+  ``Continue/.continue/prompts``, ``Copilot/.github/prompts``,
+  ``Gemini/.gemini/commands``, ``Mammouth/.mammouth/commands``,
+  ``Opencode/.opencode/commands``, ``ZCode/.zcode/commands``). No other artifact,
+  ``AGENTS.md``, ``context-hashes.json`` or golden content changed. The manifest
+  was patched **per entry** (7 single-line replacements, 1094 of the 1101 lines
+  untouched) - not via ``--write`` - after independently recomputing each digest
+  from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``c49564db…`` -> ``f74d3088…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+  (``5cbe9ea4…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Test environments (SPEC-TEST-ENVIRONMENTS-2026-10-31): six role templates were
+  minor-bumped (``tester`` 2.9.0, ``e2e-tester`` 1.7.0, ``developer`` 4.9.0,
+  ``docker`` 1.10.0, ``devops-engineer`` 1.8.0, ``test-executor`` 1.3.0) and
+  ``agent-meta-manager`` to 1.27.0 (the test-environment recipe plus its §3
+  row). The conditional gate block is byte-neutral when ``test-environments`` is
+  unset - proven by ``test_unset_render_matches_baseline`` (the dedicated
+  baseline ``tests/fixtures/test-env-baseline/hashes.json`` stays unchanged) and
+  by the slimming gate, whose six role diffs are exactly the frontmatter pins.
+  Changed: **63 of 1099 hashes; 0 added/removed** - the seven roles (six base
+  templates + manager) x 9 providers. No rule artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or other artifact changed. The manifest was patched
+  **per entry** (63 single-line replacements, 1038 of the 1101 lines untouched)
+  - not via ``--write`` - after independently recomputing each digest from the
+  rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes: ``f74d3088…`` -> ``ea59522c…``).
+  ``slimming-golden`` was re-derived for ``agent-meta-manager.md`` (recipe +
+  §3 row + version, manifest §20) and re-pinned for the six role version pins
+  (frontmatter only); its digest moved (``5cbe9ea4…`` -> ``a9990f4c…``).
+  ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is
+  NOT extended.
+
+- Issues #1078/#1041 (hook fixes; ``hook_common.sh`` 1.7.0 -> 1.8.0, ``dod-push-check.sh``
+  2.2.0 -> 2.3.0, 2026-11-02, ``fix/hooks-guards``): ``hook_known_tool_name`` gains the 17
+  current built-ins (``ToolSearch``, ``TaskCreate``, ``TaskUpdate``, ``TaskList``, ``TaskGet``,
+  ``Monitor``, ``ScheduleWakeup``, ``CronCreate``, ``CronDelete``, ``CronList``, ``EnterPlanMode``,
+  ``PushNotification``, ``RemoteTrigger``, ``SendUserFile``, ``Artifact``, ``ArtifactComments``,
+  ``ArtifactData``; ``EnterWorktree``/``ExitWorktree`` stay blocked on purpose) and
+  ``dod-push-check.sh`` honours ``push.recurseSubmodules`` from the config/``-c``/``GIT_CONFIG_*``
+  value. Exactly **3 of 1099 hashes moved; 0 added/removed**: the two ``hook_common.sh`` renders
+  (``Claude/.claude/hooks/lib/hook_common.sh`` ``bcdf8b16…`` -> ``3564b211…``,
+  ``Gemini/.agents/hooks/lib/hook_common.sh`` ``bcdf8b16…`` -> ``3564b211…``; one identical
+  render for both providers, the lib carries no ``{{AGENT_META_PROVIDER}}``) and the only
+  ``dod-push-check.sh`` render (``Claude/.claude/hooks/dod-push-check.sh`` ``e7458463…`` ->
+  ``cdfd0131…``). No rule, agent or command artifact, ``AGENTS.md``, ``context-hashes.json``
+  or golden content changed. The manifest was patched **per entry** (3 single-line replacements,
+  1098 of the 1101 lines untouched) -- not via ``--write`` -- after independently recomputing
+  each digest from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from the
+  fixture bytes: ``ea59522c…`` -> ``647b75a4…``); ``slimming-golden`` and ``compact-golden``
+  were re-verified as unchanged (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+- Issue #1041 (PR A review follow-up; ``dod-push-check.sh`` 2.3.0 -> 2.4.0, 2026-11-02,
+  ``fix/hooks-guards``): the tag-only exemption is gated on the repository declaring
+  submodules (same predicate as the destination check) and the ``push.recurseSubmodules``
+  override value is parsed for ``-c``/``GIT_CONFIG_VALUE_n`` (``--config-env`` stays
+  value-blind). Exactly **1 of 1101 hashes moved; 0 added/removed**: the only
+  ``dod-push-check.sh`` render (``Claude/.claude/hooks/dod-push-check.sh`` ``cdfd0131…``
+  -> ``89759e26…``). No rule, agent or command artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched **per entry**
+  (1 single-line replacement, 1100 of the 1101 lines untouched) -- not via ``--write`` --
+  after independently recomputing the digest from the rendered file bytes with the
+  harness's own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``647b75a4…`` -> ``90f1f74a…``);
+  ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
+   (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issues #1072/#1073 (gitignore managed block, 2026-11-02, ``fix/gitignore-managed-block``):
+  #1072 stops the shadowing warning for provider directories that a rule *inside* the managed
+  block already matches (rules outside the block still warn), and #1073 writes
+  ``.meta-config/platform-defaults.resolved.yaml`` into the managed block unconditionally in
+  both managed branches (fresh block and merge). Both change only the rendered managed block
+  of every provider, so exactly **9 of 1099 hashes moved; 0 added/removed** -- one
+  ``<Provider>/.gitignore`` per provider (Claude, Codex, Continue, Copilot, Gemini, KimiCode,
+  Mammouth, Opencode, ZCode). No rule, agent or command artifact, ``AGENTS.md``,
+  ``context-hashes.json`` or golden content changed. The manifest was patched **per entry**
+  (9 single-line replacements, 1092 of the 1101 lines untouched) -- not via ``--write`` --
+  after independently recomputing each digest from the rendered file bytes with the harness's
+  own ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4
+  digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``90f1f74a…`` -> ``afe5c7cc…``); ``slimming-golden`` and
+  ``compact-golden`` were re-verified as unchanged (``a9990f4c…``/``44148ea7…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1093 (empty remote-URL parens in the git template; ``git.md`` 2.1.1,
+  ``fix/git-template-empty-remote-url``, 2026-11-02): the line now keeps the platform name
+  unconditional and moves only the ``({{GIT_REMOTE_URL}})`` suffix behind the
+  ``GIT_REMOTE_URL_SET`` conditional, so a project without a remote renders
+  ``**Git platform:** <platform>`` instead of ``**Git platform:** <platform> ()``. The
+  template is a rendered source, so exactly **9 of 1099 hashes moved; 0 added/removed** --
+  the ``git`` agent render of every provider (``Claude/.claude/agents/git.md``
+  ``bbd5bf7c…`` -> ``f101f48e…``, ``Codex/.codex/agents/git.toml`` ``a08e8baf…`` ->
+  ``285b15db…``, ``Continue/.continue/agents/git.md`` ``2e0f98b5…`` -> ``05a10b66…``,
+  ``Copilot/.github/agents/git.agent.md`` ``630385ff…`` -> ``9cd41292…``,
+  ``Gemini/.gemini/agents/git.md`` ``9392e6c0…`` -> ``61d1a2e4…``,
+  ``KimiCode/.kimi-code/agents/git.md`` ``c05ae33a…`` -> ``dd69344f…``,
+  ``Mammouth/.mammouth/agents/git.md`` ``b00e2706…`` -> ``36dbcfe7…``,
+  ``Opencode/.opencode/agents/git.md`` ``95f07030…`` -> ``872577e8…``,
+  ``ZCode/.zcode/agents/git.md`` ``3e741e14…`` -> ``d55d9509…``). No rule, command or
+  other agent artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed.
+  The manifest was patched **per entry** (9 single-line replacements, 1092 of the 1101
+  lines untouched) -- not via ``--write`` -- after independently recomputing each digest
+  from the rendered file bytes with the harness's own ``_hash_file``. Because
+  ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from the
+  fixture bytes: ``afe5c7cc…`` -> ``5232fe62…``); ``compact-golden`` was
+  re-verified as unchanged (``44148ea7…``), while ``slimming-golden`` was re-pinned
+  frontmatter-only for the ``git.md`` version pin (2.1.0 -> 2.1.1, its digest
+  ``a9990f4c…`` -> ``3bd5c31c…``). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1093 residual (whitespace-only / non-string remote URL; ``git.md`` 2.1.2,
+  ``fix/git-remote-url-set-hardening``, 2026-11-02): ``GIT_REMOTE_URL_SET`` now requires a
+  non-blank string, so ``remote-url: '   '`` and a non-string YAML value (list/dict) count
+  as absent and no longer render ``(   )`` or a Python repr. The template is unchanged, but
+  the patch version bump is a rendered source change: exactly **9 of 1099 hashes moved; 0
+  added/removed** -- the ``git`` agent render of every provider (``Claude/.claude/agents/git.md``
+  ``f101f48e…`` -> ``3088c609…``, ``Codex/.codex/agents/git.toml`` ``285b15db…`` ->
+  ``57ac1397…``, ``Continue/.continue/agents/git.md`` ``05a10b66…`` -> ``815fee5e…``,
+  ``Copilot/.github/agents/git.agent.md`` ``9cd41292…`` -> ``9e7ea1a8…``,
+  ``Gemini/.gemini/agents/git.md`` ``61d1a2e4…`` -> ``a26c4d04…``,
+  ``KimiCode/.kimi-code/agents/git.md`` ``dd69344f…`` -> ``faaeb937…``,
+  ``Mammouth/.mammouth/agents/git.md`` ``36dbcfe7…`` -> ``d2faeca5…``,
+  ``Opencode/.opencode/agents/git.md`` ``872577e8…`` -> ``7461efb3…``,
+  ``ZCode/.zcode/agents/git.md`` ``d55d9509…`` -> ``3786a820…``). No rule, command or
+  other agent artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed.
+  The manifest was patched **per entry** (9 single-line replacements) -- not via
+  ``--write`` -- after independently recomputing each digest from the rendered file bytes
+  with the harness's own ``_hash_file``. Because ``hashes.json`` is the only
+  ``ac01-baseline`` file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows
+  the rebaselined tree (``5232fe62…`` -> ``74290aad…``); ``compact-golden`` was
+  re-verified as unchanged (``44148ea7…``), while ``slimming-golden`` was re-pinned
+  frontmatter-only for the ``git.md`` version pin (2.1.1 -> 2.1.2, its digest
+  ``3bd5c31c…`` -> ``8857b666…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Issue #1079 (host-local pytest basetemp; **no rebaseline**, 2026-11-03,
+  ``fix/test-basetemp-allowlist``): the new ``settings-allow-dirs-key`` writer adds the
+  resolved, machine-specific ``<temp>/<user>/pytest-agent-meta`` to
+  ``permissions.additionalDirectories`` of the gitignored
+  ``Claude/.claude/settings.local.json``, so exactly that one key drifted (1 of 1099).
+  The file is host-local by design (gitignored, never part of the shipped contract), so it
+  is excluded from the render-identity key set instead of being re-pinned: a rebaseline
+  would bake this machine's username/temp path into ``hashes.json`` and drift on every
+  other machine. ``hashes.json`` is NOT modified -- the three pre-existing
+  ``settings.local.json`` entries stay in the file but are ignored on both sides (a future
+  justified ``--write`` drops them). No other key embeds an absolute host path
+  (``sync.log`` was already skipped by ``_SKIP_RE``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Bug batch PR B (#1071/#1083/#1082, 2026-11-03, ``fix/consistency-false-positives``):
+  #1071 gates the dispatch tables on ``ROLE_<R>_ACTIVE`` (no dangling-dispatch false
+  positives), #1083 downgrades a frontmatter role mention to the
+  ``active-set.dangling-mention-frontmatter`` WARNING and neutralizes the ``tester`` /
+  ``data-engineer`` descriptions, #1082 makes the placeholder check skip code spans and
+  fences. Five templates were minor-bumped (``orchestrator`` 8.9.0,
+  ``senior-developer`` 1.11.0, ``meta-feedback`` 2.7.0, ``tester`` 2.10.0,
+  ``data-engineer`` 0.7.0) and ``hacs-tester`` re-pinned to ``tester@2.10.0``.
+  Exactly **36 of 1099 hashes moved; 0 added/removed** -- the four matrix roles
+  ``data-engineer``/``meta-feedback``/``orchestrator``/``tester`` × 9 providers.
+  ``senior-developer``/``hacs-tester`` are not in the default matrix. No rule,
+  ``AGENTS.md``, ``context-hashes.json`` or other artifact changed. The manifest was
+  patched **per entry** (36 single-line replacements, 1065 of the 1101 lines untouched)
+  -- not via ``--write`` -- after independently recomputing every digest from the
+  rendered file bytes with the harness's own ``_hash_file``. Because ``hashes.json`` is
+  the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from
+  the fixture bytes: ``74290aad…`` -> ``2adf04f6…``). ``slimming-golden`` was re-pinned
+  for the five touched role goldens (``data-engineer``, ``meta-feedback``,
+  ``orchestrator``, ``senior-developer``, ``tester``; frontmatter incl. the two #1083
+  descriptions, manifest §22) and its AC-T4 digest moved (``8857b666…`` ->
+  ``607b6c8a…``); ``compact-golden`` stayed unchanged (``44148ea7…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Review follow-up PR #1122 (Bug-Batch PR B, 2026-11-04,
+  ``fix/consistency-false-positives``): the AC-38 doctor fixtures for
+  ``dangling-role-mention-frontmatter``, the senior-escalation persona aligned to
+  ``STATUS: escalate`` + reason + metric, the frontmatter skip in the dispatch
+  check (D7), the gated base ``developer`` row (#1071) and the neutralized
+  ``code-reviewer`` hint / ``ux-researcher`` description change three templates:
+  ``orchestrator`` 8.9.1, ``senior-developer`` 1.11.1, ``code-reviewer`` 1.9.3
+  and ``ux-researcher`` 1.0.2 (``hacs-code-reviewer`` re-pinned to
+  ``code-reviewer@1.9.3``). Exactly **28 of 1099 hashes moved; 0 added/removed**
+  -- ``code-reviewer``/``orchestrator``/``ux-researcher`` × 9 providers plus
+  ``Copilot/.github/copilot-instructions.md`` (it embeds the ``code-reviewer``
+  hint). No rule, ``AGENTS.md``, ``context-hashes.json`` or other artifact
+  changed. The manifest was patched **per entry** (28 single-line replacements,
+  1071 of the 1099 lines untouched) -- not via ``--write`` -- after independently
+  recomputing every digest from the rendered file bytes with the harness's own
+  ``_hash_file``. Because ``hashes.json`` is the only ``ac01-baseline`` file, its
+  AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined
+  tree (recomputed from the fixture bytes: ``2adf04f6…`` -> ``1a6df729…``).
+  ``slimming-golden`` was re-pinned for ``orchestrator``, ``code-reviewer`` and
+  ``senior-developer`` (frontmatter pins plus the neutralized ``code-reviewer``
+  hint; manifest §23) and its AC-T4 digest moved (``607b6c8a…`` -> ``dcd2f5be…``);
+  ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
+  extended.
+
+- Orchestrator topology v1 (SPEC-orchestrator-topology-2026-11-03, issue #1077,
+  Task 18, 2026-11-04, ``feat/orchestrator-topology-v1``): the A2A rule now
+  states the singleton gate conditionally and both singleton-bearing agent
+  templates carry the conditional line (``orchestrator`` 8.9.1 -> **8.10.0**,
+  ``_reference-agent`` 1.2.1 -> 1.3.0). Because the new branch is gated on
+  ``ORCH_TOPOLOGY_EXPLICIT`` and the else branch is word-identical, the **unset**
+  render is byte-identical: the two ``tests/fixtures/topology-golden`` fixtures
+  are **unchanged** (AC-6) and no rule render moved. Exactly **9 of 1099 hashes
+  moved; 0 added/removed** -- the ``orchestrator`` agent render of every provider
+  (``Claude/.claude/agents/orchestrator.md`` ``dd79e5cf…`` -> ``9b7bc261…``,
+  ``Codex/.codex/agents/orchestrator.toml`` ``9e713667…`` -> ``3a99d13a…``,
+  ``Continue/.continue/agents/orchestrator.md`` ``1b8a2c4f…`` -> ``7d8d91f6…``,
+  ``Copilot/.github/agents/orchestrator.agent.md`` ``5cd5fac2…`` -> ``140c93fb…``,
+  ``Gemini/.gemini/agents/orchestrator.md`` ``f4a0a756…`` -> ``14e86f57…``,
+  ``KimiCode/.kimi-code/agents/orchestrator.md`` ``7a38413b…`` -> ``4e0a081c…``,
+  ``Mammouth/.mammouth/agents/orchestrator.md`` ``03a03ae0…`` -> ``379628c6…``,
+  ``Opencode/.opencode/agents/orchestrator.md`` ``df357d75…`` -> ``4d101617…``,
+  ``ZCode/.zcode/agents/orchestrator.md`` ``1db5e066…`` -> ``e69d405a…``) --
+  i.e. the frontmatter version/``generated-from`` pins only; the body is
+  unchanged and the ``_reference-agent`` template is not part of the matrix.
+  The manifest was patched **per entry** (9 single-line replacements, 1090 of the
+  1099 lines untouched) -- not via ``--write`` -- after independently recomputing
+  every digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``1a6df729…`` -> ``a88fca0d…``). ``slimming-golden``
+  and ``compact-golden`` were re-pinned frontmatter-only for the same
+  ``orchestrator`` version pins (manifest §24) and their AC-T4 digests moved
+  (``dcd2f5be…`` -> ``8d1ade1a…`` / ``416cd520…`` -> ``badf2362…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Orchestrator topology P3 (SPEC-orchestrator-topology-2026-11-03, issue #1077,
+  2026-11-05, ``feat/orchestrator-topology-p3``): multi-instance lands and two
+  rendered sources move. The guard template ``orchestrator-guard-impl.sh`` is
+  bumped ``1.9.0 -> 1.10.0`` (audit-only instance id in the sentinel grammar and
+  the orchestrator audit line) and renders for Claude and Gemini only; the
+  ``config/project-config.schema.json`` description text for
+  ``orchestrator.max-instances``/``singleton`` is embedded in every copied
+  ``.meta-config/project.yaml`` (9 providers). Exactly **11 of 1099 hashes
+  moved; 0 added/removed**: the two guard renders
+  (``Claude/.claude/hooks/orchestrator-guard-impl.sh``, Gemini's counterpart)
+  plus the nine ``.meta-config/project.yaml`` files. No agent, rule, command or
+  ``AGENTS.md`` artifact and no ``context-hashes.json`` changed. The manifest was
+  patched **per entry** (11 single-line replacements, 1088 of the 1099 lines
+  untouched) -- not via ``--write`` -- after independently recomputing every
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``a88fca0d…`` -> ``bbcc14a7…``); ``slimming-golden``
+  and ``compact-golden`` were re-verified as unchanged
+  (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
+  unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
@@ -514,6 +912,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 from lib.config import _resolve_agent_meta_date  # noqa: E402
+from lib.log import SyncLog  # noqa: E402
+from lib.variables import (  # noqa: E402
+    _topology_flags,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 _MANIFEST = Path(__file__).resolve().parent / "fixtures" / "ac01-baseline" / "hashes.json"
 _PROVIDERS = sorted(
     yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
@@ -530,6 +934,19 @@ AC01_EXCEPTIONS = frozenset({
     r".*/meta-optimizer\.(md|toml|agent\.md)$",
     r".*/standalone/agents/meta-doctor\.md$",
 })
+
+# Host-local files: written into a gitignored path in every real project, so
+# their content is not part of the shipped render contract. Providers may put
+# machine-specific absolute paths into them (the pytest basetemp allow-list,
+# #1079), which a byte-identity baseline must never pin. Excluded on BOTH sides
+# (rendered key set and manifest) so a rebaseline cannot re-introduce them.
+_HOST_LOCAL_RE = re.compile(r"(^|/)settings\.local\.json$")
+
+
+def is_host_local(path: str) -> bool:
+    """True for gitignored, machine-specific files that never enter the key set."""
+    return bool(_HOST_LOCAL_RE.search(path))
+
 
 # Volatile, non-render artifacts: never part of the manifest.
 _SKIP_RE = re.compile(r"(^|/)(\.git)(/|$)|(^|/)sync\.log$|\.sync-backup-")
@@ -603,7 +1020,7 @@ def render_matrix_hashes(fixture_root: Path) -> Dict[str, str]:
             if not f.is_file():
                 continue
             rel = f.relative_to(fixture_root).as_posix()
-            if _SKIP_RE.search(rel):
+            if _SKIP_RE.search(rel) or is_host_local(rel):
                 continue
             projects.append((rel, f))
     # Date captured once before and once after all syncs; both are normalized.
@@ -620,6 +1037,8 @@ def diff_against_manifest(current: Dict[str, str], baseline: Dict[str, str]) -> 
     patterns = [re.compile(p) for p in AC01_EXCEPTIONS]
     drift = []
     for path in sorted(set(current) | set(baseline)):
+        if is_host_local(path):
+            continue
         if current.get(path) == baseline.get(path):
             continue
         if any(p.match(path) for p in patterns):
@@ -658,6 +1077,32 @@ def test_ac01_detects_drift(rendered):
         target.write_bytes(original)
 
 
+def test_ac01_render_key_set_excludes_host_local_settings(rendered):
+    """Host-local settings must never become a render-identity key (#1079)."""
+    _root, current = rendered
+    assert not [path for path in current if is_host_local(path)]
+    assert "Claude/.claude/settings.local.json" not in current
+
+
+def test_ac01_host_local_settings_are_ignored_on_both_sides():
+    assert is_host_local("Claude/.claude/settings.local.json")
+    assert is_host_local("Gemini/.gemini/settings.local.json")
+    assert is_host_local("Opencode/.opencode/settings.local.json")
+    # Narrow on purpose: only the gitignored local settings overlay is excluded.
+    assert not is_host_local("Claude/.claude/settings.json")
+    assert not is_host_local("Claude/.claude/settings.local.json.bak")
+
+    baseline = {
+        "Claude/.claude/settings.local.json": "host-a",
+        "Claude/.claude/settings.json": "committed",
+    }
+    current = {"Claude/.claude/settings.local.json": "host-b"}
+    # The host-local digest change is inert; the missing committed key still drifts.
+    assert diff_against_manifest(current, baseline) == [
+        "removed: Claude/.claude/settings.json"
+    ]
+
+
 def test_ac01_hash_ignores_model_id(tmp_path):
     def h(name: str, text: str) -> str:
         f = tmp_path / name
@@ -688,6 +1133,245 @@ def test_ac01_exception_list_allows_meta_optimizer_artifacts():
         "Copilot/.github/agents/meta-optimizer.agent.md": "d",
     })
     assert diff_against_manifest(current, baseline) == []
+
+
+# --- Orchestrator topology goldens (Task 16, AC-6/AC-18) --------------------
+#
+# The topology key is unset in both fixtures, so the A2A rule must render
+# today's bytes in BOTH role states. The two states differ only in the
+# ``ROLE_ORCHESTRATOR_ACTIVE`` flag, which the ActiveSet derives from the
+# project's ``roles:`` allowlist:
+#
+#   role inactive + key unset -> ``Worker → HARD REJECT``
+#   role active   + key unset -> ``Worker → `orchestrator` → HARD REJECT``
+#
+# The fixtures are produced through the real sync path (see
+# ``render_topology_rule``), never hand-written, and use the same normalisation
+# discipline as ``_hash_file``: CRLF folded to LF, volatile scratch roots
+# replaced, model lines pinned. The rule render carries neither a model line
+# nor a root today, so the normalisation is a no-op that keeps the contract
+# explicit.
+_TOPOLOGY_GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "topology-golden"
+_TOPOLOGY_GOLDEN_INACTIVE = "a2a-delegation-gates.role-inactive.md"
+_TOPOLOGY_GOLDEN_ACTIVE = "a2a-delegation-gates.role-active.md"
+_TOPOLOGY_RULE_REL = Path(".claude") / "rules" / "a2a-delegation-gates.md"
+_TOPOLOGY_RULE_SOURCE = _REPO_ROOT / "rules" / "1-generic" / "a2a-delegation-gates.md"
+
+#: The (role state, golden file, expected gate fragment) triples of AC-18.
+_TOPOLOGY_GOLDEN_CASES = (
+    (False, _TOPOLOGY_GOLDEN_INACTIVE, "Worker → HARD REJECT"),
+    (True, _TOPOLOGY_GOLDEN_ACTIVE, "Worker → `orchestrator` → HARD REJECT"),
+)
+
+
+def _topology_project_config(role_active: bool) -> str:
+    """Return the minimal single-provider config for one AC-18 role state.
+
+    The orchestrator role flag comes from the ActiveSet's ``roles:`` allowlist,
+    so "role inactive" is expressed by a whitelist that omits ``orchestrator``
+    (omitting the key entirely renders every gate-enabled role, i.e. the
+    active state). The inactive whitelist keeps the security-critical default
+    roles so the only byte difference between the two goldens is the A2A role
+    gate itself.
+
+    ``AGENT_META_REPO`` is pinned to a neutral slug for the same reason as in
+    ``_make_project`` (issue #1037): a derived value would make the fixture
+    depend on the cloning remote.
+    """
+    roles_block = "" if role_active else (
+        "roles:\n- developer\n- documenter\n- security-auditor\n- code-reviewer\n"
+    )
+    return (
+        'agent-meta-version: "2.0.0-beta.1"\n'
+        "ai-providers:\n- Claude\n"
+        "dod-preset: rapid-prototyping\n"
+        + roles_block
+        + "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n"
+        "  AGENT_META_REPO: example/agent-meta\n"
+    )
+
+
+def _normalize_topology_golden(text: str, root: Path) -> str:
+    """Normalise a golden render like ``_hash_file`` does (no volatile bytes)."""
+    text = text.replace("\r\n", "\n")
+    for needle in sorted({str(root), root.as_posix()}, key=len, reverse=True):
+        text = text.replace(needle, "<ROOT>")
+    return _MODEL_LINE_RE.sub(b"model: <MODEL>", text.encode()).decode()
+
+
+def render_topology_rule(role_active: bool, root: Path) -> str:
+    """Render the real ``a2a-delegation-gates`` rule for one role state.
+
+    Runs a full ``sync.py --init`` against a scratch project and returns the
+    rendered Claude rule file (normalised). This is the generator for the
+    frozen fixtures and the comparison path of the golden tests -- a golden is
+    never hand-edited (``python -c`` import of this module, see
+    ``tests/fixtures/topology-golden/README.md``).
+    """
+    project = Path(root) / ("role-active" if role_active else "role-inactive")
+    (project / ".meta-config").mkdir(parents=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        _topology_project_config(role_active), encoding="utf-8"
+    )
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = _run_sync(project, "--init")
+    assert result.returncode == 0, (
+        f"topology golden sync failed (role_active={role_active})\n"
+        f"{result.stdout[-1500:]}\n{result.stderr[-1500:]}"
+    )
+    rendered = (project / _TOPOLOGY_RULE_REL).read_text(encoding="utf-8")
+    return _normalize_topology_golden(rendered, project)
+
+
+@pytest.mark.parametrize(
+    ("role_active", "golden_name", "expected_fragment"), _TOPOLOGY_GOLDEN_CASES
+)
+def test_topology_golden_key_unset_is_byte_identical(
+    role_active, golden_name, expected_fragment, tmp_path
+):
+    """AC-6/AC-18: with the key unset the A2A rule keeps today's bytes.
+
+    One fixture per role state: role inactive renders ``Worker → HARD
+    REJECT``, role active renders ``Worker → `orchestrator` → HARD REJECT``.
+    A drift here is a real AC-6 regression, not a rebaseline candidate.
+    """
+    rendered = render_topology_rule(role_active, tmp_path)
+    golden = (_TOPOLOGY_GOLDEN_DIR / golden_name).read_text(encoding="utf-8")
+    assert rendered == golden
+    assert expected_fragment in rendered
+    assert "<ROOT>" not in rendered
+
+
+def test_topology_goldens_differ_only_in_the_role_gate():
+    """The two fixtures are distinct and prove the gate is not vacuous.
+
+    ``test_topology_golden_key_unset_is_byte_identical`` would be green for two
+    identical files even if the role flag were ignored; this pair assertion
+    pins that exactly the `` → `orchestrator` `` fragment separates them.
+    """
+    inactive = (_TOPOLOGY_GOLDEN_DIR / _TOPOLOGY_GOLDEN_INACTIVE).read_text(
+        encoding="utf-8"
+    )
+    active = (_TOPOLOGY_GOLDEN_DIR / _TOPOLOGY_GOLDEN_ACTIVE).read_text(
+        encoding="utf-8"
+    )
+    assert inactive != active
+    assert active.replace(" → `orchestrator`", "", 1) == inactive
+    assert "→ `orchestrator` →" not in inactive
+
+
+#: Prospective Task 18 branch (design §10, v1 wording without the P3 instance
+#: placeholder). It is the *shape* the conditional must have: both markers
+#: inline, the ``{{else}}`` branch word-identical to the current source line.
+_TOPOLOGY_NEW_GATE_BRANCH = (
+    "2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**\n"
+    "   G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.\n"
+    "   G2 NUR `main_chat` spawnt **genau einen** Orchestrator pro Session, mit\n"
+    "      eindeutiger `orchestrator_id` und disjunktem Scope. Doppelte ID oder\n"
+    "      Scope-Überlappung = HARD ERROR beim Spawn (beide Eigentümer nennen).\n"
+    "   G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.\n"
+    "   Der Main Chat ist der einzige Aggregator; Instanzen koordinieren sich nicht."
+)
+
+#: The four flag combinations of AC-18/IC-4: unset plus one explicit position.
+_TOPOLOGY_FLAG_CASES = (
+    ("unset", "", False, "derived"),
+    ("primary", "primary", True, "project"),
+    ("subagent", "subagent", True, "project"),
+    ("hybrid", "hybrid", True, "project"),
+)
+
+
+def _topology_gate_line() -> str:
+    """The current Gate-2 else-branch source (single source, no copied wording).
+
+    Task 18 wraps the historic line in an inline conditional, so the historic
+    wording now lives after ``{{else}}`` on the same logical line. The helper
+    extracts exactly that branch and keeps working for an unwrapped source.
+    """
+    marker = "{{else}}2. **Orchestrator-Singleton:**"
+    prefix = "2. **Orchestrator-Singleton:**"
+    for line in _TOPOLOGY_RULE_SOURCE.read_text(encoding="utf-8").splitlines():
+        if marker in line:
+            return line[line.index(prefix):].rsplit("{{/if}}", 1)[0]
+        if line.startswith(prefix):
+            return line
+    raise AssertionError("Gate-2 line not found in the A2A rule source")
+
+
+def _render_prospective_gate(topology: str, explicit: bool, source: str) -> str:
+    """Render the prospective conditional with the real conditional engine.
+
+    Uses the real ``substitute`` + ``strip_inactive_conditional_blocks`` pair
+    on the real source wording, so the four flag combinations are exercised
+    against the engine rather than against a hand-rolled boolean.
+    """
+    flags = _topology_flags(topology, explicit=explicit, source=source)
+    variables = {**flags, "ROLE_ORCHESTRATOR_ACTIVE": "true"}
+    template = (
+        "{{#if ORCH_TOPOLOGY_EXPLICIT}}"
+        + _TOPOLOGY_NEW_GATE_BRANCH
+        + "{{else}}"
+        + _topology_gate_line()
+        + "{{/if}}"
+    )
+    substituted = substitute(template, variables, "topology-probe", SyncLog())
+    return strip_inactive_conditional_blocks(substituted, variables)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "topology", "explicit", "source"), _TOPOLOGY_FLAG_CASES
+)
+def test_topology_flag_combinations_pick_exactly_one_gate_branch(
+    case_id, topology, explicit, source
+):
+    """AC-18/IC-4: the four flag combinations select one branch, never both.
+
+    Unset renders the historic else branch (byte-identical to the golden
+    active fixture); every explicit combination renders the new topology
+    branch. The absent-variable branch semantics themselves are already
+    asserted in ``tests/test_orchestrator_topology_conditionals.py``
+    (``test_absent_variable_renders_the_else_branch_only``,
+    ``test_explicit_true_renders_the_new_branch_only``,
+    ``test_explicit_false_renders_the_else_branch_only``) and are not
+    duplicated here.
+    """
+    rendered = _render_prospective_gate(topology, explicit, source)
+    if case_id == "unset":
+        assert rendered == strip_inactive_conditional_blocks(
+            _topology_gate_line(), {"ROLE_ORCHESTRATOR_ACTIVE": "true"}
+        )
+        assert "Orchestrator-Singleton" in rendered
+        assert "Orchestrator-Topologie" not in rendered
+        return
+    assert rendered.startswith(f"2. **Orchestrator-Topologie ({topology}):**")
+    assert "Orchestrator-Singleton" not in rendered
+    assert "G1 " in rendered
+    assert rendered.count("Orchestrator-Topologie") == 1
+
+
+def test_topology_flags_are_never_simultaneously_true():
+    """AC-18 invariant: the four boolean flags can never all read ``"true"``.
+
+    ``ORCH_TOPOLOGY_EXPLICIT`` is independent of the position triple, but a
+    position flag is only true when a valid topology is set, and then exactly
+    one of the three is true. An invalid value fails closed to all-false. The
+    absent-variable / else-branch render is covered by the existing
+    ``tests/test_orchestrator_topology_conditionals.py`` tests named in
+    ``test_topology_flag_combinations_pick_exactly_one_gate_branch``.
+    """
+    four = (
+        "ORCH_TOPOLOGY_EXPLICIT",
+        "ORCH_TOPOLOGY_PRIMARY",
+        "ORCH_TOPOLOGY_SUBAGENT",
+        "ORCH_TOPOLOGY_HYBRID",
+    )
+    position = four[1:]
+    for topology in ("", "primary", "subagent", "hybrid", "not-a-topology"):
+        for explicit in (False, True):
+            flags = _topology_flags(topology, explicit=explicit, source="project")
+            assert not all(flags[name] == "true" for name in four)
+            assert sum(flags[name] == "true" for name in position) <= 1
 
 
 if __name__ == "__main__":

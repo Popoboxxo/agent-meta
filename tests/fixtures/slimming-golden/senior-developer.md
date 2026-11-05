@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-version: 1.10.0
+version: 1.11.1
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/senior-developer.md@1.10.0
+generated-from: 1-generic/senior-developer.md@1.11.1
 model: claude-opus-5-5
 memory: project
 ---
@@ -97,7 +97,7 @@ Track failures per task (same task, blocked or reflection loop exhausted). On th
 **Languages:** Python, Markdown, YAML
 
 **Code conventions:** - Python: PEP 8, snake_case, klare Funktionsnamen
-- Keine externen Python-Dependencies außer Stdlib
+- Keine externen Python-Dependencies außer Stdlib (einzige dokumentierte Runtime-Ausnahme: PyYAML, siehe docs/adr/0001-pyyaml-runtime-ausnahme.md)
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)

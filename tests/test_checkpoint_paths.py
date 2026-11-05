@@ -101,6 +101,16 @@ def test_custom_checkpoint_dir_keeps_session_confinement(tmp_path):
     assert store._session_file("ok") == (custom / "ok.json").resolve()
 
 
+def test_default_store_keeps_todays_paths(tmp_path):
+    """P3 AC-10: an unset orchestrator id is byte-identical to today."""
+    store = CheckpointStore(project_root=tmp_path, orchestrator_id=None)
+    store.save_checkpoint("sess1", _cp())
+
+    assert (tmp_path / ".meta-viz" / "checkpoints" / "sess1.json").exists()
+    assert (tmp_path / ".meta-viz" / "progress" / "current.md").exists()
+    assert not list((tmp_path / ".meta-viz" / "checkpoints").glob("*__*"))
+
+
 def test_module_aliases_point_to_new_defaults():
     assert checkpoint_module.CHECKPOINT_DIR == DEFAULT_CHECKPOINT_DIR
     assert checkpoint_module._PROGRESS_DIR == DEFAULT_PROGRESS_DIR

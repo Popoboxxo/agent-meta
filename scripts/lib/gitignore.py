@@ -30,6 +30,29 @@ from .io import run_git_check_ignore
 from .providers import resolve_providers
 from .tmp_paths import TmpPaths, resolve_tmp_paths
 
+# Markers of the agent-meta managed .gitignore block. Defined here (not in
+# context.py) so the shadowing detector can tell rules it wrote itself from
+# pre-existing project rules (#1072). context.py imports them.
+GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
+GITIGNORE_BLOCK_END = "# --- end agent-meta managed ---"
+
+# Framework-generated artifacts that are pure snapshots without a CI contract
+# and therefore always ignored by the managed block (#1073). Kept in sync with
+# ``generated_file_drift.PLATFORM_DEFAULTS_RESOLVED_REL`` via a pin test
+# (importing it here would couple the writer to the drift scanner).
+FRAMEWORK_GENERATED_ENTRIES: tuple[str, ...] = (
+    ".meta-config/platform-defaults.resolved.yaml",
+)
+
+
+def framework_baseline_entries() -> list[str]:
+    """Return the framework-wide baseline entries for the additive path (#1073).
+
+    Used when no provider with a dedicated context file is active, so the
+    exact managed-block computation is skipped entirely.
+    """
+    return ["sync.log", "*.sync-backup-*", *FRAMEWORK_GENERATED_ENTRIES]
+
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
 _CLAUDE_LOCAL_ENTRIES_FALLBACK: list[str] = [
@@ -320,6 +343,12 @@ def compute_base_gitignore_entries(
     if custom_entries:
         entries.extend(custom_entries)
 
+    # Unconditional (#1073): pure snapshot, no CI contract, independent of any
+    # category toggle or custom_entries.
+    for _entry in FRAMEWORK_GENERATED_ENTRIES:
+        if _entry not in entries:
+            entries.append(_entry)
+
     if _tmp_sink_gitignore_enabled(repo_containment_cfg):
         if tmp_paths is None:
             tmp_paths = resolve_tmp_paths(
@@ -393,6 +422,38 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
     return entries
 
 
+def _managed_block_intervals(gitignore_text: str) -> list[tuple[int, int]]:
+    """Return the balanced (BEGIN, END) line intervals of the managed block.
+
+    Only properly terminated blocks count. An unterminated BEGIN (a broken or
+    hand-truncated block) is discarded instead of leaving the rest of the file
+    "inside" — otherwise a single missing END marker would suppress every
+    following shadowing warning.
+    """
+    intervals: list[tuple[int, int]] = []
+    pending: list[int] = []
+    for index, line in enumerate(gitignore_text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped == GITIGNORE_BLOCK_BEGIN:
+            pending.append(index)
+        elif stripped == GITIGNORE_BLOCK_END and pending:
+            intervals.append((pending.pop(), index))
+    return intervals
+
+
+def _line_in_managed_block(gitignore_text: str, lineno: int) -> bool:
+    """Return True when the 1-based ``lineno`` lies inside the managed block (#1072).
+
+    A rule between the BEGIN and END markers was written by the syncer itself;
+    a match on it is expected behavior, not silent shadowing. The marker lines
+    themselves are not rules and report False. Only balanced blocks count, so an
+    unterminated BEGIN leaves the rest of the file outside.
+    """
+    if lineno < 1:
+        return False
+    return any(begin < lineno < end for begin, end in _managed_block_intervals(gitignore_text))
+
+
 def detect_shadowed_provider_roots(
     project_root: Path,
     providers: list[str],
@@ -400,21 +461,33 @@ def detect_shadowed_provider_roots(
     ignore_provider_dirs: bool,
 ) -> list[str]:
     """Return one warning per provider whose ENTIRE generated output is
-    swallowed by a pre-existing .gitignore rule the managed block did not
-    write itself (issue #713).
+    swallowed by a pre-existing .gitignore rule outside the managed block
+    (issue #713, refined by #1072).
 
     Only meaningful when ``ignore-provider-dirs`` is False (the default):
     in that mode the managed block never adds a whole-``agents_dir`` entry
     on its own, so any ``git check-ignore`` match on a probe path under
-    ``agents_dir`` can only come from an unrelated, pre-existing rule that
-    predates our managed block -- exactly the silent-shadowing scenario
-    reported (`git ls-files` shows nothing, no warning anywhere). When the
+    ``agents_dir`` can only come from an unrelated, pre-existing rule outside
+    the managed block -- exactly the silent-shadowing scenario reported
+    (`git ls-files` shows nothing, no warning anywhere). Rules inside the
+    managed block were written by the syncer itself and never warn; when the
     toggle is True the managed block DOES add that whole-root entry itself,
     so a match there is expected and not reported.
     """
     warnings: list[str] = []
     if ignore_provider_dirs or not (project_root / ".git").is_dir():
         return warnings
+    # Read the managed-marked file once for the whole provider loop instead of
+    # re-reading and re-splitting it per provider. On an unreadable/invalid
+    # file fall back to the empty text: every rule then counts as outside the
+    # block, which keeps the warning (the safe direction) instead of crashing.
+    gitignore_text = ""
+    gitignore_path = project_root / ".gitignore"
+    if gitignore_path.is_file():
+        try:
+            gitignore_text = gitignore_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            gitignore_text = ""
     for provider in providers:
         agents_dir = provider_config.get(provider, {}).get("agents_dir")
         if not agents_dir:
@@ -427,6 +500,10 @@ def detect_shadowed_provider_roots(
             continue  # not ignored at all -- fine
         # `git check-ignore -v` output: "<source>:<line>:<pattern>\t<path>"
         source_rule = result.stdout.strip().split("\t", 1)[0]
+        src, ln, _pat = (source_rule.split(":", 2) + ["", ""])[:3]
+        if src == ".gitignore" and ln.isdigit():
+            if _line_in_managed_block(gitignore_text, int(ln)):
+                continue  # rule written by the syncer itself -- not shadowing
         warnings.append(
             f"gitignore-shadowing: provider '{provider}' output under "
             f"'{agents_dir}/' is silently ignored by a pre-existing rule "
