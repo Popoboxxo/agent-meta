@@ -1,0 +1,66 @@
+# Orchestrator-Topology Golden Baseline
+
+Frozen renders of `rules/1-generic/a2a-delegation-gates.md` for the two
+required AC-6/AC-18 states. Both projects leave `orchestrator.topology`
+**unset**; only the orchestrator role state differs:
+
+| Fixture | Role state | Rendered gate |
+|---|---|---|
+| `a2a-delegation-gates.role-inactive.md` | `ROLE_ORCHESTRATOR_ACTIVE=false` | `Worker → HARD REJECT` |
+| `a2a-delegation-gates.role-active.md` | `ROLE_ORCHESTRATOR_ACTIVE=true` | ``Worker → `orchestrator` → HARD REJECT`` |
+
+The pair differs by exactly the `` → `orchestrator` `` fragment. That is the
+regression guard for AC-6: an unset topology key must keep today's bytes in
+both role states, including the fail-closed `ORCH_TOPOLOGY_EXPLICIT` else
+branch. A drift here is a real regression, **not** a rebaseline candidate.
+
+## How the fixtures were generated
+
+Through the real sync path, never hand-written. `tests/test_ac01_render_identity.py`
+exposes the generator (`render_topology_rule`); it synced a scratch project
+(provider `Claude`, `dod-preset: rapid-prototyping`) into
+`<scratch>/.claude/rules/a2a-delegation-gates.md` and copied the normalised
+bytes:
+
+```bash
+python3 - <<'PY'
+import sys, tempfile
+from pathlib import Path
+sys.path.insert(0, "tests")
+import test_ac01_render_identity as h
+
+out = Path("tests/fixtures/topology-golden")
+with tempfile.TemporaryDirectory() as td:
+    for role_active, name in (
+        (False, h._TOPOLOGY_GOLDEN_INACTIVE),
+        (True, h._TOPOLOGY_GOLDEN_ACTIVE),
+    ):
+        text = h.render_topology_rule(role_active, Path(td) / str(role_active))
+        (out / name).write_bytes(text.encode("utf-8"))
+PY
+```
+
+The **role state** is expressed through the project's `roles:` allowlist
+(ActiveSet): the inactive project lists `developer`, `documenter`,
+`security-auditor`, `code-reviewer`, the active project omits the key (every
+gate-enabled role stays active). Keeping the two security-critical roles in the
+inactive whitelist makes the role gate the *only* byte difference between the
+two fixtures.
+
+## Normalisation
+
+Same discipline as the AC-01 harness (`_hash_file`):
+
+- CRLF folded to LF;
+- volatile scratch roots replaced with `<ROOT>`;
+- `model:` lines pinned to `model: <MODEL>`.
+
+The rule render contains no model line, no root and no date today, so the
+normalisation is a no-op that keeps the contract explicit.
+
+## Freeze point
+
+Frozen after Task 15 of `docs/plans/2026-11-04-orchestrator-topology-v1-plan.md`.
+The Task 18 rule amendment (conditional topology branch) must leave these bytes
+unchanged when the key is unset; `test_topology_golden_key_unset_is_byte_identical`
+is the guard. Do not regenerate without a documented AC-6 reason.

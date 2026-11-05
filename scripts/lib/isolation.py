@@ -551,8 +551,10 @@ def _opencode_entry_point(
     provider_config: dict,
     active_set,
     config: dict | None = None,
+    *,
+    topology=None,
 ) -> str | None:
-    """Primary role of *provider* if explicit AND emitted, else ``None``.
+    """Primary role of *provider* if explicit AND emitted AND primary, else ``None``.
 
     ``provider_config`` must be the resolved provider registry
     (``{provider: {...}}``), never a single provider entry — the lookup is
@@ -565,6 +567,13 @@ def _opencode_entry_point(
     predicate ``active_set.role_emitted_for_provider`` additionally checks the
     orchestrator mode for this provider (main-chat does not emit the role).
     ``config=None`` keeps the historical behaviour for callers without config.
+
+    *topology* (IC-7) is the already resolved ``TopologyResolution`` for this
+    provider, passed by the caller so it is resolved exactly once per run. The
+    role is still EMITTED under ``subagent`` (as a subagent) — the entry point
+    is what the position withholds: only ``effective == "primary"`` names a
+    session default. ``topology=None`` keeps the historic behaviour for
+    callers without topology information.
     """
     role = providers.explicit_primary_role(provider_config, provider)
     if role is None:
@@ -576,8 +585,9 @@ def _opencode_entry_point(
 
         if not role_emitted_for_provider(role, active_set, config, provider):
             return None
-        return role
-    if active_set is not None and role not in active_set.roles:
+    elif active_set is not None and role not in active_set.roles:
+        return None
+    if topology is not None and topology.effective != "primary":
         return None
     return role
 
@@ -808,12 +818,57 @@ def _sync_opencode_runtime_gate(
 
     is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
 
+    # Orchestrator topology (IC-7): resolved ONCE per provider/run and handed to
+    # the single entry-point source. ``rollback_only`` must not re-derive it —
+    # the managed value is taken back below regardless of the current position.
+    topology = None
+    if not rollback_only and config is not None:
+        from .providers import load_provider_capabilities
+        from .topology import resolve_topology, topology_explicit
+        from .variables import _resolve_orch_mode
+
+        orch_config = config.get("orchestrator", {})
+        if not isinstance(orch_config, dict):
+            orch_config = {}
+        provider_override = orch_config.get("provider-overrides", {})
+        provider_override = (
+            provider_override.get(provider)
+            if isinstance(provider_override, dict) else None
+        )
+        if not isinstance(provider_override, dict):
+            provider_override = None
+        capability_map: dict = {}
+        if agent_meta_root is not None:
+            try:
+                capability_map = load_provider_capabilities(agent_meta_root) or {}
+            except Exception:  # noqa: BLE001 - unreadable registry degrades
+                capability_map = {}
+        topology = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=capability_map.get(provider, {})
+            if isinstance(capability_map, dict) else {},
+            mode=_resolve_orch_mode(
+                orch_config, provider_override, validate=False
+            ),
+            active_set=active_set,
+        )
+        if not topology_explicit(config, provider) and active_set is None:
+            # Unset key and no active-set information: the resolver can only
+            # fall back to `subagent`, which would silently remove an entry
+            # point (and suspend the gate) for callers that never had that
+            # information. Keep the historic emission; AC-6 byte identity.
+            topology = None
+
     # Entry point (#1006/IC-6): an explicit AND generated primary role. A
     # rollback must not re-derive it — the managed value is taken back below.
     entry = (
         None
         if rollback_only
-        else _opencode_entry_point(provider, provider_config, active_set, config)
+        else _opencode_entry_point(
+            provider, provider_config, active_set, config, topology=topology
+        )
     )
 
     # #1090/D16: the reverse of the #1006 invariant. A USER ``default_agent``
@@ -826,10 +881,35 @@ def _sync_opencode_runtime_gate(
     # the user to "remove the key" would be wrong.
     da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
     state_value = da_state.get("value") if isinstance(da_state, dict) else None
+    current = existing.get(_DEFAULT_AGENT_JSON_KEY)
+
+    # IC-7 migration: a USER value on the orchestrator role (no matching state
+    # record) is preserved when the resolved position is no longer `primary`.
+    # No auto-delete — the user decides. The stable ID lives in the consistency
+    # checker (IC-5); this is its emitter-side counterpart for the same run.
+    gate_role = providers.explicit_primary_role(provider_config, provider)
+    managed_current = (
+        isinstance(state_value, str) and bool(state_value) and current == state_value
+    )
+    if (
+        not rollback_only
+        and topology is not None
+        and topology.effective != "primary"
+        and isinstance(gate_role, str)
+        and current == gate_role
+        and not managed_current
+    ):
+        log.warning(
+            "orchestrator-topology.default-agent-conflict: default_agent "
+            f"'{current}' names the orchestrator role, but the effective "
+            f"orchestrator topology for provider '{provider}' is "
+            f"'{topology.effective}'. Leaving the user value untouched (no "
+            "auto-delete); remove the key or set orchestrator.topology: primary."
+        )
+
     if not rollback_only and entry is None and active_set is not None:
         from .active_set import role_emitted_for_provider
 
-        current = existing.get(_DEFAULT_AGENT_JSON_KEY)
         if (
             isinstance(current, str)
             and current != state_value
@@ -850,8 +930,8 @@ def _sync_opencode_runtime_gate(
     # by the rollback branch below (``entries`` empty), and the user is told
     # how to restore the entry point.
     if entries and entry is None:
-        gate_role = providers.explicit_primary_role(provider_config, provider)
         mode_hides = False
+        topology_hides = False
         if gate_role is not None and config is not None:
             from .active_set import role_emitted_for_provider
 
@@ -859,10 +939,30 @@ def _sync_opencode_runtime_gate(
                 active_set is None
                 or gate_role in getattr(active_set, "roles", ())
             )
-            mode_hides = role_is_active and not role_emitted_for_provider(
+            role_emitted = role_is_active and role_emitted_for_provider(
                 gate_role, active_set, config, provider
             )
-        if mode_hides:
+            mode_hides = role_is_active and not role_emitted
+            # R2/AC-20: the gate is wanted and the role IS emitted, but the
+            # resolved position withholds the entry point. One per provider per
+            # run (this writer runs once); the stable ID is deduplicated per
+            # check ID in the consistency checker.
+            topology_hides = (
+                role_emitted
+                and topology is not None
+                and topology.effective != "primary"
+            )
+        if topology_hides:
+            log.warning(
+                "orchestrator-topology.gate-inactive: runtime gate "
+                "(permission.edit/bash deny) NOT written for provider "
+                f"'{provider}': the effective orchestrator topology is "
+                f"'{topology.effective}', so no default_agent/entry point is "
+                "written and the deny would lock every agent. The role is still "
+                "emitted as a subagent; set orchestrator.topology: primary to "
+                "activate the gate."
+            )
+        elif mode_hides:
             log.warning(
                 "runtime gate (permission.edit/bash deny) NOT written for "
                 f"provider '{provider}': orchestrator.mode 'main-chat' does not "

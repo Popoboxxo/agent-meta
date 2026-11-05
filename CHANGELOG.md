@@ -3,6 +3,27 @@
 ## [Unreleased]
 
 ### Added
+- **Orchestrator topology (`orchestrator.topology`, #1077)**: new optional position axis
+  (`primary | subagent | hybrid`), overridable per provider via
+  `orchestrator.provider-overrides.<P>.topology`, with **no default** — an unset key derives
+  `primary` only when `providers.<P>.primary-role` names a role in the active set, otherwise
+  `subagent`; `hybrid` is never derived. A hard stdlib validator (no `jsonschema`) rejects an
+  unknown enum value, `orchestrator.enabled: false` and a same-scope `mode: main-chat`
+  contradiction. The single resolver (`scripts/lib/topology.py`) falls back to
+  `topology_degrade.<axis>` and finally to `subagent` whenever `topology_support` is false or
+  `topology_verified_state` is `UNVERIFIED`, and reports that downgrade loudly.
+- **Topology consistency checks and sync summary (#1077)**: the new
+  `orchestrator-topology.*` checks (`degraded`, `hybrid-unverified`, `main-chat-supersedes`,
+  `gate-inactive`, `default-agent-conflict`) surface cross-scope contradictions, and each sync
+  prints one derived `topology: <effective> (derived from …)` INFO line per provider.
+- **Conditional A2A rule and concept doc (#1077)**: `a2a-delegation-gates` states the orchestrator
+  position only behind `ORCH_TOPOLOGY_EXPLICIT` (word-identical else branch), and
+  `docs/concepts/active/orchestrator-topology.md` documents the three topologies, the degradation
+  matrix and the `hybrid` deviation.
+- **Topology evidence state (#1077)**: five read-only provider probes are documented (0 evidence,
+  3 inconclusive, 2 not run), so **no matrix cell was upgraded**: the 40-cell matrix stays at
+  **25 data-derived / 15 `UNVERIFIED ⇒ no`**, `hybrid` is granted nowhere and deferred in v1, and
+  P3 (multi-instance, `max-instances`/`singleton`) is not part of this change.
 - **Structured release checklist (`release-checklist`, #1089)**: new opt-in block with
   `mode: off|advisory|strict` (default `off`) and project items that are either `check: agent` or
   `check: script`, each with `phase` (`precondition`/`step`), `required` and `applies-when`. A
@@ -46,6 +67,14 @@
   required precondition yields `STATUS: failed`, Prompt-/Konventions-Boundary).
 
 ### Changed
+- **Orchestrator emission follows the resolved topology (#1077)**: **behavior change:** for
+  projects that set `orchestrator.topology` or a provider override, `subagent` withholds the
+  managed Opencode `default_agent` entry point (the role is emitted as a subagent only), and the
+  builder default is gated on the **effective** topology instead of the emitted role alone; a
+  user-set `default_agent` is preserved with a WARN, never overwritten. Projects that leave the
+  key unset are unaffected: the derivation keeps the historic behaviour and `sync --check` stays
+  **byte-identical**. The provider matrix is unchanged in this release (25 data-derived /
+  15 `UNVERIFIED ⇒ no`); no cell was upgraded by the probes.
 - **Submodule push targets are checked instead of blocking `--recurse-submodules` (#1051)**:
   `dod-push-check.sh` resolves, for `--recurse-submodules=on-demand|only`, each
   submodule's own push destination (`remote.<name>.push`, then `push.default` /

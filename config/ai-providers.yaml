@@ -249,6 +249,8 @@ providers:
     # v1 and v2 emit this role as `mode: primary` and write it as
     # `default_agent`; without this key `primary` is never emitted
     # (#1006, OQ-8 amendment A2).
+    # IC-6: the RESOLVED orchestrator topology is a second condition — an
+    # effective `subagent` withholds `mode: primary`/`default_agent`.
     primary-role: orchestrator
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md

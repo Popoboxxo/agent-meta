@@ -5,6 +5,14 @@
 > Quelle: Bug-Report "Worker spawnt Orchestrator" — siehe Sitzungs-Log 2026-06-28
 > Kern-These: **Es existiert genau EIN Orchestrator — der vom `main_chat` gespawnte. Worker-Agents dürfen niemals einen Orchestrator dispatchen.**
 
+> **Status-Hinweis (2026-11-04):** Diese Aussage gilt unverändert für die
+> ungesetzte Konfiguration. Mit `orchestrator.topology`
+> (`primary | subagent | hybrid`) wird die *Position* des Orchestrators
+> explizit: unter `subagent`/`hybrid` spawnt der **Main Chat** den
+> Orchestrator, während Worker weiterhin hart abgelehnt werden. Die
+> Multi-Instanz-Erweiterung ist dort als **„P3, designed, not shipped"**
+> markiert. Siehe [Orchestrator-Topologie](orchestrator-topology.md).
+
 ---
 
 ## 16.5.1 Problem-Diagnose

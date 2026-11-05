@@ -174,6 +174,15 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     # The roster gate is opt-in too: standalone has no harness roster, so the
     # compact agent table keeps its names list (the gate stays closed).
     "ROSTER_IN_HARNESS": "false",
+    # Orchestrator topology axis (IC-4): standalone has no project config, so
+    # the position is undeclared — the four boolean gates stay closed and the
+    # string fallback is empty (AC-18 fail-closed; no new branch may leak into
+    # the exported persona).
+    "ORCH_TOPOLOGY": "",
+    "ORCH_TOPOLOGY_EXPLICIT": "false",
+    "ORCH_TOPOLOGY_PRIMARY": "false",
+    "ORCH_TOPOLOGY_SUBAGENT": "false",
+    "ORCH_TOPOLOGY_HYBRID": "false",
     # route_intent is a harness-registered callable tool with no standalone
     # counterpart — keep the §3 routing-rules fallback (issue #264).
     "ROUTE_INTENT_CALLABLE": "false",

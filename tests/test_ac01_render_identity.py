@@ -828,6 +828,37 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``compact-golden`` stayed unchanged (``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT
   extended.
 
+- Orchestrator topology v1 (SPEC-orchestrator-topology-2026-11-03, issue #1077,
+  Task 18, 2026-11-04, ``feat/orchestrator-topology-v1``): the A2A rule now
+  states the singleton gate conditionally and both singleton-bearing agent
+  templates carry the conditional line (``orchestrator`` 8.9.1 -> **8.10.0**,
+  ``_reference-agent`` 1.2.1 -> 1.3.0). Because the new branch is gated on
+  ``ORCH_TOPOLOGY_EXPLICIT`` and the else branch is word-identical, the **unset**
+  render is byte-identical: the two ``tests/fixtures/topology-golden`` fixtures
+  are **unchanged** (AC-6) and no rule render moved. Exactly **9 of 1099 hashes
+  moved; 0 added/removed** -- the ``orchestrator`` agent render of every provider
+  (``Claude/.claude/agents/orchestrator.md`` ``dd79e5cf…`` -> ``9b7bc261…``,
+  ``Codex/.codex/agents/orchestrator.toml`` ``9e713667…`` -> ``3a99d13a…``,
+  ``Continue/.continue/agents/orchestrator.md`` ``1b8a2c4f…`` -> ``7d8d91f6…``,
+  ``Copilot/.github/agents/orchestrator.agent.md`` ``5cd5fac2…`` -> ``140c93fb…``,
+  ``Gemini/.gemini/agents/orchestrator.md`` ``f4a0a756…`` -> ``14e86f57…``,
+  ``KimiCode/.kimi-code/agents/orchestrator.md`` ``7a38413b…`` -> ``4e0a081c…``,
+  ``Mammouth/.mammouth/agents/orchestrator.md`` ``03a03ae0…`` -> ``379628c6…``,
+  ``Opencode/.opencode/agents/orchestrator.md`` ``df357d75…`` -> ``4d101617…``,
+  ``ZCode/.zcode/agents/orchestrator.md`` ``1db5e066…`` -> ``e69d405a…``) --
+  i.e. the frontmatter version/``generated-from`` pins only; the body is
+  unchanged and the ``_reference-agent`` template is not part of the matrix.
+  The manifest was patched **per entry** (9 single-line replacements, 1090 of the
+  1099 lines untouched) -- not via ``--write`` -- after independently recomputing
+  every digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``1a6df729…`` -> ``a88fca0d…``). ``slimming-golden``
+  and ``compact-golden`` were re-pinned frontmatter-only for the same
+  ``orchestrator`` version pins (manifest §24) and their AC-T4 digests moved
+  (``dcd2f5be…`` -> ``8d1ade1a…`` / ``416cd520…`` -> ``badf2362…``).
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
@@ -848,6 +879,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 from lib.config import _resolve_agent_meta_date  # noqa: E402
+from lib.log import SyncLog  # noqa: E402
+from lib.variables import (  # noqa: E402
+    _topology_flags,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 _MANIFEST = Path(__file__).resolve().parent / "fixtures" / "ac01-baseline" / "hashes.json"
 _PROVIDERS = sorted(
     yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
@@ -1063,6 +1100,245 @@ def test_ac01_exception_list_allows_meta_optimizer_artifacts():
         "Copilot/.github/agents/meta-optimizer.agent.md": "d",
     })
     assert diff_against_manifest(current, baseline) == []
+
+
+# --- Orchestrator topology goldens (Task 16, AC-6/AC-18) --------------------
+#
+# The topology key is unset in both fixtures, so the A2A rule must render
+# today's bytes in BOTH role states. The two states differ only in the
+# ``ROLE_ORCHESTRATOR_ACTIVE`` flag, which the ActiveSet derives from the
+# project's ``roles:`` allowlist:
+#
+#   role inactive + key unset -> ``Worker → HARD REJECT``
+#   role active   + key unset -> ``Worker → `orchestrator` → HARD REJECT``
+#
+# The fixtures are produced through the real sync path (see
+# ``render_topology_rule``), never hand-written, and use the same normalisation
+# discipline as ``_hash_file``: CRLF folded to LF, volatile scratch roots
+# replaced, model lines pinned. The rule render carries neither a model line
+# nor a root today, so the normalisation is a no-op that keeps the contract
+# explicit.
+_TOPOLOGY_GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "topology-golden"
+_TOPOLOGY_GOLDEN_INACTIVE = "a2a-delegation-gates.role-inactive.md"
+_TOPOLOGY_GOLDEN_ACTIVE = "a2a-delegation-gates.role-active.md"
+_TOPOLOGY_RULE_REL = Path(".claude") / "rules" / "a2a-delegation-gates.md"
+_TOPOLOGY_RULE_SOURCE = _REPO_ROOT / "rules" / "1-generic" / "a2a-delegation-gates.md"
+
+#: The (role state, golden file, expected gate fragment) triples of AC-18.
+_TOPOLOGY_GOLDEN_CASES = (
+    (False, _TOPOLOGY_GOLDEN_INACTIVE, "Worker → HARD REJECT"),
+    (True, _TOPOLOGY_GOLDEN_ACTIVE, "Worker → `orchestrator` → HARD REJECT"),
+)
+
+
+def _topology_project_config(role_active: bool) -> str:
+    """Return the minimal single-provider config for one AC-18 role state.
+
+    The orchestrator role flag comes from the ActiveSet's ``roles:`` allowlist,
+    so "role inactive" is expressed by a whitelist that omits ``orchestrator``
+    (omitting the key entirely renders every gate-enabled role, i.e. the
+    active state). The inactive whitelist keeps the security-critical default
+    roles so the only byte difference between the two goldens is the A2A role
+    gate itself.
+
+    ``AGENT_META_REPO`` is pinned to a neutral slug for the same reason as in
+    ``_make_project`` (issue #1037): a derived value would make the fixture
+    depend on the cloning remote.
+    """
+    roles_block = "" if role_active else (
+        "roles:\n- developer\n- documenter\n- security-auditor\n- code-reviewer\n"
+    )
+    return (
+        'agent-meta-version: "2.0.0-beta.1"\n'
+        "ai-providers:\n- Claude\n"
+        "dod-preset: rapid-prototyping\n"
+        + roles_block
+        + "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n"
+        "  AGENT_META_REPO: example/agent-meta\n"
+    )
+
+
+def _normalize_topology_golden(text: str, root: Path) -> str:
+    """Normalise a golden render like ``_hash_file`` does (no volatile bytes)."""
+    text = text.replace("\r\n", "\n")
+    for needle in sorted({str(root), root.as_posix()}, key=len, reverse=True):
+        text = text.replace(needle, "<ROOT>")
+    return _MODEL_LINE_RE.sub(b"model: <MODEL>", text.encode()).decode()
+
+
+def render_topology_rule(role_active: bool, root: Path) -> str:
+    """Render the real ``a2a-delegation-gates`` rule for one role state.
+
+    Runs a full ``sync.py --init`` against a scratch project and returns the
+    rendered Claude rule file (normalised). This is the generator for the
+    frozen fixtures and the comparison path of the golden tests -- a golden is
+    never hand-edited (``python -c`` import of this module, see
+    ``tests/fixtures/topology-golden/README.md``).
+    """
+    project = Path(root) / ("role-active" if role_active else "role-inactive")
+    (project / ".meta-config").mkdir(parents=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        _topology_project_config(role_active), encoding="utf-8"
+    )
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = _run_sync(project, "--init")
+    assert result.returncode == 0, (
+        f"topology golden sync failed (role_active={role_active})\n"
+        f"{result.stdout[-1500:]}\n{result.stderr[-1500:]}"
+    )
+    rendered = (project / _TOPOLOGY_RULE_REL).read_text(encoding="utf-8")
+    return _normalize_topology_golden(rendered, project)
+
+
+@pytest.mark.parametrize(
+    ("role_active", "golden_name", "expected_fragment"), _TOPOLOGY_GOLDEN_CASES
+)
+def test_topology_golden_key_unset_is_byte_identical(
+    role_active, golden_name, expected_fragment, tmp_path
+):
+    """AC-6/AC-18: with the key unset the A2A rule keeps today's bytes.
+
+    One fixture per role state: role inactive renders ``Worker → HARD
+    REJECT``, role active renders ``Worker → `orchestrator` → HARD REJECT``.
+    A drift here is a real AC-6 regression, not a rebaseline candidate.
+    """
+    rendered = render_topology_rule(role_active, tmp_path)
+    golden = (_TOPOLOGY_GOLDEN_DIR / golden_name).read_text(encoding="utf-8")
+    assert rendered == golden
+    assert expected_fragment in rendered
+    assert "<ROOT>" not in rendered
+
+
+def test_topology_goldens_differ_only_in_the_role_gate():
+    """The two fixtures are distinct and prove the gate is not vacuous.
+
+    ``test_topology_golden_key_unset_is_byte_identical`` would be green for two
+    identical files even if the role flag were ignored; this pair assertion
+    pins that exactly the `` → `orchestrator` `` fragment separates them.
+    """
+    inactive = (_TOPOLOGY_GOLDEN_DIR / _TOPOLOGY_GOLDEN_INACTIVE).read_text(
+        encoding="utf-8"
+    )
+    active = (_TOPOLOGY_GOLDEN_DIR / _TOPOLOGY_GOLDEN_ACTIVE).read_text(
+        encoding="utf-8"
+    )
+    assert inactive != active
+    assert active.replace(" → `orchestrator`", "", 1) == inactive
+    assert "→ `orchestrator` →" not in inactive
+
+
+#: Prospective Task 18 branch (design §10, v1 wording without the P3 instance
+#: placeholder). It is the *shape* the conditional must have: both markers
+#: inline, the ``{{else}}`` branch word-identical to the current source line.
+_TOPOLOGY_NEW_GATE_BRANCH = (
+    "2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**\n"
+    "   G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.\n"
+    "   G2 NUR `main_chat` spawnt **genau einen** Orchestrator pro Session, mit\n"
+    "      eindeutiger `orchestrator_id` und disjunktem Scope. Doppelte ID oder\n"
+    "      Scope-Überlappung = HARD ERROR beim Spawn (beide Eigentümer nennen).\n"
+    "   G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.\n"
+    "   Der Main Chat ist der einzige Aggregator; Instanzen koordinieren sich nicht."
+)
+
+#: The four flag combinations of AC-18/IC-4: unset plus one explicit position.
+_TOPOLOGY_FLAG_CASES = (
+    ("unset", "", False, "derived"),
+    ("primary", "primary", True, "project"),
+    ("subagent", "subagent", True, "project"),
+    ("hybrid", "hybrid", True, "project"),
+)
+
+
+def _topology_gate_line() -> str:
+    """The current Gate-2 else-branch source (single source, no copied wording).
+
+    Task 18 wraps the historic line in an inline conditional, so the historic
+    wording now lives after ``{{else}}`` on the same logical line. The helper
+    extracts exactly that branch and keeps working for an unwrapped source.
+    """
+    marker = "{{else}}2. **Orchestrator-Singleton:**"
+    prefix = "2. **Orchestrator-Singleton:**"
+    for line in _TOPOLOGY_RULE_SOURCE.read_text(encoding="utf-8").splitlines():
+        if marker in line:
+            return line[line.index(prefix):].rsplit("{{/if}}", 1)[0]
+        if line.startswith(prefix):
+            return line
+    raise AssertionError("Gate-2 line not found in the A2A rule source")
+
+
+def _render_prospective_gate(topology: str, explicit: bool, source: str) -> str:
+    """Render the prospective conditional with the real conditional engine.
+
+    Uses the real ``substitute`` + ``strip_inactive_conditional_blocks`` pair
+    on the real source wording, so the four flag combinations are exercised
+    against the engine rather than against a hand-rolled boolean.
+    """
+    flags = _topology_flags(topology, explicit=explicit, source=source)
+    variables = {**flags, "ROLE_ORCHESTRATOR_ACTIVE": "true"}
+    template = (
+        "{{#if ORCH_TOPOLOGY_EXPLICIT}}"
+        + _TOPOLOGY_NEW_GATE_BRANCH
+        + "{{else}}"
+        + _topology_gate_line()
+        + "{{/if}}"
+    )
+    substituted = substitute(template, variables, "topology-probe", SyncLog())
+    return strip_inactive_conditional_blocks(substituted, variables)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "topology", "explicit", "source"), _TOPOLOGY_FLAG_CASES
+)
+def test_topology_flag_combinations_pick_exactly_one_gate_branch(
+    case_id, topology, explicit, source
+):
+    """AC-18/IC-4: the four flag combinations select one branch, never both.
+
+    Unset renders the historic else branch (byte-identical to the golden
+    active fixture); every explicit combination renders the new topology
+    branch. The absent-variable branch semantics themselves are already
+    asserted in ``tests/test_orchestrator_topology_conditionals.py``
+    (``test_absent_variable_renders_the_else_branch_only``,
+    ``test_explicit_true_renders_the_new_branch_only``,
+    ``test_explicit_false_renders_the_else_branch_only``) and are not
+    duplicated here.
+    """
+    rendered = _render_prospective_gate(topology, explicit, source)
+    if case_id == "unset":
+        assert rendered == strip_inactive_conditional_blocks(
+            _topology_gate_line(), {"ROLE_ORCHESTRATOR_ACTIVE": "true"}
+        )
+        assert "Orchestrator-Singleton" in rendered
+        assert "Orchestrator-Topologie" not in rendered
+        return
+    assert rendered.startswith(f"2. **Orchestrator-Topologie ({topology}):**")
+    assert "Orchestrator-Singleton" not in rendered
+    assert "G1 " in rendered
+    assert rendered.count("Orchestrator-Topologie") == 1
+
+
+def test_topology_flags_are_never_simultaneously_true():
+    """AC-18 invariant: the four boolean flags can never all read ``"true"``.
+
+    ``ORCH_TOPOLOGY_EXPLICIT`` is independent of the position triple, but a
+    position flag is only true when a valid topology is set, and then exactly
+    one of the three is true. An invalid value fails closed to all-false. The
+    absent-variable / else-branch render is covered by the existing
+    ``tests/test_orchestrator_topology_conditionals.py`` tests named in
+    ``test_topology_flag_combinations_pick_exactly_one_gate_branch``.
+    """
+    four = (
+        "ORCH_TOPOLOGY_EXPLICIT",
+        "ORCH_TOPOLOGY_PRIMARY",
+        "ORCH_TOPOLOGY_SUBAGENT",
+        "ORCH_TOPOLOGY_HYBRID",
+    )
+    position = four[1:]
+    for topology in ("", "primary", "subagent", "hybrid", "not-a-topology"):
+        for explicit in (False, True):
+            flags = _topology_flags(topology, explicit=explicit, source="project")
+            assert not all(flags[name] == "true" for name in four)
+            assert sum(flags[name] == "true" for name in position) <= 1
 
 
 if __name__ == "__main__":

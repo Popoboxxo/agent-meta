@@ -3,8 +3,8 @@
 Covers the two risk-staged helpers in isolation:
 
 - ``_should_skip_role``: the four skip gates (ROLE_MAP, config['roles'],
-  role-enabled, MAIN_CHAT orchestrator) with their Claude-gated log.skip
-  messages byte-identical to the pre-split monolith.
+  role-enabled, main-chat orchestrator via the one emission predicate) with
+  their Claude-gated log.skip messages byte-identical to the pre-split monolith.
 - ``_cleanup_stale_agents``: stale-file pruning (ext-aware globs), the
   managed-index contract and the DELETE-log/dry-run semantics.
 """
@@ -238,8 +238,8 @@ def test_orchestrator_skipped_in_main_chat_mode(tmp_path):
         pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
-        config={},
-        variables={"ORCH_MODE_MAIN_CHAT": "true"},
+        config={"orchestrator": {"mode": "main-chat"}},
+        variables={},
         project_root=tmp_path,
         target_dir=tmp_path / "claude-agents",
         log=log,
@@ -247,7 +247,7 @@ def test_orchestrator_skipped_in_main_chat_mode(tmp_path):
     assert skip is True
     assert filename == "orchestrator.md"
     assert log.events == [("skip", "claude-agents/orchestrator.md",
-                           "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")]
+                           "orchestrator skipped — orchestrator mode is main-chat")]
 
 
 def test_orchestrator_synced_outside_main_chat_mode(tmp_path):

@@ -622,15 +622,22 @@ def _should_skip_role(
     if active_set is not None and not active_set.has(role):
         return _skip_not_in_roles()
 
-    # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
-    # is spawned; the main chat acts as router + worker. Not added to
+    # Single emission predicate (R1): the orchestrator file is skipped in
+    # main-chat mode — no orchestrator subagent is spawned; the main chat acts
+    # as router + worker. ``role_emitted_for_provider`` owns that decision and
+    # also knows the provider-scoped mode override; reading ORCH_MODE_MAIN_CHAT
+    # here would be a second, independent decision point. Not added to
     # expected_filenames so any stale orchestrator.md gets pruned.
-    if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+    from .active_set import role_emitted_for_provider
+
+    if role == "orchestrator" and not role_emitted_for_provider(
+        role, active_set, config, provider
+    ):
         if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
-            log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
+            log.skip(rel, "orchestrator skipped — orchestrator mode is main-chat")
         return True, filename
 
     return False, filename

@@ -66,6 +66,7 @@ from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
 from lib.consistency.temp_literals import check_temp_literals
+from lib.consistency.topology import check_orchestrator_topology
 from lib.io import load_yaml_file
 
 # ── git helpers ───────────────────────────────────────────────────────────────
@@ -259,6 +260,11 @@ def run_checks(
         # Context topology consistency (SPEC-CONTEXT-FILE-MODES, AC-19):
         # WARNING-only validation of context_file.topology / adapter keys.
         findings.extend(check_context_topology_consistency(root))
+
+        # Orchestrator topology consistency (SPEC-orchestrator-topology, AC-3/
+        # AC-7/AC-14/AC-16/AC-20): WARNING-only, one finding per check ID and
+        # provider. A project without orchestrator.topology yields nothing.
+        findings.extend(check_orchestrator_topology(root, project_config))
 
         # Changelog check: only meaningful when checking changed/new files
         new_files = get_new_files_vs_main(root)
