@@ -24,6 +24,23 @@
   3 inconclusive, 2 not run), so **no matrix cell was upgraded**: the 40-cell matrix stays at
   **25 data-derived / 15 `UNVERIFIED ⇒ no`**, `hybrid` is granted nowhere and deferred in v1, and
   P3 (multi-instance, `max-instances`/`singleton`) is not part of this change.
+- **Multi-instance orchestrators (`orchestrator.max-instances`, `orchestrator.singleton`,
+  #1077 P3)**: new `max-instances` key (integer 1..8, default 1) as the canonical
+  multiplicity, plus the presence-only `singleton` alias (`enum: [true]`, no schema default) for
+  exactly one instance; `singleton: false`, `singleton` × N>1 and `primary` × N>1 are hard
+  config errors, while `singleton` × N=1 is the redundant INFO
+  `orchestrator-topology.singleton-redundant` and a cross-scope `primary` at global N>1 the
+  WARNING `orchestrator-topology.instances-clamped` (effective N=1). Logical identity is
+  `orchestrator#<scope-id>`: the main chat derives `orchestrator_id` deterministically from the
+  scope key (plan/task ref, branch, PR) and normalizes it to `[a-z0-9][a-z0-9._-]{0,39}`; the
+  dispatch target stays the plain role name and the identity travels only in the A2A envelope
+  (`orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`, `metadata.scope_id`). State is
+  namespaced per instance: checkpoint `<base>__<id>.json`, human-only progress
+  `progress-<id>.md` (`current.md` stays the single machine-read root progress), and the shared
+  `.meta-viz/events.jsonl` carries the four audit fields (no file shards). The guard audit
+  reduces the record to `orchestrator_id=<id|unset>` (**audit-only** — never read by an
+  allow/deny decision). **N=1 is byte-identical**: without the keys no role name, file name,
+  session id or render changes.
 - **Structured release checklist (`release-checklist`, #1089)**: new opt-in block with
   `mode: off|advisory|strict` (default `off`) and project items that are either `check: agent` or
   `check: script`, each with `phase` (`precondition`/`step`), `required` and `applies-when`. A
@@ -75,6 +92,13 @@
   key unset are unaffected: the derivation keeps the historic behaviour and `sync --check` stays
   **byte-identical**. The provider matrix is unchanged in this release (25 data-derived /
   15 `UNVERIFIED ⇒ no`); no cell was upgraded by the probes.
+- **Multi-instance keys are accepted instead of rejected (#1077 P3)**: **behavior change:** a
+  project that already carried `orchestrator.max-instances` or `orchestrator.singleton` under the
+  v1 contract saw a hard validator error; those declarations now validate and take effect. With
+  `max-instances: 1` (the default, key absent) **N=1 stays byte-identical** in every render — no
+  role name, file name or session id changes. The orchestrator guard audit line gains
+  `orchestrator_id=<id|unset>` for every N — a log-format addition only: the id is **audit-only**,
+  it is never read by an allow/deny decision and nothing enforces N or scopes at runtime.
 - **Submodule push targets are checked instead of blocking `--recurse-submodules` (#1051)**:
   `dod-push-check.sh` resolves, for `--recurse-submodules=on-demand|only`, each
   submodule's own push destination (`remote.<name>.push`, then `push.default` /

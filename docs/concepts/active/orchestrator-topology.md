@@ -1,6 +1,6 @@
 # Orchestrator-Topologie (`primary | subagent | hybrid`)
 
-> Status: **Aktiv (v1, P0–P2 + P4)** — implementiert am 2026-11-04.
+> Status: **Aktiv (v1, P0–P4)** — implementiert am 2026-11-04; P3 (Multi-Instanz) nachgezogen am 2026-11-05.
 > Spec: [Orchestrator-Topologie (normativ)](../../specs/2026-11-04-orchestrator-topology-spec.md)
 > Design: [Design Rev. 4](../../specs/2026-11-03-orchestrator-topology-design.md)
 > Rule: [`a2a-delegation-gates.md`](../../../rules/1-generic/a2a-delegation-gates.md)
@@ -10,7 +10,7 @@
 expliziten, validierten Projekt-Entscheidung. Der Key ist optional; bleibt er
 ungesetzt, leitet der Builder die heutige Position ab und jedes gerenderte Byte
 bleibt identisch (AC-6). Die Topologie ist **orthogonal** zu `mode`
-(Gate-Stärke) und zur Multiplizität (P3).
+(Gate-Stärke) und zur Multiplizität (`max-instances`, siehe unten).
 
 ## Die drei Topologien
 
@@ -24,7 +24,8 @@ bleibt identisch (AC-6). Die Topologie ist **orthogonal** zu `mode`
 Rolle, **nicht zwei gleichzeitige Positionen**. Das Issue #1077 §2 las `hybrid`
 ursprünglich als „primary **und** zusätzlich spawnbar"; diese Lesart ist
 verworfen. Die Anzahl der Instanzen regelt ausschließlich `max-instances`
-(P3), nie die Enum. Ein Identitätsmodell gilt für alle drei Werte.
+(siehe Multi-Instanz-Vertrag), nie die Enum. Ein Identitätsmodell gilt
+für alle drei Werte.
 
 **`hybrid` ist in v1 nirgends gewährt:** Für jeden Provider ist
 `topology_support.hybrid == false` und `topology_verified_state.hybrid ==
@@ -87,28 +88,55 @@ ist ein **harter Validator-ERROR** (rc ≠ 0). Cross-Scope (Provider-Override
 `orchestrator-topology.main-chat-supersedes`; die Topologie ist dann **inert**,
 nicht still übersteuert.
 
-## Multi-Instanz-Vertrag — **P3, designed, not shipped**
+## Multi-Instanz-Vertrag — **P3, shipped**
 
-> **P3, designed, not shipped.** Der folgende Vertrag ist entworfen und
-> akzeptiert, aber **kein v1-Versprechen** — er ist **nicht Teil von v1** und
-> wird erst mit P3 implementiert.
+> **P3, shipped.** Der Vertrag ist implementiert und validiert und damit Teil
+> des ausgelieferten Vertrags — nicht mehr nur entworfen. Der Default bleibt
+> N=1: **N=1 ist byte-identisch** zu vorher (keine Rollen-, Dateinamen-,
+> Session-ID- oder Render-Änderung ohne gesetzten Key).
 
-- `orchestrator.max-instances` (integer 1..8, Default 1) ist der kanonische
-  Multiplizitäts-Key; `orchestrator.singleton` ist ein presence-only Alias
-  (`true`), kein Schema-Default.
+- `orchestrator.max-instances` (integer **1..8**, Default **1**) ist der
+  kanonische Multiplizitäts-Key; `orchestrator.singleton` ist ein
+  **presence-only** Alias (`enum: [true]`, **kein** Schema-Default) für genau
+  eine Instanz. `singleton: false` ist ein harter ERROR mit Hinweis auf
+  `max-instances`.
 - Same-Scope-Konflikte sind harte ERRORs: `singleton` present × N>1,
   `primary` × N>1, `singleton: false`. `singleton` present × N=1 ist **kein**
   Fehler, sondern das redundante INFO `orchestrator-topology.singleton-redundant`.
-- Die Singleton-Regel wird kardinalitätsfrei: **G1** Worker → Orchestrator =
+  Ein Cross-Scope-`primary` bei globalem N>1 ist ebenfalls kein Fehler, sondern
+  die WARNING `orchestrator-topology.instances-clamped` mit effektivem N=1.
+- **Identitätsmodell:** `orchestrator#<scope-id>`. Der Main Chat leitet die
+  `orchestrator_id` deterministisch aus dem Scope-Schlüssel ab (Plan-/Task-Ref,
+  Branch, PR-Nummer) und normalisiert sie auf
+  `[a-z0-9][a-z0-9._-]{0,39}` (1..40 Zeichen, kein `..`). Das Dispatch-Ziel
+  bleibt der reine Rollenname `orchestrator`; die Identität reist **nur** in
+  den Envelope-Feldern `orchestrator_id`/`scope_id` (bzw. `metadata.scope_id`),
+  nie als `#`-Suffix in Dateinamen oder `subagent_type`.
+- **Singleton-Regel, kardinalitätsfrei:** **G1** Worker → Orchestrator =
   HARD REJECT (immer); **G2** nur `main_chat` spawnt Orchestratoren, höchstens
   `max-instances`, mit eindeutiger `orchestrator_id` und disjunktem Scope;
-  **G3** Orchestrator → Orchestrator = HARD REJECT.
-- Zustands-Namespaces (`<base>__<id>`, `progress-<id>.md`) und das
-  Guard-Audit der Instanz-ID sind P3-only.
+  **G3** Orchestrator → Orchestrator = HARD REJECT. Fehlende oder doppelte ID
+  bzw. Scope-Überlappung ist ein HARD ERROR **beim Spawn**; es gibt kein
+  Runtime-Registry (dieselbe akzeptierte Prompt-Grenze wie
+  `validate_envelope`).
+- **Zustands-Namespaces:** Der Checkpoint einer Instanz liegt als
+  `<checkpoint-dir>/<base>__<id>.json`; `current.md` bleibt der einzige
+  maschinell gelesene Fortschritt und gehört der Wurzel-Session, jede Instanz
+  schreibt zusätzlich das rein menschlich lesbare `progress-<id>.md`. Das
+  gemeinsame `.meta-viz/events.jsonl` trägt die Audit-Felder
+  **`orchestrator_id`, `scope_id`, `spawned_by`, `spawned_at`** — keine
+  Datei-Shards.
+- **Audit-Felder:** Der vollständige Datensatz
+  `{orchestrator_id, scope_id, spawned_by, spawned_at}` steht im Viz-Event;
+  das Guard-Audit-Log reduziert ihn auf `orchestrator_id=<id|unset>`. Die
+  Guard-ID ist **audit-only**: sie wird geloggt und **nie** in einer
+  Allow/Deny-Entscheidung gelesen (kein Runtime-Enforcement von N oder
+  Scopes, OQ-2 = A).
 
-In v1 existiert keiner dieser Keys. Der v1-Vertrag ist: **genau ein spawnbarer
-Orchestrator**, und `max-instances`/`singleton`/`orchestrator_id` werden vom
-Validator nicht akzeptiert, weil sie noch nicht existieren.
+Ohne gesetzte Keys gilt der v1-Vertrag weiter: **genau ein spawnbarer
+Orchestrator**; `max-instances: 1` und das Fehlen von `singleton` sind der
+Default. Rollennamen, Dateinamen und Session-IDs bleiben bei N=1
+byte-identisch zu vorher.
 
 ## Cross-Links
 
