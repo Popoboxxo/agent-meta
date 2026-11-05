@@ -11,7 +11,8 @@ trace:
 
 # Orchestrator-Topologie P3 (Multi-Instanz) — Implementation Plan
 
-> Status: **Entwurf (Plan)**
+> Status: **DONE (2026-11-05)** — Branch `feat/orchestrator-topology-p3`, PR #1133,
+> Merge `b820acf2`, 21/21 Checks grün, Issue #1077 geschlossen.
 >
 > **Spec:** `docs/specs/2026-11-04-orchestrator-topology-spec.md`
 > **Spec-ID:** `SPEC-orchestrator-topology-2026-11-03`
@@ -139,19 +140,19 @@ JSON-Schema (Daten, kein Validator), Markdown/YAML-Templates, Bash (Hook als Tes
 `description`s von `max-instances` und `max-parallel-agents` grenzen sich gegenseitig ab.
 Consumes nichts.
 
-- [ ] Step 1: Schema-Test erweitern: `max-instances` existiert mit Typ/Grenzen/Default;
+- [x] Step 1: Schema-Test erweitern: `max-instances` existiert mit Typ/Grenzen/Default;
   `singleton` hat `enum: [true]` und **keinen** `default`-Key; `singleton: false` wird vom
   Schema abgelehnt; beide `description`s nennen den jeweils anderen Key (AC-12);
   konsistente Config (`max-instances: 8`, `singleton: true`) validiert. Lauf:
   `python3 -m pytest tests/test_orchestrator_topology_schema.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 6 failed**.
-- [ ] Step 2: Beide Properties unter `orchestrator.properties` ergänzen; `singleton` ohne
+- [x] Step 2: Beide Properties unter `orchestrator.properties` ergänzen; `singleton` ohne
   Schema-`default`; `max-parallel-agents`-Description um „Anzahl paralleler Worker
   **innerhalb eines** Orchestrators, nicht die Anzahl Orchestratoren" erweitern. Lauf:
   → **grün — 6 passed**.
-- [ ] Step 3: `python3 scripts/sync.py --validate` → **rc 0**; `max-instances: 9` und
+- [x] Step 3: `python3 scripts/sync.py --validate` → **rc 0**; `max-instances: 9` und
   `singleton: false` werden vom Schema als ungültig gemeldet.
-- [ ] Step 4: Commit `feat: declare multi-instance keys in project config schema`.
+- [x] Step 4: Commit `feat: declare multi-instance keys in project config schema`.
 
 ### Task 2: Harter Validator (d)/(e) (AC-8, AC-9, AC-17 P3)
 
@@ -164,7 +165,7 @@ Consumes nichts.
 `config.py::_validate_orchestrator_topology(config, config_path)` mit den gepinnten
 Teilstrings aus IC-8; Consumes `orchestrator.max-instances` / `orchestrator.singleton`.
 
-- [ ] Step 1: Test erweitern: `singleton` present + N>1 →
+- [x] Step 1: Test erweitern: `singleton` present + N>1 →
   `orchestrator.singleton conflicts with orchestrator.max-instances`;
   `singleton: false` → `orchestrator.singleton: false is not supported (use max-instances)`;
   `primary` + N>1 im selben Scope →
@@ -173,14 +174,14 @@ Teilstrings aus IC-8; Consumes `orchestrator.max-instances` / `orchestrator.sing
   `primary` + globales N>1) **kein** Validator-Fehler. Lauf:
   `python3 -m pytest tests/test_orchestrator_topology_validator.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 6 failed**.
-- [ ] Step 2: (d)/(e) nach den bestehenden (a)-(c) implementieren; `max-instances` fehlt ⇒
+- [x] Step 2: (d)/(e) nach den bestehenden (a)-(c) implementieren; `max-instances` fehlt ⇒
   N=1; `singleton`-Presence über Schlüssel-Existenz (nicht Truthiness). `singleton: false`
   wird zusätzlich zum Schema-`enum: [true]` (Warn-/Editor-Kanal) hart abgelehnt; alle
   Fehler über `_topology_error` (stderr `ERROR: <path>: …`, `sys.exit(1)`), stdlib-only.
   Lauf: → **grün — 6 passed**.
-- [ ] Step 3: Subprozess-Nachweis: `sync.py` **und** `sync.py --validate` liefern für je
+- [x] Step 3: Subprozess-Nachweis: `sync.py` **und** `sync.py --validate` liefern für je
   eine widersprüchliche Temp-Config **rc≠0**; `singleton: true` + N=1 liefert **rc 0**.
-- [ ] Step 4: Commit `feat: reject multi-instance contradictions before sync`.
+- [x] Step 4: Commit `feat: reject multi-instance contradictions before sync`.
 
 ### Task 3: `_instance_flags` + vier fail-closed Registrierungen (AC-8 Flags)
 
@@ -198,7 +199,7 @@ Teilstrings aus IC-8; Consumes `orchestrator.max-instances` / `orchestrator.sing
 provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 `orchestrator.max-instances` / `orchestrator.singleton`.
 
-- [ ] Step 1: Flag-/Conditional-Test erweitern: `_instance_flags(1, singleton_declared=False)`
+- [x] Step 1: Flag-/Conditional-Test erweitern: `_instance_flags(1, singleton_declared=False)`
   → `"1"`/`"false"`; `_instance_flags(3, singleton_declared=True)` → `"3"`/`"true"`;
   `ORCH_MAX_INSTANCES`/`ORCH_SINGLETON_DECLARED` stehen in
   `strip_inactive_conditional_blocks`-Whitelist, `_FALSE_DEFAULT_CONDITIONALS`,
@@ -206,16 +207,16 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
   Conditional-Variable ⇒ inaktiv. Lauf: `python3 -m pytest
   tests/test_orchestrator_topology_flags.py tests/test_orchestrator_topology_conditionals.py
   --basetemp="$PYTEST_BASETEMP"` → **rot — 6 failed**.
-- [ ] Step 2: `_instance_flags` implementieren (pure, provider-agnostisch, Wert außerhalb
+- [x] Step 2: `_instance_flags` implementieren (pure, provider-agnostisch, Wert außerhalb
   1..8 fail-closed auf `"1"`); beide Flags **explizit** in die `conditional_vars`-Menge
   aufnehmen (nicht nur über das `ORCH_TOPOLOGY_`-Präfix); `_FALSE_DEFAULT_CONDITIONALS` um
   beide ergänzen; `_CONDITIONAL_FALSE_FLAGS` um `"ORCH_MAX_INSTANCES": "1"` und
   `"ORCH_SINGLETON_DECLARED": "false"`; `_BUILTIN_VARS` um beide; in
   `_build_orch_variables` `variables.update(_instance_flags(...))` aus dem Projekt-Scope
   einsetzen. Lauf: → **grün — 6 passed**.
-- [ ] Step 3: `python3 scripts/sync.py --check` → **rc 0**; `tests/test_standalone_render.py`
+- [x] Step 3: `python3 scripts/sync.py --check` → **rc 0**; `tests/test_standalone_render.py`
   → **0 failed** (keine Byte-Drift, da noch kein Template den Platzhalter nutzt).
-- [ ] Step 4: Commit `feat: add multi-instance flags, fail-closed registered`.
+- [x] Step 4: Commit `feat: add multi-instance flags, fail-closed registered`.
 
 ### Task 4: Instanz-Identität + Auflösung (AC-10, AC-11 Identitäts-Teil)
 
@@ -230,20 +231,20 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 -> str`; Consumes `TopologyResolution`, `orchestrator_instances.multiple`,
 `topology_verified_state.multiple`.
 
-- [ ] Step 1: Identitäts-Test schreiben: Grammatik `[a-z0-9][a-z0-9._-]{0,39}` akzeptiert
+- [x] Step 1: Identitäts-Test schreiben: Grammatik `[a-z0-9][a-z0-9._-]{0,39}` akzeptiert
   `scope-a`/`pr-42`, lehnt `Scope-A`, `-scope`, `a/b`, `..` und >40 Zeichen ab;
   `compose(base, None)` ist die Identität; `compose("base", "scope-a") ==
   "base__scope-a"`; `checkpoint.validate_session_id` akzeptiert die Komposition; ungültige
   ID/ Komposition → `ValueError`. Lauf:
   `python3 -m pytest tests/test_multi_instance_identity.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 5 failed** (Symbole fehlen).
-- [ ] Step 2: Resolver-Test schreiben: Default N=1/Reason `None`; N=3 + `multiple: true`+
+- [x] Step 2: Resolver-Test schreiben: Default N=1/Reason `None`; N=3 + `multiple: true`+
   `DOCUMENTED` → `(3, None)`; `multiple: false` → `(1, reason)`; `multiple: UNVERIFIED` →
   `(1, reason)`; explizites `primary` + N>1 same-scope → `SyncError` (bei `validate=True`),
   `validate=False` → `(1, reason)`; Provider-Override `primary` + globales N>1 → `(1, reason)`
   **ohne** `SyncError`; `singleton` present + N>1 → `SyncError`; `singleton` present + N=1 →
   `(1, None)`; `singleton: false` → `SyncError`. Lauf: → **rot — 9 failed**.
-- [ ] Step 3: Implementieren. `resolve_orchestrator_instances`: N aus Projekt-Scope
+- [x] Step 3: Implementieren. `resolve_orchestrator_instances`: N aus Projekt-Scope
   (Default 1), Same-Scope-Konflikte hart, Capability-Clamp auf 1 mit Reason,
   Cross-Scope-`primary` auf 1 mit Reason. `compose_instance_session_id`: `None` ⇒ Basis
   unverändert; sonst `<base>__<id>` und `validate_session_id` **lazy** importieren
@@ -254,8 +255,8 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
   Envelope. Fehlende ID bei N>1 = Prompt-HARD-REJECT + Guard-Audit `id=unset`; doppelte
   ID/Scope-Überlappung = HARD ERROR beim Spawn (Prompt-Vertrag, keine Runtime-Registry).
   Lauf: → **grün — 14 passed**.
-- [ ] Step 4: `python3 scripts/sync.py --check` → **rc 0** (kein Konsument verdrahtet).
-- [ ] Step 5: Commit `feat: resolve orchestrator instance count and session ids`.
+- [x] Step 4: `python3 scripts/sync.py --check` → **rc 0** (kein Konsument verdrahtet).
+- [x] Step 5: Commit `feat: resolve orchestrator instance count and session ids`.
 
 ### Task 5: Checkpoint-/Progress-Namespaces (AC-10, AC-11 Zustands-Teil)
 
@@ -269,21 +270,21 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 `from_config`), Session-ID-Komposition über `topology.compose_instance_session_id`, Pfad
 `<base>__<id>.json` und `progress-<id>.md`; Consumes Task 4.
 
-- [ ] Step 1: Test schreiben: Default-Store (`orchestrator_id=None`) schreibt
+- [x] Step 1: Test schreiben: Default-Store (`orchestrator_id=None`) schreibt
   `sess1.json` + `current.md` **byte-identisch**; Store mit `orchestrator_id="scope-a"`
   schreibt `sess1__scope-a.json` und `progress-scope-a.md`, **kein** `current.md`;
   `validate_session_id("base__scope-a")` akzeptiert; `_session_file` bleibt im
   Checkpoint-Verzeichnis; Raw-Output-Verzeichnis nutzt dieselbe Komposition. Lauf:
   `python3 -m pytest tests/test_multi_instance_state.py tests/test_checkpoint_paths.py
   --basetemp="$PYTEST_BASETEMP"` → **rot — 6 failed**.
-- [ ] Step 2: `orchestrator_id`-Parameter ergänzen; `_session_file`/`_session_raw_dir`
+- [x] Step 2: `orchestrator_id`-Parameter ergänzen; `_session_file`/`_session_raw_dir`
   komponieren vor der Validierung; `_write_progress_file` schreibt bei gesetzter ID nur
   `progress-<id>.md` (rein menschlich, **kein** Konsument), sonst unverändert `current.md`.
   Tracker bleibt im Kontext: kein Datei-Artefakt, kein Code-Pfad. Lauf: → **grün — 6 passed**;
   bestehende `test_checkpoint_paths.py` **0 failed**.
-- [ ] Step 3: `python3 scripts/sync.py --check` → **rc 0**; `git status --porcelain` zeigt
+- [x] Step 3: `python3 scripts/sync.py --check` → **rc 0**; `git status --porcelain` zeigt
   nur die erwarteten Dateien.
-- [ ] Step 4: Commit `feat: namespace checkpoints and progress per orchestrator instance`.
+- [x] Step 4: Commit `feat: namespace checkpoints and progress per orchestrator instance`.
 
 ### Task 6: `singleton-redundant` (INFO) + `instances-clamped` (WARNING) (AC-8, AC-9)
 
@@ -296,19 +297,19 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 `orchestrator-topology.instances-clamped` (WARNING); Consumes
 `resolve_orchestrator_instances`, `orchestrator.singleton`, Capability-Multiple.
 
-- [ ] Step 1: Test schreiben: `singleton: true` + N=1 ⇒ genau ein INFO
+- [x] Step 1: Test schreiben: `singleton: true` + N=1 ⇒ genau ein INFO
   `singleton-redundant`, **kein** ERROR, rc 0; N=3 auf Provider mit `multiple: false` ⇒
   genau eine WARNING `instances-clamped`; Cross-Scope Provider-Override `primary` +
   globales N=3 ⇒ genau eine WARNING + effektiv N=1; Dedup je Check-ID; N=1 ohne
   `singleton` ⇒ keine Findings. Lauf:
   `python3 -m pytest tests/test_orchestrator_topology_consistency.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 5 failed**.
-- [ ] Step 2: `_append_once` um `severity` (Default WARNING) erweitern; pro Provider
+- [x] Step 2: `_append_once` um `severity` (Default WARNING) erweitern; pro Provider
   `resolve_orchestrator_instances` aufrufen; INFO/WARNING mit Provider, N und Reason
   anhängen; **kein** Schreiben, kein Exit. Lauf: → **grün — 5 passed**.
-- [ ] Step 3: `python3 scripts/consistency-check.py` → keine neuen ERRORs;
+- [x] Step 3: `python3 scripts/consistency-check.py` → keine neuen ERRORs;
   `--check`-rc unverändert 0.
-- [ ] Step 4: Commit `feat: report redundant singleton and clamped instances`.
+- [x] Step 4: Commit `feat: report redundant singleton and clamped instances`.
 
 ### Task 7: A2A-Rule-Wortlaut + provider-skopierte effektive N (AC-9 Gate-Teil)
 
@@ -323,23 +324,23 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 Überschreibung von `ORCH_MAX_INSTANCES` mit der effektiven N in
 `rules.py::_merged_rule_vars`; Consumes `_instance_flags`, `resolve_orchestrator_instances`.
 
-- [ ] Step 1: Test schreiben: ungesetzte Topologie rendert den `{{else}}`-Zweig
+- [x] Step 1: Test schreiben: ungesetzte Topologie rendert den `{{else}}`-Zweig
   **wortgleich** zu heute (kein `ORCH_MAX_INSTANCES`, kein neuer Satz); explizite
   Topologie rendert „höchstens {{ORCH_MAX_INSTANCES}}" statt „Genau eine Instanz";
   Provider mit `multiple: false` rendert effektiv `1`; `_merged_rule_vars(..., variables=None)`
   baut die Instanz-Flags selbst. Lauf:
   `python3 -m pytest tests/test_a2a_instance_wording.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 4 failed**.
-- [ ] Step 2: Rule-Zweig ändern: G2 ersetzt „Genau eine Instanz" durch „höchstens
+- [x] Step 2: Rule-Zweig ändern: G2 ersetzt „Genau eine Instanz" durch „höchstens
   {{ORCH_MAX_INSTANCES}}" und nennt eindeutige `orchestrator_id` + disjunkten Scope;
   fehlende/doppelte ID = HARD ERROR beim Spawn (Prompt-Vertrag); der `{{else}}`-Zweig
   bleibt Zeichen für Zeichen unverändert. In `rules.py` nach der Topologie-Auflösung
   `resolve_orchestrator_instances(...)` + `_instance_flags(...)` re-resolven und
   `ORCH_MAX_INSTANCES` mit der effektiven N überschreiben. Lauf: → **grün — 4 passed**.
-- [ ] Step 3: `python3 scripts/sync.py --check` → **rc 0** (Topologie in diesem Repo
+- [x] Step 3: `python3 scripts/sync.py --check` → **rc 0** (Topologie in diesem Repo
   ungesetzt ⇒ else-Zweig byte-identisch); `tests/test_orchestrator_topology_conditionals.py`
   → **0 failed**.
-- [ ] Step 4: Commit `docs: state multi-instance gate wording behind explicit topology`.
+- [x] Step 4: Commit `docs: state multi-instance gate wording behind explicit topology`.
 
 ### Task 8: Guard-Sentinel `id=` audit-only (AC-11 Guard-Teil, OQ-2 = A)
 
@@ -352,21 +353,21 @@ provider-losen Global-Werte in `config.py::_build_orch_variables`; Consumes
 `^#agent-meta:agent=([A-Za-z0-9_-]+)(?:\s+id=([A-Za-z0-9._-]+))?$` und ein Audit-Feld
 `orchestrator_id=<id|unset>` **nur** im Audit-Log; Consumes die ID-Grammatik aus Task 4.
 
-- [ ] Step 1: Hook-Test erweitern: Sentinel mit `id=scope-a` liefert **denselben**
+- [x] Step 1: Hook-Test erweitern: Sentinel mit `id=scope-a` liefert **denselben**
   Allow/Deny-Exit wie ohne ID; Audit-Log-Zeile enthält `orchestrator_id=scope-a`; Sentinel
   ohne ID → `orchestrator_id=unset`; ungültige ID (`scope/a`, `Scope-A`, `..`) macht den
   Sentinel unparsebar (Rolle leer), ohne den Hook zu crashen; git-Sentinel-Zeile bleibt
   unverändert. Lauf:
   `python3 -m pytest tests/test_orchestrator_guard_hook.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 4 failed**.
-- [ ] Step 2: Regex im Sentinel-Parser erweitern, beide Gruppen ausgeben, ID an die
+- [x] Step 2: Regex im Sentinel-Parser erweitern, beide Gruppen ausgeben, ID an die
   Audit-Zeile des Orchestrator-Sentinels hängen; Entscheidungspfad liest die ID **nie**;
   Kommentarblock dokumentiert den 4-Feld-Audit-Datensatz `{orchestrator_id, scope_id,
   spawned_by, spawned_at}` und die Reduktion auf `orchestrator_id`. `# version: 1.9.3` →
   `1.10.0`, `# changelog:`-Zeile ergänzen. Lauf: → **grün — 4 passed**; bestehende
   Hook-Tests **0 failed**.
-- [ ] Step 3: `bash -n hooks/1-generic/orchestrator-guard-impl.sh` → **rc 0**.
-- [ ] Step 4: Commit `feat: audit orchestrator instance id in the guard sentinel`.
+- [x] Step 3: `bash -n hooks/1-generic/orchestrator-guard-impl.sh` → **rc 0**.
+- [x] Step 4: Commit `feat: audit orchestrator instance id in the guard sentinel`.
 
 ### Task 9: A2A-Envelope, Delegation-Syntax & Viz-Emitter (AC-11 Event-Teil)
 
@@ -383,7 +384,7 @@ stdlib-Pattern-Check in `validate_envelope`, CLI/MCP-Felder `--orchestrator-id`,
 `--scope-id`, `--spawned-by`, `--spawned-at` im Viz-Emitter; Consumes die ID-Grammatik
 aus Task 4.
 
-- [ ] Step 1: Tests schreiben: Schema akzeptiert gültige optionale `orchestrator_id` +
+- [x] Step 1: Tests schreiben: Schema akzeptiert gültige optionale `orchestrator_id` +
   `metadata.scope_id`, lehnt ungültige ab, verlangt sie **nicht** (N unbekannt);
   `validate_envelope` akzeptiert gültige optionale Felder und lehnt `target_agent:
   orchestrator#scope-a` ab (Ziel bleibt `orchestrator`); Event ohne Instanzfelder ist
@@ -391,12 +392,12 @@ aus Task 4.
   **eine** Datei (`events.jsonl`, kein Shard). Lauf: `python3 -m pytest
   tests/test_multi_instance_envelope.py tests/test_viz_instance_fields.py
   --basetemp="$PYTEST_BASETEMP"` → **rot — 6 failed**.
-- [ ] Step 2: Schema-Properties ergänzen (nicht `required`); Pattern-Check in
+- [x] Step 2: Schema-Properties ergänzen (nicht `required`); Pattern-Check in
   `validate_envelope`; Viz-CLI/MCP um die vier optionalen Felder erweitern und nur bei
   Vorhandensein in das Event schreiben. Lauf: → **grün — 6 passed**.
-- [ ] Step 3: `python3 scripts/sync.py --validate` → **rc 0**;
+- [x] Step 3: `python3 scripts/sync.py --validate` → **rc 0**;
   `python3 scripts/viz-report.py --help` → **rc 0** (Reader unverändert).
-- [ ] Step 4: Commit `feat: carry orchestrator identity in envelopes and viz events`.
+- [x] Step 4: Commit `feat: carry orchestrator identity in envelopes and viz events`.
 
 ### Task 10: Doku-Flip + CHANGELOG + v1-Ledger (AC-8…AC-11 Doku)
 
@@ -411,21 +412,21 @@ aus Task 4.
 **Interfaces:** Produces die P3-Doku (Keys, ID-Modell, Namespaces, Guard-Audit, Scope-Regel)
 und den CHANGELOG-Eintrag; Consumes den implementierten Stand aus Tasks 1–9.
 
-- [ ] Step 1: Doku-Test anpassen: Concept-Doc enthält **nicht** mehr
+- [x] Step 1: Doku-Test anpassen: Concept-Doc enthält **nicht** mehr
   „P3, designed, not shipped", sondern den Shipped-Status und die neuen Keys; die
   Singleton-Concept verlinkt auf den Shipped-Abschnitt; das v1-Ledger nennt P3
   „umgesetzt"; der CHANGELOG-Eintrag existiert. Lauf:
   `python3 -m pytest tests/test_orchestrator_topology_docs.py --basetemp="$PYTEST_BASETEMP"`
   → **rot — 4 failed**.
-- [ ] Step 2: Concept-Doc-Abschnitt auf „shipped" umschreiben (`max-instances`/`singleton`,
+- [x] Step 2: Concept-Doc-Abschnitt auf „shipped" umschreiben (`max-instances`/`singleton`,
   `orchestrator#<scope-id>`-Modell, `<base>__<id>`/`progress-<id>.md`, audit-only
   Guard-ID, Main-Chat-Scope-Pflicht); Singleton-Concept-Status aktualisieren; v1-Ledger-
   P3-Notiz von „offen" auf „umgesetzt in P3" ändern; CHANGELOG unter `Unreleased`
   ergänzen (Keys, harte Konflikte, INFO/WARNING, State-Namespaces, Guard-Audit, N=1
   byte-identisch). Lauf: → **grün — 4 passed**.
-- [ ] Step 3: `python3 scripts/sync.py --check` → **rc 0**;
+- [x] Step 3: `python3 scripts/sync.py --check` → **rc 0**;
   `python3 scripts/consistency-check.py` → keine neuen ERRORs.
-- [ ] Step 4: Commit `docs: document shipped multi-instance orchestrators`.
+- [x] Step 4: Commit `docs: document shipped multi-instance orchestrators`.
 
 ---
 
@@ -525,3 +526,60 @@ P3 ist fertig, wenn **alle** folgenden Punkte erfüllt sind:
 - **Keine offene Frage:** OQ-2 = A und OQ-3 = A sind eingefaltet; der Plan fügt **0** OQ
   hinzu. K-1…K-3 sind Präzisierungen gegen den Checkout mit gewähltem Verhalten, keine
   Entscheidungsbedarfe.
+
+---
+
+## Ausführungsnachweis (Ledger)
+
+**Abschluss:** 2026-11-05 · Branch `feat/orchestrator-topology-p3` · PR #1133 ·
+Merge `b820acf2` · 21/21 Checks grün · Issue #1077 geschlossen.
+
+### Task → Commit
+
+| Task | Inhalt | Commit |
+|---|---|---|
+| T1 | Schema `max-instances` / `singleton` | `864d7239` |
+| T2 | Harter Validator (d)/(e) | `34399977` |
+| T4 | Instanz-Identität & Auflösung | `65c2e834` |
+| T3 | `_instance_flags` + vier Registrierungen | `f451c634` |
+| T5 | Checkpoint-/Progress-Namespaces | `fa33cf8a` |
+| T6 | `singleton-redundant` (INFO) + `instances-clamped` (WARNING) | `256e88b0` |
+| T7 | A2A-Rule-Wortlaut + provider-skopierte N | `356aa1b1` |
+| T8 | Guard-Sentinel `id=` (audit-only) | `7862184b` |
+| T9 | A2A-Envelope, Delegation-Syntax & Viz | `cab48919` |
+| T10 | Doku-Flip + CHANGELOG | `af522f82` |
+
+### Follow-ups
+
+| Follow-up | Inhalt | Commit |
+|---|---|---|
+| Rebaseline | AC-01-Einträge per Eintrag neu gepinnt | `e2cf6b49` |
+| Doku/CHANGELOG | P3-Doku + CHANGELOG-Eintrag | `af522f82` |
+
+> T10 und der Doku/CHANGELOG-Follow-up teilen sich `af522f82`; dadurch **11** statt der
+> im Dispatch angenommenen 12 Commits. Kein Inhalt fehlt.
+
+### Evidenz
+
+- Tests über die Runden: **207 + 501 + 277 + 10**, keine Fehlschläge.
+- `python3 scripts/sync.py --check` → **rc 0**.
+- `python3 scripts/sync.py --validate` → **rc 0**.
+- `python3 scripts/consistency-check.py` → **PASS**, keine neuen ERRORs.
+- AC-01: **11 Einträge** per Eintrag neu gepinnt, **ohne** `--write`-Sammellauf;
+  `settings.local.json` blieb ausgeschlossen.
+- N=1-Byte-Identität: `topology-golden`, `slimming-golden`, `compact-golden`
+  **unverändert**.
+- `hooks/1-generic/orchestrator-guard-impl.sh` **1.10.0**, Sentinel-ID **audit-only**.
+
+### Abweichungen vom Plan
+
+- AC-01-Drift umfasste **11 Einträge** (2 Guard-Renders aus dem 1.10.0-Bump + 9
+  `project.yaml`-Renders, weil die Schema-`description` dort eingebettet ist) — entdeckt
+  von einem späteren Task, nicht am Änderungspunkt.
+- Der Cross-Scope-Clamp samt WARNING landete in **T6**, das Clamp-Verhalten selbst kam aus
+  **T2** (auf zwei Tasks verteilt).
+- `tests/test_orchestrator_topology_docs.py` wurde auf die „P3 shipped"-Formulierung
+  angepasst.
+- Die Guard-ID ist **audit-only**: kein Runtime-Enforcement von N — die
+  Convention-Boundary-Aussage bleibt bestehen.
+- Der Branch trug **11 Commits**, nicht die 12 aus dem Dispatch (kein Inhalt fehlt).
