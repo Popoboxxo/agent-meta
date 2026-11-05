@@ -38,6 +38,7 @@ from .providers import (
     resolve_agent_meta_root,
     resolve_providers,
 )
+from .topology import compose_instance_session_id, is_valid_orchestrator_id
 
 # Deprecated compatibility aliases. The historical defaults now live in
 # ``scripts/lib/progress_paths.py`` and are no longer the source of truth for
@@ -335,8 +336,22 @@ class CheckpointStore:
         agent_meta_root: Path | str | None = None,
         progress_dir: Path | str | None = None,
         checkpoint_dir: Path | str | None = None,
+        orchestrator_id: Optional[str] = None,
     ):
         self.project_root = Path(project_root) if project_root else Path.cwd()
+        # P3 (AC-10): ``orchestrator_id=None`` is the N=1 default and keeps the
+        # historic paths byte-identical. A present id namespaces the checkpoint
+        # file (``<base>__<id>.json``) and the human-readable progress file
+        # (``progress-<id>.md``). Validated eagerly so a bad id can never reach
+        # a path builder.
+        if orchestrator_id is not None and not is_valid_orchestrator_id(
+            orchestrator_id
+        ):
+            raise ValueError(
+                f"invalid orchestrator id {orchestrator_id!r}: expected "
+                "[a-z0-9][a-z0-9._-]{0,39} (1..40 chars, no '..')"
+            )
+        self.orchestrator_id = orchestrator_id
         # When the harness omits agent_meta_root, detect it from the project
         # root (`.agent-meta/` submodule vs. self-hosting checkout) instead of
         # silently reading provider config from the project root — the latter
@@ -360,13 +375,15 @@ class CheckpointStore:
         project_root: Path | str,
         config: Optional[dict] = None,
         agent_meta_root: Path | str | None = None,
+        orchestrator_id: Optional[str] = None,
     ) -> "CheckpointStore":
         """Build a store whose directories respect the ``progress`` config.
 
         Supersedes direct ``CheckpointStore(project_root=...)`` construction at
         the production call sites so writes and reads observe the same resolved
         directories (no split-brain). Without a ``progress`` block the resolved
-        paths are byte-identical to the framework defaults.
+        paths are byte-identical to the framework defaults. ``orchestrator_id``
+        is forwarded unchanged (P3 state namespace).
         """
         resolved = resolve_progress_paths(Path(project_root), config)
         return cls(
@@ -374,6 +391,7 @@ class CheckpointStore:
             agent_meta_root=agent_meta_root,
             progress_dir=resolved.progress_dir,
             checkpoint_dir=resolved.checkpoint_dir,
+            orchestrator_id=orchestrator_id,
         )
 
     def _ensure_dir(self) -> None:
@@ -382,13 +400,16 @@ class CheckpointStore:
     def _session_file(self, session_id: str) -> Path:
         """Resolve the session JSON path, confined to the checkpoint directory.
 
-        Defense-in-depth for IC-11: the session id is validated here as well
-        (not only in the CLI handler) and the resolved path must stay under
-        ``checkpoint_dir`` — a traversal id can never create or read a file
-        outside it.
+        Defense-in-depth for IC-11: the composed session id is validated here
+        as well (not only in the CLI handler) and the resolved path must stay
+        under ``checkpoint_dir`` — a traversal id can never create or read a
+        file outside it. P3 (AC-10): the id is composed through
+        ``topology.compose_instance_session_id`` first — ``None`` instance id
+        is the unchanged base (byte-identical N=1), otherwise ``<base>__<id>``.
         """
-        validate_session_id(session_id)
-        path = (self.checkpoint_dir / f"{session_id}.json").resolve()
+        composed = compose_instance_session_id(session_id, self.orchestrator_id)
+        validate_session_id(composed)
+        path = (self.checkpoint_dir / f"{composed}.json").resolve()
         root = self.checkpoint_dir.resolve()
         try:
             path.relative_to(root)
@@ -400,12 +421,15 @@ class CheckpointStore:
         """Resolve the per-session raw-output directory, confined to
         ``checkpoint_dir`` (defense-in-depth like ``_session_file``).
 
-        Also closes a Windows drive-relative id without a separator
-        (e.g. ``C:foo``) that the id validation alone cannot catch. The path is
-        returned unresolved so callers compose it exactly as before.
+        P3 (AC-10): the same composed session id is used, so the raw output of
+        an instance lands under ``<checkpoint-dir>/<base>__<id>/``. Also closes
+        a Windows drive-relative id without a separator (e.g. ``C:foo``) that
+        the id validation alone cannot catch. The path is returned unresolved
+        so callers compose it exactly as before.
         """
-        validate_session_id(session_id)
-        path = self.checkpoint_dir / session_id
+        composed = compose_instance_session_id(session_id, self.orchestrator_id)
+        validate_session_id(composed)
+        path = self.checkpoint_dir / composed
         root = self.checkpoint_dir.resolve()
         try:
             path.resolve().relative_to(root)
@@ -504,16 +528,27 @@ class CheckpointStore:
         self._write_progress_file(session_data)
 
     def _write_progress_file(self, session_data: dict) -> None:
-        """Write <progress_dir>/current.md -- see _render_progress_markdown
-        and _render_progress_entry. Tier A: overwrite (unchanged pre-existing
-        behavior). Tier B: append the newest checkpoint only, with a rotation
-        reset on the first checkpoint of a new session, and a running byte
-        cap (design doc 2026-09-10, Architecture §1).
+        """Write the human-readable progress file -- see
+        _render_progress_markdown and _render_progress_entry.
+
+        P3 (AC-10): without an ``orchestrator_id`` this is
+        ``<progress_dir>/current.md`` — unchanged, the single machine-read
+        progress file. With an id it is ``<progress_dir>/progress-<id>.md``:
+        **human-only**, no code consumer reads it, and ``current.md`` stays the
+        root session's machine-read file (an instance never writes it).
+
+        Tier A: overwrite (unchanged pre-existing behavior). Tier B: append the
+        newest checkpoint only, with a rotation reset on the first checkpoint of
+        a new session, and a running byte cap (design doc 2026-09-10,
+        Architecture §1).
 
         Provider-neutral path (live-progress-channel design, 2026-09-10) --
         was hardcoded to the Claude-specific .claude/progress/ before.
         """
-        progress_path = self.progress_dir / "current.md"
+        if self.orchestrator_id is None:
+            progress_path = self.progress_dir / "current.md"
+        else:
+            progress_path = self.progress_dir / f"progress-{self.orchestrator_id}.md"
         # Defense-in-depth (IC-03): never write outside the resolved progress
         # directory, e.g. when ``current.md`` is a symlink pointing elsewhere.
         try:
