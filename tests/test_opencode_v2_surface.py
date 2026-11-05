@@ -5435,10 +5435,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # at 1.10.0 plus the nine copied `.meta-config/project.yaml` files with the new
 # schema descriptions); `slimming-golden`/`compact-golden` and the topology
 # goldens are unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Release 2.0.0-beta.7 (VERSION bump 2.0.0-beta.6 -> 2.0.0-beta.7): version
+# strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
+# `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
+# trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "bbcc14a7ef37a9940751f9106363a8a554b27a714cb7266ad7cc03d3c8eaed48",
+    "ac01-baseline": "5c90f431f31f290f0f83b142301444c4d9e605763655d58f793f1d0640048eb5",
     "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
-    "compact-golden": "badf23628a2a251d424947d53485cdb0355ca795db23fdc170665ce70b97ab4c",
+    "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
 }
 
 

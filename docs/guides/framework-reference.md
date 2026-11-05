@@ -1,6 +1,6 @@
 # Framework-Referenz
 
-> Aus dem README ausgelagerte Referenzabschnitte (Stand 2.0.0-beta.6). Quelle der Wahrheit bleibt der Code
+> Aus dem README ausgelagerte Referenzabschnitte (Stand 2.0.0-beta.7). Quelle der Wahrheit bleibt der Code
 > (`agents/1-generic/*.md`-Frontmatter, `config/role-defaults.yaml`, `scripts/lib/`). Versionen und
 > Tiers im Roster driften mit jedem Template-Bump — bei Abweichung gilt der Code.
 >
