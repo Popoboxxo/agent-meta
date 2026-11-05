@@ -5440,7 +5440,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "5c90f431f31f290f0f83b142301444c4d9e605763655d58f793f1d0640048eb5",
+    "ac01-baseline": "3acc668ea8f1f58452e973f76a023358ff91d25f584eab16ef831d184335f411",
     "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
     "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
 }
