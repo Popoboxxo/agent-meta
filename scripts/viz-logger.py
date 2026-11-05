@@ -144,7 +144,33 @@ def _build_event_from_args(args: argparse.Namespace) -> dict:
         except json.JSONDecodeError:
             event["payload"] = {"message": args.payload}
 
+    _add_instance_fields(event, args)
     return event
+
+
+#: P3 instance identity fields (AC-11). At N=1 none is passed, so the event
+#: keeps the historic key set; the log stays the single events.jsonl file.
+_INSTANCE_FIELD_ATTRS = (
+    ("orchestrator_id", "orchestrator_id"),
+    ("scope_id", "scope_id"),
+    ("spawned_by", "spawned_by"),
+    ("spawned_at", "spawned_at"),
+)
+
+
+def _add_instance_fields(event: dict, source) -> None:
+    """Copy the four optional instance fields onto *event* when present.
+
+    *source* is either an ``argparse.Namespace`` (CLI) or a params dict (MCP).
+    Absent/empty values add nothing — the N=1 event is unchanged.
+    """
+    for field, attr in _INSTANCE_FIELD_ATTRS:
+        if isinstance(source, dict):
+            value = source.get(attr)
+        else:
+            value = getattr(source, attr, None)
+        if value:
+            event[field] = value
 
 
 def _build_event_from_params(params: dict) -> dict:
@@ -172,6 +198,7 @@ def _build_event_from_params(params: dict) -> dict:
     if "tokens_out" in params:
         event["tokens_out"] = params["tokens_out"]
 
+    _add_instance_fields(event, params)
     return event
 
 
@@ -231,6 +258,22 @@ TOOLS = [
                 "tokens_out": {
                     "type": "integer",
                     "description": "Optional output token count for this agent invocation",
+                },
+                "orchestrator_id": {
+                    "type": "string",
+                    "description": "Optional (P3, N>1): orchestrator instance id; omitted at N=1",
+                },
+                "scope_id": {
+                    "type": "string",
+                    "description": "Optional (P3, N>1): disjoint instance scope",
+                },
+                "spawned_by": {
+                    "type": "string",
+                    "description": "Optional (P3, N>1): spawner of record (main_chat)",
+                },
+                "spawned_at": {
+                    "type": "string",
+                    "description": "Optional (P3, N>1): ISO 8601 spawn timestamp",
                 },
             },
             "required": ["event", "agent"],
@@ -614,6 +657,14 @@ def main():
     parser.add_argument("--task_id", help="Correlation UUID to track delegation")
     parser.add_argument("--tokens_in", type=int, default=None, help="Input token count (optional)")
     parser.add_argument("--tokens_out", type=int, default=None, help="Output token count (optional)")
+    parser.add_argument("--orchestrator-id", default=None,
+                        help="Orchestrator instance id (P3, N>1 only; omitted at N=1)")
+    parser.add_argument("--scope-id", default=None,
+                        help="Disjoint orchestrator scope (P3, N>1 only)")
+    parser.add_argument("--spawned-by", default=None,
+                        help="Spawner of record, normally main_chat (P3, N>1 only)")
+    parser.add_argument("--spawned-at", default=None,
+                        help="ISO 8601 spawn timestamp (P3, N>1 only)")
 
     args = parser.parse_args()
 
