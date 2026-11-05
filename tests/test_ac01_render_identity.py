@@ -859,6 +859,28 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (``dcd2f5be…`` -> ``8d1ade1a…`` / ``416cd520…`` -> ``badf2362…``).
   ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Orchestrator topology P3 (SPEC-orchestrator-topology-2026-11-03, issue #1077,
+  2026-11-05, ``feat/orchestrator-topology-p3``): multi-instance lands and two
+  rendered sources move. The guard template ``orchestrator-guard-impl.sh`` is
+  bumped ``1.9.0 -> 1.10.0`` (audit-only instance id in the sentinel grammar and
+  the orchestrator audit line) and renders for Claude and Gemini only; the
+  ``config/project-config.schema.json`` description text for
+  ``orchestrator.max-instances``/``singleton`` is embedded in every copied
+  ``.meta-config/project.yaml`` (9 providers). Exactly **11 of 1099 hashes
+  moved; 0 added/removed**: the two guard renders
+  (``Claude/.claude/hooks/orchestrator-guard-impl.sh``, Gemini's counterpart)
+  plus the nine ``.meta-config/project.yaml`` files. No agent, rule, command or
+  ``AGENTS.md`` artifact and no ``context-hashes.json`` changed. The manifest was
+  patched **per entry** (11 single-line replacements, 1088 of the 1099 lines
+  untouched) -- not via ``--write`` -- after independently recomputing every
+  digest from the rendered file bytes with the harness's own ``_hash_file``.
+  Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed
+  from the fixture bytes: ``a88fca0d…`` -> ``bbcc14a7…``); ``slimming-golden``
+  and ``compact-golden`` were re-verified as unchanged
+  (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
+  unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
