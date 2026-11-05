@@ -323,7 +323,7 @@ def _known(name: str) -> str:
     "Bash", "Write", "Edit", "Read", "Glob", "Grep", "TodoWrite", "Task",
     "WebFetch", "WebSearch", "NotebookEdit", "MultiEdit", "Skill",
     "mcp__playwright__browser_navigate", "mcp__reqogniloom__workspace_get",
-    "Agent", "SendMessage",
+    "Agent", "SendMessage", "SubagentHandback", "ToolSearch",
 ])
 def test_hook_known_tool_name_accepts_known_tools(name):
     """The shared allow-list both security guards consult (M2): every name
