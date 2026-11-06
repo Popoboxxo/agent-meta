@@ -375,7 +375,7 @@ def test_settings_json_identical_and_no_secrets_file(tmp_path_factory):  # AC-EN
 OVERRIDES = {
     "homeassistant-developer.md": ("2.1.3", "1-generic/developer.md@4.9.0"),
     "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
-    "hacs-developer.md": ("1.3.2", "1-generic/developer.md@4.9.0"),
+    "hacs-developer.md": ("1.3.3", "1-generic/developer.md@4.9.0"),
     "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
     "hacs-tester.md": ("1.0.6", "1-generic/tester.md@2.10.0"),
     "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),

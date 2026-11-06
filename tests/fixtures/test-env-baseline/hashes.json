@@ -11,7 +11,7 @@
   "base/e2e-tester": "d84d984adcc17b411f8561e417ecf145e5c9dd8299cd0adef9d3dd20b2cc1c87",
   "base/test-executor": "8757cc5227abfe6b45f078ef1bd33189b2d6c873e84d847ab1dff1cc48a7e582",
   "base/tester": "3d6fbfa3a80b59e72db89aa7d3b7afdb914e3959f3dae878ec84530778540843",
-  "hacs/developer": "d333b3667c145c18650fded9bc2e207ab84acb366af11ceed4776f7baae03b6c",
+  "hacs/developer": "8e68907cb040f784796e87b3c8ce5f4cd229b5ea96b37f7fba6cc4ea1c1ae23d",
   "hacs/devops-engineer": "dc16a6cfdfd481c5fae47e3e17df7c5b2f04291d35d0a2777af3514858b2e317",
   "hacs/docker": "6b73546ee262c425be30b9ffde989d9d615dfa1c68b1987d45103fe213bd169f",
   "hacs/e2e-tester": "6915857421a9e38e91f7209e227b122b7e82dc0e582cae50f06c1239d41cf672",

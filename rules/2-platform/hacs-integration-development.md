@@ -185,23 +185,125 @@ Entity-Registry-Einträge umbenannt.
 
 ```python
 # custom_components/<domain>/__init__.py
+from __future__ import annotations
+
+import logging
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+# Explicit map: unique_id -> (new_entity_id, original_name). Never derive targets from display names.
+_RENAMES = {
+    "health_o_mat_power_old": ("sensor.health_o_mat_power", "Power"),
+    "health_o_mat_energy_old": ("sensor.health_o_mat_energy", "Energy"),
+}
+_ANCHOR = "sensor.health_o_mat_"  # common prefix of the integration's own entity_ids
+
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """v1 -> v2: Entity umbenennen, unique_id bleibt stabil."""
-    if entry.version < 2:
-        def _rename(reg_entry: er.RegistryEntry) -> dict[str, str] | None:
-            if reg_entry.unique_id == "health_o_mat_power_old":
-                return {
-                    "new_entity_id": "sensor.health_o_mat_power",
-                    "original_name": "Power",
-                }
-            return None
+    """v1 -> v2: rename entities, unique_id stays stable. Idempotent."""
+    if entry.version >= 2:
+        return True
 
-        er.async_migrate_entries(hass, entry.entry_id, _rename)
-        hass.config_entries.async_update_entry(entry, version=2)
+    registry = er.async_get(hass)
+    own = er.async_entries_for_config_entry(registry, entry.entry_id)
+    # Warning guard only (no bump gate): the anchor is a fixed constant, a single entity proves little.
+    anchored = sum(1 for e in own if e.entity_id.startswith(_ANCHOR)) >= 2
+    collisions: list[str] = []  # target entity_ids that are taken
+    errors: list[str] = []  # registry errors (ValueError), logged only
+
+    def _rename(reg_entry: er.RegistryEntry) -> dict[str, str] | None:
+        target = _RENAMES.get(reg_entry.unique_id)
+        if target is None:
+            return None
+        new_entity_id, original_name = target
+        if reg_entry.entity_id == new_entity_id:
+            return None  # already migrated
+        if not reg_entry.entity_id.startswith(_ANCHOR):
+            # Per-entity decision (unique_id-based): a hand-renamed id is the user's.
+            _LOGGER.warning("Skip %s: user-renamed", reg_entry.entity_id)
+            return None
+        if registry.async_get(new_entity_id) is not None or not hass.states.async_available(new_entity_id):
+            _LOGGER.warning("Skip %s: target %s is taken", reg_entry.entity_id, new_entity_id)
+            collisions.append(new_entity_id)
+            return None
+        # Rename fields only - never entity_category/labels/aliases/area_id/hidden_by/disabled_by.
+        return {"new_entity_id": new_entity_id, "original_name": original_name}
+
+    try:
+        await er.async_migrate_entries(hass, entry.entry_id, _rename)
+    except ValueError as err:
+        _LOGGER.warning("Entity registry migration failed: %s", err)
+        errors.append(str(err))
+
+    if collisions or errors:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            f"migration_blocked_{entry.entry_id}",
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="migration_blocked",
+            translation_placeholders={"entities": ", ".join(collisions or [t for t, _ in _RENAMES.values()])},
+        )
+        # No bump. False => MIGRATION_ERROR (not recoverable): retry only after a HA restart.
+        return False
+
+    # Resolved collision: clear the stale repair issue (no-op if none exists).
+    ir.async_delete_issue(hass, DOMAIN, f"migration_blocked_{entry.entry_id}")
+    if not anchored:
+        # Nothing is broken; warn once, but still bump (blocking would only mean v1 + warning on every start).
+        _LOGGER.warning("Anchor %s supported by < 2 entities", _ANCHOR)
+    hass.config_entries.async_update_entry(entry, version=2)
     return True
 ```
+
+Rezept-Regeln:
+
+- `async_migrate_entries` ist eine Coroutine — **immer `await`en**. Ohne `await` läuft die
+  Migration nie, und der Version-Bump markiert den Entry trotzdem als migriert.
+- Version-Bump (`async_update_entry(entry, version=...)`) genau einmal, **nach** dem `await`
+  und nur im Erfolgsfall — nie bei Kollision oder `ValueError`. `data`/`options`/`version`
+  in **einem** `async_update_entry`-Aufruf schreiben (nie getrennte Aufrufe); `entry.version = N`
+  ist verboten (wirft `AttributeError`, schon in HA 2026.2.3 — `version` steht in
+  `UPDATE_ENTRY_CONFIG_ENTRY_ATTRS`).
+- Zielnamen kommen aus der expliziten `unique_id`-Map. „User-umbenannt“ wird **pro Entity**
+  entschieden (Präfix passt nicht): Warnung, Skip (`None`), nicht überschrieben.
+  Grenze: eine User-Umbenennung, die den Präfix behält (z. B. `sensor.health_o_mat_my_power`),
+  ist von einer Alt-ID nicht unterscheidbar und wird auf das Ziel zurückbenannt.
+- Der Präfix-Anker (`_ANCHOR`, feste Konstante) ist nur ein Warn-Guard: Tragen weniger als
+  2 Entities den Anker, gibt es **eine** Warnung (kein Präfix aus einer Einzel-Entity ableiten),
+  die Migration läuft trotzdem pro Entity weiter. Er sperrt den Bump **nicht**. Gebumpt wird,
+  wenn keine Kollision und kein `ValueError` auftrat (dann ist jede gemappte Entity am Ziel
+  oder bewusst als user-umbenannt übersprungen); kein Repair-Issue, Rückgabe `True`.
+- Kollision (`registry.async_get(target)` belegt oder `states.async_available` false):
+  Callback gibt `None` zurück, Warnung, **ein** Repair-Issue, Rückgabe `False`. HA wirft sonst
+  `ValueError` beim Rename; auch dieser Fall wird gefangen und genauso behandelt.
+  `False` setzt den Entry auf `MIGRATION_ERROR` (nicht recoverable): `async_unload`/Reload
+  werfen `OperationNotAllowed` (HA `config_entries.py`), ein Retry gibt es nur nach
+  HA-Neustart bzw. HA-Update, nicht nach dem Beheben im UI.
+- Der Callback liefert nur `new_entity_id`/`original_name` — Metadaten des Users bleiben erhalten.
+- Konvergent: teilmigrierte Entries (Ziel bereits erreicht) liefern `None`; nach Kollision/
+  `ValueError` führt ein Neustart die Migration zu Ende. Nach dem Bump ist der Lauf ein No-op
+  (Versions-Guard).
+- Erfolgspfad: vor dem Bump `ir.async_delete_issue(...)` mit derselben `issue_id` — ein
+  aufgelöster Konflikt entfernt das Repair-Issue.
+- Das Repair-Issue braucht einen `translation_key`-Eintrag (`migration_blocked`) unter
+  `issues` in `strings.json` (und `translations/<lang>.json`).
+- Tests: `async_migrate_entries` mit `AsyncMock` mocken und `assert_awaited_once()`
+  prüfen; ein einfaches `MagicMock` für `async_migrate_entries` ist **verboten** (verschluckt das
+  fehlende `await` und lässt den Fehler grün durchlaufen). Callback aus `mock.call_args.args[2]` ziehen und direkt aufrufen.
+- Grenze: `hass.states.async_available` ist während des Setups nur Best-Effort (wiederhergestellte
+  States kommen erst nach `EVENT_HOMEASSISTANT_START`); die Registry-Prüfung ist maßgeblich.
+- Device-Registry (falls genutzt): laut #1102 (beobachtet auf HA 2026.8/2026.9, nicht gegen
+  HA-Quelle verifiziert) ist `async_get_device(identifiers=...)` deprecated zugunsten
+  `async_get_device_by_identifier((DOMAIN, entry.entry_id), entry.entry_id)` (Entfernung 2027.8).
 
 `manifest.json`: `"version": "2.0.0"` (Breaking), GitHub-Release mit 💥-Entry und
 Migrationshinweis. Verwaiste Alt-Entities werden erst im **Post-Release-Cleanup**
