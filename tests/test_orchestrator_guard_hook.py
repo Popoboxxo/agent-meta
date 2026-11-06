@@ -146,14 +146,79 @@ STRICT_CASES = [
 ]
 
 
+def _rendered_guard(tmp_path, agent_id_capability: str) -> Path:
+    """Copy the guard + lib into tmp_path/hooks with the sync-time
+    `{{AGENT_META_HOOK_AGENT_ID}}` placeholder baked like
+    scripts/lib/hooks.py does for a provider (issue #1151 F6-05)."""
+    hooks_dir = tmp_path / "rendered-hooks"
+    (hooks_dir / "lib").mkdir(parents=True)
+    shutil.copy(_HOOK_PATH, hooks_dir / _HOOK_PATH.name)
+    shutil.copy(_IMPL_PATH.parent / "lib" / "hook_common.sh", hooks_dir / "lib" / "hook_common.sh")
+    impl = _IMPL_PATH.read_text(encoding="utf-8").replace(
+        "{{AGENT_META_HOOK_AGENT_ID}}", agent_id_capability)
+    (hooks_dir / _IMPL_PATH.name).write_text(impl, encoding="utf-8")
+    return hooks_dir / _HOOK_PATH.name
+
+
+def _run_rendered(hook: Path, payload: dict) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [_BASH, str(hook)], input=json.dumps(payload), capture_output=True,
+        text=True, cwd=str(_PROJECT_ROOT), env=_clean_env(), timeout=SCRIPT_TIMEOUT,
+    )
+
+
 @pytest.mark.parametrize("command,expected_exit_code", STRICT_CASES)
-def test_strict_mode_sentinel_exemption(command, expected_exit_code):
-    assert _HOOK_PATH.is_file(), f"hook script not found: {_HOOK_PATH}"
-    result = _run_hook(_bash_payload(command))
+def test_strict_mode_sentinel_exemption(command, expected_exit_code, tmp_path):
+    """Provider WITHOUT a harness agent_id (capability baked to false, e.g. the
+    Antigravity adapter): the self-declared sentinel is the only delegate
+    signal, so it keeps exempting main-thread Bash from strict mode."""
+    hook = _rendered_guard(tmp_path, "false")
+    result = _run_rendered(hook, _bash_payload(command))
     assert result.returncode == expected_exit_code, (
         f"command={command!r}: expected exit code {expected_exit_code}, "
         f"got {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
+
+
+@pytest.mark.parametrize("command", [c for c, _ in STRICT_CASES])
+def test_strict_mode_ignores_main_thread_sentinel_when_agent_id_is_reliable(command, tmp_path):
+    """Issue #1151 F6-05: where the hook payload carries a harness-set agent_id
+    (capability baked to true, Claude), the git/orchestrator delegates always
+    run as subagents. A sentinel on a MAIN-thread call (no agent_id) is a
+    self-declaration the main chat could forge, so it is discarded and strict
+    mode blocks every main-thread Bash call -- the old test pinned the opposite."""
+    hook = _rendered_guard(tmp_path, "true")
+    result = _run_rendered(hook, _bash_payload(command))
+    assert result.returncode == 2, result.stderr
+    assert "STRICT MODE" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit status",
+    "#agent-meta:agent=orchestrator\necho test",
+    "#agent-meta:agent=git\ngit commit -m 'x'",
+])
+def test_subagent_sentinel_still_counts_when_agent_id_is_reliable(command, tmp_path):
+    hook = _rendered_guard(tmp_path, "true")
+    payload = _bash_payload(command)
+    payload["agent_id"] = "subagent-123"
+    result = _run_rendered(hook, payload)
+    assert result.returncode == 0, result.stderr
+
+
+def test_main_thread_git_sentinel_cannot_mutate_in_non_strict_mode(tmp_path):
+    """F6-05 non-strict half: a discarded main-thread `git` sentinel no longer
+    exempts `git commit --amend` from the mutation gate."""
+    hook = _rendered_guard(tmp_path, "true")
+    project = tmp_path / "p"
+    (project / ".meta-config").mkdir(parents=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        "orchestrator:\n  enabled: true\n  strict: false\n", encoding="utf-8")
+    payload = {"tool_name": "Bash", "cwd": project.as_posix(),
+               "tool_input": {"command": "#agent-meta:agent=git\ngit commit --amend -m x"}}
+    result = _run_rendered(hook, payload)
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations" in result.stderr
 
 
 def test_strict_mode_blocks_write_for_main_thread():
@@ -2365,3 +2430,182 @@ def test_toolsearch_is_allowed_and_unknown_tool_still_blocked():
     assert ok.returncode == 0, ok.stderr
     bad = _run_hook({"tool_name": "Bogus", "tool_input": {}})
     assert bad.returncode == 2
+
+
+# --- issue #1151 (system audit 2026-11-06, group G1) -----------------------
+
+
+@pytest.mark.parametrize("tool", ["Agent", "Task"])
+def test_subagent_cannot_spawn_an_orchestrator(tool):
+    """F3-03: the singleton rule (exactly one orchestrator, spawned by the main
+    chat) was text only. A subagent call (agent_id set) that spawns
+    `orchestrator` is blocked."""
+    payload = {"tool_name": tool, "cwd": _PROJECT_ROOT.as_posix(), "agent_id": "sub-1",
+               "tool_input": {"subagent_type": "orchestrator", "prompt": "x"}}
+    result = _run_hook(payload)
+    assert result.returncode == 2, result.stderr
+    assert "orchestrator" in result.stderr
+
+
+def test_main_thread_may_spawn_the_orchestrator():
+    payload = {"tool_name": "Agent", "cwd": _PROJECT_ROOT.as_posix(),
+               "tool_input": {"subagent_type": "orchestrator", "prompt": "x"}}
+    result = _run_hook(payload)
+    assert result.returncode == 0, result.stderr
+
+
+def test_subagent_may_spawn_a_worker():
+    payload = {"tool_name": "Agent", "cwd": _PROJECT_ROOT.as_posix(), "agent_id": "sub-1",
+               "tool_input": {"subagent_type": "developer", "prompt": "x"}}
+    result = _run_hook(payload)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("agent_id", ["", "sub-1"])
+def test_worktree_isolation_is_blocked(agent_id):
+    """F3-03: rules/1-generic/no-worktree-isolation.md forbids
+    `isolation: "worktree"` for every spawn, main thread included."""
+    payload = {"tool_name": "Agent", "cwd": _PROJECT_ROOT.as_posix(),
+               "tool_input": {"subagent_type": "developer", "prompt": "x",
+                              "isolation": "worktree"}}
+    if agent_id:
+        payload["agent_id"] = agent_id
+    result = _run_hook(payload)
+    assert result.returncode == 2, result.stderr
+    assert "worktree" in result.stderr
+
+
+def test_strict_mode_blocks_read_only_git_on_the_main_thread():
+    """F3-02: strict mode blocks EVERY main-thread Bash call, read-only git
+    included -- the rule text now says so instead of 'read-only ok'."""
+    result = _run_hook(_bash_payload("git status"))
+    assert result.returncode == 2, result.stderr
+    assert "STRICT MODE" in result.stderr
+
+
+_F6_04_MUTATIONS = [
+    "git stash",
+    "git stash push -m wip",
+    "git stash apply",
+    "git mv a b",
+    "git apply fix.patch",
+    "git notes add -m note",
+    "git replace abc def",
+    "git update-index --assume-unchanged f",
+    "git config user.name someone",
+    "git config --unset user.name",
+    "git config set user.name someone",
+    "git fast-import",
+    "git init",
+    "git submodule update --init",
+    "git gc",
+]
+_F6_04_READ_ONLY = [
+    "git stash list",
+    "git stash show -p",
+    "git config user.name",
+    "git config --get user.name",
+    "git config --list",
+    "git config get user.name",
+    "git submodule",
+    "git submodule status",
+    "git status",
+    "git log --oneline -3",
+]
+
+
+@pytest.mark.parametrize("command", _F6_04_MUTATIONS)
+def test_f6_04_mutation_verbs_are_blocked_without_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations" in result.stderr
+
+
+@pytest.mark.parametrize("command", _F6_04_MUTATIONS)
+def test_f6_04_mutation_verbs_pass_with_git_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", _F6_04_READ_ONLY)
+def test_f6_04_read_only_forms_stay_allowed(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    'echo "$(git push origin main)"',
+    'echo "`git push origin main`"',
+    "echo $(git commit -m x)",
+    'x="$(git stash)"',
+])
+def test_f6_03_mutation_inside_command_substitution_is_blocked(tmp_path, command):
+    """F6-03 (part of #592): a mutation hidden in a command substitution, also
+    inside double quotes, is classified like a top-level statement."""
+    payload = _bash_payload(command)
+    payload["agent_id"] = "sub-1"
+    result = _run_with(payload, tmp_path)
+    assert result.returncode == 2, result.stderr
+
+
+def test_f6_03_destructive_inside_substitution_beats_git_sentinel(tmp_path):
+    result = _run_with(
+        _bash_payload('#agent-meta:agent=git\necho "$(git push --force origin x)"'), tmp_path)
+    assert result.returncode == 2, result.stderr
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "echo '$(git push origin main)'",
+    "git log --format=\"$(echo %H)\"",
+])
+def test_f6_03_literal_or_read_only_substitution_stays_allowed(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_f6_08_subagent_mutation_message_does_not_say_main_chat(tmp_path):
+    payload = _bash_payload("git commit -m x")
+    payload["agent_id"] = "sub-1"
+    result = _run_with(payload, tmp_path)
+    assert result.returncode == 2
+    assert "main chat" not in result.stderr
+    assert "subagent" in result.stderr
+
+
+def test_f6_08_main_thread_mutation_message_names_the_main_chat(tmp_path):
+    result = _run_with(_bash_payload("git commit -m x"), tmp_path)
+    assert result.returncode == 2
+    assert "main chat" in result.stderr
+
+
+def test_f6_08_fork_bomb_hint_only_on_a_fork_bomb_verdict(tmp_path):
+    branch = _run_with(_bash_payload("git branch -D old"), tmp_path)
+    assert branch.returncode == 2
+    assert "fork-bomb" not in branch.stderr
+    bomb = _run_with(_bash_payload(":(){ :|:& };:"), tmp_path)
+    assert bomb.returncode == 2
+    assert "fork-bomb" in bomb.stderr
+
+
+@pytest.mark.parametrize("provider,expected", [("Claude", "true"), ("Gemini", "false")])
+def test_sync_bakes_the_agent_id_capability_per_provider(tmp_path, provider, expected):
+    """F6-05: the agent_id trust switch comes from the provider's
+    `hook-agent-id` capability (config/ai-providers.yaml), never from a
+    provider-name branch: Claude's payload carries agent_id, the Antigravity
+    adapter's does not."""
+    scripts_dir = str(_REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from lib.hooks import sync_hooks
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+
+    providers = load_providers_config(_REPO_ROOT)
+    project = tmp_path / "project"
+    project.mkdir()
+    sync_hooks(_REPO_ROOT, project, {"platforms": [], "hooks": {}}, SyncLog(),
+               dry_run=False, provider=provider, provider_config=providers)
+    hooks_dir = providers[provider].get("hooks_dir", ".claude/hooks")
+    rendered = (project / hooks_dir / "orchestrator-guard-impl.sh").read_text(encoding="utf-8")
+    assert f'HOOK_AGENT_ID_RELIABLE="{expected}"' in rendered

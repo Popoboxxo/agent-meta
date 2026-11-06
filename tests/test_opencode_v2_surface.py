@@ -5439,10 +5439,20 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1151 (audit G1 hook fixes: `hook_common.sh` 1.9.0, `dod-push-check.sh`
+# 2.5.0, `orchestrator-guard-impl.sh` 1.11.0, `repo-containment-impl.sh` 1.6.0,
+# graphify guards 1.2.0, strict-mode wording in `use-orchestrator`):
+# `ac01-baseline` re-pinned — 18 hashes (9 hook renders, 3 `use-orchestrator`
+# rule renders, 6 `AGENTS.md`); `compact-golden` re-derived from the real compact
+# render (the one strict-mode sentence in `agents-managed.md`, fa992b69 ->
+# eaeaddfe); `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Review follow-up (#1151): scoped cd / old-style tar in `repo-containment-impl.sh`
+# and the worker-git sentence in `use-orchestrator`: `ac01-baseline` 11 more
+# hashes (706e1515 -> 00178459), `compact-golden` one line (eaeaddfe -> e7eecf36).
 _FIXTURE_TREES = {
-    "ac01-baseline": "3acc668ea8f1f58452e973f76a023358ff91d25f584eab16ef831d184335f411",
+    "ac01-baseline": "00178459912e22f7cb4f7d4eed733f42c4522e519ebb9bb1cdaa44106f7a5b4c",
     "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
-    "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
+    "compact-golden": "e7eecf36e270b0f091284077aefeb71b226ef9e24f6055b824b9616235f85f3e",
 }
 
 

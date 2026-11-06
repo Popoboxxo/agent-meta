@@ -35,6 +35,9 @@ Rebaseline log:
 - Release 2.0.0-beta.7 (VERSION bump 2.0.0-beta.6 -> 2.0.0-beta.7): only the
   ``agent-meta v...`` version string in the compact gate-card header changed
   (line 4, ``v2.0.0-beta.6`` -> ``v2.0.0-beta.7``). No substantive render change.
+- Issue #1151 (audit G1): the ``use-orchestrator`` Git-Delegation block gained the
+  strict-mode sentence and one sentence that worker subagents without the ``git``
+  sentinel cannot run ``git init``/config writes/``git stash`` (lines 14-15). Nothing else.
 """
 from __future__ import annotations
 
