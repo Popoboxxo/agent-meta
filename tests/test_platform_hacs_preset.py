@@ -69,9 +69,18 @@ contract changes:
       back to a plain rules_dir file.
 """
 
+import __future__
+import ast
+import asyncio
+import builtins
+import enum
+import logging
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
@@ -601,6 +610,489 @@ class TestTier2ReleaseNamingBlock:
         for name, text in texts.items():
             assert _BETA_TAG_EXAMPLE in text, f"{name} is missing the beta tag example"
             assert re.search(r"v\d+\.\d+\.\d+b\d+", text), f"{name} lacks a vX.Y.Zb<N>-style example"
+
+
+# ---------------------------------------------------------------------------
+# Tier 2c — Entity-registry migration recipe (#1102 await, #1106 A+C)
+# ---------------------------------------------------------------------------
+#
+# Snippet loader: the recipe under "### Entity-Registry-Migration bei
+# Umbenennung" is a markdown fence. _migration_recipe_source() extracts it,
+# _load_recipe() drops every `from/import homeassistant...` statement (the
+# caller supplies those names as stubs in the namespace) and execs the rest.
+# PEP 563 is enabled for the exec so HA-only annotation types stay unevaluated.
+#
+# Contract the recipe must satisfy:
+#   - async def async_migrate_entry(hass, entry) -> bool
+#   - er.async_migrate_entries(hass, entry.entry_id, <callback>) with the
+#     callback as 3rd positional argument; callback(reg_entry) -> dict | None
+#   - ir.async_create_issue(..., translation_key=..., is_fixable=..., severity=...)
+#   - hass.config_entries.async_update_entry(entry, version=2) exactly once,
+#     after the awaited migration
+# Namespace names provided by the tests: er, ir, DOMAIN, _LOGGER, HomeAssistant,
+# ConfigEntry. Fixture registry: _UID_* / _OLD_EID_* / _NEW_EID_* constants below.
+
+_MIGRATION_SECTION = "### Entity-Registry-Migration bei Umbenennung"
+_HACS_CODE_REVIEWER = _REPO_ROOT / "agents" / "2-platform" / "hacs-code-reviewer.md"
+
+_UID_POWER = "health_o_mat_power_old"
+_UID_ENERGY = "health_o_mat_energy_old"
+_UID_HUMIDITY = "health_o_mat_humidity_old"  # not in the rename map
+_OLD_EID_POWER = "sensor.health_o_mat_power_old"
+_OLD_EID_ENERGY = "sensor.health_o_mat_energy_old"
+_OLD_EID_HUMIDITY = "sensor.health_o_mat_humidity_old"
+_NEW_EID_POWER = "sensor.health_o_mat_power"
+_NEW_EID_ENERGY = "sensor.health_o_mat_energy"
+_USER_RENAMED_EID = "sensor.kitchen_custom_label"
+
+_RECIPE_LOGGER = "custom_components.health_o_mat"
+_RENAME_ONLY_KEYS = frozenset({"new_entity_id", "original_name"})
+
+
+def _migration_recipe_source() -> str:
+    """Return the first ```python fence under the migration heading (markdown parse)."""
+    text = _HACS_RULE.read_text(encoding="utf-8")
+    assert _MIGRATION_SECTION in text, f"heading missing: {_MIGRATION_SECTION}"
+    section = text.split(_MIGRATION_SECTION, 1)[1]
+    # Cut at the next ## / ### heading; single-# lines are python comments inside the fence.
+    section = re.split(r"\n#{2,3} ", section, maxsplit=1)[0]
+    fence = re.search(r"^```python\n(.*?)^```[ \t]*$", section, re.S | re.M)
+    assert fence, "no ```python fence under the migration heading"
+    return fence.group(1)
+
+
+def _is_ha_import(node: ast.stmt) -> bool:
+    """True for homeassistant imports and relative imports (not resolvable in the test)."""
+    if isinstance(node, ast.ImportFrom):
+        return node.level > 0 or (node.module or "").startswith("homeassistant")
+    if isinstance(node, ast.Import):
+        return any(alias.name.startswith("homeassistant") for alias in node.names)
+    return False
+
+
+def _load_recipe(namespace: dict) -> None:
+    """Exec the recipe into ``namespace`` with homeassistant imports removed."""
+    tree = ast.parse(_migration_recipe_source())
+    tree.body = [node for node in tree.body if not _is_ha_import(node)]
+    code = compile(
+        tree,
+        "<hacs-rule:entity-registry-migration>",
+        "exec",
+        flags=__future__.annotations.compiler_flag,
+        dont_inherit=True,
+    )
+    exec(code, namespace)  # trusted repo text, test-only
+
+
+def _parent_map(tree: ast.AST) -> dict:
+    parents = {}
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+    return parents
+
+
+def _enclosing_function(node: ast.AST, parents: dict):
+    current = parents.get(node)
+    while current is not None and not isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        current = parents.get(current)
+    return current
+
+
+def _calls_to(tree: ast.AST, attr: str) -> list:
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == attr
+    ]
+
+
+def _reg_entry(entity_id: str, unique_id: str, name: str) -> SimpleNamespace:
+    """Synthetic RegistryEntry shape (fields HA's registry entry exposes)."""
+    return SimpleNamespace(
+        entity_id=entity_id,
+        unique_id=unique_id,
+        name=name,
+        original_name=name,
+        config_entry_id="entry-1",
+        platform="health_o_mat",
+        entity_category=None,
+        labels=set(),
+        aliases=set(),
+        area_id=None,
+        hidden_by=None,
+        disabled_by=None,
+    )
+
+
+def _healthy_entries() -> list:
+    return [
+        _reg_entry(_OLD_EID_POWER, _UID_POWER, "Power"),
+        _reg_entry(_OLD_EID_ENERGY, _UID_ENERGY, "Energy"),
+    ]
+
+
+class _FakeRegistry:
+    def __init__(self, entries: list) -> None:
+        self.entries = list(entries)
+
+    def async_get(self, entity_id: str):
+        return next((e for e in self.entries if e.entity_id == entity_id), None)
+
+    def entity_ids(self) -> set:
+        return {e.entity_id for e in self.entries}
+
+    def snapshot(self) -> list:
+        return [(e.entity_id, e.original_name, e.unique_id) for e in self.entries]
+
+
+class _FakeIssueRegistry:
+    """Hand-written ``issue_registry`` stand-in with HA's required keyword-only signature.
+
+    A MagicMock would accept a wrong enum member, a missing is_fixable or a None
+    translation_key, all of which crash in real HA.
+    """
+
+    class IssueSeverity(enum.Enum):
+        CRITICAL = "critical"
+        ERROR = "error"
+        WARNING = "warning"
+
+    def __init__(self) -> None:
+        self.issues: dict = {}  # issue_id -> kwargs of the live issue
+        self.created: list = []  # issue_id per async_create_issue call
+
+    def async_create_issue(self, hass, domain, issue_id, *, is_fixable, severity,
+                           translation_key, translation_placeholders=None, **kw):
+        assert isinstance(severity, self.IssueSeverity), f"bad severity {severity!r}"
+        assert isinstance(translation_key, str) and translation_key, "translation_key required"
+        self.created.append(issue_id)
+        self.issues[issue_id] = {"translation_key": translation_key, "domain": domain,
+                                 "placeholders": translation_placeholders}
+
+    def async_delete_issue(self, hass, domain, issue_id):
+        self.issues.pop(issue_id, None)
+
+
+def _make_env(entries: list, *, migrate_error: Optional[Exception] = None) -> SimpleNamespace:
+    """Stub HA surface. async_migrate_entries drives the callback like HA does.
+
+    HA's async_update_entity raises ValueError when the target id is taken;
+    the fake mirrors that. ``returned`` records every dict the callback gave back.
+    """
+    registry = _FakeRegistry(entries)
+    events: list = []   # ordered: ("migrate_done", None) / ("update", kwargs)
+    returned: list = [] # (unique_id, dict) for every non-None callback result
+
+    async def _migrate(hass, config_entry_id, callback):
+        for reg_entry in list(registry.entries):
+            if reg_entry.config_entry_id != config_entry_id:
+                continue
+            updates = callback(reg_entry)
+            if updates is None:
+                continue
+            returned.append((reg_entry.unique_id, dict(updates)))
+            new_id = updates.get("new_entity_id", reg_entry.entity_id)
+            if new_id != reg_entry.entity_id and registry.async_get(new_id) is not None:
+                raise ValueError(f"Entity id already exists: {new_id}")
+            for key, value in updates.items():
+                attr = "entity_id" if key == "new_entity_id" else key
+                setattr(reg_entry, attr, value)
+        events.append(("migrate_done", None))
+
+    er = MagicMock(name="er")
+    er.async_migrate_entries = AsyncMock(
+        side_effect=migrate_error if migrate_error is not None else _migrate
+    )
+    er.async_get.return_value = registry
+    er.async_entries_for_config_entry.side_effect = (
+        lambda reg, cid: [e for e in reg.entries if e.config_entry_id == cid]
+    )
+    ir = _FakeIssueRegistry()
+    hass = MagicMock(name="hass")
+    hass.states.async_available.side_effect = lambda eid: eid not in registry.entity_ids()
+    hass.config_entries.async_update_entry.side_effect = (
+        lambda entry, **kwargs: events.append(("update", kwargs))
+    )
+    return SimpleNamespace(er=er, ir=ir, hass=hass, registry=registry,
+                           events=events, returned=returned)
+
+
+def _run_recipe(env: SimpleNamespace, *, version: int = 1) -> tuple:
+    entry = SimpleNamespace(entry_id="entry-1", version=version)
+    namespace = {
+        "er": env.er,
+        "ir": env.ir,
+        "DOMAIN": "health_o_mat",
+        "__name__": _RECIPE_LOGGER,  # the recipe's getLogger(__name__) resolves to this
+        "_LOGGER": logging.getLogger(_RECIPE_LOGGER),
+        "HomeAssistant": object,
+        "ConfigEntry": object,
+    }
+    _load_recipe(namespace)
+    # Private loop: asyncio.run() resets the global loop and breaks the HA pytest plugin for later tests.
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(namespace["async_migrate_entry"](env.hass, entry))
+    finally:
+        loop.close()
+    return entry, result
+
+
+def _run_persisted(env: SimpleNamespace, runs: int = 2) -> list:
+    """Run the recipe repeatedly; the stored version carries over like in HA."""
+    version, results = 1, []
+    for _ in range(runs):
+        _entry, result = _run_recipe(env, version=version)
+        results.append(result)
+        for kind, kwargs in env.events:
+            if kind == "update" and "version" in kwargs:
+                version = kwargs["version"]
+    return results
+
+
+def _warnings(caplog) -> list:
+    return [r for r in caplog.records
+            if r.levelno == logging.WARNING and r.name == _RECIPE_LOGGER]
+
+
+class TestTier2EntityMigrationRecipe:
+    """Migration recipe contract (#1102: await + single bump; #1106 A+C: safety net).
+
+    Behavioural tests exec the recipe with stub HA objects. The fake
+    async_migrate_entries awaits and feeds the callback real-shaped registry
+    entries, so a recipe that skips the await never renames anything.
+    """
+
+    def test_req534_recipe_awaits_async_migrate_entries_inside_async_def(self):
+        """REQ-534: async_migrate_entries call is the operand of an Await in an async def."""
+        tree = ast.parse(_migration_recipe_source())
+        parents = _parent_map(tree)
+        calls = _calls_to(tree, "async_migrate_entries")
+        assert len(calls) == 1, f"expected one async_migrate_entries call, found {len(calls)}"
+        call_node = calls[0]
+        assert isinstance(parents.get(call_node), ast.Await), (
+            "async_migrate_entries is called without await: the rename runs after the version bump"
+        )
+        enclosing = _enclosing_function(call_node, parents)
+        assert isinstance(enclosing, ast.AsyncFunctionDef), "await used outside an async def"
+
+    def test_req534_recipe_bumps_version_once_and_only_after_the_await(self):
+        """REQ-534: exactly one async_update_entry(..., version=...) call, placed after the await."""
+        tree = ast.parse(_migration_recipe_source())
+        awaited = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Await)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "async_migrate_entries"
+        ]
+        bumps = _calls_to(tree, "async_update_entry")
+        assert len(bumps) == 1, f"expected exactly one version bump, found {len(bumps)}"
+        assert any(kw.arg == "version" for kw in bumps[0].keywords), "bump lacks version= keyword"
+        assert awaited, "no awaited async_migrate_entries to order the version bump against"
+        assert bumps[0].lineno > awaited[0].lineno, (
+            "version bump is not placed after the awaited async_migrate_entries"
+        )
+
+    def test_req534_recipe_happy_path_awaits_then_bumps_version_once(self, caplog):
+        """REQ-534: happy path awaits the migration once, then bumps version=2 exactly once."""
+        env = _make_env(_healthy_entries())
+        entry, result = _run_recipe(env)
+
+        env.er.async_migrate_entries.assert_awaited_once()
+        assert result is True
+        assert env.registry.async_get(_NEW_EID_POWER) is not None
+        assert env.registry.async_get(_NEW_EID_ENERGY) is not None
+        assert env.hass.config_entries.async_update_entry.call_args_list == [call(entry, version=2)]
+        assert env.events == [("migrate_done", None), ("update", {"version": 2})], (
+            f"version bump must follow the completed migration, got {env.events}"
+        )
+
+    def test_req534_recipe_collision_skips_entity_warns_creates_issue_no_bump(self, caplog):
+        """REQ-534: #1102 — target id already taken -> callback None, warning, repair issue, no bump."""
+        caplog.set_level(logging.WARNING)
+        entries = _healthy_entries() + [_reg_entry(_NEW_EID_POWER, "unrelated_uid", "Power")]
+        env = _make_env(entries)
+        _entry, result = _run_recipe(env)
+
+        env.er.async_migrate_entries.assert_awaited_once()
+        assert _UID_POWER not in dict(env.returned), "colliding entity must not be renamed"
+        assert ("update", {"version": 2}) not in env.events, "version bumped despite collision"
+        assert result is False, f"collision must return False, got {result!r}"
+        assert _warnings(caplog), "collision produced no warning"
+        assert len(env.ir.created) == 1
+        assert [i["translation_key"] for i in env.ir.issues.values()] == ["migration_blocked"]
+        placeholders = next(iter(env.ir.issues.values()))["placeholders"]
+        assert placeholders == {"entities": _NEW_EID_POWER}, "placeholder must carry entity ids"
+
+    def test_req534_recipe_dirty_registry_migrates_rest_warns_and_rerun_is_noop(self, caplog):
+        """REQ-534: #1106 — user-renamed entity is skipped with a warning; rest migrates; anchor holds -> bump.
+
+        The mapped entities are power (healthy) and energy (user-renamed); the anchor is
+        supported by two OTHER, unmapped entities, so the skip is purely per-entity.
+        """
+        caplog.set_level(logging.WARNING)
+        entries = [
+            _reg_entry(_OLD_EID_POWER, _UID_POWER, "Power"),
+            _reg_entry(_USER_RENAMED_EID, _UID_ENERGY, "Kitchen Custom"),
+            _reg_entry(_OLD_EID_HUMIDITY, _UID_HUMIDITY, "Humidity"),
+            _reg_entry("sensor.health_o_mat_other_old", "health_o_mat_other_old", "Other"),
+        ]
+        env = _make_env(entries)
+        result = _run_persisted(env, runs=1)[0]
+
+        assert result is True
+        assert env.registry.async_get(_NEW_EID_POWER) is not None, "healthy entity was not migrated"
+        assert env.registry.async_get(_USER_RENAMED_EID) is not None, "user-renamed entity was renamed"
+        assert _UID_ENERGY not in dict(env.returned)
+        assert _warnings(caplog), "user-renamed entity produced no warning"
+        assert env.events.count(("update", {"version": 2})) == 1
+
+        before = env.registry.snapshot()
+        returned_before = len(env.returned)
+        _run_recipe(env, version=2)  # second run starts from the persisted version, like HA
+        assert env.events.count(("update", {"version": 2})) == 1, "second run bumped again"
+        assert env.registry.snapshot() == before, "second run changed the registry"
+        assert len(env.returned) == returned_before, "second run returned further renames"
+
+    def test_req534_recipe_all_mapped_user_renamed_with_anchor_support_bumps(self):
+        """REQ-534: #1106 D — every mapped entity user-renamed, anchor held by unmapped others -> bump."""
+        env = _make_env([
+            _reg_entry("sensor.kitchen_a", _UID_POWER, "A"),
+            _reg_entry("sensor.kitchen_b", _UID_ENERGY, "B"),
+            _reg_entry(_OLD_EID_HUMIDITY, _UID_HUMIDITY, "Humidity"),
+            _reg_entry("sensor.health_o_mat_other_old", "health_o_mat_other_old", "Other"),
+        ])
+        _entry, result = _run_recipe(env)
+
+        assert result is True
+        assert env.returned == []
+        assert env.events.count(("update", {"version": 2})) == 1
+
+    def test_req534_recipe_single_entity_unanchored_migrates_warns_bumps_once_no_issue(self, caplog):
+        """REQ-534: #1106 A — one entity: rename, ONE anchor warning, bump once, no issue; rerun is a no-op."""
+        caplog.set_level(logging.WARNING)
+        env = _make_env([_reg_entry(_OLD_EID_POWER, _UID_POWER, "Power")])
+        results = _run_persisted(env, runs=2)
+
+        assert results == [True, True]
+        assert env.registry.async_get(_NEW_EID_POWER) is not None, "healthy single entity was not migrated"
+        assert len(_warnings(caplog)) == 1, "expected exactly one anchor warning (second run is guarded)"
+        assert env.events.count(("update", {"version": 2})) == 1, "expected exactly one bump"
+        assert env.ir.created == [], "repair issue created although nothing is broken"
+
+    def test_req534_recipe_one_user_renamed_without_other_anchor_support_bumps_once(self, caplog):
+        """REQ-534: #1106 A — 2 entities, one user-renamed -> healthy one migrates, one warning pair, bump once."""
+        caplog.set_level(logging.WARNING)
+        env = _make_env([
+            _reg_entry(_OLD_EID_POWER, _UID_POWER, "Power"),
+            _reg_entry(_USER_RENAMED_EID, _UID_ENERGY, "Kitchen Custom"),
+        ])
+        results = _run_persisted(env, runs=2)
+
+        assert results == [True, True]
+        assert env.registry.async_get(_NEW_EID_POWER) is not None, "healthy entity was not migrated"
+        assert env.registry.async_get(_USER_RENAMED_EID) is not None
+        warnings = " | ".join(r.getMessage() for r in _warnings(caplog))
+        assert "user-renamed" in warnings and "Anchor" in warnings
+        assert env.events.count(("update", {"version": 2})) == 1
+        assert env.ir.created == []
+
+    def test_req534_recipe_error_path_warns_creates_repair_issue_no_bump(self, caplog):
+        """REQ-534: #1106 C — ValueError from the registry -> warning + repair issue, version kept."""
+        caplog.set_level(logging.WARNING)
+        env = _make_env(_healthy_entries(), migrate_error=ValueError("entity id already exists"))
+        try:
+            _entry, result = _run_recipe(env)
+        except ValueError as exc:
+            pytest.fail(f"migration raised {exc!r}; expected warning + repair issue instead")
+
+        assert result is False
+        assert _warnings(caplog), "registry error produced no warning"
+        assert len(env.ir.created) == 1
+        assert [i["translation_key"] for i in env.ir.issues.values()] == ["migration_blocked"]
+        assert ("update", {"version": 2}) not in env.events, "version bumped after failed migration"
+        placeholders = next(iter(env.ir.issues.values()))["placeholders"]
+        assert "already exists" not in placeholders["entities"], "error text leaked into entities placeholder"
+        assert _NEW_EID_POWER in placeholders["entities"]
+
+    def test_req534_recipe_callback_returns_only_rename_fields(self, caplog):
+        """REQ-534: callback returns only new_entity_id/original_name; registry metadata is preserved."""
+        env = _make_env(_healthy_entries())
+        _run_recipe(env)
+
+        returned = dict(env.returned)
+        assert {_UID_POWER, _UID_ENERGY} <= set(returned), "recipe returned no rename for mapped entities"
+        for uid, updates in returned.items():
+            assert "new_entity_id" in updates, f"{uid}: no new_entity_id in callback result"
+            assert set(updates) <= _RENAME_ONLY_KEYS, f"{uid}: unexpected keys {set(updates) - _RENAME_ONLY_KEYS}"
+
+    def test_req534_recipe_version_guard_skips_when_already_v2(self):
+        """REQ-534: entry.version >= 2 -> no migration, no bump, True."""
+        env = _make_env(_healthy_entries())
+        _entry, result = _run_recipe(env, version=2)
+
+        assert result is True
+        env.er.async_migrate_entries.assert_not_awaited()
+        env.hass.config_entries.async_update_entry.assert_not_called()
+
+    def test_req534_recipe_collision_resolved_then_rerun_converges(self):
+        """REQ-534: collision -> False; blocker removed; rerun -> True, one bump, no second issue."""
+        blocker = _reg_entry(_NEW_EID_POWER, "unrelated_uid", "Power")
+        env = _make_env(_healthy_entries() + [blocker])
+        _entry, first = _run_recipe(env)
+        assert first is False
+        env.registry.entries.remove(blocker)  # user resolves the collision
+
+        _entry, second = _run_recipe(env)
+        assert second is True
+        assert env.registry.async_get(_NEW_EID_POWER).unique_id == _UID_POWER
+        assert env.events.count(("update", {"version": 2})) == 1
+        assert len(env.ir.created) == 1, "clean rerun created another issue"
+
+    def test_req534_recipe_success_after_failure_deletes_repair_issue(self):
+        """REQ-534: a resolved collision clears the stale repair issue."""
+        blocker = _reg_entry(_NEW_EID_POWER, "unrelated_uid", "Power")
+        env = _make_env(_healthy_entries() + [blocker])
+        _run_recipe(env)
+        assert len(env.ir.issues) == 1, "collision did not create a repair issue"
+        env.registry.entries.remove(blocker)
+
+        _entry, result = _run_recipe(env)
+        assert result is True
+        assert env.ir.issues == {}, "repair issue survived the successful migration"
+
+    def test_req534_recipe_snippet_binds_every_definition_time_name(self):
+        """REQ-534: annotations/decorators/defaults only use names the snippet imports or defines."""
+        tree = ast.parse(_migration_recipe_source())
+        bound = set(dir(builtins))
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                bound |= {(a.asname or a.name).split(".")[0] for a in node.names}
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                bound.add(node.name)
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                bound |= {n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)}
+        used: set = set()
+        for fn in ast.walk(tree):
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            a = fn.args
+            exprs = [*fn.decorator_list, *a.defaults, *(d for d in a.kw_defaults if d), fn.returns,
+                     *(x.annotation for x in [*a.posonlyargs, *a.args, *a.kwonlyargs] if x.annotation)]
+            used |= {n.id for e in exprs if e for n in ast.walk(e) if isinstance(n, ast.Name)}
+        assert not used - bound, f"snippet uses unimported names: {sorted(used - bound)}"
+
+    def test_req534_reviewer_f4_requires_await_for_migration(self):
+        """REQ-534: reviewer F4 names the missing await as a fail predicate."""
+        text = _HACS_CODE_REVIEWER.read_text(encoding="utf-8")
+        f4 = [line for line in text.splitlines() if "**F4**" in line]
+        assert len(f4) == 1, f"expected exactly one F4 line, found {len(f4)}"
+        assert "await er.async_migrate_entries" in f4[0], "F4 does not require await er.async_migrate_entries"
+        assert "MagicMock" in f4[0], "F4 does not fail a MagicMock-mocked migration"
 
 
 # ---------------------------------------------------------------------------
