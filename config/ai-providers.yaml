@@ -56,6 +56,12 @@ providers:
     - model-overrides-flat
     - verbose-sync-log
     - mcp-agent-frontmatter-tools
+    # PreToolUse payload carries a harness-set agent_id for every subagent
+    # call (code.claude.com hooks docs). Baked into orchestrator-guard via the
+    # AGENT_META_HOOK_AGENT_ID placeholder: a delegate sentinel on a main-thread call
+    # is then discarded (issue #1151 F6-05). Providers without it keep the
+    # sentinel as their only delegate signal.
+    - hook-agent-id
     # channel: skill support (issue #751) — see the rationale comment next
     # to provider_supports_skill_channel() in scripts/lib/skill_channel.py.
     - native-skill-channel

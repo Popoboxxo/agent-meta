@@ -1,5 +1,6 @@
 #!/bin/bash
-# version: 1.5.0
+# version: 1.6.0
+# changelog: 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, $CLAUDE_PROJECT_DIR (hook environment) and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -50,9 +51,11 @@
 # provider_root_dirs.
 #
 # Provider identity: `AGENT_META_PROVIDER` is substituted per provider by
-# sync.py's per-provider copy step (scripts/lib/hooks.py:470,
-# `source_content.replace("Gemini", provider)`), exactly like
-# orchestrator-guard-impl.sh. That is the one reliable provider signal
+# sync.py's per-provider copy step (scripts/lib/hooks.py, which replaces the
+# braced AGENT_META_PROVIDER placeholder with the provider name), exactly like
+# orchestrator-guard-impl.sh. The placeholder itself is spelled out only on
+# the assignment line below, so the replace never rewrites this comment
+# (#1151 F6-12). That is the one reliable provider signal
 # available to a hook at runtime (the PreToolUse payload carries no provider
 # field and no documented provider env var exists), so we use it. When the
 # file is run straight from source (never synced) the placeholder is left
@@ -112,9 +115,15 @@
 # convention boundary, NOT a security boundary — see
 # .claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-
 # security-boundary. The Bash detector is a best-effort token scan:
-#   * command substitution / backticks / `eval` / `xargs`, interpreters
-#     (`python -c "open(...,'w')"`), and tools outside the write-command set
-#     below can still smuggle a write outside the root;
+#   * `eval` / `xargs` / `bash -c` strings, interpreters (`python -c
+#     "open(...,'w')"`), targets in an arbitrary `$VAR`, and tools outside the
+#     write-command set below can still smuggle a write outside the root.
+#     Command substitutions ($(...), backticks, also inside double quotes)
+#     are split and scanned since #1151; `~`/`$HOME` targets are expanded
+#     and cd/pushd/popd are tracked (relative targets are judged against
+#     every directory the command may be in; a cd inside $(...) or a
+#     '( ... )' subshell stays scoped to it, a cd inside a `case` is not
+#     scoped (over-blocks));
 #   * statements are split by the shared quote/heredoc-aware splitter
 #     (hook_shell_scan_py), so a quoted operator is not a separator and a
 #     heredoc body is prose, not commands (#944 SR-B-16). A real command
@@ -220,6 +229,17 @@ if ! hook_known_tool_name "$TOOL_NAME"; then
   exit 2
 fi
 
+# Write-capable tools without their own branch map onto the one they behave
+# like (#1151 F6-01): NotebookEdit/MultiEdit write a file like Edit (the
+# notebook target is tool_input.notebook_path, read below), PowerShell runs a
+# shell command in tool_input.command like Bash (best-effort: the detector
+# reads it with shell grammar; PowerShell cmdlets are not write commands it
+# knows, redirections are).
+case "$TOOL_NAME" in
+  NotebookEdit|MultiEdit) TOOL_NAME="Edit" ;;
+  PowerShell) TOOL_NAME="Bash" ;;
+esac
+
 # Only write-capable tools are intercepted; reads (Read/Glob/Grep) and every
 # other tool pass through untouched.
 case "$TOOL_NAME" in
@@ -250,6 +270,9 @@ resolve_realpath() {
 # Extracted before the anchor: with a missing/empty `cwd`, an absolute
 # Write/Edit target is what the anchor is derived from.
 FILE_PATH=$(hook_json_get "$INPUT" "tool_input.file_path")
+if [ -z "$FILE_PATH" ]; then
+  FILE_PATH=$(hook_json_get "$INPUT" "tool_input.notebook_path")
+fi
 BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
 
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
@@ -701,7 +724,12 @@ anchor_label() {
 block_write() {
   local target="$1" reason="${2:-outside}" absolute
   absolute="$(display_target "$target")"
-  if [ "$reason" = "sink-disabled" ]; then
+  if [ "$reason" = "cwd-unknown" ]; then
+    echo "REPO_CONTAINMENT: relative write target after a directory change the hook cannot resolve (prison mode)." >&2
+    echo "  target:    $target (relative to an unknown directory)" >&2
+    echo "  reason:    a cd/pushd/popd to a computed path ('\$VAR', 'cd -', popd) hides where it lands (#1151)." >&2
+    echo "  repair:    use a literal directory or an absolute target inside $REPO_ROOT" >&2
+  elif [ "$reason" = "sink-disabled" ]; then
     echo "REPO_CONTAINMENT: write target is inside the configured but DISABLED tmp-sink (prison mode)." >&2
     echo "  target:    $absolute" >&2
     echo "  reason:    the tmp-sink ($SINK_ABS) is writable only when" >&2
@@ -808,7 +836,29 @@ def is_dev_target(target):
     )
 
 
+HOME = os.environ.get("HOME") or os.path.expanduser("~")
+# Variables whose value the hook knows; an unset one stays a '$' word.
+KNOWN_VARS = {"HOME": HOME, "CLAUDE_PROJECT_DIR": os.environ.get("CLAUDE_PROJECT_DIR")}
+
+
+def expand_home(target):
+    # '~', '~/x', '~user/x', '$HOME/x' and '${HOME}/x' name a real place
+    # outside the repo (#1151 F6-06: they used to be skipped as literal text
+    # or as a '$' variable); $CLAUDE_PROJECT_DIR is expanded from the hook
+    # environment the same way. Any other '$VAR' stays unresolved (known gap).
+    if target.startswith("~"):
+        return os.path.expanduser(target)
+    for name, value in KNOWN_VARS.items():
+        if not value:
+            continue
+        for prefix in ("$" + name, "${" + name + "}"):
+            if target == prefix or target.startswith(prefix + "/"):
+                return value + target[len(prefix):]
+    return target
+
+
 def is_skippable(target):
+    target = expand_home(target)
     return (
         not target
         or target == "-"
@@ -816,6 +866,119 @@ def is_skippable(target):
         or target.startswith("$")
         or is_dev_target(target)
     )
+
+
+# Options whose value is a write destination (#1151 F6-06). A short option
+# may also carry its value glued ('-o/x') or end a cluster ('-sSLo /x').
+OUTPUT_OPTS = {
+    "curl": ({"-o", "--output", "--output-dir"}, "o"),
+    "wget": ({"-O", "--output-document", "-o", "--output-file", "-a",
+              "--append-output", "-P", "--directory-prefix"}, "OoaP"),
+    "unzip": ({"-d"}, "d"),
+}
+
+
+def option_values(args, long_short, cluster_chars):
+    values = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a.startswith("--"):
+            name, eq, val = a.partition("=")
+            if name in long_short:
+                if eq:
+                    values.append(val)
+                elif i < len(args):
+                    values.append(args[i])
+                    i += 1
+            continue
+        if a.startswith("-") and a != "-":
+            for k, ch in enumerate(a[1:], start=1):
+                if ch in cluster_chars and "-" + ch in long_short:
+                    if k + 1 < len(a):
+                        values.append(a[k + 1:])
+                    elif i < len(args):
+                        values.append(args[i])
+                        i += 1
+                    break
+    return values
+
+
+# Old-style tar letters that take the next words as values, in order.
+TAR_OLD_VALUE_LETTERS = "fCbTXLNgKVHI"
+
+
+def tar_targets(args):
+    # Extraction writes into -C/--directory; creation writes the -f archive.
+    # An old-style first word ('cf', 'xzfC') is a cluster whose value letters
+    # consume the following words in order ('tar cf /etc/x.tar .').
+    old = {}
+    rest = args
+    flags = ""
+    if args and not args[0].startswith("-"):
+        flags = args[0]
+        rest = args[1:]
+        for ch in flags:
+            if ch in TAR_OLD_VALUE_LETTERS and rest:
+                old.setdefault(ch, rest[0])
+                rest = rest[1:]
+    flags +="".join(a.lstrip("-") for a in rest if a.startswith("-") and not a.startswith("--"))
+    longs = {a.split("=", 1)[0] for a in rest if a.startswith("--")}
+    extract = "x" in flags or longs & {"--extract", "--get"}
+    create = any(c in flags for c in "cruA") or longs & {"--create", "--append", "--update", "--concatenate"}
+    targets = []
+    if extract:
+        targets += ([old["C"]] if "C" in old else []) + option_values(rest, {"-C", "--directory"}, "C")
+    if create:
+        targets += ([old["f"]] if "f" in old else []) + option_values(rest, {"-f", "--file"}, "f")
+    return targets
+
+
+GIT_GLOBAL_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
+                              "--config-env", "--exec-path", "--super-prefix"}
+CLONE_OPTS_WITH_VALUE = {"-b", "--branch", "-o", "--origin", "-u", "--upload-pack",
+                         "--depth", "--reference", "--reference-if-able",
+                         "--separate-git-dir", "--template", "-c", "--config",
+                         "-j", "--jobs", "--filter", "--shallow-since",
+                         "--shallow-exclude", "--server-option", "--bundle-uri"}
+
+
+def git_clone_targets(args):
+    # 'git [-C DIR] clone [opts] <repo> [<dir>]' writes <dir> (default: the
+    # repo's basename) under DIR or the cwd.
+    base = ""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        if args[i] == "-C" and i + 1 < len(args):
+            base = os.path.join(base, args[i + 1])
+        i += 2 if args[i] in GIT_GLOBAL_OPTS_WITH_VALUE else 1
+    if i >= len(args) or args[i] != "clone":
+        return []
+    positionals = []
+    rest = args[i + 1:]
+    j = 0
+    while j < len(rest):
+        a = rest[j]
+        j += 1
+        if a == "--":
+            positionals += rest[j:]
+            break
+        if a in CLONE_OPTS_WITH_VALUE:
+            j += 1
+            continue
+        if a.startswith("-"):
+            continue
+        positionals.append(a)
+    if not positionals:
+        return []
+    if len(positionals) >= 2:
+        dest = positionals[1]
+    else:
+        dest = os.path.basename(positionals[0].rstrip("/"))
+        if dest.endswith(".git"):
+            dest = dest[:-4]
+    return [os.path.join(base, expand_home(dest)) if base else dest]
 
 
 def split_flags(args):
@@ -903,12 +1066,82 @@ def inplace_operands(args):
     return operands
 
 
-targets = []
+UNRESOLVED_CWD = "\x01"  # marks a relative target under an unknown directory
 
-for statement, _heredocs in split_shell_statements(command):
-    tokens = tokenize(statement)
-    if not tokens:
-        continue
+
+def cd_destination(args, cwds):
+    # Directories a cd/pushd/popd may land in; None = cannot be resolved.
+    positionals = [a for a in args if not (a.startswith("-") and a != "-")]
+    if not positionals:
+        return {expand_home("~")}
+    dest = expand_home(positionals[0])
+    for prefix in ("$PWD", "${PWD}"):
+        # $PWD is whichever directory the command is in: relative to each cwd.
+        if dest == prefix or dest.startswith(prefix + "/"):
+            dest = "." + dest[len(prefix):]
+    if dest == "-" or any(ch in dest for ch in "$`*?[{"):
+        return {None}
+    if os.path.isabs(dest):
+        return {dest}
+    return {os.path.join(c, dest) if c is not None else None for c in cwds}
+
+
+CASE_WORD = re.compile(r"(?<![\w-])(case|esac)(?![\w-])")
+
+
+def subshell_parens(statement):
+    """('(' count, closing ')' positions, masked text, unquoted text).
+
+    The masked text is the statement with every unquoted $(...) replaced by
+    '$_': its body is scanned as separate 'subst' statements, and a 'cd' in
+    'X=$(cd ...)' must not be read as the outer command. Only parens outside
+    quotes, backticks and $(...) count; the ')' of an empty '()' pair
+    (function definition) does not. Positions refer to the masked text.
+    """
+    n = len(statement)
+    opens = 0
+    closes = []
+    masked = []
+    unquoted = []
+    last = ""  # last non-blank unquoted character
+    i = 0
+    while i < n:
+        c = statement[i]
+        if c == "\\":
+            masked.append(statement[i:i + 2])
+            i += 2
+            continue
+        if c in ("'", '"', "`"):
+            j = _skip_quoted(statement, i + 1, c)
+            masked.append(statement[i:j])
+            i = j
+            continue
+        if c == "$" and statement[i + 1:i + 2] == "(":
+            depth, i = 1, i + 2
+            while i < n and depth:
+                ch = statement[i]
+                if ch in ("'", '"'):
+                    i = _skip_quoted(statement, i + 1, ch)
+                    continue
+                depth += (ch == "(") - (ch == ")")
+                i += 2 if ch == "\\" else 1
+            masked.append("$_")
+            continue
+        if c == "(" and not statement[i + 1:].lstrip().startswith(")"):
+            opens += 1
+        if c == ")" and last != "(":
+            closes.append(sum(map(len, masked)))
+        masked.append(c)
+        unquoted.append(c)
+        if not c.isspace():
+            last = c
+        i += 1
+    return opens, closes, "".join(masked), "".join(unquoted)
+
+
+def detect(tokens):
+    """Return (write targets, command word, its arguments) for one statement."""
+    found = []
 
     # Redirection operators `>`, `>>`, `>|` (and `&>` once the `&` split above
     # has peeled it); the following token is the write target. shlex emits the
@@ -921,7 +1154,7 @@ for statement, _heredocs in split_shell_statements(command):
             while j < len(tokens) and tokens[j] in (">", "|", ">>", ">|"):
                 j += 1
             if j < len(tokens) and not is_skippable(tokens[j]):
-                targets.append(tokens[j])
+                found.append(tokens[j])
             i = j + 1
             continue
         i += 1
@@ -932,38 +1165,122 @@ for statement, _heredocs in split_shell_statements(command):
     # arity) and a transparent `--` are all handled there, not here. See the
     # header note for the shapes this closed in v1.5.0.
     idx = command_start(tokens)
-    if idx >= len(tokens):
-        continue
-    cmd = os.path.basename(tokens[idx])
+    cmd = os.path.basename(tokens[idx]) if idx < len(tokens) else ""
     args = tokens[idx + 1:]
 
     if cmd in WRITE_ALL:
         positionals, _target_dir = split_flags(args)
-        targets.extend(positionals)
+        found.extend(positionals)
     elif cmd in WRITE_DEST:
         positionals, target_dir = split_flags(args)
         if target_dir is not None:
             if not is_skippable(target_dir):
-                targets.append(target_dir)
+                found.append(target_dir)
         elif positionals:
-            targets.append(positionals[-1])
+            found.append(positionals[-1])
     elif cmd == "mv":
         positionals, _target_dir = split_flags(args)
-        targets.extend(positionals)
+        found.extend(positionals)
     elif cmd == "dd":
         for arg in args:
             if arg.startswith("of=") and not is_skippable(arg[3:]):
-                targets.append(arg[3:])
+                found.append(arg[3:])
     elif cmd in INPLACE:
         if inplace_requested(args):
-            targets.extend(inplace_operands(args))
+            found.extend(inplace_operands(args))
+    elif cmd in OUTPUT_OPTS:
+        found.extend(v for v in option_values(args, *OUTPUT_OPTS[cmd]) if not is_skippable(v))
+    elif cmd == "tar":
+        found.extend(v for v in tar_targets(args) if not is_skippable(v))
+    elif cmd == "git":
+        found.extend(v for v in git_clone_targets(args) if not is_skippable(v))
+    return found, cmd, args
+
+
+def judge(found, cwds):
+    for target in found:
+        target = expand_home(target)
+        if os.path.isabs(target):
+            targets.append(target)
+            continue
+        for cwd in cwds:
+            targets.append(UNRESOLVED_CWD + target if cwd is None
+                           else os.path.join(cwd, target))
+
+
+workdir = sys.argv[1] if len(sys.argv) > 1 else ""
+# Every directory the command may be in at this point (#1151 F6-07). A cd
+# joined by '&&' moves the command (it ran only when cd succeeded); after
+# any other separator, a failed cd leaves the old directory in place, so the
+# set is widened instead of replaced. A relative target is judged against
+# every member; an unresolvable member blocks it.
+# A cd inside $(...) or a '( ... )' subshell does not move the outer command:
+# the set is restored once the substitution / subshell ends. Inside, it is
+# tracked as usual (a substitution starts from the directories before AND
+# after its parent statement, and its inner separators count as ';').
+cwds = {workdir}
+before_parent = cwds
+dirstack = []
+subshells = []    # cwds saved at each open '(' subshell
+in_subst = None   # (cwds, len(subshells)) to restore after a substitution run
+case_depth = 0
+targets = []
+
+for statement, _heredocs, op in split_shell_statements_with_ops(command):
+    if op == "subst":
+        if in_subst is None:
+            in_subst = (cwds, len(subshells))
+            cwds = cwds | before_parent
+    else:
+        if in_subst is not None:
+            cwds, depth = in_subst
+            del subshells[depth:]
+            in_subst = None
+        before_parent = cwds
+    tokens = tokenize(statement)
+    if not tokens:
+        continue
+
+    opens, closes, statement, unquoted = subshell_parens(statement)
+    words = CASE_WORD.findall(unquoted)
+    if case_depth or words:
+        # shortcut: a case arm's ')' looks like a subshell close; inside a
+        # case no subshell is scoped, so a cd there stays in play (over-block).
+        opens, closes = 0, []
+    case_depth = max(0, case_depth + words.count("case") - words.count("esac"))
+    subshells.extend([cwds] * opens)
+
+    # Text after the last closing ')' (e.g. '> log' in '(cd x && make) > log')
+    # runs in the directory restored by that close.
+    head, tail = statement, ""
+    if closes:
+        head, tail = statement[:closes[-1]], statement[closes[-1] + 1:]
+    found, cmd, args = detect(tokenize(head))
+    judge(found, cwds)
+
+    if cmd in ("cd", "pushd", "popd"):
+        if cmd == "popd":
+            dest = dirstack.pop() if dirstack else {None}
+        elif cmd == "pushd" and not [a for a in args if not a.startswith("-")]:
+            dest = {None}  # bare pushd swaps the top two stack entries
+        else:
+            dest = cd_destination(args, cwds)
+        if cmd == "pushd":
+            dirstack.append(set(cwds))
+        cwds = dest if op == "&&" else (cwds | dest)
+
+    for _ in closes:
+        if subshells:
+            cwds = subshells.pop()
+    if tail.strip():
+        judge(detect(tokenize(tail))[0], cwds)
 
 for target in targets:
     print(target)
 PYEOF
 )
   _DETECTOR_RC=0
-  WRITE_TARGETS=$(printf '%s' "$BASH_CMD" | "$_PY" -c "$_DETECTOR_SRC" 2>/dev/null) || _DETECTOR_RC=$?
+  WRITE_TARGETS=$(printf '%s' "$BASH_CMD" | "$_PY" -c "$_DETECTOR_SRC" "$WORKDIR" 2>/dev/null) || _DETECTOR_RC=$?
   if [ "$_DETECTOR_RC" != "0" ]; then
     echo "REPO_CONTAINMENT: the Bash write-target detector exited rc=$_DETECTOR_RC." >&2
     echo "Failing closed (#944) — a command the detector cannot evaluate must not be allowed." >&2
@@ -975,6 +1292,13 @@ PYEOF
   if [ -n "$WRITE_TARGETS" ]; then
     while IFS= read -r candidate; do
       [ -n "$candidate" ] || continue
+      # Relative target after a cd/pushd the detector cannot resolve
+      # ('cd "$DIR"', 'cd -', popd): its real location is unknown (#1151 F6-07).
+      if [ "${candidate:0:1}" = $'\x01' ]; then
+        BLOCKED_TARGET="${candidate:1}"
+        BLOCKED_REASON="cwd-unknown"
+        break
+      fi
       case "$(containment_verdict "$candidate")" in
         ALLOW) ;;
         BLOCK_SINK)
