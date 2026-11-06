@@ -711,12 +711,15 @@ def test_tmp_sink_location_skipped_when_sink_disabled(tmp_path, monkeypatch):
 def test_tmp_sink_location_under_system_temp(tmp_path, monkeypatch):
     import tempfile
     project = tmp_path / "project"
-    (project / "scratch").mkdir(parents=True)
-    # project root is outside the (patched) system temp dir, the sink resolves into it
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(project / "scratch"))
-    cfg = {"repo_containment": {"tmp-sink": {"path": "scratch"}}}
+    systmp = tmp_path / "systmp"
+    systmp.mkdir()
+    project.mkdir()
+    (project / "link").symlink_to(systmp)
+    # project root is outside the (patched) system temp dir, the sink reaches it via symlink (caught by the path check first)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(systmp))
+    cfg = {"repo_containment": {"tmp-sink": {"path": "link/x"}}}
     (hit,) = run(project, monkeypatch, real("tmp-sink-outside-repo-or-system-temp"), config=cfg).findings
-    assert hit.severity is Severity.ERROR and hit.message.endswith("resolves into the system temp directory")
+    assert hit.severity is Severity.ERROR and "escape the project root" in hit.message
 
 
 def test_tmp_sink_check_uses_resolver_reason(tmp_path, monkeypatch):

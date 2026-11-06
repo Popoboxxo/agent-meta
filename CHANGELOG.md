@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **tmp-sink default rejected (#1136)**: `tmp_sink_location_error()` no longer reports a sink inside the project root as "resolves into the system temp directory" (default `.tmp` with `TMPDIR=<root>/.tmp`); sinks outside the root are still rejected.
+
 ## [2.0.0-beta.7] - 2026-11-05
 
 ### Added

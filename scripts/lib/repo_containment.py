@@ -361,8 +361,10 @@ def tmp_sink_location_error(path: str, project_root: Path) -> Optional[str]:
     """Return an error when the sink resolves outside the repo or in system temp.
 
     Only place that consults :func:`tempfile.gettempdir` in the sink context.
-    A sink under the system temp dir is reported only when the project root
-    itself is *not* under it (otherwise every temp-based checkout would fail).
+    A sink inside the project root is always valid, even when the platform
+    temp dir points into it (TMPDIR=<root>/.tmp, #1136). Otherwise a sink under
+    the system temp dir is reported only when the project root itself is *not*
+    under it (otherwise every temp-based checkout would fail).
     """
     root_real = os.path.realpath(os.fspath(project_root))
     target_real = os.path.realpath(os.path.join(root_real, path))
@@ -373,12 +375,12 @@ def tmp_sink_location_error(path: str, project_root: Path) -> Optional[str]:
         except ValueError:
             return False
 
+    if under(root_real, target_real):
+        return None
     temp_real = os.path.realpath(tempfile.gettempdir())
     if under(temp_real, target_real) and not under(temp_real, root_real):
         return "resolves into the system temp directory"
-    if not under(root_real, target_real):
-        return "resolves outside the project root"
-    return None
+    return "resolves outside the project root"
 
 
 def default_repo_containment_block() -> dict:

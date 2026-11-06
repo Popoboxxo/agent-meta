@@ -211,3 +211,45 @@ def test_location_error_under_system_temp(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "gettempdir", lambda: str(other))
     err = tmp_sink_location_error(str(other / "sink"), root)
     assert err and "temp" in err.lower()
+
+
+# --- #1136: sink inside a root that lives in the system temp dir -------------
+
+def test_location_default_ok_when_tempdir_is_sink(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    (root / ".tmp").mkdir(parents=True)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(root / ".tmp"))
+    assert tmp_sink_location_error(".tmp", root) is None
+
+
+def test_location_inside_root_ok_with_outside_tempdir(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    root.mkdir()
+    sys_tmp = tmp_path / "systmp"
+    sys_tmp.mkdir()
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(sys_tmp))
+    assert tmp_sink_location_error(".tmp", root) is None
+    assert tmp_sink_location_error("scratch/out", root) is None
+
+
+def test_location_symlink_into_system_temp_still_error(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    root.mkdir()
+    sys_tmp = tmp_path / "systmp"
+    sys_tmp.mkdir()
+    (root / "link").symlink_to(sys_tmp)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(sys_tmp))
+    err = tmp_sink_location_error("link/x", root)
+    assert err and "temp" in err.lower()
+
+
+def test_config_load_with_tmpdir_in_sink(tmp_path, monkeypatch):
+    from lib import config as cfg_mod
+    root = tmp_path / "root"
+    (root / ".meta-config").mkdir(parents=True)
+    (root / ".tmp").mkdir()
+    cfg_path = root / ".meta-config" / "project.yaml"
+    cfg_path.write_text("repo_containment:\n  tmp-sink:\n    path: '.tmp'\n", encoding="utf-8")
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(root / ".tmp"))
+    fn = next(getattr(cfg_mod, n) for n in dir(cfg_mod) if "repo_containment" in n and n.startswith("_validate"))
+    fn(__import__("yaml").safe_load(cfg_path.read_text()), cfg_path)
