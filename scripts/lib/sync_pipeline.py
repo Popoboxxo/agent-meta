@@ -856,7 +856,7 @@ def sync_version_bookkeeping(
     log.action("UPDATE", rel,
                f"agent-meta-version: {current!r} -> {actual_version!r}")
     config["agent-meta-version"] = actual_version
-    config_path.write_text(new_text, encoding="utf-8")
+    write_atomic(config_path, new_text)
     # Keep the owner-only mode even if this write path runs without a prior
     # fill_defaults() in the same process (issue #864).
     from lib.permissions import harden_admin_config_files
@@ -1780,7 +1780,7 @@ def _sync_stage_gitignore(
         )
     # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
-    if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
+    if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) is True or args.viz:
         viz_gitignore = viz_gitignore_entries()
         base_gitignore_entries.extend(viz_gitignore)
 
@@ -1927,8 +1927,9 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
 def _log_context_finding(log: SyncLog, finding) -> None:
     """Route one consistency Finding into sync.log: INFO -> note, ERROR -> error, else WARN.
 
-    ERROR (e.g. ``active-set.dangling-dispatch`` from phase 1) is still report-only:
-    it lands in the sync.log error list and summary, the exit code is unchanged.
+    ERROR (e.g. ``active-set.dangling-dispatch`` from phase 1) lands in the
+    sync.log error list and summary. Plain sync keeps its exit code (0);
+    ``--check`` exits 1 when any ERROR was recorded (#1155, policy D6).
     """
     text = f"{finding.check}: {finding.file}: {finding.message}"
     level = getattr(finding.severity, "value", finding.severity)

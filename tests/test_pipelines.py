@@ -1521,3 +1521,19 @@ def test_agent_renderer_consumes_the_variable_builders_effective_pipelines(tmp_p
     assert "UNIQUE-TASK-MARKER" in content
     # feature-lifecycle is not in the builder's dict -> its placeholder stays untouched.
     assert "Feature-Branch anlegen" not in content
+
+
+def test_safe_load_reflection_pairs_lets_keyboard_interrupt_through(monkeypatch):
+    """#1155 F9: Ctrl-C must not be swallowed; SystemExit (no PyYAML) still is."""
+    from scripts.lib import pipelines
+
+    def _raise(exc):
+        def _inner(_root=None):
+            raise exc
+        return _inner
+
+    monkeypatch.setattr(pipelines, "effective_reflection_pairs", _raise(SystemExit(1)))
+    assert pipelines._safe_load_reflection_pairs() == []
+    monkeypatch.setattr(pipelines, "effective_reflection_pairs", _raise(KeyboardInterrupt()))
+    with pytest.raises(KeyboardInterrupt):
+        pipelines._safe_load_reflection_pairs()

@@ -150,7 +150,7 @@ def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
         result = subprocess.run(  # noqa: PLW1510
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=str(agent_meta_root / submodule_path),
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -210,7 +210,7 @@ def _is_ahead_of_pin(repo_dir: Path, pinned_commit: str) -> bool:
     if probe.returncode != 0:
         return False
     head = subprocess.run(  # noqa: PLW1510
-        ["git", "rev-parse", "HEAD"], cwd=str(repo_dir), capture_output=True, text=True,
+        ["git", "rev-parse", "HEAD"], cwd=str(repo_dir), capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     return head.returncode == 0 and head.stdout.strip() != pinned_commit
 

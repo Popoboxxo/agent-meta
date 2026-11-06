@@ -444,6 +444,18 @@ _HOOK_REGISTRATION_WRITERS: dict = {
 }
 
 
+def _strict_enabled(value, key: str, log) -> bool:
+    """Only a real bool ``true`` enables; anything else warns + disables (#1155).
+
+    A quoted ``"true"``/``"false"`` must neither silently enable nor silently
+    disable — same explicit-warning convention as ``_normalize_auto_commit_mode``.
+    """
+    if not isinstance(value, bool):
+        log.warning(f"{key}: expected true/false (bool), got {value!r} "
+                    f"({type(value).__name__}) — treated as disabled")
+    return value is True
+
+
 def sync_hooks(
     agent_meta_root: Path,
     project_root: Path,
@@ -480,6 +492,11 @@ def sync_hooks(
 
     platforms = config.get("platforms", [])
     sources = collect_hook_sources(agent_meta_root, platforms)
+    known_hooks = {Path(name).stem for _, name in sources}
+    for name in config.get("hooks", {}):
+        if known_hooks and name not in known_hooks:
+            log.warning(f"hooks.{name}: unknown hook name — no hook script "
+                        "with this name exists, entry ignored")
 
     target_dir = project_root / hooks_dir_rel
     managed_index_path = target_dir / ".agent-meta-managed"
@@ -517,7 +534,7 @@ def sync_hooks(
     # Viz mode: conditional hooks (viz-log) are only managed when viz is enabled
     # and mode is dynamic/full.
     viz_cfg = config.get("viz", {})
-    viz_enabled = viz_cfg.get("enabled", False)
+    viz_enabled = _strict_enabled(viz_cfg.get("enabled", False), "viz.enabled", log)
     viz_mode = viz_cfg.get("mode", "off")
     viz_active = viz_enabled and viz_mode in ("dynamic", "full")
 
@@ -596,7 +613,10 @@ def sync_hooks(
             is_enabled = True
         else:
             enabled_by_default = meta.get("enabled_by_default", "false").lower() == "true"
-            is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", enabled_by_default)
+            is_enabled = _strict_enabled(
+                project_hooks_cfg.get(hook_stem, {}).get("enabled", enabled_by_default),
+                f"hooks.{hook_stem}.enabled", log,
+            )
 
         event = meta.get("event", "PreToolUse")
         if is_enabled and event in NON_RUNTIME_HOOK_EVENTS:

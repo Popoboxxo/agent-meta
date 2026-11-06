@@ -10,6 +10,7 @@ which is what keeps the scripts/lib dependency graph acyclic (Issue #565).
 from __future__ import annotations
 
 import re
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -104,10 +105,17 @@ def _update_frontmatter_dict(content: str, updates: dict, removes: list | None =
         inner = _fm_inner(fm_block)
         try:
             fm_dict = _yaml.safe_load(inner)
-            if not isinstance(fm_dict, dict):
-                fm_dict = {}
-        except _yaml.YAMLError:
+        except _yaml.YAMLError as exc:
+            # Rewriting would drop every existing field (#1155): keep it as is.
+            print(f"  !  frontmatter is not valid YAML, left unchanged ({type(exc).__name__})",
+                  file=sys.stderr)
+            return content
+        if fm_dict is None:
             fm_dict = {}
+        elif not isinstance(fm_dict, dict):
+            print(f"  !  frontmatter not a valid YAML mapping, left unchanged ({type(fm_dict).__name__})",
+                  file=sys.stderr)
+            return content
     else:
         fm_dict = {}
         body = content

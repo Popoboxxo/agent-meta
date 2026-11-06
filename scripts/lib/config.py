@@ -252,6 +252,16 @@ def _framework_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
+def _schema_top_level_props() -> dict:
+    """``properties`` of ``config/project-config.schema.json`` ({} if unreadable)."""
+    schema_path = _framework_root() / "config" / "project-config.schema.json"
+    try:
+        with schema_path.open(encoding="utf-8") as f:
+            return json.load(f).get("properties", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def _non_object_top_level_keys() -> frozenset[str]:
     """Top-level schema keys that are NOT mappings (scalar/array typed).
 
@@ -259,15 +269,8 @@ def _non_object_top_level_keys() -> frozenset[str]:
     when a new scalar key is added; ``_KNOWN_NON_OBJECT_KEYS`` is unioned in
     as a fallback for a missing/unreadable schema.
     """
-    schema_path = _framework_root() / "config" / "project-config.schema.json"
-    props: dict = {}
-    try:
-        with schema_path.open(encoding="utf-8") as f:
-            props = json.load(f).get("properties", {})
-    except (OSError, json.JSONDecodeError):
-        props = {}
     derived = {
-        key for key, prop in props.items()
+        key for key, prop in _schema_top_level_props().items()
         if isinstance(prop, dict) and prop.get("type") not in (None, "object")
     }
     return frozenset(derived) | _KNOWN_NON_OBJECT_KEYS
@@ -293,6 +296,36 @@ def _normalize_null_blocks(config: dict) -> None:
             del config[key]
         else:
             config[key] = {}
+
+
+def _object_top_level_keys() -> frozenset[str]:
+    """Top-level keys the schema declares as ``type: object``."""
+    return frozenset(
+        key for key, prop in _schema_top_level_props().items()
+        if isinstance(prop, dict) and prop.get("type") == "object"
+    )
+
+
+def _normalize_non_mapping_blocks(config: dict) -> None:
+    """Replace a non-mapping value of a mapping block with ``{}`` (#1155).
+
+    ``viz: true`` or ``hooks: {x: true}`` used to crash readers that chain
+    ``.get()`` with ``AttributeError``; warn and treat the block as empty.
+    """
+    for key in _object_top_level_keys():
+        value = config.get(key)
+        if value is not None and not isinstance(value, dict):
+            print(f"  !  WARNING: '{key}' must be a mapping, got "
+                  f"{type(value).__name__} — ignored", file=sys.stderr)
+            config[key] = {}
+    hooks = config.get("hooks")
+    if isinstance(hooks, dict):
+        for name, entry in hooks.items():
+            if not isinstance(entry, dict):
+                print(f"  !  WARNING: 'hooks.{name}' must be a mapping like "
+                      f"{{enabled: true}}, got {type(entry).__name__} — ignored",
+                      file=sys.stderr)
+                hooks[name] = {}
 
 
 def load_config(config_path: Path) -> dict:
@@ -349,6 +382,9 @@ def load_config(config_path: Path) -> dict:
     from .release_checklist import normalize_release_checklist_mode
     normalize_release_checklist_mode(config)
     _validate_config(config, config_path)
+    # After validation: strict validators must still reject bad values
+    # (repo_containment: 'yes' -> exit 1) before the lenient coercion runs.
+    _normalize_non_mapping_blocks(config)
     return config
 
 
@@ -671,8 +707,10 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       {path}: {err.message}", file=sys.stderr)
             if len(errors) > 5:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
-    except (ImportError, TypeError, ValueError):
-        pass  # jsonschema not installed or validation error — best-effort
+    except Exception as exc:  # noqa: BLE001 — best-effort, but never silent (#1155)
+        # Broken schema JSON, jsonschema.UnknownType, ...: warn, do not crash.
+        print(f"  !  WARNING: schema validation skipped: "
+              f"{type(exc).__name__}: {exc}", file=sys.stderr)
 
 
 def _validate_providers(config: dict, config_path: Path) -> None:
@@ -1377,9 +1415,8 @@ def fill_defaults(
         if config_path.suffix.lower() in (".yaml", ".yml"):
             _write_yaml_with_comments(config_path, config, added)
         else:
-            with config_path.open("w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-                f.write("\n")
+            from .io import write_atomic
+            write_atomic(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
     # Enforce owner-only permissions on every non-dry run, not just when the
     # file changed: project.yaml may carry a plaintext admin token
@@ -1428,7 +1465,7 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
     tabs, self-check mismatch, …), the historical full-dump path runs and
     injects ``#`` comment lines before the auto-filled top-level keys.
     """
-    from .io import yaml_dump_preserving_multiline
+    from .io import write_atomic, yaml_dump_preserving_multiline
     from .yaml_patch import patch_top_level
 
     def _dump(payload: dict) -> str:
@@ -1444,8 +1481,8 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
     descriptions = {name: desc for name, desc in auto_filled if "." not in name}
     patched = patch_top_level(original, data, _dump, comments=descriptions)
     if patched is not None:
-        with path.open("w", encoding="utf-8", newline="") as f:
-            f.write(patched)
+        # Bytes keep CRLF verbatim (write_atomic's text mode is LF-only).
+        write_atomic(path, patched.encode("utf-8"), mode="wb")
         return
 
     text = _dump(data)
@@ -1466,8 +1503,7 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
                     result.append(f"# {descriptions[key]}\n")
         result.append(line)
 
-    with path.open("w", encoding="utf-8") as f:
-        f.write("".join(result))
+    write_atomic(path, "".join(result))
 
 
 def read_version(agent_meta_root: Path) -> str:
@@ -1486,7 +1522,7 @@ def read_git_version(agent_meta_root: Path) -> str:
         result = subprocess.run(  # noqa: PLW1510
             ["git", "describe", "--tags", "--exact-match"],
             cwd=str(agent_meta_root),
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
         )
         if result.returncode == 0:
             return result.stdout.strip().lstrip("v")

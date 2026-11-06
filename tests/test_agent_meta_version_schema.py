@@ -66,3 +66,30 @@ def test_repo_project_yaml_version_satisfies_schema() -> None:
         e for e in validator.iter_errors(config) if list(e.path) == ["agent-meta-version"]
     ]
     assert errors == [], [e.message for e in errors]
+
+
+# --- #1155 F8: a broken schema must warn, never pass silently or crash ------
+
+
+def _load_minimal(tmp_path: Path) -> dict:
+    import sys
+
+    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    from lib.config import load_config
+
+    path = tmp_path / "project.yaml"
+    path.write_text("project: {name: t, prefix: t, short: t}\n", encoding="utf-8")
+    return load_config(path)
+
+
+@pytest.mark.parametrize("exc", [
+    ValueError("broken schema json"),
+    jsonschema.exceptions.UnknownType("foo", {}, {}),
+])
+def test_schema_validation_failure_warns(tmp_path, monkeypatch, capsys, exc) -> None:
+    def _boom(_schema):
+        raise exc
+
+    monkeypatch.setattr(jsonschema, "Draft7Validator", _boom)
+    _load_minimal(tmp_path)
+    assert "schema validation skipped" in capsys.readouterr().err

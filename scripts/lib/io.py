@@ -5,9 +5,9 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -347,7 +347,7 @@ def read_json_lenient(path: Path) -> dict | None:
         return None
 
 
-def write_atomic(path: Path, content: str, mode: str = "w") -> None:
+def write_atomic(path: Path, content: str, mode: str = "w", *, private: bool = False) -> None:
     """Write content to path atomically via temp file + os.replace() (#573).
 
     A plain ``path.write_text()`` truncates the target file in place — a
@@ -370,17 +370,33 @@ def write_atomic(path: Path, content: str, mode: str = "w") -> None:
     (``mode="wb"``) is untouched and writes ``bytes`` verbatim.
 
     mode: "w" (text, default) or "wb" (binary).
+
+    File mode (#1155): an existing target keeps its permission bits (an
+    0755 hook stays executable); a new file gets ``0o666 & ~umask`` like a
+    plain ``open()``. ``private=True`` always yields ``0o600`` — use it for
+    files that may carry secrets (env scripts, local provider configs).
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     binary = "b" in mode
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        keep_mode = None if private else stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        keep_mode = None
+    # os.open applies the umask itself (no racy os.umask() probe); flags
+    # mirror tempfile.mkstemp (exclusive, no symlink follow, binary on Windows).
+    flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+    tmp_name = str(path.parent / f".{path.name}.{os.urandom(8).hex()}.tmp")
+    fd = os.open(tmp_name, flags, 0o600 if private else 0o666)
     open_kwargs = {} if binary else {"encoding": "utf-8", "newline": "\n"}
     try:
         with os.fdopen(fd, "wb" if binary else "w", **open_kwargs) as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
+        if keep_mode is not None:
+            os.chmod(tmp_name, keep_mode)
         os.replace(tmp_name, path)
     except BaseException:
         try:
@@ -418,10 +434,11 @@ def yaml_dump_preserving_multiline(yaml_module, data: dict, stream=None, **kwarg
     return yaml_module.dump(data, stream, Dumper=dumper_cls, **kwargs)
 
 
-def _write_yaml(path: Path, data: dict) -> None:
-    """Write data as YAML with consistent formatting."""
+def _write_yaml(path: Path, data: dict, *, private: bool = False) -> None:
+    """Write data as YAML with consistent formatting (``private`` -> 0600)."""
     write_atomic(path, yaml_dump_preserving_multiline(
-        _yaml, data, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2))
+        _yaml, data, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2),
+        private=private)
 
 
 def content_hash(text: str) -> str:
@@ -518,7 +535,8 @@ def write_checked(
         # not a security boundary, just an early warning for a misconfigured
         # provider ignore-file.
         _warn_if_not_gitignored(path, rel_label, log)
-    write_atomic(path, content)
+    # Local-only (gitignored) files may carry secrets: keep them owner-only.
+    write_atomic(path, content, private=verify_gitignored)
     return True
 
 
@@ -539,7 +557,7 @@ def run_git_check_ignore(
             ["git", "check-ignore", *flags, target],
             cwd=cwd,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=5,
             check=False,
         )

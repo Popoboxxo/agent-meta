@@ -161,7 +161,7 @@ def generate_env_scripts(config: dict, project_root: Path, dry_run: bool = False
             results[rel_path] = "skipped"
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        write_atomic(target, content)
+        write_atomic(target, content, private=True)  # may carry secret values
         results[rel_path] = "created"
 
     return results

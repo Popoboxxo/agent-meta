@@ -131,3 +131,27 @@ def test_deactivation_status_writes_nothing_self_hosting(tmp_path):
     env_dir = meta / ".meta-config"
     for name in _ENV_FILES:
         assert not (env_dir / name).exists(), f"unexpected env file: {name}"
+
+
+def test_rmtree_failure_is_logged_not_type_error(tmp_path, monkeypatch) -> None:
+    """#1155 F2: a failing rmtree records a SyncLog error (target, message).
+
+    Before, ``log.error`` got one argument -> TypeError aborted
+    ``--deactivate-providers`` before ``update_deactivation_config`` ran.
+    """
+    from lib import deactivation
+    from lib.providers import load_providers_config
+
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "x.md").write_text("x\n", encoding="utf-8")
+
+    def _boom(*_a, **_k):
+        raise OSError("busy")
+
+    monkeypatch.setattr(deactivation.shutil, "rmtree", _boom)
+    log = SyncLog()
+    results = deactivation.deactivate_providers(
+        tmp_path, ["Claude"], load_providers_config(_REPO_ROOT), {}, log,
+    )
+    assert results["Claude"]["removed"] is False
+    assert len(log.errors) == 1 and "busy" in log.errors[0]
