@@ -29,12 +29,19 @@ from pathlib import Path
 from .report import Finding, Severity
 
 # Both hazards apply everywhere the CI matrix actually runs pytest against
-# Python 3.9: scripts/lib (the framework) and tests/ (its test suite).
+# Python 3.9: scripts/lib (the framework), the top-level scripts/*.py entry
+# points (#1154; non-recursive, so scripts/lib is not scanned twice) and
+# tests/ (its test suite).
 # vendored submodules (external/) are excluded -- foreign code, foreign floor.
 _SCAN_DIRS = (("scripts", "lib"), ("tests",))
+_FLAT_SCAN_DIRS = (("scripts",),)
 
 
 def _iter_py_files(root: Path):
+    for parts in _FLAT_SCAN_DIRS:
+        scan_dir = root.joinpath(*parts)
+        if scan_dir.is_dir():
+            yield from sorted(scan_dir.glob("*.py"))
     for parts in _SCAN_DIRS:
         scan_dir = root.joinpath(*parts)
         if not scan_dir.is_dir():
