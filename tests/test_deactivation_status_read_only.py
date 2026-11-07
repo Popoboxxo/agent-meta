@@ -145,8 +145,15 @@ def test_rmtree_failure_is_logged_not_type_error(tmp_path, monkeypatch) -> None:
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".claude" / "x.md").write_text("x\n", encoding="utf-8")
 
-    def _boom(*_a, **_k):
-        raise OSError("busy")
+    target = tmp_path / ".claude"
+    real_rmtree = deactivation.shutil.rmtree
+
+    # Fail only for the provider dir: on Python <= 3.12 tempfile's staging
+    # cleanup also resolves shutil.rmtree, which must keep working.
+    def _boom(path, *a, **k):
+        if Path(path) == target:
+            raise OSError("busy")
+        return real_rmtree(path, *a, **k)
 
     monkeypatch.setattr(deactivation.shutil, "rmtree", _boom)
     log = SyncLog()
