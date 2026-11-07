@@ -280,11 +280,19 @@ TOLERANCE_MAX_BYTES = 4096
 # (+781 Claude; the #1157 template text), harness-roster +793..+838 B, always-loaded
 # +1,350..+1,395 B on the roster providers, Copilot +575 B, Gemini entry-file/always-loaded
 # 32,873 -> 33,430 (+557, ceiling 33,530), Copilot entry-file +18 B.
+# MERGE RE-PIN (main #1157/#1162 into #1158 G4 `fix/dod-gating-spec-gate`, 2026-11-07): measured
+# with `measure_artifacts` on the merged tree. Main's Copilot always-loaded +575 B (left in the
+# tolerance) plus G4's longer `max_depth` soft-gate row (+71 B on every `rules`/AGENTS.md
+# artifact) exceeds the ceiling. Exactly the one failing entry is re-pinned:
+#   * always-loaded: Copilot 31,206 -> 31,852.
+# Left inside the tolerance (pins unchanged): rules/entry-file +71 B, orchestrator +756 B
+# (+781 Claude), harness-roster +519..+564 B, roster always-loaded +1,147..+1,192 B.
+# NEAR LIMIT: Gemini entry-file/always-loaded 33,501 B vs ceiling 33,530 B (29 B headroom).
 _IST_FULL: Dict[str, Dict[str, int]] = {
     "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 90241, "rules": 18208},
     "Codex": {"always-loaded": 702748, "entry-file": 24787, "harness-roster": 678518, "orchestrator": 89856},
     "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 74393, "rules": 21080},
-    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 74269, "rules": 20876},
+    "Copilot": {"always-loaded": 31852, "entry-file": 10887, "orchestrator": 74269, "rules": 20876},
     "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 90263},
     "KimiCode": {"always-loaded": 695981, "entry-file": 24801, "harness-roster": 671737, "orchestrator": 76322},
     "Mammouth": {"always-loaded": 691238, "entry-file": 24798, "harness-roster": 666997, "orchestrator": 74694},
@@ -557,11 +565,16 @@ def test_ac07_missing_ceiling_is_a_violation():
 # Left inside the tolerance (pins unchanged): orchestrator +20 B, harness-roster
 # +793..+838 B, roster always-loaded +1,119..+1,395 B, Copilot always-loaded +575 B /
 # entry-file +18 B.
+# MERGE RE-PIN (main #1157/#1162 into #1158 G4, 2026-11-07): measured with
+# `render_into_work_dir(..., profile="compact")` + `measure_artifacts`. Exactly the one failing
+# entry: Copilot always-loaded 31,206 -> 31,852 (main +575 B, G4 rules +71 B). Left inside
+# the tolerance: rules +71 B, orchestrator +20 B, harness-roster +519..+564 B, roster
+# always-loaded +845..+1,192 B; the multi-provider AGENTS.md stays 12,519 B.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
     "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34792, "rules": 18208},
     "Codex": {"always-loaded": 625634, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
     "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 35357, "rules": 21080},
-    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 35231, "rules": 20876},
+    "Copilot": {"always-loaded": 31852, "entry-file": 10887, "orchestrator": 35231, "rules": 20876},
     "Gemini": {"always-loaded": 11274, "entry-file": 11274, "orchestrator": 36105},
     "KimiCode": {"always-loaded": 633773, "entry-file": 3749, "harness-roster": 630350, "orchestrator": 35659},
     "Mammouth": {"always-loaded": 629072, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},

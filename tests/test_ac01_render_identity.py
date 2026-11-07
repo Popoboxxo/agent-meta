@@ -915,6 +915,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   and ``compact-golden`` were re-verified as unchanged
   (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
   unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+* Issue #1158 (G4 DoD/spec-gate: REQ/test mandates gated, feature-lifecycle
+  approve stage, planner APPROVED precondition, one classify-gate statement,
+  live ``max_depth`` doc): **45 of 1096 hashes moved; 0 added/removed** --
+  ``git``/``orchestrator``/``planner``/``tester`` x 9 providers (36), the
+  ``a2a-delegation-gates`` rule for Claude/Continue/Copilot (3) and the six
+  ``AGENTS.md`` that embed ``use-orchestrator`` (Codex, Gemini, KimiCode,
+  Mammouth, Opencode, ZCode). Regenerated via ``--write`` and verified per entry
+  against the previous manifest (no other key moved). ``slimming-golden``
+  (git/orchestrator/planner/tester) and ``compact-golden`` (orchestrator,
+  agents-managed) were patched per hunk with exactly these deltas; both
+  ``topology-golden`` fixtures follow the K-10 ``max_depth`` row. AC-T4 digests
+  in ``tests/test_opencode_v2_surface.py`` follow. ``AC01_EXCEPTIONS`` is NOT
+  extended.
 
 - Orchestrator worker control (issue #1157, 2026-11-06,
   ``fix/orchestrator-tools-handback``): ``orchestrator`` 8.10.0 -> **8.11.0**
@@ -952,6 +965,15 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``tests/test_opencode_v2_surface.py`` recomputed from the merged trees: ac01 ->
   ``e89ed97c…``, compact -> ``e9dc8776…`` (``agents-managed.md`` carries both sentences),
   slimming = #1157 (``c08f66b0…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Merge of ``main`` (#1151 G1, #1156 G2, #1157/#1162 G3, ``orchestrator`` 8.11.0) into
+  ``fix/dod-gating-spec-gate`` (#1158 G4, ``orchestrator`` -> 8.11.1, 2026-11-07): 27 G4-only keys
+  and 12 main-only keys (9 hook renders, 3 ``use-orchestrator`` rule renders) merged by key;
+  18 keys were moved by both sides (9 ``orchestrator`` renders, 3 ``a2a-delegation-gates`` rule
+  renders, 6 ``AGENTS.md``). A fresh matrix render drifted on exactly those **18 of 1096** keys
+  (renders verified to carry main's gate-3 sentence + depth row, G4's soft-gate ``max_depth`` row,
+  ``TaskStop``, 8.11.1); patched **per entry** from ``render_matrix_hashes`` -- not via ``--write``.
+  Net: 45 keys vs ``main``, 30 vs the G4 head. ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

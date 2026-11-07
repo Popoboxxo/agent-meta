@@ -5459,10 +5459,18 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `ac01-baseline` carries both sides' keys plus 6 `AGENTS.md` re-rendered with
 # both rule changes (-> e89ed97c); `compact-golden` = #1157 orchestrator.md plus
 # `agents-managed.md` with both sentences (-> e9dc8776); `slimming-golden` = #1157.
+# Issue #1158 (DoD/spec-gate, G4): `ac01-baseline` re-pinned — 45 hashes (`git`,
+# `orchestrator`, `planner`, `tester` x 9 providers, 3 a2a rule renders, 6
+# AGENTS.md); `slimming-golden` (git/orchestrator/planner/tester) and
+# `compact-golden` (orchestrator, agents-managed) patched per hunk; topology
+# goldens follow the K-10 row. Log: `tests/test_ac01_render_identity.py`.
+# Merge of main (#1151 G1, #1156 G2, #1157/#1162 G3, `orchestrator` 8.11.0) into
+# #1158 G4 (`orchestrator` -> 8.11.1): digests recomputed from the merged trees
+# (ac01 -> 9df232ba, slimming -> 6598edb7, compact -> c5c43c00).
 _FIXTURE_TREES = {
-    "ac01-baseline": "e89ed97c468397485b41bc00d010800a260592ea46ec79c4ad4230e9a314b902",
-    "slimming-golden": "c08f66b0a052e4b04a9be48d964eed35813d4659aba099322a907ca7c5dff099",
-    "compact-golden": "e9dc8776c49106277abe395e0406990b1313222c2e9de48b542a99bea2724316",
+    "ac01-baseline": "9df232ba8019a290447cf07c60183725bb49b2c8233803298042ccae1d33b55e",
+    "slimming-golden": "6598edb7c2a06a4aece8aec7002e724e24aad35402d8621bc7e5f7043dd76c9c",
+    "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
 }
 
 

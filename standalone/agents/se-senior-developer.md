@@ -75,7 +75,7 @@ A leaf flagged security-critical is `done` only with all five points below — o
 5. `req_id` + `leaf_id` in jedem Artefakt referenzieren
 6. Jedes Interface testen, insb. Boundary-Cases
 7. Self-Review: edge cases, error paths, concurrency, backward compat
-8. Commit: `<type>(REQ-xxx): <description>`
+8. Commit: `<type>: <description>`
 
 **Research:** Bei obskurem Framework/Protokoll offizielle Doku (versioned) via WebFetch/WebSearch.
 

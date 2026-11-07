@@ -1,6 +1,14 @@
 # DoD presets. Override via 'dod-preset' or per-field 'dod' in project.yaml.
 # Precedence: dod > dod-preset > full.
 #
+# Spec/plan workflow master switch (#1158 K-06) -- ONE canonical resolution:
+#   1. project.yaml `spec-plan-workflow.enabled` (explicit bool) -- wins always
+#   2. resolved DoD `spec-plan-required` (dod override > preset below)
+#   3. false
+# `spec-plan-required` is only the preset default for (1). `spec-plan-enabled`
+# is the read-only resolved render key (resolve_dod output), not settable --
+# the closed project schema rejects it under `dod:`.
+#
 # 'release-gates' (per preset, optional): default enabled/disabled state for
 # the built-in pre-release-check.sh gate scripts (hooks/1-generic/release-gates/).
 # NOT part of the flat 'dod' block — resolved separately via
@@ -43,7 +51,7 @@ presets:
       docker-image-scan: false
       action-pin-validation: false
 
-  rapid-prototyping:    # minimal overhead
+  rapid-prototyping:    # minimal overhead (an explicit spec-plan-workflow.enabled still wins)
     req-traceability: false
     tests-required: false
     codebase-overview: false

@@ -54,3 +54,39 @@ def test_use_orchestrator_rule_uses_the_conditional():
     assert "Classify-Route" in block
     assert "APPROVED" in block
     assert "spec-plan-workflow" in block
+
+
+def _spec_plan_render(rel: str, enabled: bool) -> str:
+    text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+    return strip_inactive_conditional_blocks(
+        text, {"SPEC_PLAN_WORKFLOW_ENABLED": "true" if enabled else "false"},
+    )
+
+
+def test_planner_requires_approved_spec_only_when_workflow_on():
+    # #1158 K-04: the planner must not plan an unapproved M/L/XL spec.
+    on = _spec_plan_render("agents/1-generic/planner.md", True)
+    off = _spec_plan_render("agents/1-generic/planner.md", False)
+    assert "Precondition" in on and "Status: APPROVED" in on
+    assert "Precondition" not in off
+
+
+def test_orchestrator_plan_driven_gate_requires_approval_when_workflow_on():
+    on = _spec_plan_render("agents/1-generic/orchestrator.md", True)
+    off = _spec_plan_render("agents/1-generic/orchestrator.md", False)
+    gate = on[on.index("**Plan-driven gate:**"):].split("\n\n", 1)[0]
+    assert "Status: APPROVED" in gate
+    gate_off = off[off.index("**Plan-driven gate:**"):].split("\n\n", 1)[0]
+    assert "Status: APPROVED" not in gate_off
+
+
+# One canonical statement on the classify gate outside pipelines (K-05).
+_CLASSIFY_GATE_CANON = "S-Klasse ohne Artefakt"
+
+
+def test_classify_gate_statement_is_identical_everywhere():
+    for rel in ("rules/1-generic/use-orchestrator.md",
+                "rules/1-generic/spec-plan-workflow.md",
+                "agents/1-generic/orchestrator.md"):
+        rendered = _spec_plan_render(rel, True)
+        assert _CLASSIFY_GATE_CANON in rendered, rel

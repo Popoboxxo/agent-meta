@@ -41,6 +41,10 @@ documented reason):
   template diff -- version pins, Claude ``tools`` + ``SendMessage``/``TaskStop``,
   the reworded Sync-Call/Hard-interrupt lines, the dispatch-context hand-back
   line and BARRIER step 6 (worker run without report = failed).
+* Merge of main (#1157/#1162, 8.11.0) into #1158 G4 (8.10.1): template -> 8.11.1;
+  both goldens = main's goldens plus exactly G4's deltas (classify-gate sentence,
+  planner gate, slimming only: feature-lifecycle approve stage + neutral commit task)
+  and the 8.11.1 version pins.
 """
 from __future__ import annotations
 

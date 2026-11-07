@@ -48,7 +48,7 @@ Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature
 {{/if}}
 
 {{#if SPEC_PLAN_WORKFLOW_ENABLED}}
-**Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
+**Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen. Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 {{/if}}
 ## Git Delegation
 {{#unless AUTO_COMMIT_ENABLED}}

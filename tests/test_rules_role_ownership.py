@@ -68,6 +68,7 @@ _PINNED = REPO_ROOT / "tests" / "fixtures" / "active-set-prose" / "rules-all-act
 def test_rules_unchanged_when_owners_active(projects, name, stem):
     # Every owner role is active in the default and the all-roles project, so the
     # render equals the pre-change render (pinned from main 8f2ecb2, default project).
+    # Rebaselined #1158: a2a-delegation-gates max_depth row now 'live (Soft Gate)'.
     text = _rule(projects[name][0], stem)
     assert text == (_PINNED / f"{stem}.md").read_text(encoding="utf-8")
     assert "keine aktive Eigentümer-Rolle" not in text

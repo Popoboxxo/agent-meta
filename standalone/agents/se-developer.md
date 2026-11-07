@@ -83,7 +83,7 @@ Separate read/query paths from write/command paths on this component's interface
 ### Traceability
 
 - Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
-- Commit message format: `<type>(REQ-xxx): <description>`
+- Commit message format: `<type>: <description>`
 
 ### Domain Gate
 
@@ -101,7 +101,7 @@ Separate read/query paths from write/command paths on this component's interface
 6. Reference req_id + leaf_id in every code artifact
 7. Cover each implemented interface with a test
 8. Do not break existing tests
-9. Commit format: <type>(REQ-xxx): <description>
+9. Commit format: `<type>: <description>`
 ```
 
 ## Mandatory Escalation

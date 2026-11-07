@@ -121,7 +121,7 @@ Report the candidates (local + remote) to the user.
 - `docs/<topic>` — docs-only
 - `chore/<topic>` — maintenance
 
-**Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+**Commit format:** `<type>: <description>`, first line ≤ 72 characters — type/scope rules: Rule `commit-conventions.md` (auto-loaded).
 
 **No leading BOM (issue #842):** the subject must start at byte 0 with the Conventional-Commit type. Never prefix a commit message with a UTF-8 BOM (`EF BB BF`, e.g. from a copied `-F` message file saved by an editor) — the guard hook rejects such a commit with exit 2. Strip the BOM before committing.
 
