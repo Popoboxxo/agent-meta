@@ -128,6 +128,9 @@ providers:
       tools: keep
       tools-format: keep
       tool-name-map: {}
+      # Orchestrator worker control (#1157): continue a worker / stop a
+      # background agent. Primary role only; whitelisted in provider-tools.yaml.
+      primary-role-tools: [SendMessage, TaskStop]
       reject-fields: []
   Gemini:
     agents_dir: .gemini/agents

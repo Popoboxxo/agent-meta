@@ -5449,10 +5449,20 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Review follow-up (#1151): scoped cd / old-style tar in `repo-containment-impl.sh`
 # and the worker-git sentence in `use-orchestrator`: `ac01-baseline` 11 more
 # hashes (706e1515 -> 00178459), `compact-golden` one line (eaeaddfe -> e7eecf36).
+# Issue #1157 (orchestrator worker control, `orchestrator` 8.10.0 -> 8.11.0):
+# `ac01-baseline` re-pinned per entry — 18 of 1096 hashes (9 `orchestrator`
+# renders, 3 `a2a-delegation-gates` rule renders, 6 `AGENTS.md` that embed the
+# rule); `slimming-golden`/`compact-golden` re-pinned for the same template diff
+# (orchestrator.md) and `compact-golden/agents-managed.md` for the embedded
+# a2a gate-3 sentence. Log: `tests/test_ac01_render_identity.py`.
+# Merge of main (#1151 G1) into #1157: digests recomputed from the merged trees —
+# `ac01-baseline` carries both sides' keys plus 6 `AGENTS.md` re-rendered with
+# both rule changes (-> e89ed97c); `compact-golden` = #1157 orchestrator.md plus
+# `agents-managed.md` with both sentences (-> e9dc8776); `slimming-golden` = #1157.
 _FIXTURE_TREES = {
-    "ac01-baseline": "00178459912e22f7cb4f7d4eed733f42c4522e519ebb9bb1cdaa44106f7a5b4c",
-    "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
-    "compact-golden": "e7eecf36e270b0f091284077aefeb71b226ef9e24f6055b824b9616235f85f3e",
+    "ac01-baseline": "e89ed97c468397485b41bc00d010800a260592ea46ec79c4ad4230e9a314b902",
+    "slimming-golden": "c08f66b0a052e4b04a9be48d964eed35813d4659aba099322a907ca7c5dff099",
+    "compact-golden": "e9dc8776c49106277abe395e0406990b1313222c2e9de48b542a99bea2724316",
 }
 
 

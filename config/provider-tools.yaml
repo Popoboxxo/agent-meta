@@ -16,6 +16,8 @@ claude:
   - TodoWrite
   - WebFetch
   - WebSearch
+  - SendMessage         # continue/resume a worker (granted via primary-role-tools; whitelist is provider-wide, #1157)
+  - TaskStop            # stop a background agent/task (granted via primary-role-tools; whitelist is provider-wide, #1157)
   - mcp__*              # MCP tool prefix (wildcard)
 
 opencode:

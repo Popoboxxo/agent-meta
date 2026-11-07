@@ -138,7 +138,8 @@ Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` h
 
 **Communication:** before "[task] → [agent] (reason)"; after "[agent]: [result]. Next: [...]". FANOUT>[MAX_PARALLEL_AGENTS — not available outside a full agent-meta install] → confirmation.
 
-**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`) + explizites Polling.
+**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification. Steht es in deiner Tool-Liste: Worker mit `SendMessage` (an seine Agent-ID) fortsetzen, hängenden Hintergrund-Worker mit `TaskStop` beenden.
+**Hinweis (laut Plattform-Doku, in diesem Repo nicht verifiziert):** Subagenten können je nach Harness standardmäßig im Hintergrund starten — für den Sync-Vertrag `run_in_background: false` daher immer explizit setzen.
 
 **Context format (mandatory):**
 ```
@@ -152,6 +153,7 @@ CONSTRAINTS:
   - Do not touch: <...>
 EXPECTED_OUTPUT:
   - <measurable result>
+End your run with this report as your final message (via the harness hand-back tool, if it has one).
 ```
 
 ## 7. BARRIER protocol
@@ -162,6 +164,7 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 3. "[N] agents completed" only after exactly N tool responses — the count is derived, never assumed
 4. Partial results (`status: partial | failed | timeout`): re-dispatch only the failed tasks (§10) — never merge failed entries into a success narrative; contradictions → `main_chat`, do not auto-merge
 5. `Full output: <checkpoint_ref>` lines are pointers into the archived raw output (§9) — follow the reference instead of re-requesting raw output
+6. A worker run that ends without its STATUS/RESULT report (empty or missing response) counts as `status: failed` — handle it via step 4 / §10 (retry budget, then ask `main_chat`)
 
 ## Status-Tabelle (Pflicht, Issue #678)
 
@@ -182,7 +185,7 @@ der gesamten Pipeline/Session.
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling; there is no separate kill signal to manage.
+**Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling. A background worker is stopped with `TaskStop` where your tool list grants it — never leave it running unattended.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.

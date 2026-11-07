@@ -916,6 +916,43 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
   unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Orchestrator worker control (issue #1157, 2026-11-06,
+  ``fix/orchestrator-tools-handback``): ``orchestrator`` 8.10.0 -> **8.11.0**
+  (Sync-Call/Hard-interrupt text names ``SendMessage``/``TaskStop``, BARRIER step 6
+  "worker run without report = failed", dispatch-context hand-back line, the
+  unverified ``run_in_background: false`` hint) and ``a2a-delegation-gates``
+  (gate 3 sentence + platform depth-limit row); Claude's primary role gains the
+  data-declared ``primary-role-tools`` ``SendMessage``/``TaskStop``. Exactly
+  **18 of 1096 hashes moved; 0 added/removed**: the ``orchestrator`` agent render
+  of all nine providers, the three standalone rule renders
+  (``Claude/.claude/rules/a2a-delegation-gates.md``,
+  ``Continue/.continue/rules/a2a-delegation-gates.md``,
+  ``Copilot/.github/instructions/a2a-delegation-gates.instructions.md``) and the
+  six ``AGENTS.md`` that embed the rule (Codex, Gemini, KimiCode, Mammouth,
+  Opencode, ZCode). The manifest was patched **per entry** (18 single-line
+  replacements) -- not via ``--write`` -- from two independent matrix renders
+  with identical drift. AC-T4 digests in ``tests/test_opencode_v2_surface.py``
+  follow: ac01 ``3acc668e…`` -> ``c241ad07…``, slimming ``8d1ade1a…`` ->
+  ``2054b433…``, compact ``fa992b69…`` -> ``1f37318f…`` (both orchestrator goldens carry
+  exactly the template diff; ``compact-golden/agents-managed.md`` carries the
+  one-line gate-3 sentence, log in ``tests/test_gate_card_compact.py``). Both ``topology-golden`` fixtures were regenerated
+  with the README generator and differ by exactly the two ``a2a-delegation-gates``
+  rule lines (gate-3 sentence, depth row) -- no topology wording moved.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
+- Merge of ``main`` (#1151 G1 hooks, #1156 G2 sync) into ``fix/orchestrator-tools-handback``
+  (#1157, 2026-11-07): the manifest conflicted only on the six ``AGENTS.md`` keys, which both
+  sides moved (G1: ``use-orchestrator`` sentences; #1157: ``a2a-delegation-gates`` gate 3).
+  The 12 G1-only keys (9 hook renders, 3 ``use-orchestrator`` rule renders) and the 12
+  #1157-only keys (9 ``orchestrator`` renders, 3 ``a2a-delegation-gates`` rule renders) merged
+  cleanly. A fresh matrix render drifted on exactly those **6 of 1096** ``AGENTS.md`` keys
+  (Codex, Gemini, KimiCode, Mammouth, Opencode, ZCode; each render verified to carry both
+  sentences); they were patched **per entry** from the harness's own ``_hash_file`` over the
+  rendered tree -- not via ``--write``. Net vs. the merge base: 30 keys. AC-T4 digests in
+  ``tests/test_opencode_v2_surface.py`` recomputed from the merged trees: ac01 ->
+  ``e89ed97c…``, compact -> ``e9dc8776…`` (``agents-managed.md`` carries both sentences),
+  slimming = #1157 (``c08f66b0…``). ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
