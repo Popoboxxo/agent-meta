@@ -320,7 +320,18 @@ def test_render_json_round_trip():
     definition = _sample_definition()
     rendered = render_routing_tool_definition(definition, "json")
     assert json.loads(rendered) == definition
-    assert f'"name": "{ROUTING_TOOL_NAME}"' in rendered
+    assert f'"name":"{ROUTING_TOOL_NAME}"' in rendered
+
+
+def test_render_json_is_compact_single_line():
+    """G7 (#1161): the json render drops indentation/whitespace — same data,
+    no newline inside the payload, >=25% smaller than an indent=2 dump."""
+    definition = _sample_definition()
+    rendered = render_routing_tool_definition(definition, "json")
+    pretty = json.dumps(definition, indent=2, ensure_ascii=False) + "\n"
+    assert json.loads(rendered) == json.loads(pretty)
+    assert rendered.endswith("\n") and "\n" not in rendered[:-1]
+    assert len(rendered.encode("utf-8")) <= 0.75 * len(pretty.encode("utf-8"))
 
 
 def test_render_yaml_text_block_round_trip():
