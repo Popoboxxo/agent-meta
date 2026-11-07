@@ -5467,9 +5467,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Merge of main (#1151 G1, #1156 G2, #1157/#1162 G3, `orchestrator` 8.11.0) into
 # #1158 G4 (`orchestrator` -> 8.11.1): digests recomputed from the merged trees
 # (ac01 -> 9df232ba, slimming -> 6598edb7, compact -> c5c43c00).
+# Issue #1159 (G5, K-08/K-09): `slimming-golden` patched per line (17 roles:
+# EXTRA_DONTS placeholder rule; `developer` also escape example, constraint line,
+# 2.0.4 pins) -> e3c930ec; `ac01-baseline` 0 of 1096 hashes moved (the matrix
+# project renders neither agent-meta-developer nor this EXTRA_DONTS);
+# `compact-golden` unchanged. Log: `tests/test_template_slimming_equivalence.py`.
 _FIXTURE_TREES = {
     "ac01-baseline": "9df232ba8019a290447cf07c60183725bb49b2c8233803298042ccae1d33b55e",
-    "slimming-golden": "6598edb7c2a06a4aece8aec7002e724e24aad35402d8621bc7e5f7043dd76c9c",
+    "slimming-golden": "e3c930ec579ae9db7bb86255df03bc4b0098db6145f910bbb1dd3567b489ea67",
     "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
 }
 

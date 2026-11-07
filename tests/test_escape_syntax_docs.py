@@ -98,3 +98,28 @@ def test_rendered_copy_survives_sync_unchanged_in_meaning():
         "('{{VAR}} -> rendert als {{VAR}}') -- that described the escape "
         "token as identical to an unescaped placeholder, which is wrong."
     )
+
+
+_DEV_TEMPLATE = _REPO_ROOT / "agents" / "2-platform" / "agent-meta-developer.md"
+
+
+def test_agent_meta_developer_escape_example_survives_render():
+    """Issue #1159 (K-09): the agent-meta-developer template documented the
+    escape with a raw escape token, which substitute() consumed, so the
+    rendered developer agent claimed '{{VAR}} -> rendert als {{VAR}}'. The
+    rendered template must not contain that self-contradicting claim and must
+    point to the canonical 'Platzhalter-Escape' section instead."""
+    from lib.config import SyncLog, substitute  # type: ignore
+
+    content = _DEV_TEMPLATE.read_text(encoding="utf-8")
+    rendered = substitute(content, {}, "test:agent-meta-developer.md", SyncLog())
+
+    old_wrong_claim = re.compile(r"\{\{VAR\}\}\s*.*rendert als\s*.*\{\{VAR\}\}")
+    assert not old_wrong_claim.search(rendered), (
+        "Rendered agent-meta-developer must not claim '{{VAR}} -> rendert als "
+        "{{VAR}}' -- the raw escape token in the source was consumed by render."
+    )
+    assert "Platzhalter-Escape" in rendered, (
+        "agent-meta-developer must point to the canonical 'Platzhalter-Escape' "
+        "section in rules/2-platform/agent-meta-architecture.md."
+    )

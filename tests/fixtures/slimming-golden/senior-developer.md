@@ -185,7 +185,7 @@ FAILURE_LOG: <attempt n approach + failure reason>
 - No secrets / API keys
 - - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 - Blocked after 2+ verified failures on the same task → escalate to `principal-developer` (see workflow step 7) with reason (`repeated_failure`) + metric (`attempts: <n>`) + task summary + failure log, do not silently report `failed` or loop further
 

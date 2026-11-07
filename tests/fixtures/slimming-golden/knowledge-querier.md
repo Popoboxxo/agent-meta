@@ -69,7 +69,7 @@ Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `
 - KEIN File-Back ohne `file-back-results: true` Konfiguration
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>

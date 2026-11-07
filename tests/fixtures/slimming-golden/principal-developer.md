@@ -198,7 +198,7 @@ NEXT: [Review | Tests | Commit]
 - No "done" report without reproducing the original failure scenario
 - - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** requirement → `requirements` · tests → `tester` · docs → `documenter` (include DECISION block). You never delegate scope work — there is no higher tier.

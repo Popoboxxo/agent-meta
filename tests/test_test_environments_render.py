@@ -20,6 +20,10 @@ Rebaseline log:
 - G4 (spec-gate / DoD REQ gating): the five ``tester`` hashes moved (tester
   2.10.1, REQ-traceability gating in the template); the other roles'
   hashes are unchanged. Intended delta only.
+- #1159 G5 (K-08/K-09): exactly one of 30 hashes moved, ``agent-meta/developer``
+  (``da1a95ec…`` -> ``b43ddf27…``): ``agent-meta-developer`` 2.0.4 escape example,
+  and its placeholder constraint line (the matrix project sets no ``EXTRA_DONTS``). Patched
+  per key from ``_matrix_hashes``' own helpers, not via ``--capture-baseline``.
 
 Run: ``python3 -m pytest tests/test_test_environments_render.py --basetemp="{{PYTEST_BASETEMP}}"``
 """
@@ -382,7 +386,7 @@ OVERRIDES = {
     "homeassistant-developer.md": ("2.1.3", "1-generic/developer.md@4.9.0"),
     "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
     "hacs-developer.md": ("1.3.3", "1-generic/developer.md@4.9.0"),
-    "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
+    "agent-meta-developer.md": ("2.0.4", "1-generic/developer.md@4.9.0"),
     "hacs-tester.md": ("1.0.7", "1-generic/tester.md@2.10.1"),
     "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),
     "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),

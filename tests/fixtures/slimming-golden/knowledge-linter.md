@@ -65,7 +65,7 @@ Dein Delegations-Payload ist `knowledge-lint-v1` — an `knowledge-gardener` (me
 - KEINE CRITICAL-Findings (#7) ignorieren oder verzögern
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>

@@ -146,7 +146,7 @@ On failed tests or audit violations: return structured findings (affected flow, 
 - No arbitrary code execution in the browser context
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** test failures / regressions → `developer` · new requirement → `requirements` · unit-test need → `tester` · docs → `documenter`

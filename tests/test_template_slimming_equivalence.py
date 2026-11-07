@@ -207,6 +207,15 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   same orchestrator/use-orchestrator deltas.
 * Merge of main (#1157/#1162 orchestrator 8.11.0) into #1158: ``orchestrator``
   golden = main's golden plus G4's hunks, version 8.11.1; other goldens unchanged.
+* Issue #1159 (G5, K-08/K-09): seventeen goldens patched per line. The project
+  ``EXTRA_DONTS`` rule now points to ``agent-meta.config.example.yaml`` instead
+  of the non-existent "CLAUDE.md Variablen-Tabelle" (exactly that one line in
+  each of the 17 roles that render ``EXTRA_DONTS``); ``developer`` (via
+  ``agent-meta-developer`` 2.0.3 -> 2.0.4) additionally changes its constraint
+  line the same way, its escape example (the raw escape token was consumed by
+  the render, K-09) and the two frontmatter pins. The red run's drift was
+  exactly these lines; ``_GOLDEN_ROLE_COUNT``, the normalization table and
+  ``compact-golden`` are unchanged.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
