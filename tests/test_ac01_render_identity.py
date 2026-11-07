@@ -891,6 +891,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   and ``compact-golden`` were re-verified as unchanged
   (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
   unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+* Issue #1158 (G4 DoD/spec-gate: REQ/test mandates gated, feature-lifecycle
+  approve stage, planner APPROVED precondition, one classify-gate statement,
+  live ``max_depth`` doc): **45 of 1096 hashes moved; 0 added/removed** --
+  ``git``/``orchestrator``/``planner``/``tester`` x 9 providers (36), the
+  ``a2a-delegation-gates`` rule for Claude/Continue/Copilot (3) and the six
+  ``AGENTS.md`` that embed ``use-orchestrator`` (Codex, Gemini, KimiCode,
+  Mammouth, Opencode, ZCode). Regenerated via ``--write`` and verified per entry
+  against the previous manifest (no other key moved). ``slimming-golden``
+  (git/orchestrator/planner/tester) and ``compact-golden`` (orchestrator,
+  agents-managed) were patched per hunk with exactly these deltas; both
+  ``topology-golden`` fixtures follow the K-10 ``max_depth`` row. AC-T4 digests
+  in ``tests/test_opencode_v2_surface.py`` follow. ``AC01_EXCEPTIONS`` is NOT
+  extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

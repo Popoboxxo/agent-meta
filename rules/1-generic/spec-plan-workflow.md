@@ -56,10 +56,9 @@ keine Security boundary (Terminologie:
 `.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
 
 - Vollständig greift der Gate nur über die Pipeline-Route (`requires_approval`-Stage).
-- Ad-hoc-Dispatches sowie `quick-fix`/`bugfix` haben keine Classify-/Approve-Stage —
-  dort ist der Gate rein regelbasiert.
-- Ohne explizite Freigabe (`Status: APPROVED`) darf weder ein Plan noch eine
-  Implementierung entstehen.
+- Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`).
+- Ohne explizite Freigabe (`Status: APPROVED`) darf für M/L/XL weder ein Plan noch
+  eine Implementierung entstehen.
 
 ## Spec-Template (Pflichtsektionen)
 

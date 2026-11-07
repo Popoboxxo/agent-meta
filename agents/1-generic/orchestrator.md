@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.10.0"
+version: "8.10.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -61,7 +61,7 @@ gilt das Bestandsverhalten — kein Gate, keine Classify-Pflicht. Master-Rule
 - **Ownership/Barrieren:** Datei-Ownership aus dem `Files:`-Block; nur ownership-disjunkte Tasks parallel (`check_plan_file_overlap`/`check_file_overlap`); Zyklen/Overlaps im `parallel_group` sind Fehler. Eingebunden wird nur der Graph-Validator (`FanoutPlan`/`validate_plan`), `execute_plan` bleibt out-of-scope (F6); `max-parallel-agents` bleibt Obergrenze.
 - **Kein Worktree:** `isolation: "worktree"` ist verboten (`rules/1-generic/no-worktree-isolation.md`); Ersatz ist Ownership + Barrieren + Checkpoint-Ledger, Repo-Containment bleibt unangetastet.
 
-**Gate auch außerhalb der Pipeline:** Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — dort gilt die Classify-/Gate-Pflicht regelbasiert, verbindlich verankert in `rules/1-generic/use-orchestrator.md` (Convention boundary, kein Security-Anspruch).
+**Gate auch außerhalb der Pipeline:** Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`); verbindlich verankert in `rules/1-generic/use-orchestrator.md` (Convention boundary, kein Security-Anspruch).
 {{/if}}
 ## 1. Planning phase
 
@@ -91,7 +91,7 @@ Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-dri
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 {{#if PIPELINE_FEATURE_LIFECYCLE_ENABLED}}(z.B. `feature-lifecycle` → Stage `implement`), {{/if}}und KEIN Plan existiert:
-→ delegiere ZUERST an `planner` zur Plan-Erstellung. Warte auf den Plan-Pfad
+→ delegiere ZUERST an `planner` zur Plan-Erstellung{{#if SPEC_PLAN_WORKFLOW_ENABLED}} — bei M/L/XL nur gegen eine Spec mit `Status: APPROVED`, sonst zuerst `concept-driven-dev`{{/if}}. Warte auf den Plan-Pfad
 (`plan-*.md` oder Knowledge-Wiki Plan-Seite). Dann starte die Pipeline mit
 `payload.plan_ref`. Ohne diesen Schritt würde die Pipeline mit dem Fallback-Agent
 laufen — das ist nur für Quick-Fixes und triviale Tasks akzeptabel, NIEMALS für

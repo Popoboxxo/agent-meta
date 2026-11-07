@@ -82,7 +82,7 @@ Implement the leaf node EXCLUSIVELY against its black-box requirement (`descript
 ### Traceability
 
 - Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
-- Commit message format: `<type>(REQ-xxx): <description>`
+- Commit message format: `<type>: <description>`
 
 ### Domain Gate
 
@@ -122,7 +122,7 @@ FINDINGS: <what you already discovered — files, root cause, context>
 4. Implement the minimal change inside context_boundary
 5. Reference req_id + leaf_id in every code artifact
 6. Do not break existing tests
-7. Commit format: <type>(REQ-xxx): <description>
+7. Commit format: `<type>: <description>`
 ```
 
 ## A2A Handoff — Incoming Tasks

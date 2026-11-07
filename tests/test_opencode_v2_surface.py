@@ -5439,10 +5439,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1158 (DoD/spec-gate, G4): `ac01-baseline` re-pinned — 45 hashes (`git`,
+# `orchestrator`, `planner`, `tester` x 9 providers, 3 a2a rule renders, 6
+# AGENTS.md); `slimming-golden` (git/orchestrator/planner/tester) and
+# `compact-golden` (orchestrator, agents-managed) patched per hunk; topology
+# goldens follow the K-10 row. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "3acc668ea8f1f58452e973f76a023358ff91d25f584eab16ef831d184335f411",
-    "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
-    "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
+    "ac01-baseline": "4e73d2dec4774006e3d1faed7b759ddbb7ee0b6f2166c967da26d47f0cfc87a9",
+    "slimming-golden": "dedb12a4d51771622179df07b126ce9c623f925d4feb8a9f004bbeb315ba2566",
+    "compact-golden": "461a0d37f6d412c7e0d54fcdb39933d069a8149ba13e83b0a248897f3a4e4581",
 }
 
 

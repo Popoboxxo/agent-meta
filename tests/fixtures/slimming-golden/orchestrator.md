@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.10.0
+version: 8.10.1
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@8.10.0
+generated-from: 1-generic/orchestrator.md@8.10.1
 model: claude-sonnet-5
 permissionMode: plan
 ---
@@ -63,7 +63,7 @@ gilt das Bestandsverhalten — kein Gate, keine Classify-Pflicht. Master-Rule
 - **Ownership/Barrieren:** Datei-Ownership aus dem `Files:`-Block; nur ownership-disjunkte Tasks parallel (`check_plan_file_overlap`/`check_file_overlap`); Zyklen/Overlaps im `parallel_group` sind Fehler. Eingebunden wird nur der Graph-Validator (`FanoutPlan`/`validate_plan`), `execute_plan` bleibt out-of-scope (F6); `max-parallel-agents` bleibt Obergrenze.
 - **Kein Worktree:** `isolation: "worktree"` ist verboten (`rules/1-generic/no-worktree-isolation.md`); Ersatz ist Ownership + Barrieren + Checkpoint-Ledger, Repo-Containment bleibt unangetastet.
 
-**Gate auch außerhalb der Pipeline:** Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — dort gilt die Classify-/Gate-Pflicht regelbasiert, verbindlich verankert in `rules/1-generic/use-orchestrator.md` (Convention boundary, kein Security-Anspruch).
+**Gate auch außerhalb der Pipeline:** Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`); verbindlich verankert in `rules/1-generic/use-orchestrator.md` (Convention boundary, kein Security-Anspruch).
 ## 1. Planning phase
 
 - >1 delegation step → show plan (3–7 steps), request confirmation
@@ -94,6 +94,8 @@ Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-dri
 Execution mode: parallel_group
 
 1. background(agent="git", prompt="Feature-Branch anlegen") → warten bis abgeschlossen
+⏸ Abnahme erforderlich vor Stage 'approve' — warte auf explizite Nutzerbestätigung, bevor validator startet.
+2. background(agent="validator", prompt="Spec/Plan-Gate: freigegebene Spec/Plan (Status: APPROVED) per plan_ref belegen (S-Klasse: entfällt) — fehlt sie, Abbruch und Route auf concept-driven-dev") → warten bis abgeschlossen
 
 **implement** — Plan-driven: Agent aus payload.plan_ref (Stage-ID 'implement') übernehmen.
 
@@ -108,7 +110,7 @@ Execution mode: parallel_group
   - background(agent="validator", prompt="DoD-Check")
   - background(agent="documenter", prompt="CODEBASE_OVERVIEW aktualisieren")
 
-2. background(agent="git", prompt="Commit: feat([REQ-ID]): ... + PR") → warten bis abgeschlossen
+3. background(agent="git", prompt="Commit (Format: Rule commit-conventions) + PR") → warten bis abgeschlossen
 
 ### `quick-fix`
 Execution mode: sequential
@@ -197,7 +199,7 @@ Execution mode: sequential
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 (z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:
-→ delegiere ZUERST an `planner` zur Plan-Erstellung. Warte auf den Plan-Pfad
+→ delegiere ZUERST an `planner` zur Plan-Erstellung — bei M/L/XL nur gegen eine Spec mit `Status: APPROVED`, sonst zuerst `concept-driven-dev`. Warte auf den Plan-Pfad
 (`plan-*.md` oder Knowledge-Wiki Plan-Seite). Dann starte die Pipeline mit
 `payload.plan_ref`. Ohne diesen Schritt würde die Pipeline mit dem Fallback-Agent
 laufen — das ist nur für Quick-Fixes und triviale Tasks akzeptabel, NIEMALS für

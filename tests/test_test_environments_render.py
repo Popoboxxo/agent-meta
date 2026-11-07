@@ -15,6 +15,12 @@ which runs ``python3 scripts/sync.py --config <project>/.meta-config/project.yam
 for every entry of :data:`PLATFORM_MATRIX` and hashes the rendered
 ``.claude/agents/*.md`` of the six roles.
 
+Rebaseline log:
+
+- G4 (spec-gate / DoD REQ gating): the five ``tester`` hashes moved (tester
+  2.10.1, REQ-traceability gating in the template); the other roles'
+  hashes are unchanged. Intended delta only.
+
 Run: ``python3 -m pytest tests/test_test_environments_render.py --basetemp="{{PYTEST_BASETEMP}}"``
 """
 
@@ -67,7 +73,7 @@ OVERRIDE_COVERAGE = {
 
 #: Task 8: the minor version bump each base template receives with the gate.
 BASE_VERSIONS = {
-    "tester": "2.10.0",
+    "tester": "2.10.1",
     "e2e-tester": "1.7.0",
     "developer": "4.9.0",
     "docker": "1.10.0",
@@ -377,7 +383,7 @@ OVERRIDES = {
     "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
     "hacs-developer.md": ("1.3.3", "1-generic/developer.md@4.9.0"),
     "agent-meta-developer.md": ("2.0.3", "1-generic/developer.md@4.9.0"),
-    "hacs-tester.md": ("1.0.6", "1-generic/tester.md@2.10.0"),
+    "hacs-tester.md": ("1.0.7", "1-generic/tester.md@2.10.1"),
     "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),
     "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),
 }

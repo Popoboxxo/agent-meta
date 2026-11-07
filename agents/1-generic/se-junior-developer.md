@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.8.2
+version: 1.8.3
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -94,7 +94,7 @@ Implement the leaf node EXCLUSIVELY against its black-box requirement (`descript
 ### Traceability
 
 - Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
-- Commit message format: `<type>(REQ-xxx): <description>`
+- Commit message format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
 
 ### Domain Gate
 
@@ -134,7 +134,7 @@ FINDINGS: <what you already discovered — files, root cause, context>
 4. Implement the minimal change inside context_boundary
 5. Reference req_id + leaf_id in every code artifact
 6. Do not break existing tests
-7. Commit format: <type>(REQ-xxx): <description>
+7. Commit format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
 ```
 
 ## A2A Handoff — Incoming Tasks

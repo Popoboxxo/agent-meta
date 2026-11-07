@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.8.2
+version: 1.8.3
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -95,7 +95,7 @@ Separate read/query paths from write/command paths on this component's interface
 ### Traceability
 
 - Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
-- Commit message format: `<type>(REQ-xxx): <description>`
+- Commit message format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
 
 ### Domain Gate
 
@@ -113,7 +113,7 @@ Separate read/query paths from write/command paths on this component's interface
 6. Reference req_id + leaf_id in every code artifact
 7. Cover each implemented interface with a test
 8. Do not break existing tests
-9. Commit format: <type>(REQ-xxx): <description>
+9. Commit format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
 ```
 
 ## Mandatory Escalation

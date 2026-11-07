@@ -15,7 +15,7 @@ den praktischen Fehlerfall ab:
 | Check | Status | Begründung |
 |---|---|---|
 | `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
-| `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | dokumentiert | Toter Konfigurationsraum bei einem 2-Ebenen-Repo; der enforced-Pfad wurde aus `validate_envelope()` entfernt, der Doku-Verweis bleibt |
+| `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | live (Soft Gate) | sync liest den Key (Default 10, geklemmt 1–50) in `A2A_MAX_DEPTH`; der Orchestrator rendert ihn als Soft Gate `depth>10`. Kein Hard-Reject: der enforced-Pfad wurde aus `validate_envelope()` entfernt |
 
 ## Schema-erzwungen: `payload.t ≤ 300 Zeichen` (Issue #812)
 

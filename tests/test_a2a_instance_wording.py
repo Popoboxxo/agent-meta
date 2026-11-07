@@ -133,3 +133,12 @@ def test_merged_rule_vars_resolves_effective_instance_count(tmp_path):
         _REPO_ROOT, tmp_path, config, "Continue", {}, None
     )
     assert continue_vars["ORCH_MAX_INSTANCES"] == "1"
+
+
+def test_max_depth_key_documented_as_live_soft_gate():
+    # #1158 K-10: orchestrator.delegation.max_depth is read by config.py into
+    # A2A_MAX_DEPTH and rendered into the orchestrator soft gates -> live key.
+    text = _RULE_SOURCE.read_text(encoding="utf-8")
+    row = next(line for line in text.splitlines() if "orchestrator.delegation.max_depth" in line)
+    assert "Toter Konfigurationsraum" not in row
+    assert "A2A_MAX_DEPTH" in row

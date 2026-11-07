@@ -266,3 +266,11 @@ def test_progress_defaults_documented_in_schema():
     assert block["additionalProperties"] is False
     assert block["properties"]["dir"]["default"] == ".meta-viz/progress"
     assert block["properties"]["checkpoint-dir"]["default"] == ".meta-viz/checkpoints"
+
+
+def test_dod_rejects_resolved_render_key_spec_plan_enabled():
+    # #1158 K-06: only spec-plan-workflow.enabled and dod.spec-plan-required are
+    # settable; the resolved render key must not become a third alias.
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config(dod={"spec-plan-enabled": False}), _schema())

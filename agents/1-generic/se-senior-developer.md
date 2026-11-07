@@ -1,6 +1,6 @@
 ---
 name: se-senior-developer
-version: 1.8.1
+version: 1.8.2
 description: Implements complex SE leaf nodes. Pre-analyzes interfaces before coding. Persists output.
 hint: "Complex SE leaf nodes: cross-cutting, boundary, security/performance-critical, 5+ interfaces."
 tools:
@@ -88,7 +88,7 @@ A leaf flagged security-critical is `done` only with all five points below — o
 5. `req_id` + `leaf_id` in jedem Artefakt referenzieren
 6. Jedes Interface testen, insb. Boundary-Cases
 7. Self-Review: edge cases, error paths, concurrency, backward compat
-8. Commit: `<type>(REQ-xxx): <description>`
+8. Commit: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
 
 **Research:** Bei obskurem Framework/Protokoll offizielle Doku (versioned) via WebFetch/WebSearch.
 

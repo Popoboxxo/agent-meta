@@ -2131,7 +2131,8 @@ def _build_orch_variables(
     t_limit = resolve_a2a_t_size_limit(config)
     variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
     variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
-    # A2A_MAX_DEPTH: configurable maximum delegation depth before HARD REJECT.
+    # A2A_MAX_DEPTH: configurable delegation depth, rendered as a documented
+    # soft gate (no hard reject since validate_envelope() dropped the check).
     # Read from orchestrator.delegation.max_depth (default: 10, range: 1-50).
     _delegation_cfg = orch_config.get("delegation", {})
     _max_depth = _delegation_cfg.get("max_depth", 10) if isinstance(_delegation_cfg, dict) else 10
@@ -2334,6 +2335,8 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
         )["template-conditional"] else "false"
     )
 
+    # .get() defaults mirror resolve_dod()'s "full" fallback; standalone mode
+    # deliberately renders these false (no DoD config there, #1158 K-13).
     variables["DOD_REQ_TRACEABILITY"] = "true" if dod_resolved.get("req-traceability", True) else "false"
     variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"

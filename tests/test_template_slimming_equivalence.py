@@ -198,6 +198,13 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   the ``model:`` pins, the declaration regions and ``_GOLDEN_ROLE_COUNT`` (58)
   are unchanged. Diff manifest §22. AC-01 hashes rebaselined separately (see the
   rebaseline log in ``tests/test_ac01_render_identity.py``).
+* Issue #1158 (G4 DoD/spec-gate): four goldens patched per hunk -- ``git``
+  (2.1.2 -> 2.1.3, REQ commit format gated off), ``tester`` (2.10.0 -> 2.10.1,
+  REQ naming gated off), ``planner`` (1.6.0 -> 1.6.1, APPROVED precondition) and
+  ``orchestrator`` (8.10.0 -> 8.10.1, classify-gate sentence, planner gate,
+  feature-lifecycle approve stage + neutral commit task). ``_GOLDEN_ROLE_COUNT``
+  and the normalization table are unchanged; ``compact-golden`` patched for the
+  same orchestrator/use-orchestrator deltas.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

@@ -954,7 +954,7 @@ def test_feature_lifecycle_pipeline_definition_is_valid():
     assert expected_keywords.issubset(set(fl["signal_keywords"]))
 
     stage_ids = [s["id"] for s in fl["stages"]]
-    assert stage_ids == ["branch", "requirement", "tests", "implement", "verify", "validate-and-document", "commit"]
+    assert stage_ids == ["branch", "approve", "requirement", "tests", "implement", "verify", "validate-and-document", "commit"]
 
     implement_stage = next(s for s in fl["stages"] if s["id"] == "implement")
     assert implement_stage["mode"] == "plan-driven"
@@ -1521,3 +1521,22 @@ def test_agent_renderer_consumes_the_variable_builders_effective_pipelines(tmp_p
     assert "UNIQUE-TASK-MARKER" in content
     # feature-lifecycle is not in the builder's dict -> its placeholder stays untouched.
     assert "Feature-Branch anlegen" not in content
+
+
+def test_feature_lifecycle_approval_gate_follows_spec_plan_switch():
+    # #1158 K-03: feature-lifecycle must not bypass the spec/plan approval
+    # gate. With the workflow on, an `approve` gate precedes implementation;
+    # with it off (e.g. rapid-prototyping default), no gate and no overhead.
+    from scripts.lib.pipelines import inject_pipeline_blocks, load_quality_pipelines
+    from scripts.lib.dod import resolve_dod
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    for enabled in (True, False):
+        dod = resolve_dod({"platforms": [], "spec-plan-workflow": {"enabled": enabled}}, REPO_ROOT)
+        rendered = inject_pipeline_blocks(
+            "{{PIPELINE_FEATURE_LIFECYCLE_BLOCK}}", pipelines, "Claude", dod,
+        )
+        gate = "Abnahme erforderlich vor Stage 'approve'"
+        assert (gate in rendered) is enabled
+        if enabled:
+            assert "Status: APPROVED" in rendered
+            assert rendered.index(gate) < rendered.index("**implement**")

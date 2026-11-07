@@ -2653,6 +2653,16 @@ quality_pipelines:
       agent: git
       task: Feature-Branch anlegen
       mode: sequential
+    # #1158: spec/plan approval gate; only when the workflow is on (no
+    # overhead otherwise). S-class tasks need no artifact (Master-Rule).
+    - id: approve
+      agent: validator
+      task: 'Spec/Plan-Gate: freigegebene Spec/Plan (Status: APPROVED) per plan_ref
+        belegen (S-Klasse: entfällt) — fehlt sie, Abbruch und Route auf concept-driven-dev'
+      mode: conditional
+      requires_approval: true
+      condition:
+        dod_flag: spec-plan-enabled
     - id: requirement
       agent: requirements
       task: REQ-ID vergeben
@@ -2661,7 +2671,7 @@ quality_pipelines:
         dod_flag: req-traceability
     - id: tests
       agent: tester
-      task: TDD Red Phase — Tests mit REQ-ID im Namen
+      task: TDD Red Phase — fehlschlagende Tests zuerst (Benennung laut tester-Rolle)
       mode: conditional
       condition:
         dod_flag: tests-required
@@ -2691,7 +2701,7 @@ quality_pipelines:
         task: CODEBASE_OVERVIEW aktualisieren
     - id: commit
       agent: git
-      task: 'Commit: feat([REQ-ID]): ... + PR'
+      task: 'Commit (Format: Rule commit-conventions) + PR'
       mode: sequential
     on_error: escalate_to_orchestrator
   quick-fix:
