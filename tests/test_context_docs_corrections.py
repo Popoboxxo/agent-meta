@@ -101,6 +101,22 @@ def test_gemini_doc_reflects_native_subagents_and_context_filename():
     assert any(".gemini/rules" in x and "von keinem" in x for x in _sentences(text))
 
 
+def test_gemini_target_surface_note_and_generated_paths():
+    """#1160 (G4-1): the agent-discovery default and the real generated paths are documented."""
+    import yaml
+    caps = yaml.safe_load(_read("config/provider-capabilities.yaml"))
+    notes = _flat(" ".join(caps["capabilities"]["Gemini"]["special_notes"]))
+    assert "agent-discovery: true" in notes and "#854" in notes and "antigravity" in notes
+    assert "g4-2" in notes and "g4-3" in notes
+    doc = _read("docs/providers/gemini-cli.md")
+    assert "agent-discovery: true" in doc
+    # Generator writes hooks to .agents/ and no longer writes .gemini/rules (#975).
+    gem = yaml.safe_load(_read("config/ai-providers.yaml"))["providers"]["Gemini"]
+    assert gem["hooks_config_file"] in doc and gem["hooks_dir"] in doc
+    assert "`.gemini/hooks" not in doc.replace("bash .gemini/hooks/my-hook.sh", "")
+    assert "has_rules: true" not in doc
+
+
 def test_measurement_doc_has_orchestrator_and_agents_md_rows():
     path = _ROOT / "docs/analysis/2026-10-11-context-tokenizer-measurement.md"
     assert path.is_file()
