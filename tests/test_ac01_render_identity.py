@@ -713,6 +713,30 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   tree (recomputed from the fixture bytes: ``647b75a4…`` -> ``90f1f74a…``);
   ``slimming-golden`` and ``compact-golden`` were re-verified as unchanged
    (``a9990f4c…``/``44148ea7…``). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1151 (system audit 2026-11-06, group G1 hook fixes, ``fix/hooks-containment-allowlist``):
+  ``hook_common.sh`` 1.8.1 -> 1.9.0 (allow-list parity, substitution bodies), ``dod-push-check.sh``
+  2.4.0 -> 2.5.0, ``orchestrator-guard-impl.sh`` 1.10.0 -> 1.11.0 (new ``AGENT_META_HOOK_AGENT_ID``
+  sync-time placeholder: ``true`` for Claude, ``false`` for Gemini), ``repo-containment-impl.sh``
+  1.5.0 -> 1.6.0, both graphify guards 1.1.0 -> 1.2.0, and the strict-mode sentence in
+  ``rules/1-generic/use-orchestrator.md`` (the matrix project is strict, so "read-only git in the
+  main chat ok" became the strict wording). Exactly **18 of 1096 hashes moved; 0 added/removed**:
+  9 hook renders (Claude: dod-push-check, both graphify guards, lib/hook_common, orchestrator-guard-impl,
+  repo-containment-impl; Gemini: lib/hook_common, orchestrator-guard-impl, repo-containment-impl), the
+  3 ``use-orchestrator`` rule renders (Claude, Continue, Copilot) and 6 ``AGENTS.md`` (Codex, Gemini,
+  KimiCode, Mammouth, Opencode, ZCode) that embed the rule. The manifest was patched **per entry** (18
+  single-line replacements) from the harness's own ``render_matrix_hashes`` -- not via ``--write``.
+  AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows (``3acc668e…`` -> ``706e1515…``);
+  ``slimming-golden`` re-verified unchanged; ``compact-golden`` re-derived from the real compact render
+  (the same strict-mode sentence in ``agents-managed.md``, one line). ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1151 review follow-up (same branch): ``repo-containment-impl.sh`` (cd inside ``$(...)``/
+  subshells scoped, ``$CLAUDE_PROJECT_DIR``/``$PWD`` resolved, old-style ``tar cf``) and one
+  sentence in ``rules/1-generic/use-orchestrator.md`` (worker subagents without ``git`` sentinel
+  cannot run ``git init``/config writes/``git stash``). Exactly **11 of 1096 hashes moved; 0
+  added/removed**: 2 hook renders (Claude, Gemini ``repo-containment-impl.sh``), 3 ``use-orchestrator``
+  rule renders (Claude, Continue, Copilot) and 6 ``AGENTS.md`` (Codex, Gemini, KimiCode, Mammouth,
+  Opencode, ZCode). Patched per entry from ``render_matrix_hashes`` (not ``--write``). AC-T4 digest
+  ``706e1515…`` -> ``00178459…``; ``compact-golden`` +1 line (``eaeaddfe…`` -> ``e7eecf36…``);
+  ``slimming-golden`` unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
 - Issues #1072/#1073 (gitignore managed block, 2026-11-02, ``fix/gitignore-managed-block``):
   #1072 stops the shadowing warning for provider directories that a rule *inside* the managed
   block already matches (rules outside the block still warn), and #1073 writes

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .io import is_absent_gitignored_target, is_unchanged, load_json_file, safe_path, write_atomic, write_checked
 from .log import SyncLog
-from .providers import provider_hooks_supported
+from .providers import provider_has_capability, provider_hooks_supported
 
 HOOKS_DIR = "hooks"
 CLAUDE_HOOKS_DIR = ".claude/hooks"
@@ -552,6 +552,13 @@ def sync_hooks(
         # sync.py bakes the provider into each provider's own generated
         # copy at build time instead.
         source_content = source_content.replace("{{AGENT_META_PROVIDER}}", provider)
+        # Issue #1151 F6-05: whether this provider's hook payload carries a
+        # harness-set agent_id (capability flag, never a provider-name branch).
+        # orchestrator-guard-impl.sh only distrusts a main-thread sentinel
+        # when this is "true".
+        source_content = source_content.replace(
+            "{{AGENT_META_HOOK_AGENT_ID}}",
+            "true" if provider_has_capability(pc, "hook-agent-id") else "false")
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
         hook_stem = Path(output_name).stem
