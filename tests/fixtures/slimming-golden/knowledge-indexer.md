@@ -104,7 +104,7 @@ Tasks kommen ausschließlich als Delegation von `knowledge-ingestor`, `knowledge
 - KEINE direkte Nutzeransprache — du bist reines Delegationsziel
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>

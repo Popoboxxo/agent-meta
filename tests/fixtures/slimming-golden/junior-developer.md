@@ -132,7 +132,7 @@ FINDINGS: <already found — files, cause, context>
 - No secrets / API keys
 - - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **User proxy:** `main_chat`.

@@ -159,7 +159,7 @@ NEXT: [Review | Developer feature work | Documenter]
 - No removal of the old path in the same change as its replacement
 - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** missing tests / characterization tests → `tester` · feature development (behavior change) → `developer` · map blast radius upfront → `explorer` · document refactoring plan → `documenter`.

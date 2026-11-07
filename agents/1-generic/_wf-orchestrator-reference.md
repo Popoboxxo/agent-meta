@@ -12,7 +12,7 @@
 
 | Pattern | Vorgehen |
 |---------|----------|
-| Single Feature | Pipeline `feature-lifecycle`: git→req→test→dev→test→review→doc→git |
+| Single Feature | Pipeline `feature-lifecycle` (Quelle: `config/role-defaults.yaml`); Stages req/tests/verify/approve sind konditional, kein Review-Stage |
 | Plan vorhanden | planner→feature-lifecycle(plan_ref=<path>) |
 | Multi-Bug Fix | FANOUT(N, developer) → BARRIER → git |
 | Mixed Tasks | PARALLEL_GROUP(dev, tester) → BARRIER → review → git |

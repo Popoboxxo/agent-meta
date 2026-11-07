@@ -245,7 +245,7 @@ variables:
   EXTRA_DONTS: |
     - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
     - KEINE Breaking Changes ohne Major-Version-Bump
-    - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+    - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
   CODE_QUALITY_RULES: |
     - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
