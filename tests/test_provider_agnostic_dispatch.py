@@ -320,7 +320,6 @@ _LEGACY_PROVIDER_DEFAULT_SITES = frozenset({
     ("hooks.py", "sync_hooks"),
     ("roles.py", "resolve_model"),
     ("roles.py", "_resolve_model_raw"),
-    ("rules.py", "sync_embedded_rule_files"),
     ("rules.py", "sync_rules"),
 })
 

@@ -475,7 +475,8 @@ def sync_embedded_rule_files(
     log: SyncLog,
     dry_run: bool,
     variables: dict | None = None,
-    provider: str = "Opencode",
+    *,
+    provider: str,
     provider_config: dict | None = None,
 ):
     """Render non-embedded rules as separate SKILL.md files (issue #192 Phase 2).

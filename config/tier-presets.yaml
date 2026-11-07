@@ -21,6 +21,7 @@ Cheap:
         balanced: gemini-3.5-flash-medium
         powerful: gemini-3.5-flash-medium
         max: gemini-3.5-flash-high
+    # Opencode is flat by design in every preset: nano..powerful share one model; only max (and Normal's ultra) differ.
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4.1-flash
