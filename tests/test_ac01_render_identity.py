@@ -975,6 +975,20 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``TaskStop``, 8.11.1); patched **per entry** from ``render_matrix_hashes`` -- not via ``--write``.
   Net: 45 keys vs ``main``, 30 vs the G4 head. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1161 (G7 token diet, 2026-11-07, ``chore/token-diet``): ``rules/1-generic/branch-guard.md``
+  keeps both anchored headings but trims ``## Guard-Terminologie`` to the two definitions and
+  ``## Bekannte Grenzen`` to a pointer; the full text moved verbatim to
+  ``docs/concepts/branch-guard-known-limits.md``. Exactly **9 of 1096 hashes moved; 0
+  added/removed**: the three rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``504c5ceb…`` -> ``f231e99f…``, ``Continue/.continue/rules/branch-guard.md`` ``ba868b11…`` ->
+  ``1489c60a…``, ``Copilot/.github/instructions/branch-guard.instructions.md`` ``f533e9cb…`` ->
+  ``797d2250…``) and the six ``AGENTS.md`` embedding the rule (``Codex`` ``af21d605…`` ->
+  ``01f721e1…``, ``Gemini`` ``a07ca418…`` -> ``dbe42e7d…``, ``KimiCode`` ``bbdf7721…`` ->
+  ``15bf6db1…``, ``Mammouth`` ``faff25fb…`` -> ``0b7db94b…``, ``Opencode`` ``441342f4…`` ->
+  ``1d388688…``, ``ZCode`` ``7427ae46…`` -> ``811090f6…``). Patched **per entry** from
+  ``render_matrix_hashes`` -- not via ``--write``. AC-T4: ac01 ``9df232ba…`` -> ``7c993f7f…``;
+  ``slimming-golden``/``compact-golden`` unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
