@@ -43,7 +43,7 @@ def _changed_files(project_root: Path) -> set[str] | None:
     try:
         probe = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=str(project_root), capture_output=True, text=True, timeout=10,
+            cwd=str(project_root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
         )
         if probe.returncode != 0 or probe.stdout.strip() != "true":
             return None
@@ -55,7 +55,7 @@ def _changed_files(project_root: Path) -> set[str] | None:
             ["git", "ls-files", "--others", "--exclude-standard"],
         ):
             result = subprocess.run(
-                args, cwd=str(project_root), capture_output=True, text=True,
+                args, cwd=str(project_root), capture_output=True, text=True, encoding="utf-8", errors="replace",
                 timeout=10,
             )
             if result.returncode != 0:

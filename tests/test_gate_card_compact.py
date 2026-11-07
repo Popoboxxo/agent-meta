@@ -38,6 +38,9 @@ Rebaseline log:
 - Issue #1157: the embedded ``a2a-delegation-gates`` gate 3 gains one sentence
   ("Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als
   ``failed``."); exactly that one line changed (patched in place).
+- Issue #1151 (audit G1): the ``use-orchestrator`` Git-Delegation block gained the
+  strict-mode sentence and one sentence that worker subagents without the ``git``
+  sentinel cannot run ``git init``/config writes/``git stash`` (lines 14-15). Nothing else.
 """
 from __future__ import annotations
 

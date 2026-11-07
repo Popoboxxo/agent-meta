@@ -170,19 +170,34 @@ def parse_toml_subset(text: str) -> dict:
     return root
 
 
-def parse_toml(text: str) -> dict:
-    """``tomllib`` when available (3.11+), else the subset parser.
+def toml_loads_and_error() -> tuple:
+    """Return ``(loads, decode_error)``: tomllib, else tomli, else the subset.
 
-    Both paths raise :class:`TomlUnsupported` with a fixed, content-free
+    The subset's :class:`TomlUnsupported` is a ``ValueError``; it may also
+    reject valid TOML outside the subset (arrays of tables, multi-line
+    strings) — acceptable on Python < 3.11 without tomli (#1154).
+    """
+    for name in ("tomllib", "tomli"):
+        try:
+            mod = __import__(name)
+        except ImportError:
+            continue
+        return mod.loads, mod.TOMLDecodeError
+    return parse_toml_subset, ValueError
+
+
+def parse_toml(text: str) -> dict:
+    """Parse via :func:`toml_loads_and_error` (tomllib -> tomli -> subset).
+
+    Every path raises :class:`TomlUnsupported` with a fixed, content-free
     message (artifact text must never reach finding text).
     """
+    loads, _decode_error = toml_loads_and_error()
     try:
-        import tomllib
-    except ImportError:
-        return parse_toml_subset(text)
-    try:
-        return tomllib.loads(text)
-    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        return loads(text)
+    except TomlUnsupported:
+        raise
+    except ValueError as exc:  # tomllib/tomli TOMLDecodeError subclasses ValueError
         raise TomlUnsupported("invalid TOML") from exc
 
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.10.0
-# changelog: 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
+# version: 1.11.0
+# changelog: 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -25,7 +25,9 @@ set -uo pipefail
 # walk-up to the nearest `.meta-config/` ancestor, so strict mode and the
 # auto-commit allowlist still apply after a `cd` into a subdirectory.
 #
-# Only mutating tools (Write, Edit, Bash) are intercepted.
+# Only mutating tools (Write, Edit, Bash) are intercepted; NotebookEdit and
+# MultiEdit count as Edit, PowerShell as Bash (#1151). Agent/Task calls are
+# checked for worktree isolation and orchestrator re-spawns only.
 # Research tools (read, glob, grep) are never blocked.
 #
 # Payload/tool_name fail-closed (v1.8.0, review finding M2, #954 follow-up):
@@ -117,13 +119,15 @@ set -uo pipefail
 # shell parser (convention boundary; see
 # .claude/rules/branch-guard.md#guard-terminologie for the definition of both
 # terms). Everything below is deliberate and covered by the trade-off #592:
-#   * command substitution / backticks and the interpreter indirections
-#     `eval`, `bash -c`/`sh -c`, `env -S` and `xargs ... sh -c`: the payload
-#     of these is a STRING, not a command list, so a git mutation hidden there
-#     is not classified. This is structural for a token scanner (the hook
-#     never executes anything) and is the #592 trade-off. The splitter does
-#     not split operators INSIDE a substitution, so a surrounding command is
-#     not misattributed either.
+#   * the interpreter indirections `eval`, `bash -c`/`sh -c`, `env -S` and
+#     `xargs ... sh -c`: the payload of these is a STRING, not a command
+#     list, so a git mutation hidden there is not classified. This is
+#     structural for a token scanner (the hook never executes anything) and
+#     is the #592 trade-off. Command substitution bodies ($(...) and
+#     backticks, also inside double quotes) ARE classified since #1151: the
+#     shared splitter emits each body as an extra statement and leaves the
+#     surrounding command intact. Still a gap: a command WORD produced by a
+#     command substitution (`$(echo git) commit`) is not classified.
 #   * a heredoc body is prose until proven otherwise: it is removed from the
 #     command stream (#944 SR-B-16 / #943 (j)). `git update-ref --stdin`
 #     delete lines ARE inspected, but any other destructive command fed
@@ -264,6 +268,32 @@ fi
 # hook was written, not anymore. Empty = main-thread call.
 AGENT_ID=$(hook_json_get "$INPUT" "agent_id")
 
+# Delegation gate (#1151 F3-03): the orchestrator is a singleton spawned by the
+# main chat, and worktree isolation is forbidden for every spawn
+# (rules/1-generic/no-worktree-isolation.md). Both used to be text only.
+if [ "$TOOL_NAME" = "Agent" ] || [ "$TOOL_NAME" = "Task" ]; then
+  if [ "$(hook_json_get "$INPUT" "tool_input.isolation")" = "worktree" ]; then
+    echo "ORCHESTRATOR_GUARD: isolation \"worktree\" is forbidden (no-worktree-isolation rule)." >&2
+    echo "Spawn the agent without isolation so it works in the project directory." >&2
+    exit 2
+  fi
+  _SUBAGENT_TYPE=$(hook_json_get "$INPUT" "tool_input.subagent_type" | tr '[:upper:]' '[:lower:]')
+  if [ -n "$AGENT_ID" ] && [ "$_SUBAGENT_TYPE" = "orchestrator" ]; then
+    echo "ORCHESTRATOR_GUARD: a subagent must not spawn the orchestrator (singleton rule, anti-recursion)." >&2
+    echo "Return your result to the caller instead of delegating back to the orchestrator." >&2
+    exit 2
+  fi
+  exit 0
+fi
+
+# Write-capable tools without their own branch map onto the one they behave
+# like (#1151 F6-01): NotebookEdit/MultiEdit edit a file like Edit, PowerShell
+# runs a shell command (tool_input.command) like Bash.
+case "$TOOL_NAME" in
+  NotebookEdit|MultiEdit) TOOL_NAME="Edit" ;;
+  PowerShell) TOOL_NAME="Bash" ;;
+esac
+
 # Only block mutating tools
 case "$TOOL_NAME" in
   Write|Edit|Bash) ;;
@@ -317,6 +347,22 @@ else:
     DECLARED_AGENT=${_DECLARED_RAW%%|*}
     DECLARED_ID=${_DECLARED_RAW#*|}
   fi
+fi
+
+# Sentinel vs. caller (#1151 F6-05). Baked at sync time from the provider's
+# `hook-agent-id` capability (config/ai-providers.yaml, scripts/lib/hooks.py):
+# "true" means the payload carries a harness-set agent_id for every subagent
+# call. Delegates (git, orchestrator, auto-commit roles) are always subagents
+# there, so a sentinel on a MAIN-thread call is a forged self-declaration and
+# is discarded. Any other value -- "false" for a provider whose payload has no
+# agent_id (the sentinel is then the only delegate signal), or the literal
+# placeholder in an unsynced source copy -- keeps the sentinel as before.
+HOOK_AGENT_ID_RELIABLE="false"
+SENTINEL_DISCARDED=0
+if [ -n "$DECLARED_AGENT" ] && [ -z "$AGENT_ID" ] && [ "$HOOK_AGENT_ID_RELIABLE" = "true" ]; then
+  DECLARED_AGENT=""
+  DECLARED_ID=""
+  SENTINEL_DISCARDED=1
 fi
 
 # Determine project root (needed by the audit log, allowlist and config
@@ -500,8 +546,27 @@ MUTATING = {
     # SR-B-13: history/ref/working-tree changing subcommands that used to
     # slip through ('switch' is checkout's modern alias).
     'pull', 'switch', 'cherry-pick', 'revert', 'am', 'update-ref',
+    # #1151 F6-04: index/tree/ref/object-store writers that slipped through.
+    'mv', 'apply', 'notes', 'replace', 'update-index', 'fast-import', 'init',
+    'gc',
 }
-STASH_MUTATING = {'pop', 'drop', 'clear'}
+# 'git stash' subcommands that only read; a bare 'git stash' is 'stash push'
+# and every other form (push/save/apply/pop/drop/clear/store/branch/...)
+# changes the stash or the working tree (#1151 F6-04).
+STASH_READ_ONLY = {'list', 'show'}
+# 'git submodule' forms that only read; a bare 'git submodule' is 'status'.
+SUBMODULE_READ_ONLY = {None, 'status', 'summary'}
+# 'git config' write spellings (#1151 F6-04): option forms and the git >= 2.46
+# subcommand forms. Options that consume a value are skipped when counting the
+# key/value positionals (key alone = read, key + value = write).
+CONFIG_WRITE_OPTS = {'--unset', '--unset-all', '--add', '--replace-all',
+                     '--rename-section', '--remove-section', '-e', '--edit'}
+CONFIG_READ_OPTS = {'--get', '--get-all', '--get-regexp', '--get-urlmatch',
+                    '--get-color', '--get-colorbool', '-l', '--list'}
+CONFIG_WRITE_SUBCMDS = {'set', 'unset', 'rename-section', 'remove-section', 'edit'}
+CONFIG_READ_SUBCMDS = {'get', 'list'}
+CONFIG_OPTS_WITH_VALUE = {'-f', '--file', '--blob', '--type', '--default',
+                          '--comment', '--value'}
 # Options of 'git stash' (push form) that consume a value token, so the
 # value is not misread as the stash subcommand ('git stash -m drop').
 STASH_OPTS_WITH_VALUE = {'-m', '--message', '--pathspec-from-file'}
@@ -940,6 +1005,30 @@ def is_destructive(subcmd, args, config_values, stdin_bodies=None):
     return False
 
 
+def is_config_write(args):
+    if any(a.split('=', 1)[0] in CONFIG_WRITE_OPTS for a in args):
+        return True
+    if any(a in CONFIG_READ_OPTS for a in args):
+        return False
+    positionals = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a in CONFIG_OPTS_WITH_VALUE:
+            skip = True
+            continue
+        if a.startswith('-'):
+            continue
+        positionals.append(a)
+    if positionals and positionals[0] in CONFIG_WRITE_SUBCMDS:
+        return True
+    if positionals and positionals[0] in CONFIG_READ_SUBCMDS:
+        return False
+    return len(positionals) >= 2
+
+
 def is_mutation(subcmd, args):
     if subcmd is None:
         return False
@@ -950,7 +1039,11 @@ def is_mutation(subcmd, args):
     if subcmd == 'checkout':
         return bool(args) and not all(a.startswith('-') for a in args)
     if subcmd == 'stash':
-        return first_word(args, STASH_OPTS_WITH_VALUE) in STASH_MUTATING
+        return first_word(args, STASH_OPTS_WITH_VALUE) not in STASH_READ_ONLY
+    if subcmd == 'submodule':
+        return first_word(args) not in SUBMODULE_READ_ONLY
+    if subcmd == 'config':
+        return is_config_write(args)
     if subcmd == 'reflog':
         return first_word(args) in REFLOG_DESTRUCTIVE
     if subcmd == 'worktree':
@@ -1187,7 +1280,8 @@ def is_fs_destructive(cmd, args):
 # statement stream and this cleaned code, review finding F4): a trailing
 # '# :(){ :|:& };:' is cut here exactly as it is in the statements.
 _statement_stream, _scan_code = split_shell_statements_and_clean(command)
-destructive = is_fork_bomb(strip_quoted(_scan_code))
+fork_bomb = is_fork_bomb(strip_quoted(_scan_code))
+destructive = fork_bomb
 mutation = False
 mutation_scope_broad = False
 bom = 'none'
@@ -1225,7 +1319,10 @@ for stmt, heredoc_bodies in _statement_stream:
         break
 
 category = 'destructive' if destructive else ('mutation' if mutation else 'none')
-scope = 'broad' if mutation_scope_broad else 'narrow'
+# #1151 F6-08: a fork-bomb verdict reports scope 'forkbomb' so the block
+# message names the fork-bomb scan only when it fired (scope is otherwise
+# irrelevant for 'destructive').
+scope = 'forkbomb' if fork_bomb else ('broad' if mutation_scope_broad else 'narrow')
 print(f'{category} {scope} {bom}')
 PYEOF
 )
@@ -1253,7 +1350,7 @@ PYEOF
       ;;
   esac
   case "$_GIT_SCAN_SCOPE" in
-    broad|narrow) ;;
+    broad|narrow|forkbomb) ;;
     *)
       echo "ORCHESTRATOR_GUARD: the git/destructive classifier returned an unknown scope '$_GIT_SCAN_SCOPE'." >&2
       echo "Failing closed (issue #943 (k))." >&2
@@ -1287,7 +1384,9 @@ fi
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
   echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
-  echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2
+  if [ "$_GIT_SCAN_SCOPE" = "forkbomb" ]; then
+    echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2
+  fi
   echo "Ask the user to approve and run this command manually." >&2
   exit 2
 fi
@@ -1417,6 +1516,9 @@ except Exception as exc:
       exit 0
     fi
     echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked." >&2
+    if [ "$SENTINEL_DISCARDED" = "1" ]; then
+      echo "The #agent-meta:agent= sentinel is ignored on the main thread (no agent_id in the payload, #1151)." >&2
+    fi
     echo "Delegate this task to the orchestrator agent." >&2
     exit 2
   fi
@@ -1431,7 +1533,14 @@ fi
 # The allowlist sentinel (issue #694) only passes a 'narrow' mutation scope
 # (add/commit); any broader mutation still requires the `git` role.
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ] && { [ "$IS_ALLOWLIST_SENTINEL" != "1" ] || [ "$_GIT_SCAN_SCOPE" = "broad" ]; }; then
-  echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
+  if [ -n "$AGENT_ID" ]; then
+    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden for this subagent (no \`git\` sentinel, or outside its auto-commit scope)." >&2
+  else
+    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
+    if [ "$SENTINEL_DISCARDED" = "1" ]; then
+      echo "The #agent-meta:agent= sentinel is ignored on the main thread (no agent_id in the payload, #1151)." >&2
+    fi
+  fi
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Delegate git operations to the \`git\` agent." >&2
   exit 2

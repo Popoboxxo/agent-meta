@@ -489,15 +489,30 @@ Definition einer **Convention boundary** in
 
 ### 6.2 Bekannte Bypässe und Grenzen
 
-1. **Command-Substitution/Indirektion (analog #592).** `eval "..."`, Backticks, `$(...)` und
-   `xargs` können ein schreibendes Kommando am Bash-Tokenizer vorbeischleusen, weil der Hook die
-   Shell weder ausführt noch vollständig parst. Ein echter Shell-Interpreter wäre für ein
+1. **Indirektion (analog #592).** `eval "..."`, `bash -c "..."`, `xargs`, Interpreter
+   (`python -c "open(...)"`) und Ziele in einer beliebigen Variable (`> "$OUT"`) können ein
+   schreibendes Kommando am Bash-Tokenizer vorbeischleusen, weil der Hook die Shell weder
+   ausführt noch vollständig parst. Ein echter Shell-Interpreter wäre für ein
    Konventions-Tool unverhältnismäßig — derselbe bewusste Trade-off wie in
    [`../../hooks/1-generic/orchestrator-guard-impl.sh`](../../hooks/1-generic/orchestrator-guard-impl.sh)
-   (Issue #592).
-2. **Redirections/Heredocs/`cd`-Ketten.** `cat > /etc/x`, `cd / && ...` oder mehrstufige
-   Pipes können außerhalb eines strukturierten Zielpfads schreiben. Der Hook erkennt
-   `Write`/`Edit` präzise, schreibende `Bash`-Muster nur best-effort.
+   (Issue #592). Seit #1151 geprüft: Rümpfe von `$(...)` und Backticks (auch in `"..."`),
+   `~`/`$HOME`/`${HOME}` als Ziel sowie `curl -o`, `wget -O/-P`, `tar -C` (Entpacken) /
+   `-f` (Packen), `unzip -d` und `git clone <ziel>`.
+2. **Redirections/Heredocs/`cd`-Ketten.** Mehrstufige Pipes oder unbekannte Schreib-Tools
+   können außerhalb eines strukturierten Zielpfads schreiben. `cd`/`pushd`/`popd` werden seit
+   #1151 verfolgt: ein relatives Ziel wird gegen jedes Verzeichnis geprüft, in dem der Befehl
+   stehen kann (nach `&&` das neue, nach `;`/`||`/`|` zusätzlich das alte, weil ein
+   gescheitertes `cd` dort weiterläuft); ein nicht auflösbares `cd`-Ziel (`cd "$DIR"`, `cd -`,
+   `popd`) blockt jedes spätere relative Schreibziel. Ein `cd` in `$(...)` oder in einer
+   `( ... )`-Subshell gilt nur dort und bewegt den äußeren Befehl nicht
+   (`DIR=$(cd "$(dirname x)" && pwd); echo x > out.log` bleibt erlaubt);
+   `$CLAUDE_PROJECT_DIR` (aus der Hook-Umgebung) und `$PWD` werden als `cd`-Ziel aufgelöst.
+   Akzeptierte Lücke: die Subshell-Erkennung zählt Klammern pro Statement und ist kein
+   Shell-Parser — innerhalb von `case … esac` wird bewusst nicht gescoped (überblockt eher),
+   und eine exotische Klammerform kann das äußere Verzeichnis zu früh wiederherstellen.
+   Der Hook erkennt `Write`/`Edit`
+   (inkl. `MultiEdit` und `NotebookEdit` über `notebook_path`) präzise, schreibende
+   `Bash`-/`PowerShell`-Muster nur best-effort.
 3. **Symlink-/TOCTOU-Escape.** Ein Agent legt einen Symlink innerhalb des Repo-Roots auf ein
    Ziel außerhalb an und schreibt durch ihn. Der **entschiedene** `realpath`-Check mildert das
    (Q5), hat aber ein TOCTOU-Fenster (Ziel ändert sich zwischen Check und Write); dieses
@@ -513,6 +528,12 @@ Definition einer **Convention boundary** in
 7. **`orchestrator-guard`-Analogie.** Wie beim bestehenden Guard gilt: Der Hook ist ein
    Konventions-Tool mit einzelnen security-boundary-Eigenschaften (hier: hard fail beim
    Sync-Validator), kein vollständiger Schutz.
+8. **Git-Mutationen ohne Sentinel (#1151).** Worker-Subagenten ohne `git`-Sentinel können
+   auch `git init`, schreibendes `git config` und `git stash` nicht ausführen — der
+   `orchestrator-guard` zählt sie zu den Git-Mutationen.
+9. **`dod-push-check` nur für `Bash`.** Der Matcher des Push-Checks ist `Bash`; ein Push über
+   das `PowerShell`-Tool läuft am Push-Check vorbei, wird aber weiterhin von der
+   Mutationsliste des `orchestrator-guard` blockiert (ohne `git`-Sentinel).
 
 ### 6.3 Was eine echte Security Boundary bräuchte
 

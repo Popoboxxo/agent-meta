@@ -887,7 +887,7 @@ def _apply_agent_body_injections(
     historic order (transform first, then these injections) is preserved.
     """
     viz_cfg = config.get('viz', {})
-    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
+    if viz_cfg.get('enabled', False) is True and viz_cfg.get('mode') in ('dynamic', 'full'):
         from .viz import inject_viz_prompt_block
         content = inject_viz_prompt_block(content, role, provider, viz_enabled=viz_cfg.get('enabled', False), agent_meta_root=agent_meta_root,
                                           viz_debug=viz_cfg.get("debug", False))

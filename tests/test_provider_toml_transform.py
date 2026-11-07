@@ -307,3 +307,41 @@ def test_empty_catalog_still_falls_back_to_preset_global() -> None:
                              REPO_ROOT, provider="Continue",
                              provider_config=_PROVIDER_CONFIG)
     assert resolved == "claude-sonnet-5-5"
+
+
+def test_sync_imports_without_tomllib_or_tomli() -> None:
+    """Python < 3.11 without tomli must still import the sync CLI (#1154).
+
+    A real 3.9/3.10 interpreter is not available in every dev env, so the
+    missing modules are simulated via ``sys.modules[name] = None``.
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "import sys\n"
+        "sys.modules['tomllib'] = None\n"
+        "sys.modules['tomli'] = None\n"
+        "sys.path.insert(0, 'scripts')\n"
+        "import sync\n"
+        "import lib.consistency.model_contracts as mc\n"
+        "from lib.artifact_validate import validate_toml\n"
+        "assert validate_toml('a = 1\\n', 'x.toml') == []\n"
+        # Subset parser cannot validate -> no false ERROR (#1154 A1).
+        "assert validate_toml('a = = 1\\n', 'x.toml') == []\n"
+        "from lib.agent_toml import build_agent_toml_document\n"
+        "doc = build_agent_toml_document('dev', 'd', 'm', {}, 'line1\\nline2')\n"
+        "assert '\"\"\"' in doc\n"
+        "assert validate_toml(doc, '.codex/agents/dev.toml') == []\n"
+        "from lib.doctor_formats import TomlUnsupported, parse_toml\n"
+        "assert parse_toml('a = 1\\n') == {'a': 1}\n"
+        "try:\n    parse_toml(doc)\nexcept TomlUnsupported:\n    pass\n"
+        "else:\n    raise AssertionError('subset must raise TomlUnsupported')\n"
+        "assert mc._extract_models('model = \"m\"\\n', 'codex-toml') == ['m']\n"
+        "assert mc._extract_models('model = = \\n', 'codex-toml') == []\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], cwd=REPO_ROOT,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    assert result.returncode == 0, result.stderr

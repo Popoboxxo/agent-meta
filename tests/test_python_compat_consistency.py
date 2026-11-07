@@ -39,6 +39,14 @@ class TestPy39UnionSyntax:
         assert findings[0].check == "python.py39-union-syntax"
         assert findings[0].file == "scripts/lib/foo.py"
 
+    def test_flags_union_annotation_in_top_level_scripts(self, tmp_path: Path) -> None:
+        """#1154 F11: scripts/*.py (sync.py, admin-server.py, ...) also run on 3.9."""
+        _write(tmp_path, "scripts/x.py", "def f(x: int | None) -> None:\n    pass\n")
+        _write(tmp_path, "scripts/lib/y.py", "def f(x: int | None) -> None:\n    pass\n")
+        findings = check_py39_union_syntax(tmp_path)
+        # scripts/lib is reported once, not again via a recursive scripts/ scan.
+        assert sorted(f.file for f in findings) == ["scripts/lib/y.py", "scripts/x.py"]
+
     def test_flags_union_annotation_in_tests(self, tmp_path: Path) -> None:
         """The scope gap this check used to have (issue #674 roadmap review)."""
         _write(tmp_path, "tests/test_foo.py", "def f(x: int | None) -> None:\n    pass\n")

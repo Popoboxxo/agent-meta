@@ -5439,16 +5439,30 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1151 (audit G1 hook fixes: `hook_common.sh` 1.9.0, `dod-push-check.sh`
+# 2.5.0, `orchestrator-guard-impl.sh` 1.11.0, `repo-containment-impl.sh` 1.6.0,
+# graphify guards 1.2.0, strict-mode wording in `use-orchestrator`):
+# `ac01-baseline` re-pinned — 18 hashes (9 hook renders, 3 `use-orchestrator`
+# rule renders, 6 `AGENTS.md`); `compact-golden` re-derived from the real compact
+# render (the one strict-mode sentence in `agents-managed.md`, fa992b69 ->
+# eaeaddfe); `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Review follow-up (#1151): scoped cd / old-style tar in `repo-containment-impl.sh`
+# and the worker-git sentence in `use-orchestrator`: `ac01-baseline` 11 more
+# hashes (706e1515 -> 00178459), `compact-golden` one line (eaeaddfe -> e7eecf36).
 # Issue #1157 (orchestrator worker control, `orchestrator` 8.10.0 -> 8.11.0):
 # `ac01-baseline` re-pinned per entry — 18 of 1096 hashes (9 `orchestrator`
 # renders, 3 `a2a-delegation-gates` rule renders, 6 `AGENTS.md` that embed the
 # rule); `slimming-golden`/`compact-golden` re-pinned for the same template diff
 # (orchestrator.md) and `compact-golden/agents-managed.md` for the embedded
 # a2a gate-3 sentence. Log: `tests/test_ac01_render_identity.py`.
+# Merge of main (#1151 G1) into #1157: digests recomputed from the merged trees —
+# `ac01-baseline` carries both sides' keys plus 6 `AGENTS.md` re-rendered with
+# both rule changes (-> e89ed97c); `compact-golden` = #1157 orchestrator.md plus
+# `agents-managed.md` with both sentences (-> e9dc8776); `slimming-golden` = #1157.
 _FIXTURE_TREES = {
-    "ac01-baseline": "a78d0f985dde2e869fabffaa9dbbc1d096f87712a22172ff1f41a1ac3b47aa3f",
+    "ac01-baseline": "e89ed97c468397485b41bc00d010800a260592ea46ec79c4ad4230e9a314b902",
     "slimming-golden": "c08f66b0a052e4b04a9be48d964eed35813d4659aba099322a907ca7c5dff099",
-    "compact-golden": "f5b9abefc6c7d2edb0f765741cdb0ac88a41216eb75347c23129e69a62a57933",
+    "compact-golden": "e9dc8776c49106277abe395e0406990b1313222c2e9de48b542a99bea2724316",
 }
 
 

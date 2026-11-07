@@ -893,6 +893,7 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 
 **Audit- und Check-Verhalten (Audit-Batch #730–#743):**
 - `--check` behandelt legitim fehlende, gitignorierte Provider-Wurzeln als Non-Drift (fail-open, #752).
+- `--check` endet mit Exit 1, wenn `log.errors` nicht leer ist (`[ERROR]` in `sync.log`), auch ohne ausstehende Datei-Aktionen (#1155). Ein normaler Sync bleibt bei `[ERROR]` report-only (Exit 0) — bewusste Policy (D6), damit ein einzelner Befund keine Regeneration blockiert.
 - `--audit-config` arbeitet read-only: keine `env.*`-Dateien, kein `sync.log` (#738, WP7).
 - `AGENT_META_DATE` ist reproduzierbar aufgelöst: `SOURCE_DATE_EPOCH` → CHANGELOG-Release-Datum → `now()` (#752).
 

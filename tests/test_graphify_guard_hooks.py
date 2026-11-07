@@ -108,3 +108,42 @@ def test_guard_rejects_malicious_graphify_bin_env_override(guard_path, tmp_path)
     )
     assert "PWNED" not in result.stdout
     assert result.returncode == 0  # graphify (real name) not found -> pass through
+
+
+def _scripted_graphify(bin_dir: Path, rc: int, stderr: str) -> None:
+    p = bin_dir / "graphify"
+    p.write_text(
+        "#!/bin/bash\n"
+        "cat >/dev/null\n"
+        'echo "stdout-context"\n'
+        + (f'echo "{stderr}" >&2\n' if stderr else "")
+        + f"exit {rc}\n",
+        encoding="utf-8",
+    )
+    p.chmod(0o700)
+
+
+@pytest.mark.parametrize("guard_path", [_READ_GUARD, _SEARCH_GUARD])
+@pytest.mark.parametrize("rc,stderr,expected", [
+    (0, "", 0),
+    (1, "Traceback: crash", 0),   # a graphify crash is not a block
+    (2, "", 0),                   # rc 2 without a reason is not a block either
+    (127, "", 0),
+    (2, "graphify: use graphify query first", 2),
+])
+def test_guard_exit_code_is_normalised(guard_path, rc, stderr, expected, tmp_path):
+    """Issue #1151 F6-10: the guards ended in `exit $?`, so any graphify exit
+    status reached the harness. Only rc 2 WITH a guard message on stderr
+    blocks; everything else passes (graphify routing is advisory)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _scripted_graphify(bin_dir, rc, stderr)
+    result = subprocess.run(
+        [_BASH, str(guard_path)], input="{}", capture_output=True, text=True,
+        env={"PATH": f"{bin_dir}:/usr/bin:/bin"}, cwd=str(tmp_path),
+        timeout=SCRIPT_TIMEOUT,
+    )
+    assert result.returncode == expected, result.stderr
+    assert "stdout-context" in result.stdout
+    if expected == 2:
+        assert stderr in result.stderr

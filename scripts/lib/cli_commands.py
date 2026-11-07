@@ -1666,7 +1666,7 @@ def _run_common_tail(ctx: _SyncContext) -> None:
 
     # Visualization: generate static mindmap if requested (static or full mode)
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
-    if args.viz or viz_cfg.get("enabled", False) or viz_mode in ("static", "full"):
+    if args.viz or viz_cfg.get("enabled", False) is True or viz_mode in ("static", "full"):
         generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
 
     # AST dependency analysis summary (analysis.ast: true)
@@ -1697,13 +1697,21 @@ def _run_common_tail(ctx: _SyncContext) -> None:
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run,
               providers=_providers, speech_mode=_speech)
 
-    # CI check mode: signal pending changes via exit code.
+    # CI check mode: signal pending changes or recorded errors via exit code.
+    # Plain sync stays report-only for [ERROR] lines (#1155, decision D6).
     if getattr(args, "check", False):
         pending = len(log.actions)
         if pending > 0:
             print(
                 f"  X  {pending} file(s) out of sync — run "
                 f"`python scripts/sync.py` to regenerate.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if log.errors:
+            print(
+                f"  X  {len(log.errors)} error(s) recorded in {LOGFILE} — "
+                f"fix them before the check can pass.",
                 file=sys.stderr,
             )
             sys.exit(1)

@@ -200,7 +200,7 @@ class GitHubIssuesAdapter(SEAdapter):
             result = subprocess.run(  # noqa: PLW1510
                 ["gh", "auth", "status"],
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
             )
             if result.returncode != 0:
                 raise RuntimeError(
@@ -262,7 +262,7 @@ class GitHubIssuesAdapter(SEAdapter):
         Raises:
             RuntimeError: If the command exits with a non-zero status.
         """
-        result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: PLW1510
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")  # noqa: PLW1510
         if result.returncode != 0:
             raise RuntimeError(
                 f"gh command failed (exit {result.returncode}):\n"

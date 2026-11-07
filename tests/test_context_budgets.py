@@ -267,16 +267,29 @@ TOLERANCE_MAX_BYTES = 4096
 #   * rules: Claude 17,650 -> 17,651, Continue 20,522 -> 20,523, Copilot 20,318 ->
 #     20,319 (+1 each).
 #   * orchestrator, all nine: unchanged.
+# MERGE RE-PIN (main #1151 G1 into #1157 `fix/orchestrator-tools-handback`, 2026-11-07):
+# measured with `measure_artifacts` on the merged tree, not derived arithmetically. Each side
+# alone stayed inside the tolerance (#1157: `a2a-delegation-gates` +307 B; G1: the rendered
+# `use-orchestrator` strict/worker-git sentences +250 B), their union (+557 B on every
+# artifact embedding the rules) does not. Exactly the nine failing entries are re-pinned:
+#   * rules: Claude 17,651 -> 18,208, Continue 20,523 -> 21,080, Copilot 20,319 -> 20,876.
+#   * entry-file (AGENTS.md embeds the rules): Codex 24,230 -> 24,787, KimiCode 24,244 ->
+#     24,801, Mammouth 24,241 -> 24,798, Opencode 24,305 -> 24,862, ZCode 25,143 -> 25,700.
+#   * always-loaded: Continue 20,881 -> 21,438.
+# Measured deltas left inside the tolerance on purpose (pins unchanged): orchestrator +756 B
+# (+781 Claude; the #1157 template text), harness-roster +793..+838 B, always-loaded
+# +1,350..+1,395 B on the roster providers, Copilot +575 B, Gemini entry-file/always-loaded
+# 32,873 -> 33,430 (+557, ceiling 33,530), Copilot entry-file +18 B.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 90241, "rules": 17651},
-    "Codex": {"always-loaded": 702748, "entry-file": 24230, "harness-roster": 678518, "orchestrator": 89856},
-    "Continue": {"always-loaded": 20881, "entry-file": 358, "orchestrator": 74393, "rules": 20523},
-    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 74269, "rules": 20319},
+    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 90241, "rules": 18208},
+    "Codex": {"always-loaded": 702748, "entry-file": 24787, "harness-roster": 678518, "orchestrator": 89856},
+    "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 74393, "rules": 21080},
+    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 74269, "rules": 20876},
     "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 90263},
-    "KimiCode": {"always-loaded": 695981, "entry-file": 24244, "harness-roster": 671737, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 691238, "entry-file": 24241, "harness-roster": 666997, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 705658, "entry-file": 24305, "harness-roster": 681353, "orchestrator": 89928},
-    "ZCode": {"always-loaded": 693854, "entry-file": 25143, "harness-roster": 668711, "orchestrator": 74965},
+    "KimiCode": {"always-loaded": 695981, "entry-file": 24801, "harness-roster": 671737, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 691238, "entry-file": 24798, "harness-roster": 666997, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 705658, "entry-file": 24862, "harness-roster": 681353, "orchestrator": 89928},
+    "ZCode": {"always-loaded": 693854, "entry-file": 25700, "harness-roster": 668711, "orchestrator": 74965},
 }
 
 
@@ -533,16 +546,27 @@ def test_ac07_missing_ceiling_is_a_violation():
 # +307 B (a2a gate-3 sentence + depth row) on Claude 17,651 -> 17,958, Continue
 # 20,523 -> 20,830, Copilot 20,319 -> 20,626; entry-file +76 B on the six AGENTS.md
 # providers and Copilot +18 B; harness-roster/always-loaded follow the orchestrator growth.
+# MERGE RE-PIN (main #1151 G1 into #1157, 2026-11-07): measured with
+# `render_into_work_dir(..., profile="compact")` + `measure_artifacts` on the merged tree.
+# Same cause as the `full` merge re-pin (rules +307 B #1157 + 250 B G1 = +557 B; the compact
+# AGENTS.md carries +76 B #1157 + 250 B G1 = +326 B). Exactly the eleven failing entries:
+#   * rules: Claude 17,651 -> 18,208, Continue 20,523 -> 21,080, Copilot 20,319 -> 20,876.
+#   * entry-file: Codex 3,413 -> 3,739, Gemini 10,948 -> 11,274, KimiCode 3,423 -> 3,749,
+#     Mammouth 3,421 -> 3,747, Opencode 3,481 -> 3,807, ZCode 4,326 -> 4,652.
+#   * always-loaded: Continue 20,881 -> 21,438, Gemini 10,948 -> 11,274.
+# Left inside the tolerance (pins unchanged): orchestrator +20 B, harness-roster
+# +793..+838 B, roster always-loaded +1,119..+1,395 B, Copilot always-loaded +575 B /
+# entry-file +18 B.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34792, "rules": 17651},
-    "Codex": {"always-loaded": 625634, "entry-file": 3413, "harness-roster": 622221, "orchestrator": 34283},
-    "Continue": {"always-loaded": 20881, "entry-file": 358, "orchestrator": 35357, "rules": 20523},
-    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 35231, "rules": 20319},
-    "Gemini": {"always-loaded": 10948, "entry-file": 10948, "orchestrator": 36105},
-    "KimiCode": {"always-loaded": 633773, "entry-file": 3423, "harness-roster": 630350, "orchestrator": 35659},
-    "Mammouth": {"always-loaded": 629072, "entry-file": 3421, "harness-roster": 625651, "orchestrator": 34072},
-    "Opencode": {"always-loaded": 628610, "entry-file": 3481, "harness-roster": 625129, "orchestrator": 34428},
-    "ZCode": {"always-loaded": 631646, "entry-file": 4326, "harness-roster": 627320, "orchestrator": 34298},
+    "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34792, "rules": 18208},
+    "Codex": {"always-loaded": 625634, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
+    "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 35357, "rules": 21080},
+    "Copilot": {"always-loaded": 31206, "entry-file": 10887, "orchestrator": 35231, "rules": 20876},
+    "Gemini": {"always-loaded": 11274, "entry-file": 11274, "orchestrator": 36105},
+    "KimiCode": {"always-loaded": 633773, "entry-file": 3749, "harness-roster": 630350, "orchestrator": 35659},
+    "Mammouth": {"always-loaded": 629072, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},
+    "Opencode": {"always-loaded": 628610, "entry-file": 3807, "harness-roster": 625129, "orchestrator": 34428},
+    "ZCode": {"always-loaded": 631646, "entry-file": 4652, "harness-roster": 627320, "orchestrator": 34298},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -556,7 +580,9 @@ _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "
 # MERGE RE-PIN (2026-10-26): measured 12,193 B on the merged tree; the branch value
 # already carried #1015 + fix A, and #1013's evidence gates are role-body text that
 # does not enter this shared entry file. Main's 11,257 B predates the #1015 roles.
-_IST_COMPACT_MULTI_AGENTS_MD = 12193
+# MERGE RE-PIN (main #1151 G1 into #1157, 2026-11-07): measured 12,519 B (+326 = the
+# #1157 a2a gate-3 sentence +76 and the G1 `use-orchestrator` strict/worker-git sentences +250).
+_IST_COMPACT_MULTI_AGENTS_MD = 12519
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
 # ESTIMATES (Spec section 11): goals, not measurements. `compact` ships

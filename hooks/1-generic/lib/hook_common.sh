@@ -1,8 +1,8 @@
 #!/bin/bash
 # lib: hook_common
-# version: 1.8.1
+# version: 1.9.0
 # description: Shared helper functions sourced by other hook scripts (issue #601 dedup)
-# changelog: v1.8.1: hook_known_tool_name also knows SubagentHandback (subagent report channel; blocking it lost every subagent result); v1.8.0: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData) — the closed allow-list blocked the whole task/cron/artifact surface, #1078; EnterWorktree/ExitWorktree stay blocked on purpose; v1.7.0: hook_shell_scan_py — is_fork_bomb ends a function body at the depth-matching '}' inside the 512-character window instead of the first unquoted one, so bombs with a brace or ${...} before the self-call are detected (#1050); an exhausted window still fails closed; v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
+# changelog: v1.9.0: issue #1151 (audit G1) -- hook_known_tool_name matches the documented tools table (adds EndConversation, ListAgents, ListMcpResourcesTool, LSP, PowerShell, ReadMcpResourceTool, ReportFindings, SendFeedback, ShareOnboardingGuide, WaitForMcpServers, Workflow; F6-02); hook_shell_scan_py emits the body of every $(...)/backtick substitution outside single quotes -- double-quoted ones included -- as extra statements (command_substitutions, nesting capped at 32 and failing closed beyond, F6-03) and offers split_shell_statements_with_ops (the operator that ended each statement, for cd tracking, F6-07); v1.8.1: hook_known_tool_name also knows SubagentHandback (subagent report channel; blocking it lost every subagent result); v1.8.0: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData) — the closed allow-list blocked the whole task/cron/artifact surface, #1078; EnterWorktree/ExitWorktree stay blocked on purpose; v1.7.0: hook_shell_scan_py — is_fork_bomb ends a function body at the depth-matching '}' inside the 512-character window instead of the first unquoted one, so bombs with a brace or ${...} before the self-call are detected (#1050); an exhausted window still fails closed; v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
 #
 # NOT a hook itself — no `event`/`matcher` header, sync.py never registers it
 # in settings.json. Deployed verbatim to <hooks_dir>/lib/hook_common.sh
@@ -177,6 +177,11 @@ hook_known_tool_name() {
     Agent|Bash|BashOutput|Edit|ExitPlanMode|Glob|Grep|KillBash|KillShell|LS) return 0 ;;
     ListMcpResources|MultiEdit|NotebookEdit|NotebookRead|Read|ReadMcpResource) return 0 ;;
     SendMessage|Skill|SlashCommand|Task|TaskOutput|TaskStop|TodoWrite|WebFetch|WebSearch) return 0 ;;
+    # Parity with the documented tools table (#1151 F6-02). PowerShell is
+    # write-capable: both guards intercept it like Bash. The two *Tool names
+    # are the documented spellings; the older names above stay accepted.
+    EndConversation|ListAgents|ListMcpResourcesTool|LSP|PowerShell|ReadMcpResourceTool) return 0 ;;
+    ReportFindings|SendFeedback|ShareOnboardingGuide|WaitForMcpServers|Workflow) return 0 ;;
     # Current built-ins: task board, scheduling/cron, plan mode, notifications
     # and the artifact surface (#1078). Grouped for readability; order within
     # a line carries no meaning.
@@ -432,8 +437,18 @@ hook_is_meta_submodule_dir() {
 #     '$X'), but a delimiter the hook cannot resolve is treated as
 #     unclassifiable rather than as license to skip an unknown amount of
 #     input, so the body is over-scanned (fail closed, review finding F2).
-#   * this is a splitter, not a shell parser: command-substitution contents
-#     stay opaque and the hook never executes anything (documented gap #592).
+#   * the body of every $(...) / `...` command substitution outside single
+#     quotes -- double-quoted ones included -- is split again and emitted as
+#     extra statements right after the statement that holds it (#1151 F6-03:
+#     'echo "$(git push origin main)"' used to stay opaque). Nesting deeper
+#     than _MAX_SUBST_DEPTH raises (the guards fail closed). This is a
+#     splitter, not a shell parser: eval/bash -c strings and variables stay
+#     opaque and the hook never executes anything (documented gap #592).
+#
+# split_shell_statements_with_ops(command) -> [(statement, bodies, op), ...]:
+#   the same statements plus the operator that ended each one ('&&', '||',
+#   ';', '|', '&', '\n' or '' at the end); 'subst' marks a statement that came
+#   out of a command substitution. Used for cd tracking (repo-containment).
 #
 # strip_quoted(command) removes quoted spans (fork-bomb false positives from a
 # quoted string argument, issues #602/#809).
@@ -463,6 +478,80 @@ _IDENT_CHARS = frozenset(
 )
 _WS = ' \t'
 _MAX_FUNC_BODY = 512
+_MAX_SUBST_DEPTH = 32
+
+
+def _skip_quoted(text, j, q):
+    # j is just past the opening quote q; return the index past its closer
+    # (len(text) when unclosed). A backslash escapes inside "..." only.
+    n = len(text)
+    while j < n:
+        c = text[j]
+        if c == '\\' and q == '"':
+            j += 2
+            continue
+        if c == q:
+            return j + 1
+        j += 1
+    return n
+
+
+def command_substitutions(text):
+    # Bodies of the top-level $(...) / `...` substitutions in one statement,
+    # found outside single quotes and ANSI-C strings (so also inside "...",
+    # #1151 F6-03). An unclosed substitution yields the rest of the text:
+    # over-scan, never under-scan. '$((...))' yields '(...)', which is harmless.
+    out = []
+    i, n = 0, len(text)
+    dq = False
+    while i < n:
+        c = text[i]
+        if c == '\\':
+            i += 2
+            continue
+        if c == '"':
+            dq = not dq
+            i += 1
+            continue
+        if not dq and c == "'":
+            i = _skip_quoted(text, i + 1, "'")
+            continue
+        if not dq and c == '$' and text[i + 1:i + 2] == "'":
+            j = i + 2
+            while j < n and text[j] != "'":
+                j += 2 if text[j] == '\\' else 1
+            i = j + 1
+            continue
+        if c == '`':
+            j = i + 1
+            while j < n and text[j] != '`':
+                j += 2 if text[j] == '\\' else 1
+            out.append(text[i + 1:j])
+            i = j + 1
+            continue
+        if c == '$' and text[i + 1:i + 2] == '(':
+            depth = 1
+            j = i + 2
+            while j < n:
+                ch = text[j]
+                if ch == '\\':
+                    j += 2
+                    continue
+                if ch in ("'", '"'):
+                    j = _skip_quoted(text, j + 1, ch)
+                    continue
+                if ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            out.append(text[i + 2:j])
+            i = j + 1
+            continue
+        i += 1
+    return out
 
 
 def split_shell_statements_and_clean(command):
@@ -475,8 +564,19 @@ def split_shell_statements_and_clean(command):
     into statements by the operators) is still seen as one line by the
     fork-bomb scanner.
     """
+    statements, bodies, _ops, code = _split_shell_core(command, 0)
+    return list(zip(statements, bodies)), code
+
+
+def split_shell_statements_with_ops(command):
+    statements, bodies, ops, _code = _split_shell_core(command, 0)
+    return list(zip(statements, bodies, ops))
+
+
+def _split_shell_core(command, depth):
     statements = []
     bodies = []
+    ops = []
     pending = []  # (delimiter, strip_leading_tabs, statement_index)
     kept_lines = []
     buf = []
@@ -487,12 +587,20 @@ def split_shell_statements_and_clean(command):
     lines = command.split('\n')
     li = 0
 
-    def flush():
+    def flush(op):
         text = ''.join(buf).strip()
         del buf[:]
         if text:
             statements.append(text)
             bodies.append([])
+            ops.append(op)
+            for inner in command_substitutions(text):
+                if depth >= _MAX_SUBST_DEPTH:
+                    raise ValueError('command substitution nested too deeply')
+                inner_stmts, inner_bodies, _o, _c = _split_shell_core(inner, depth + 1)
+                statements.extend(inner_stmts)
+                bodies.extend(inner_bodies)
+                ops.extend(['subst'] * len(inner_stmts))
 
     while li < len(lines):
         line = lines[li]
@@ -611,10 +719,12 @@ def split_shell_statements_and_clean(command):
                 continue
             if c in (';', '|', '&'):
                 if line[i:i + 2] in ('&&', '||'):
+                    op = line[i:i + 2]
                     i += 2
                 else:
+                    op = c
                     i += 1
-                flush()
+                flush(op)
                 word_start = True
                 continue
             if c == '<' and i + 1 < len(line) and line[i + 1] == '<':
@@ -664,7 +774,7 @@ def split_shell_statements_and_clean(command):
             continue
         if continued:
             continue
-        flush()
+        flush('\n')
         for delim, strip_tabs, idx in pending:
             body_lines = []
             while li < len(lines):
@@ -682,8 +792,8 @@ def split_shell_statements_and_clean(command):
 
     if quote is not None or subst > 0 or backtick:
         buf.append('\n')
-    flush()
-    return list(zip(statements, bodies)), '\n'.join(kept_lines)
+    flush('')
+    return statements, bodies, ops, '\n'.join(kept_lines)
 
 
 def split_shell_statements(command):

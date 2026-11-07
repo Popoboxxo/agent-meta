@@ -101,14 +101,14 @@ def get_changed_files(root: Path) -> set[str]:
         # Tracked changes vs HEAD
         for flag in [["git", "diff", "--name-only", "HEAD"],
                      ["git", "diff", "--name-only", "--cached"]]:
-            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, timeout=10,  # noqa: PLW1510
+            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,  # noqa: PLW1510
                                env=_tmp_sink_env(root))
             if r.returncode == 0:
                 changed.update(l.strip() for l in r.stdout.splitlines() if l.strip())
         # Untracked new files (agents + commands only)
         r = subprocess.run(  # noqa: PLW1510
             ["git", "ls-files", "--others", "--exclude-standard", "agents/", "commands/"],
-            cwd=str(root), capture_output=True, text=True, timeout=10,
+            cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
             env=_tmp_sink_env(root),
         )
         if r.returncode == 0:
@@ -124,7 +124,7 @@ def get_new_files_vs_main(root: Path) -> list[str]:
         try:
             r = subprocess.run(  # noqa: PLW1510
                 ["git", "diff", "--name-only", "--diff-filter=A", f"{base}...HEAD"],
-                cwd=str(root), capture_output=True, text=True, timeout=10,
+                cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
                 env=_tmp_sink_env(root),
             )
             if r.returncode == 0:

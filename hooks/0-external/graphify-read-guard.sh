@@ -1,6 +1,7 @@
 #!/bin/bash
 # hook: graphify-read-guard
-# version: 1.1.0
+# version: 1.2.0
+# changelog: v1.2.0: exit status normalised to 0/2 -- only rc 2 with a guard message on stderr blocks, a graphify crash passes (#1151 F6-10)
 # event: PreToolUse
 # matcher: Read|Glob
 # description: Route Read/Glob calls through the locally installed graphify CLI's hook-guard (see config/external-tools-registry.yaml)
@@ -27,5 +28,19 @@ if ! command -v "$GRAPHIFY_BIN" >/dev/null 2>&1; then
   exit 0  # graphify nicht installiert -- durchlassen
 fi
 INPUT=$(cat)
-printf '%s' "$INPUT" | "$GRAPHIFY_BIN" hook-guard read
-exit $?
+# Exit status normalised to {0, 2} (#1151 F6-10): `exit $?` handed any
+# graphify status to the harness. Only rc 2 WITH a guard message blocks;
+# a crash (rc 1, 127, ...) or a reasonless rc 2 passes -- graphify routing
+# is advisory, not a security boundary. stdout (the hook context) passes
+# through untouched; stderr is captured and re-emitted.
+exec 3>&1
+_ERR=$(printf '%s' "$INPUT" | "$GRAPHIFY_BIN" hook-guard read 2>&1 1>&3 3>&-)
+_RC=$?
+exec 3>&-
+if [ -n "$_ERR" ]; then
+  printf '%s\n' "$_ERR" >&2
+fi
+if [ "$_RC" -eq 2 ] && [ -n "$_ERR" ]; then
+  exit 2
+fi
+exit 0

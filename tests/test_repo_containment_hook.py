@@ -1275,3 +1275,230 @@ def test_missing_pyyaml_with_enabled_true_stays_fail_closed(tmp_path):
     )
     assert result.returncode == 2, result.stderr
     assert "PyYAML" in result.stderr
+
+
+# --- issue #1151 (system audit 2026-11-06, group G1) -----------------------
+
+
+def _run_with_home(payload: dict, home: Path) -> subprocess.CompletedProcess:
+    env = _clean_env()
+    env["HOME"] = str(home)
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload), capture_output=True,
+        text=True, cwd=str(_DECOY_ROOT), env=env, timeout=SCRIPT_TIMEOUT,
+    )
+
+
+@pytest.mark.parametrize("command", [
+    "echo x > ~/foo",
+    "cp a ~/foo",
+    "touch $HOME/foo",
+    'touch "${HOME}/foo"',
+    "cd; touch foo",
+])
+def test_f6_06_home_targets_are_expanded(tmp_path, command):
+    """F6-06: '~' and '$HOME' used to be skipped (literal text / '$' variable),
+    so a write into the home directory was allowed."""
+    root = _project(tmp_path)
+    home = tmp_path / "home"
+    result = _run_with_home(_bash_payload(command, root), home)
+    assert result.returncode == 2, result.stderr
+    assert "outside the repository root" in result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "curl -o {out}/f http://x",
+    "curl --output={out}/f http://x",
+    "curl -sSLo {out}/f http://x",
+    "curl --output-dir {out} -O http://x",
+    "wget -O {out}/f http://x",
+    "wget --output-document={out}/f http://x",
+    "wget -P {out} http://x",
+    "tar -xzf a.tgz -C {out}",
+    "tar xf a.tar --directory={out}",
+    "tar -czf {out}/a.tgz src",
+    "unzip a.zip -d {out}",
+    "git clone https://example.invalid/r.git {out}/r",
+    "git -C {out} clone https://example.invalid/r.git",
+])
+def test_f6_06_download_and_unpack_targets_outside_are_blocked(tmp_path, template):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent / "outside"), root))
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "curl -o out.txt http://x",
+    "curl -sS http://x",
+    "wget -q http://x",
+    "tar -czf .tmp/a.tgz -C /usr/share .",
+    "tar -tzf /usr/share/a.tgz",
+    "unzip a.zip -d sub",
+    "git clone https://example.invalid/r.git sub/r",
+    "git clone https://example.invalid/r.git",
+])
+def test_f6_06_targets_inside_the_root_stay_allowed(tmp_path, command):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "cd {out}; touch passwd",
+    "cd {out} && touch passwd",
+    "pushd {out} && echo x > f",
+    'echo "$(cd {out} && touch passwd)"',
+])
+def test_f6_07_relative_write_after_cd_outside_is_blocked(tmp_path, template):
+    """F6-07: relative targets used to be judged against the payload cwd even
+    after a cd, so 'cd /etc; touch passwd' was allowed."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent / "outside"), root))
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "cd .tmp/sub && touch ../x",
+    "cd sub && touch x && cd .. && touch y",
+    "pushd sub && touch x",
+])
+def test_f6_07_relative_write_after_cd_inside_is_allowed(tmp_path, command):
+    """'cd .tmp/sub && touch ../x' writes <root>/.tmp/x; before the tracking it
+    was judged against the payload cwd (<root>/../x) and blocked."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    'cd "$S"; touch x',
+    "cd -; touch x",
+    "popd; touch x",
+])
+def test_f6_07_unresolvable_cd_blocks_a_later_relative_write(tmp_path, command):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 2, result.stderr
+    assert "cannot resolve" in result.stderr
+
+
+def test_f6_07_unresolvable_cd_without_relative_write_is_allowed(tmp_path):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(f'cd "$S" && ls && touch {root}/x', root))
+    assert result.returncode == 0, result.stderr
+
+
+def test_f6_07_failed_cd_keeps_the_old_directory_in_play(tmp_path):
+    """After ';' a failing cd leaves the shell where it was: the target is
+    judged against both directories (here the old one is outside)."""
+    root = _project(tmp_path)
+    outside = root.parent / "outside"
+    result = _run_hook(_bash_payload(f"cd {outside}; cd {root}/nope; touch passwd", root))
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    'echo "$(touch {out}/x)"',
+    "echo `touch {out}/x`",
+    'x="$(cp a {out}/x)"',
+])
+def test_f6_03_write_inside_command_substitution_is_blocked(tmp_path, template):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent), root))
+    assert result.returncode == 2, result.stderr
+
+
+# --- #1151 review follow-up: scoped cd, known variables, old-style tar ------
+
+
+@pytest.mark.parametrize("template", [
+    'SCRIPT_DIR=$(cd "$(dirname x)" && pwd); echo x > out.log',
+    "X=$(cd {out} && pwd) && touch p",
+    "(cd sub && make) > .tmp/log",
+    "(cd {out} && make) > .tmp/log",
+    "(cd {out} && make); echo x > .tmp/log",
+    "( (cd {out}) ; touch p)",
+    "if (cd {out}); then touch p; fi",
+])
+def test_cd_inside_substitution_or_subshell_does_not_move_the_outer_command(tmp_path, template):
+    """Review F1: a cd in $(...) or ( ... ) widened the OUTER cwd set, so a
+    later relative write was judged against it (or blocked as unresolvable)."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent / "outside"), root))
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "(cd {out} && touch p)",
+    '(cd {out} && echo ")" > p)',
+    "(cd {out} && x=$(touch p))",
+    "(cd {out}; if (true); then touch p; fi)",
+    "(case a in a) cd {out};; esac); touch p",
+    "cd {out} && (ls) && touch p",
+])
+def test_cd_inside_a_subshell_still_scopes_writes_inside_it(tmp_path, template):
+    """Fail closed: writes INSIDE the subshell/substitution still see its cd;
+    a quoted ')' or a case arm does not close the subshell early."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent / "outside"), root))
+    assert result.returncode == 2, result.stderr
+
+
+def _run_with_project_dir(payload: dict, project_dir: Path) -> subprocess.CompletedProcess:
+    env = _clean_env()
+    env["CLAUDE_PROJECT_DIR"] = str(project_dir)
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps(payload), capture_output=True,
+        text=True, cwd=str(_DECOY_ROOT), env=env, timeout=SCRIPT_TIMEOUT,
+    )
+
+
+@pytest.mark.parametrize("command", [
+    'cd "$CLAUDE_PROJECT_DIR" && echo hi > .tmp/a.txt',
+    "cd ${CLAUDE_PROJECT_DIR}/sub && touch x",
+    'cd "$PWD" && echo hi > .tmp/a.txt',
+])
+def test_known_variables_resolve_as_cd_targets(tmp_path, command):
+    """Review F2: $CLAUDE_PROJECT_DIR / $PWD used to be unresolvable cd
+    targets, so the following relative write was blocked."""
+    root = _project(tmp_path)
+    result = _run_with_project_dir(_bash_payload(command, root), root)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    'cd "$CLAUDE_PROJECT_DIR/.." && touch x',
+    "touch $CLAUDE_PROJECT_DIR/../x",
+    'cd "$PWD/.." && touch x',
+])
+def test_known_variables_outside_the_root_are_blocked(tmp_path, command):
+    root = _project(tmp_path)
+    result = _run_with_project_dir(_bash_payload(command, root), root)
+    assert result.returncode == 2, result.stderr
+
+
+def test_unset_project_dir_stays_an_unresolvable_cd_target(tmp_path):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload('cd "$CLAUDE_PROJECT_DIR" && touch x', root))
+    assert result.returncode == 2, result.stderr
+    assert "cannot resolve" in result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "tar cf {out}/x.tar .",
+    "tar cvzf {out}/x.tgz src",
+    "tar xzfC a.tgz {out}",
+])
+def test_old_style_tar_cluster_targets_outside_are_blocked(tmp_path, template):
+    """Review F4: 'tar cf /etc/x.tar .' -- the old-style first word carries
+    the -f value in the next word; it used to be missed."""
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(template.format(out=root.parent / "outside"), root))
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize("command", ["tar cf .tmp/x.tar .", "tar xf a.tar", "tar tvf /usr/a.tar"])
+def test_old_style_tar_cluster_inside_or_read_only_is_allowed(tmp_path, command):
+    root = _project(tmp_path)
+    result = _run_hook(_bash_payload(command, root))
+    assert result.returncode == 0, result.stderr

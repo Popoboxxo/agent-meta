@@ -64,7 +64,7 @@ def _read_line_with_timeout(stream, timeout: float) -> str | None:
 
 def _run_version(binary: str) -> tuple[bool, str]:
     try:
-        out = subprocess.run([binary, "--version"], capture_output=True, text=True,
+        out = subprocess.run([binary, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=_TIMEOUT)  # noqa: S603
         msg = (out.stdout or out.stderr or "").strip().splitlines()
         return out.returncode == 0, (msg[0] if msg else f"{binary} present")
@@ -91,7 +91,7 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         child_env = {**os.environ, **env} if env else None
         proc = subprocess.Popen([command, *args], stdin=subprocess.PIPE,  # noqa: S603
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                text=True, env=child_env)
+                                text=True, encoding="utf-8", errors="replace", env=child_env)
         req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
                           "params": {"protocolVersion": "2024-11-05", "capabilities": {},
                                      "clientInfo": {"name": "agent-meta", "version": "1"}}})

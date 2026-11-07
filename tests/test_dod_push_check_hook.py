@@ -1595,3 +1595,36 @@ def test_954_push_default_mode_matrix_in_submodule_repo(
         repo_with_real_submodule, mode, expected):
     _git(repo_with_real_submodule, "config", "push.default", mode)
     _assert_outcome(repo_with_real_submodule, "git push", expected)
+
+
+
+# --- issue #1151 (system audit 2026-11-06, group G1) -----------------------
+
+
+@pytest.mark.parametrize("command", [
+    'echo "$(git push origin main)"',
+    'echo "`git push origin main`"',
+    'x="$(echo "$(git push origin main)")"',
+])
+def test_f6_03_push_inside_command_substitution_is_blocked(repo_on_main, command):
+    """F6-03: inside double quotes the tokenizer kept the substitution as one
+    opaque word, so a push to main hidden there passed (rc 0)."""
+    result = _run_hook(repo_on_main, command)
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "grep -n \"\\\"x\\\"\\|'\\$'\" f",
+    "for c in 'eval \"git push\"'; do echo \"$c\"; done",
+    'echo "$(git status)"',
+])
+def test_f6_09_literal_text_is_not_a_push(repo_on_main, command):
+    """F6-09: a "$'" inside double quotes is literal (no ANSI-C quoting) and
+    the word list of a for loop is data -- both used to block."""
+    result = _run_hook(repo_on_main, command)
+    assert result.returncode == 0, result.stderr
+
+
+def test_f6_09_real_ansi_c_push_still_blocks(repo_on_main):
+    result = _run_hook(repo_on_main, "git $'\\x70ush' origin main")
+    assert result.returncode == 2, result.stderr

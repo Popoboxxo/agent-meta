@@ -52,11 +52,12 @@ Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature
 {{/if}}
 ## Git Delegation
 {{#unless AUTO_COMMIT_ENABLED}}
-Git Mutationen (commit, push, add etc){{#if ROLE_GIT_ACTIVE}} -> `git` Agent{{else}} nur über den Orchestrator{{/if}}. Read-only (status, log) im Main Chat ok.
+Git Mutationen (commit, push, add etc){{#if ROLE_GIT_ACTIVE}} -> `git` Agent{{else}} nur über den Orchestrator{{/if}}. {{#if ORCH_MODE_STRICT}}Strict-Mode: der Main Chat führt kein Bash aus, auch kein read-only Git (status, log) — Git-Lesezugriffe über einen Subagenten.{{else}}Read-only (status, log) im Main Chat ok.{{/if}}
 {{/unless}}
 {{#if AUTO_COMMIT_ENABLED}}
-Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. Read-only (status, log) im Main Chat ok.
+Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. {{#if ORCH_MODE_STRICT}}Strict-Mode: der Main Chat führt kein Bash aus, auch kein read-only Git (status, log) — Git-Lesezugriffe über einen Subagenten.{{else}}Read-only (status, log) im Main Chat ok.{{/if}}
 {{/if}}
+Worker-Subagenten ohne `git`-Sentinel können auch `git init`, schreibendes `git config` und `git stash` nicht ausführen (Orchestrator-Guard-Mutationsliste).
 {{#if ORCH_MODE_MAIN_CHAT}}Ausnahme auf User-Wunsch erlaubt.{{/if}}
 
 {{#if NATIVE_EXTENSIONS_ENABLED}}
