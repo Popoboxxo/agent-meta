@@ -24,10 +24,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-try:  # Python >= 3.11 ships tomllib in the stdlib.
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib
+from .doctor_formats import TomlUnsupported, toml_loads_and_error
+
+# tomllib (3.11+) -> tomli -> builtin subset parser; tomli is a tests-only dep (#1154).
+_toml_loads, _TomlDecodeError = toml_loads_and_error()
 
 try:
     import yaml as _yaml
@@ -165,8 +165,13 @@ def validate_toml(text: str, path: str) -> list[Finding]:
     exited ``0``.
     """
     try:
-        tomllib.loads(text)
-    except tomllib.TOMLDecodeError as exc:
+        _toml_loads(text)
+    except TomlUnsupported:
+        # Subset fallback (Py < 3.11, no tomli) cannot tell "outside the
+        # subset" (e.g. the multi-line strings agent_toml always writes) from
+        # broken TOML: cannot validate -> no finding (#1154).
+        return []
+    except _TomlDecodeError as exc:
         return [_finding(path, f"invalid TOML: {exc}", "Re-serialize so the document parses.")]
     return []
 

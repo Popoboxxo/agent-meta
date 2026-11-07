@@ -33,13 +33,14 @@ def _sync_cli(project: Path) -> subprocess.CompletedProcess:
         cwd=project, capture_output=True, text=True, timeout=300)
 
 
-def _sync_in_process(project: Path, monkeypatch) -> int:
+def _sync_in_process(project: Path, monkeypatch, *extra: str) -> int:
     """Run sync.main() in-process (allows monkeypatching); returns the exit code."""
     import sync as sync_mod
 
     monkeypatch.chdir(project)
     monkeypatch.setattr(sys, "argv", [
-        "sync.py", "--config", str(project / ".meta-config" / "project.yaml"), "--init"])
+        "sync.py", "--config", str(project / ".meta-config" / "project.yaml"),
+        *(extra or ("--init",))])
     try:
         sync_mod.main()
     except SystemExit as exc:
@@ -91,6 +92,21 @@ def test_error_finding_keeps_real_sync_exit_code_zero(tmp_path, monkeypatch):
     text = (project / "sync.log").read_text(encoding="utf-8")
     assert any(ln.startswith("[ERROR]") and "active-set.dangling-dispatch" in ln
                for ln in text.splitlines())
+
+
+def test_check_mode_exits_one_on_logged_error(tmp_path, monkeypatch):
+    # #1155 F5: plain sync stays report-only (test above), but `--check` is
+    # the CI gate and must fail when the run recorded an [ERROR], even with
+    # zero pending file actions.
+    from lib.consistency.report import Finding, Severity
+
+    project = _project(tmp_path)
+    assert _sync_in_process(project, monkeypatch) == 0
+    assert _sync_in_process(project, monkeypatch, "--check") == 0
+    monkeypatch.setattr(active_set_refs, "check_dangling_dispatch", lambda *a, **k: [
+        Finding(Severity.ERROR, "active-set.dangling-dispatch", ".claude/agents/x.md",
+                "dispatch to inactive role 'validator' (1x, first line 1)")])
+    assert _sync_in_process(project, monkeypatch, "--check") == 1
 
 
 def test_info_findings_are_logged_as_info_not_warn(p10_synced, monkeypatch):

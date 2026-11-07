@@ -350,7 +350,7 @@ def render_into_work_dir(
                    capture_output=True, env=env, timeout=GIT_INIT_TIMEOUT_S)
     result = subprocess.run(
         [sys.executable, str(sync_script), "--config", str(target_cfg), "--init"],
-        cwd=str(work_dir), env=env, capture_output=True, text=True, timeout=600,
+        cwd=str(work_dir), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
     )
     if result.returncode != 0:
         raise RuntimeError("render failed (rc {}): {}".format(

@@ -1535,7 +1535,7 @@ def _render_into(agent_meta_root: Path, config_text: str, work_dir: Path,
                    capture_output=True, env=env, timeout=60)
     result = subprocess.run(
         [sys.executable, str(sync_script), "--config", str(config_path), "--init"],
-        cwd=str(work_dir), env=env, capture_output=True, text=True, timeout=600,
+        cwd=str(work_dir), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
     )
     if result.returncode != 0:
         raise RuntimeError("render failed (rc {}): {}".format(

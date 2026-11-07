@@ -274,7 +274,7 @@ def _get_head_version(path: Path, agent_meta_root: Path) -> str | None:
         result = subprocess.run(  # noqa: PLW1510
             ["git", "show", f"HEAD:{rel.as_posix()}"],
             cwd=str(agent_meta_root),
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
         )
         if result.returncode != 0:
             return None

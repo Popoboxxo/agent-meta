@@ -76,6 +76,37 @@ def test_write_atomic_creates_parent_dirs(tmp_path):
     assert path.read_text(encoding="utf-8") == "x"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits only")
+def test_write_atomic_preserves_existing_mode(tmp_path):
+    """#1155 F6: rewriting an 0755 hook must not drop it to mkstemp's 0600."""
+    path = tmp_path / "hook.sh"
+    path.write_text("old\n", encoding="utf-8")
+    os.chmod(path, 0o755)
+    write_atomic(path, "new\n")
+    assert path.stat().st_mode & 0o777 == 0o755
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits only")
+def test_write_atomic_new_file_follows_umask(tmp_path):
+    old = os.umask(0o027)
+    try:
+        write_atomic(tmp_path / "new.txt", "x")
+    finally:
+        os.umask(old)
+    assert (tmp_path / "new.txt").stat().st_mode & 0o777 == 0o640
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits only")
+def test_write_atomic_private_is_owner_only(tmp_path):
+    path = tmp_path / "secret.env"
+    path.write_text("old\n", encoding="utf-8")
+    os.chmod(path, 0o644)
+    write_atomic(path, "TOKEN=x\n", private=True)
+    assert path.stat().st_mode & 0o777 == 0o600
+    write_atomic(tmp_path / "fresh.env", "TOKEN=x\n", private=True)
+    assert (tmp_path / "fresh.env").stat().st_mode & 0o777 == 0o600
+
+
 # ---------------------------------------------------------------------------
 # #576 -- checkpoint.py tolerates corrupt session files
 # ---------------------------------------------------------------------------
@@ -229,3 +260,73 @@ def test_concurrent_writes_do_not_crash(tmp_path):
 
     data = json.loads(Path(cache_path).read_text(encoding="utf-8"))
     assert isinstance(data["entries"], dict)
+
+
+# ---------------------------------------------------------------------------
+# #1155 F7 -- project.yaml writers go through write_atomic
+# ---------------------------------------------------------------------------
+
+def _crash_fsync(monkeypatch):
+    def _boom(*_a, **_kw):
+        raise OSError("simulated crash mid-write")
+    monkeypatch.setattr(os, "fsync", _boom)
+
+
+@pytest.mark.parametrize("full_dump", [False, True])
+def test_project_yaml_comment_writer_is_atomic(tmp_path, monkeypatch, full_dump):
+    from lib import config as config_mod
+    from lib import yaml_patch
+
+    path = tmp_path / "project.yaml"
+    original = "# keep\r\nproject:\r\n  name: t\r\n"
+    path.write_bytes(original.encode("utf-8"))
+    if full_dump:
+        monkeypatch.setattr(yaml_patch, "patch_top_level", lambda *a, **k: None)
+    _crash_fsync(monkeypatch)
+    with pytest.raises(OSError):
+        config_mod._write_yaml_with_comments(
+            path, {"project": {"name": "t"}, "roles": ["x"]}, [("roles", "d")])
+    assert path.read_bytes().decode("utf-8") == original
+    assert [p.name for p in tmp_path.iterdir()] == ["project.yaml"]
+
+
+def test_version_bookkeeping_write_is_atomic(tmp_path, monkeypatch):
+    from lib.log import SyncLog
+    from lib.sync_pipeline import sync_version_bookkeeping
+
+    path = tmp_path / "project.yaml"
+    path.write_text('agent-meta-version: "0.0.1"\n', encoding="utf-8")
+    _crash_fsync(monkeypatch)
+    with pytest.raises(OSError):
+        sync_version_bookkeeping(_REPO_ROOT, tmp_path, path,
+                                 {"agent-meta-version": "0.0.1"}, SyncLog(), False)
+    assert path.read_text(encoding="utf-8") == 'agent-meta-version: "0.0.1"\n'
+
+
+# --- #1155 A3: project.yaml writers keep the (token-bearing) file 0600 -------
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_audit_apply_writes_project_yaml_owner_only(tmp_path):
+    from lib.config_audit_apply import apply_audit
+    from lib.config_audit_types import AuditReport
+
+    cfg = tmp_path / "project.yaml"
+    cfg.write_text("roles:\n  - old-role\n", encoding="utf-8")
+    os.chmod(cfg, 0o644)
+    report = AuditReport()
+    report.add("deprecated_roles", "warning", "old-role", "msg")
+    assert apply_audit(report, cfg) == 1
+    assert (os.stat(cfg).st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_deactivation_writes_project_yaml_owner_only(tmp_path):
+    from lib.deactivation import update_deactivation_config
+    from lib.log import SyncLog
+
+    cfg = tmp_path / "project.yaml"
+    cfg.write_text("project: {}\n", encoding="utf-8")
+    os.chmod(cfg, 0o644)
+    update_deactivation_config(cfg, {}, ["Gemini"], {}, SyncLog())
+    assert (os.stat(cfg).st_mode & 0o777) == 0o600

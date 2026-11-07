@@ -202,7 +202,7 @@ def update_deactivation_config(
         log.note("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")
         return
 
-    _write_yaml(config_path, config)
+    _write_yaml(config_path, config, private=True)  # project.yaml may hold the admin token
     log.note("deactivation-config", f"updated provider-deactivation in {config_path.name}: "
              f"{', '.join(sorted(updated)) if updated else 'none (all active)'}")
 
@@ -276,7 +276,7 @@ def remove_provider_dir(
         log.note("deactivation", f"removed provider directory: {provider_root}")
         return True
     except Exception as exc:  # noqa: BLE001
-        log.error(f"deactivation: failed to remove '{provider_root}': {exc}")
+        log.error(str(provider_root), f"deactivation: failed to remove: {exc}")
         return False
 
 
