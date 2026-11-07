@@ -64,3 +64,11 @@ Frozen after Task 15 of `docs/plans/2026-11-04-orchestrator-topology-v1-plan.md`
 The Task 18 rule amendment (conditional topology branch) must leave these bytes
 unchanged when the key is unset; `test_topology_golden_key_unset_is_byte_identical`
 is the guard. Do not regenerate without a documented AC-6 reason.
+
+## Rebaseline log
+
+- Issue #1157 (2026-11-06): regenerated with the generator above after an
+  intentional, topology-independent rule-text change (gate-3 sentence "Worker-Lauf
+  ohne Abschluss-Report = `failed`" and the platform depth-limit row). The diff is
+  exactly those two lines in both fixtures; the topology wording and the
+  role-active/role-inactive fragment difference are unchanged.

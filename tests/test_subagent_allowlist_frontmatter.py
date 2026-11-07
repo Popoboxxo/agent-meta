@@ -121,3 +121,58 @@ def test_only_the_allowlist_provider_declares_the_dispatch_keys():
             continue
         assert not spec.get("subagents-allowlist"), provider
         assert (spec.get("rename-fields") or {}).get("hint") is None, provider
+
+
+# --- #1157 F3-01: orchestrator control tools (SendMessage/TaskStop) ---------
+# The grant is data, not a provider branch: a provider declares the extra tools
+# of its primary role under ``agent-transform.primary-role-tools`` and must
+# whitelist them in config/provider-tools.yaml. Only the primary role gets them.
+_CONTROL_TOOLS = {"SendMessage", "TaskStop"}
+
+
+def _render(provider: str, role: str, template: str):
+    log = SyncLog()
+    out = transform_agent_content_for_provider(
+        template, provider, role, role, "desc", f"1-generic/{role}.md@0",
+        _DEFAULT_CONFIG, REPO_ROOT, REPO_ROOT,
+        REPO_ROOT / ".claude" / "agents" / f"{role}.md",
+        _PC, log, active_set=_active(), provider_capabilities=_CAPS,
+    )
+    return out, log
+
+
+def test_claude_orchestrator_grants_send_message_and_task_stop():
+    out, log = _render("Claude", "orchestrator", _ORCHESTRATOR_TEMPLATE)
+    tools = _frontmatter(out)["tools"]
+    assert _CONTROL_TOOLS <= set(tools), tools
+    leaked = [w for w in log.warnings if any(t in w for t in _CONTROL_TOOLS)]
+    assert not leaked, f"control tools must be whitelisted for Claude: {leaked}"
+
+
+def test_claude_worker_role_gets_no_control_tools():
+    developer = (REPO_ROOT / "agents" / "1-generic" / "developer.md").read_text(encoding="utf-8")
+    out, _ = _render("Claude", "developer", developer)
+    tools = _frontmatter(out).get("tools") or []
+    assert not _CONTROL_TOOLS & set(tools), tools
+
+
+def test_kimi_orchestrator_does_not_receive_claude_control_tools():
+    fm = _frontmatter(_render_orchestrator(_active())[0])
+    assert not _CONTROL_TOOLS & set(fm["tools"]), fm["tools"]
+
+
+def test_primary_role_tools_are_whitelisted_where_declared():
+    """Every declared primary-role tool is valid for its provider."""
+    from lib.frontmatter import load_provider_tools_config
+
+    tools_cfg = load_provider_tools_config(REPO_ROOT)
+    declared = {
+        p: (e.get("agent-transform") or {}).get("primary-role-tools")
+        for p, e in _PC.items() if isinstance(e, dict)
+    }
+    declared = {p: t for p, t in declared.items() if t}
+    assert declared.get("Claude"), "Claude must declare its orchestrator control tools"
+    for provider, tools in declared.items():
+        whitelist = tools_cfg.get(provider.lower()) or []
+        missing = [t for t in tools if t not in whitelist]
+        assert not missing, f"{provider}: {missing} not whitelisted"

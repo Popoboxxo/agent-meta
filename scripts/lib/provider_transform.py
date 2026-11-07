@@ -367,6 +367,11 @@ def _apply_agent_transform(
                                          `native_agent_tools` capability; gated
                                          on the capability
                                          `subagent_allowlist_required`
+      primary-role-tools: [name, ...]  — extra tools appended to the tool list
+                                         of the provider's primary role only
+                                         (before validation; must be
+                                         whitelisted, e.g. Claude
+                                         SendMessage/TaskStop, #1157)
       allowed-fields: [name, ...]      — frontmatter allow-list (validated by
                                          artifact_validate; Task-1)
       reject-fields: [name, ...]       — frontmatter deny-list (validated by
@@ -701,6 +706,10 @@ def _apply_agent_transform(
     if tools_mode != 'skip':
         _fm = _parse_frontmatter_yaml(content)
         _tools = _fm.get('tools')
+        if isinstance(_tools, list) and role == _primary_role:
+            # Data-declared extra tools of the primary role (e.g. Claude
+            # SendMessage/TaskStop, #1157); validated like template tools.
+            _tools = _with_native_tools(_tools, spec.get('primary-role-tools'))
         if isinstance(_tools, list):
             _valid = _validate_tools_against_whitelist(
                 _tools, provider, agent_meta_root, log, role,
@@ -712,7 +721,7 @@ def _apply_agent_transform(
                 _mapped = _apply_tool_name_map(_tools, spec.get('tool-name-map'))
                 if _emit_dispatch:
                     _mapped = _with_native_tools(_mapped, _caps.get('native_agent_tools'))
-                if _mapped != _tools:
+                if _mapped != _fm.get('tools'):
                     content = _update_frontmatter_dict(content, {'tools': _mapped})
             elif tools_mode == 'filter':
                 # filter: the ONLY mode that replaces the list with the
@@ -720,7 +729,7 @@ def _apply_agent_transform(
                 _mapped = _apply_tool_name_map(_valid, spec.get('tool-name-map'))
                 if _emit_dispatch:
                     _mapped = _with_native_tools(_mapped, _caps.get('native_agent_tools'))
-                if _mapped != _tools:
+                if _mapped != _fm.get('tools'):
                     content = _update_frontmatter_dict(content, {'tools': _mapped})
             elif tools_mode == 'map':
                 _mapped = _apply_tool_name_map(_valid, spec.get('tool-name-map'))

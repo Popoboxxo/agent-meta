@@ -5439,10 +5439,16 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1157 (orchestrator worker control, `orchestrator` 8.10.0 -> 8.11.0):
+# `ac01-baseline` re-pinned per entry — 18 of 1096 hashes (9 `orchestrator`
+# renders, 3 `a2a-delegation-gates` rule renders, 6 `AGENTS.md` that embed the
+# rule); `slimming-golden`/`compact-golden` re-pinned for the same template diff
+# (orchestrator.md) and `compact-golden/agents-managed.md` for the embedded
+# a2a gate-3 sentence. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "3acc668ea8f1f58452e973f76a023358ff91d25f584eab16ef831d184335f411",
-    "slimming-golden": "8d1ade1a814b9c9132c11ff2dc26b22356260611dba759f2fd04f1935486e787",
-    "compact-golden": "fa992b69b9c1a4b23fe31010917536be7156b5181027fd17bfa086aff8a09f62",
+    "ac01-baseline": "a78d0f985dde2e869fabffaa9dbbc1d096f87712a22172ff1f41a1ac3b47aa3f",
+    "slimming-golden": "c08f66b0a052e4b04a9be48d964eed35813d4659aba099322a907ca7c5dff099",
+    "compact-golden": "f5b9abefc6c7d2edb0f765741cdb0ac88a41216eb75347c23129e69a62a57933",
 }
 
 

@@ -4,7 +4,7 @@
 
 1. **No Self-Handoff / No Re-Delegation:** Ein `payload`, der mit "Du bist..." beginnt, ist ein Re-Delegations-/Spec-Dump-Versuch → HARD REJECT.
 2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
-3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
+3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 
 ## Degradierte Checks (Doku-Pflicht, kein Gate — Issue #346)
 
@@ -15,6 +15,7 @@ den praktischen Fehlerfall ab:
 | Check | Status | Begründung |
 |---|---|---|
 | `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
+| Plattform-Tiefenlimit | Hinweis | Laut Plattform-Doku (Claude Code, in diesem Repo nicht verifiziert): Subagenten schachteln bis 3 Ebenen unter dem Main Chat; änderbar über die Env-Var `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. |
 | `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | dokumentiert | Toter Konfigurationsraum bei einem 2-Ebenen-Repo; der enforced-Pfad wurde aus `validate_envelope()` entfernt, der Doku-Verweis bleibt |
 
 ## Schema-erzwungen: `payload.t ≤ 300 Zeichen` (Issue #812)

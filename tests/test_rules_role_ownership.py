@@ -58,6 +58,8 @@ def test_p10_paved_roads_keep_the_block_catalog(projects):
     assert "{{" not in text
 
 
+# Rebaseline #1157: a2a-delegation-gates.md took exactly the two new rule lines
+# (gate-3 sentence, platform depth-limit row); patched in place.
 _PINNED = REPO_ROOT / "tests" / "fixtures" / "active-set-prose" / "rules-all-active"
 
 

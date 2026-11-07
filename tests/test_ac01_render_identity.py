@@ -892,6 +892,30 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (``8d1ade1a…``/``badf2362…``) and the ``topology-golden`` fixtures are
   unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Orchestrator worker control (issue #1157, 2026-11-06,
+  ``fix/orchestrator-tools-handback``): ``orchestrator`` 8.10.0 -> **8.11.0**
+  (Sync-Call/Hard-interrupt text names ``SendMessage``/``TaskStop``, BARRIER step 6
+  "worker run without report = failed", dispatch-context hand-back line, the
+  unverified ``run_in_background: false`` hint) and ``a2a-delegation-gates``
+  (gate 3 sentence + platform depth-limit row); Claude's primary role gains the
+  data-declared ``primary-role-tools`` ``SendMessage``/``TaskStop``. Exactly
+  **18 of 1096 hashes moved; 0 added/removed**: the ``orchestrator`` agent render
+  of all nine providers, the three standalone rule renders
+  (``Claude/.claude/rules/a2a-delegation-gates.md``,
+  ``Continue/.continue/rules/a2a-delegation-gates.md``,
+  ``Copilot/.github/instructions/a2a-delegation-gates.instructions.md``) and the
+  six ``AGENTS.md`` that embed the rule (Codex, Gemini, KimiCode, Mammouth,
+  Opencode, ZCode). The manifest was patched **per entry** (18 single-line
+  replacements) -- not via ``--write`` -- from two independent matrix renders
+  with identical drift. AC-T4 digests in ``tests/test_opencode_v2_surface.py``
+  follow: ac01 ``3acc668e…`` -> ``c241ad07…``, slimming ``8d1ade1a…`` ->
+  ``2054b433…``, compact ``fa992b69…`` -> ``1f37318f…`` (both orchestrator goldens carry
+  exactly the template diff; ``compact-golden/agents-managed.md`` carries the
+  one-line gate-3 sentence, log in ``tests/test_gate_card_compact.py``). Both ``topology-golden`` fixtures were regenerated
+  with the README generator and differ by exactly the two ``a2a-delegation-gates``
+  rule lines (gate-3 sentence, depth row) -- no topology wording moved.
+  ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
