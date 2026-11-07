@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml
+from .io import _load_yaml_or_json, _write_yaml, write_atomic
 from .log import SyncLog
 from .skills import (
     _EXTERNAL_SKILLS_CONFIG_JSON,
@@ -96,8 +96,7 @@ def add_skill(
         if config_path.suffix.lower() in (".yaml", ".yml"):
             _write_yaml(config_path, raw)
         else:
-            with config_path.open("w", encoding="utf-8") as f:
-                json.dump(raw, f, indent=2, ensure_ascii=False)
+            write_atomic(config_path, json.dumps(raw, indent=2, ensure_ascii=False))
         print(f"  +  {config_path.name} updated")
         print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
         print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")

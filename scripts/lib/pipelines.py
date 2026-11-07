@@ -284,14 +284,15 @@ def _safe_load_reflection_pairs(agent_meta_root=None) -> list:
     explicit list. Mirrors the broad fallback already applied in config.py so a
     malformed role-defaults.yaml cannot crash rendering.
 
-    Catches ``BaseException`` on purpose: the PyYAML-absent path in
+    Catches ``SystemExit`` on purpose: the PyYAML-absent path in
     ``_require_yaml()`` raises ``SystemExit`` (not ``Exception``), which must not
-    abort sync rendering (L7). Project overrides are applied here so a project
-    override of a pair actually reaches the render path (M4).
+    abort sync rendering (L7). ``KeyboardInterrupt`` propagates (#1155).
+    Project overrides are applied here so a project override of a pair
+    actually reaches the render path (M4).
     """
     try:
         return list(effective_reflection_pairs(agent_meta_root))
-    except BaseException:
+    except (Exception, SystemExit):
         return []
 
 

@@ -1540,3 +1540,19 @@ def test_feature_lifecycle_approval_gate_follows_spec_plan_switch():
         if enabled:
             assert "Status: APPROVED" in rendered
             assert rendered.index(gate) < rendered.index("**implement**")
+
+
+def test_safe_load_reflection_pairs_lets_keyboard_interrupt_through(monkeypatch):
+    """#1155 F9: Ctrl-C must not be swallowed; SystemExit (no PyYAML) still is."""
+    from scripts.lib import pipelines
+
+    def _raise(exc):
+        def _inner(_root=None):
+            raise exc
+        return _inner
+
+    monkeypatch.setattr(pipelines, "effective_reflection_pairs", _raise(SystemExit(1)))
+    assert pipelines._safe_load_reflection_pairs() == []
+    monkeypatch.setattr(pipelines, "effective_reflection_pairs", _raise(KeyboardInterrupt()))
+    with pytest.raises(KeyboardInterrupt):
+        pipelines._safe_load_reflection_pairs()

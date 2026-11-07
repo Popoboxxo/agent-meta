@@ -457,3 +457,20 @@ def test_update_frontmatter_dict_preserves_nested_permission_mapping_order():
     assert "{" not in out.split("---")[1]
     # The body after the closing fence is byte-identical to the input body.
     assert out.split("---", 2)[2] == "\nbody\n"
+
+
+def test_update_frontmatter_dict_keeps_content_on_invalid_yaml(capsys):
+    """#1155 F3: unparseable frontmatter must not be replaced by the updates."""
+    from scripts.lib.frontmatter import _update_frontmatter_dict
+
+    content = "---\nname: a\ndescription: x: y: [\n---\nbody\n"
+    assert _update_frontmatter_dict(content, {"model": "m"}) == content
+    assert "frontmatter" in capsys.readouterr().err
+
+
+def test_update_frontmatter_dict_keeps_content_on_non_mapping_yaml(capsys):
+    from scripts.lib.frontmatter import _update_frontmatter_dict
+
+    content = "---\n- a\n- b\n---\nbody\n"
+    assert _update_frontmatter_dict(content, {"model": "m"}) == content
+    assert "frontmatter" in capsys.readouterr().err

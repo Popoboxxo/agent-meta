@@ -330,10 +330,10 @@ def test_push_arg_parser_short_clusters_and_o_value():
 
 # --- hook_known_tool_name (review finding M2, #954 follow-up) -------------
 #
-# There is NO automated consistency check against the harness's actual tool
-# list, and none can exist: the list is maintained by hand (the audit log
-# contains no `tool_name` records, verified). A new built-in therefore has to
-# be added here deliberately, together with its accept case below.
+# The list is maintained by hand (the audit log contains no `tool_name`
+# records, verified). Parity with the documented tools table is pinned by a
+# snapshot (_DOCUMENTED_CLAUDE_TOOLS, #1151); a new built-in has to be added
+# to the lib and to that snapshot deliberately.
 
 def _known(name: str) -> str:
     return _call(
@@ -384,6 +384,32 @@ def test_hook_known_tool_name_rejects_unknown_or_non_canonical(name):
     """Anything not on the list fails closed: unknown means unclassifiable,
     so both guards block it instead of matching their `*) exit 0` branch."""
     assert _known(name) == "unknown"
+
+
+#: Snapshot of the "Tool" column of https://code.claude.com/docs/en/tools-reference
+#: (state 2026-11-06, issue #1151 F6-02). The allow-list fell behind this table
+#: three times (#1055/#1078/#1137); this pins parity with the documented set.
+#: EnterWorktree/ExitWorktree are documented but stay rejected on purpose
+#: (no-worktree-isolation). Update the snapshot when the docs table changes.
+_DOCUMENTED_CLAUDE_TOOLS = (
+    "Agent", "Artifact", "AskUserQuestion", "Bash", "CronCreate", "CronDelete",
+    "CronList", "Edit", "EndConversation", "EnterPlanMode", "ExitPlanMode",
+    "Glob", "Grep", "ListAgents", "ListMcpResourcesTool", "LSP", "Monitor",
+    "NotebookEdit", "PowerShell", "PushNotification", "Read",
+    "ReadMcpResourceTool", "RemoteTrigger", "ReportFindings", "ScheduleWakeup",
+    "SendFeedback", "SendMessage", "SendUserFile", "ShareOnboardingGuide",
+    "Skill", "SubagentHandback", "TaskCreate", "TaskGet", "TaskList",
+    "TaskOutput", "TaskStop", "TaskUpdate", "TodoWrite", "ToolSearch",
+    "WaitForMcpServers", "WebFetch", "WebSearch", "Workflow", "Write",
+)
+_DELIBERATELY_REJECTED = ("EnterWorktree", "ExitWorktree")
+
+
+def test_hook_known_tool_name_matches_documented_tool_table():
+    """Every documented built-in except the worktree pair is known (F6-02)."""
+    unknown = [n for n in _DOCUMENTED_CLAUDE_TOOLS if _known(n) != "known"]
+    assert unknown == []
+    assert [n for n in _DELIBERATELY_REJECTED if _known(n) == "known"] == []
 
 
 # --- hook_is_meta_submodule_dir (issue #943 (l)) --------------------------
@@ -463,8 +489,25 @@ def test_shell_scan_py_emits_compilable_source():
     ("#agent-meta:agent=git\ngit commit -m x", [("git commit -m x", [])]),
     # Parentheses stay part of the statement; tokens_of splits them later.
     ("(git push --force)", [("(git push --force)", [])]),
-    # Operators inside a command substitution do not split the outer command.
-    ('echo "$(git push --force)"', [('echo "$(git push --force)"', [])]),
+    # Operators inside a command substitution do not split the outer command;
+    # the substitution body is ALSO emitted as its own statement (#1151 F6-03),
+    # so a mutation hidden in "$(...)" or backticks is classified.
+    ('echo "$(git push --force)"',
+     [('echo "$(git push --force)"', []), ('git push --force', [])]),
+    ('echo "`git push --force`"',
+     [('echo "`git push --force`"', []), ('git push --force', [])]),
+    ('echo $(cd /x; touch y)',
+     [('echo $(cd /x; touch y)', []), ('cd /x', []), ('touch y', [])]),
+    # Nested substitutions are emitted level by level.
+    ('echo "$(echo "$(git push)")"',
+     [('echo "$(echo "$(git push)")"', []), ('echo "$(git push)"', []),
+      ('git push', [])]),
+    # Single quotes keep a substitution literal: nothing extra is emitted.
+    ("echo '$(git push --force)'", [("echo '$(git push --force)'", [])]),
+    # A heredoc inside the substitution stays prose at the inner level.
+    ("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit push --force\nEOF\n)\"",
+     [("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit push --force\nEOF\n)\"", []),
+      ("cat <<'EOF'", ["fix: x\n\ngit push --force"])]),
 ])
 def test_split_shell_statements_semantics(command, expected):
     r = _scan(

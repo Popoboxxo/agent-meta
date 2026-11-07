@@ -161,7 +161,7 @@ def check_hook_enablement_consistency(
                 continue
             should_be_active = project_hooks_cfg.get(hook_stem, {}).get(
                 "enabled", meta.get("enabled_by_default", "false").lower() == "true"
-            )
+            ) is True  # same rule as hooks.sync_hooks (#1155)
             if not should_be_active:
                 continue
 

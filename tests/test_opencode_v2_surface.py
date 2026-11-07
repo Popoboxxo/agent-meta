@@ -5439,15 +5439,38 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`, 82 of 1099) and
 # `compact-golden` (the `agent-meta vX` stamp) were re-pinned to the rebaselined
 # trees; `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1151 (audit G1 hook fixes: `hook_common.sh` 1.9.0, `dod-push-check.sh`
+# 2.5.0, `orchestrator-guard-impl.sh` 1.11.0, `repo-containment-impl.sh` 1.6.0,
+# graphify guards 1.2.0, strict-mode wording in `use-orchestrator`):
+# `ac01-baseline` re-pinned — 18 hashes (9 hook renders, 3 `use-orchestrator`
+# rule renders, 6 `AGENTS.md`); `compact-golden` re-derived from the real compact
+# render (the one strict-mode sentence in `agents-managed.md`, fa992b69 ->
+# eaeaddfe); `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Review follow-up (#1151): scoped cd / old-style tar in `repo-containment-impl.sh`
+# and the worker-git sentence in `use-orchestrator`: `ac01-baseline` 11 more
+# hashes (706e1515 -> 00178459), `compact-golden` one line (eaeaddfe -> e7eecf36).
+# Issue #1157 (orchestrator worker control, `orchestrator` 8.10.0 -> 8.11.0):
+# `ac01-baseline` re-pinned per entry — 18 of 1096 hashes (9 `orchestrator`
+# renders, 3 `a2a-delegation-gates` rule renders, 6 `AGENTS.md` that embed the
+# rule); `slimming-golden`/`compact-golden` re-pinned for the same template diff
+# (orchestrator.md) and `compact-golden/agents-managed.md` for the embedded
+# a2a gate-3 sentence. Log: `tests/test_ac01_render_identity.py`.
+# Merge of main (#1151 G1) into #1157: digests recomputed from the merged trees —
+# `ac01-baseline` carries both sides' keys plus 6 `AGENTS.md` re-rendered with
+# both rule changes (-> e89ed97c); `compact-golden` = #1157 orchestrator.md plus
+# `agents-managed.md` with both sentences (-> e9dc8776); `slimming-golden` = #1157.
 # Issue #1158 (DoD/spec-gate, G4): `ac01-baseline` re-pinned — 45 hashes (`git`,
 # `orchestrator`, `planner`, `tester` x 9 providers, 3 a2a rule renders, 6
 # AGENTS.md); `slimming-golden` (git/orchestrator/planner/tester) and
 # `compact-golden` (orchestrator, agents-managed) patched per hunk; topology
 # goldens follow the K-10 row. Log: `tests/test_ac01_render_identity.py`.
+# Merge of main (#1151 G1, #1156 G2, #1157/#1162 G3, `orchestrator` 8.11.0) into
+# #1158 G4 (`orchestrator` -> 8.11.1): digests recomputed from the merged trees
+# (ac01 -> 9df232ba, slimming -> 6598edb7, compact -> c5c43c00).
 _FIXTURE_TREES = {
-    "ac01-baseline": "4e73d2dec4774006e3d1faed7b759ddbb7ee0b6f2166c967da26d47f0cfc87a9",
-    "slimming-golden": "dedb12a4d51771622179df07b126ce9c623f925d4feb8a9f004bbeb315ba2566",
-    "compact-golden": "461a0d37f6d412c7e0d54fcdb39933d069a8149ba13e83b0a248897f3a4e4581",
+    "ac01-baseline": "9df232ba8019a290447cf07c60183725bb49b2c8233803298042ccae1d33b55e",
+    "slimming-golden": "6598edb7c2a06a4aece8aec7002e724e24aad35402d8621bc7e5f7043dd76c9c",
+    "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
 }
 
 

@@ -185,7 +185,7 @@ def _release_exists(tag: str, cwd: str) -> bool:
     try:
         r = subprocess.run(
             ["gh", "release", "view", tag],
-            cwd=cwd, capture_output=True, text=True,
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         return r.returncode == 0
     except FileNotFoundError:
@@ -268,7 +268,7 @@ def main() -> int:
         argv.append("--prerelease")
 
     try:
-        r = subprocess.run(argv, cwd=str(project_root), capture_output=True, text=True)
+        r = subprocess.run(argv, cwd=str(project_root), capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode == 0:
             print(f"auto-github-release: created GitHub release {tag}.", file=sys.stderr)
         else:

@@ -91,6 +91,7 @@ def apply_audit(report: AuditReport, project_config_path: Path) -> int:
         changed += 1
 
     if changed:
-        write_atomic(project_config_path, "".join(lines))
+        # project.yaml may hold the admin token: keep it owner-only.
+        write_atomic(project_config_path, "".join(lines), private=True)
 
     return changed

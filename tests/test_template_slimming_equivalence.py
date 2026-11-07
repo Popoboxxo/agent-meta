@@ -205,6 +205,8 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   feature-lifecycle approve stage + neutral commit task). ``_GOLDEN_ROLE_COUNT``
   and the normalization table are unchanged; ``compact-golden`` patched for the
   same orchestrator/use-orchestrator deltas.
+* Merge of main (#1157/#1162 orchestrator 8.11.0) into #1158: ``orchestrator``
+  golden = main's golden plus G4's hunks, version 8.11.1; other goldens unchanged.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

@@ -173,3 +173,22 @@ def test_underscore_managed_hook_key_is_not_a_registration(tmp_path):
         project_root, agent_meta_root, _CONFIG, _ANTIGRAVITY_PROVIDER_CONFIG)
 
     assert any(f.check == "hooks.enabled-but-not-registered" for f in findings), findings
+
+
+def test_sync_time_placeholders_only_appear_on_their_assignment_lines():
+    """Issue #1151 F6-12: scripts/lib/hooks.py bakes the hook placeholders with
+    a plain str.replace over the whole file. A comment that spelled the braced
+    placeholder out (repo-containment-impl.sh) was rewritten to the provider
+    name in every rendered copy. Each placeholder may only appear on the
+    shell assignment that consumes it."""
+    placeholders = {
+        "{{AGENT_META_PROVIDER}}": 'AGENT_META_PROVIDER="{{AGENT_META_PROVIDER}}"',
+        "{{AGENT_META_HOOK_AGENT_ID}}": 'HOOK_AGENT_ID_RELIABLE="{{AGENT_META_HOOK_AGENT_ID}}"',
+    }
+    offenders = []
+    for path in sorted((REPO_ROOT / "hooks").rglob("*.sh")):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for token, assignment in placeholders.items():
+                if token in line and line.strip() != assignment:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+    assert offenders == []

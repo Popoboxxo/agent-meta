@@ -37,6 +37,14 @@ documented reason):
   roles ``intern-developer`` and ``principal-developer`` lose their table row
   (they stay in the routing name_index/target_agents). Full golden rebaselined
   by exactly those two lines; the compact render is unchanged.
+* Issue #1157 (template 8.10.0 -> 8.11.0): both goldens take exactly the
+  template diff -- version pins, Claude ``tools`` + ``SendMessage``/``TaskStop``,
+  the reworded Sync-Call/Hard-interrupt lines, the dispatch-context hand-back
+  line and BARRIER step 6 (worker run without report = failed).
+* Merge of main (#1157/#1162, 8.11.0) into #1158 G4 (8.10.1): template -> 8.11.1;
+  both goldens = main's goldens plus exactly G4's deltas (classify-gate sentence,
+  planner gate, slimming only: feature-lifecycle approve stage + neutral commit task)
+  and the 8.11.1 version pins.
 """
 from __future__ import annotations
 

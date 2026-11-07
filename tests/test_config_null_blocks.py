@@ -130,3 +130,79 @@ def test_nested_null_unknown_fallback_is_unset(tmp_path: Path) -> None:
     _build_orch_variables(variables, [], config, _REPO_ROOT)
     assert variables["UNKNOWN_FALLBACK_META_FEEDBACK"] == "true"
     assert variables["UNKNOWN_FALLBACK_ASK_USER"] == "false"
+
+
+# --- #1155 F4: non-mapping blocks / string booleans / unknown hook names ----
+
+
+@pytest.mark.parametrize("body,key", [
+    ("viz: true\n", "viz"),
+    ("hooks: true\n", "hooks"),
+    ("project: [a]\n", "project"),
+])
+def test_non_mapping_object_block_becomes_empty_with_warning(
+    tmp_path: Path, capsys, body: str, key: str,
+) -> None:
+    config = _load(tmp_path, body)
+    assert config[key] == {}
+    assert key in capsys.readouterr().err
+
+
+def test_non_mapping_hook_entry_becomes_empty_with_warning(tmp_path: Path, capsys) -> None:
+    config = _load(tmp_path, "hooks: {dod-push-check: true}\n")
+    assert config["hooks"] == {"dod-push-check": {}}
+    assert "dod-push-check" in capsys.readouterr().err
+
+
+def _sync_hooks(tmp_path: Path, hooks_cfg: dict, viz_cfg=None) -> tuple:
+    from lib.hooks import sync_hooks
+    from lib.log import SyncLog
+
+    log = SyncLog()
+    config = {"hooks": hooks_cfg}
+    if viz_cfg is not None:
+        config["viz"] = viz_cfg
+    sync_hooks(_REPO_ROOT, tmp_path, config, log, dry_run=False)
+    settings = tmp_path / ".claude" / "settings.json"
+    return log, settings.read_text(encoding="utf-8") if settings.exists() else ""
+
+
+def test_string_false_does_not_enable_hook(tmp_path: Path) -> None:
+    _log, settings = _sync_hooks(tmp_path, {"dod-push-check": {"enabled": "false"}})
+    assert "dod-push-check" not in settings
+
+
+def test_string_false_viz_enabled_does_not_activate_viz_log(tmp_path: Path) -> None:
+    _log, settings = _sync_hooks(tmp_path, {}, {"enabled": "false", "mode": "full"})
+    assert "viz-log" not in settings
+
+
+@pytest.mark.parametrize("hooks_cfg,viz_cfg,key", [
+    ({"dod-push-check": {"enabled": "true"}}, None, "hooks.dod-push-check.enabled"),
+    ({}, {"enabled": "true", "mode": "full"}, "viz.enabled"),
+])
+def test_non_bool_enabled_warns_and_disables(
+    tmp_path: Path, hooks_cfg: dict, viz_cfg, key: str,
+) -> None:
+    log, settings = _sync_hooks(tmp_path, hooks_cfg, viz_cfg)
+    assert any(key in w and "'true'" in w for w in log.warnings)
+    assert "dod-push-check" not in settings and "viz-log" not in settings
+
+
+# --- B1: strict validators run before the lenient non-mapping coercion -------
+
+
+@pytest.mark.parametrize("body", [
+    "repo_containment: 'yes'\n",
+    "model-inherit-main-chat: true\n",
+    "test-environments: [a]\n",
+])
+def test_strict_validators_still_reject_non_mapping_blocks(tmp_path: Path, body: str) -> None:
+    with pytest.raises(SystemExit) as exc:
+        _load(tmp_path, body)
+    assert exc.value.code == 1
+
+
+def test_unknown_hook_name_warns(tmp_path: Path) -> None:
+    log, _settings = _sync_hooks(tmp_path, {"dod-push-chek": {"enabled": True}})
+    assert any("dod-push-chek" in w for w in log.warnings)

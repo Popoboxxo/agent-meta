@@ -1745,7 +1745,7 @@ class AuditService:
                 [sys.executable, str(check_script), "--json"],
                 cwd=str(self._ctx.root),
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
                 env=_tmp_sink_env(self._ctx.root),
             )
             # consistency-check.py --json prints pure JSON to stdout regardless

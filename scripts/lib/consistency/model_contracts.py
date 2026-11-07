@@ -31,10 +31,10 @@ from ..frontmatter import parse_frontmatter_text
 from ..providers import load_providers_config
 from .report import Finding, Severity
 
-try:  # Python 3.11+
-    import tomllib as _toml
-except ModuleNotFoundError:  # pragma: no cover - Python 3.9/3.10 fallback
-    import tomli as _toml  # type: ignore[no-redef]
+from ..doctor_formats import toml_loads_and_error
+
+# tomllib (3.11+) -> tomli -> builtin subset parser; tomli is a tests-only dep (#1154).
+_toml_loads, _TomlDecodeError = toml_loads_and_error()
 
 CHECK = "model-contract"
 _PLACEHOLDER = "{model}"
@@ -80,8 +80,8 @@ def _extract_models(text: str, mechanism: str) -> list[str]:
     """Return the emitted ``model`` value(s) from a generated artifact."""
     if mechanism in _TOML_MECHANISMS:
         try:
-            doc = _toml.loads(text)
-        except _toml.TOMLDecodeError:  # malformed TOML is reported by the artifact check
+            doc = _toml_loads(text)
+        except _TomlDecodeError:  # malformed TOML is reported by the artifact check
             return []
         model = doc.get("model") if isinstance(doc, dict) else None
         return [model] if isinstance(model, str) and model else []
