@@ -5467,14 +5467,25 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Merge of main (#1151 G1, #1156 G2, #1157/#1162 G3, `orchestrator` 8.11.0) into
 # #1158 G4 (`orchestrator` -> 8.11.1): digests recomputed from the merged trees
 # (ac01 -> 9df232ba, slimming -> 6598edb7, compact -> c5c43c00).
+# Issue #1161 (G7, branch-guard rule trimmed, limits moved to a concept doc):
+# `ac01-baseline` re-pinned per entry — 9 of 1096 hashes (3 branch-guard rule
+# renders, 6 AGENTS.md; 9df232ba -> 7c993f7f); `slimming-golden`/`compact-golden`
+# unchanged (compact pointer-izes the rule). Log: `tests/test_ac01_render_identity.py`.
+# Issue #1161 step 2 (G7, compact route_intent JSON): `ac01-baseline` re-pinned per entry --
+# 4 of 1096 hashes (json-provider orchestrators; 7c993f7f -> a75074b1); `slimming-golden`
+# orchestrator.md JSON block re-serialized (6598edb7 -> 59224e04); `compact-golden` unchanged.
 # Issue #1159 (G5, K-08/K-09): `slimming-golden` patched per line (17 roles:
 # EXTRA_DONTS placeholder rule; `developer` also escape example, constraint line,
 # 2.0.4 pins) -> e3c930ec; `ac01-baseline` 0 of 1096 hashes moved (the matrix
 # project renders neither agent-meta-developer nor this EXTRA_DONTS);
 # `compact-golden` unchanged. Log: `tests/test_template_slimming_equivalence.py`.
+# Merge of main (#1160, #1161 G7) into #1159 G5: digests recomputed from the
+# merged trees -- `ac01-baseline` = main's a75074b1 (#1159 moved 0 keys);
+# `slimming-golden` = main's compact orchestrator.md JSON block plus #1159's 17
+# role lines (-> 2ba04df6); `compact-golden` unchanged (c5c43c00).
 _FIXTURE_TREES = {
-    "ac01-baseline": "9df232ba8019a290447cf07c60183725bb49b2c8233803298042ccae1d33b55e",
-    "slimming-golden": "e3c930ec579ae9db7bb86255df03bc4b0098db6145f910bbb1dd3567b489ea67",
+    "ac01-baseline": "a75074b1cfe8e0f46474f04ca5f779f69da0f6c2ec491b81c138374790c99e51",
+    "slimming-golden": "2ba04df64ee0a361f205b771b353aab0ec8197a74ea12af3570539aaaca9ed06",
     "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
 }
 

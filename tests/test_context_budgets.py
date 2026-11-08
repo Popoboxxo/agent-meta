@@ -288,15 +288,24 @@ TOLERANCE_MAX_BYTES = 4096
 # Left inside the tolerance (pins unchanged): rules/entry-file +71 B, orchestrator +756 B
 # (+781 Claude), harness-roster +519..+564 B, roster always-loaded +1,147..+1,192 B.
 # NEAR LIMIT: Gemini entry-file/always-loaded 33,501 B vs ceiling 33,530 B (29 B headroom).
+# RE-PIN (issue #1161 G7, compact route_intent JSON, 2026-11-07): the json routing block is
+# serialized with separators=(",", ":") instead of indent=2 (same data, -18,839 B per
+# orchestrator). Only shrinks, so nothing failed; the orchestrator entries of the four json
+# providers are re-pinned to the measured value for traceability:
+#   * orchestrator: Claude 90,241 -> 72,183, Codex 89,856 -> 71,773, Gemini 90,263 -> 72,180,
+#     Opencode 89,928 -> 71,845.
+# Left unchanged (shrink only, pins sit above the measurement): harness-roster/always-loaded
+# of Claude/Codex/Opencode (-18.3..-18.4 KB; the roster carries the orchestrator file).
+# YAML-format providers and the compact profile (line block, no JSON) are unaffected.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 90241, "rules": 18208},
-    "Codex": {"always-loaded": 702748, "entry-file": 24787, "harness-roster": 678518, "orchestrator": 89856},
+    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 72183, "rules": 18208},
+    "Codex": {"always-loaded": 702748, "entry-file": 24787, "harness-roster": 678518, "orchestrator": 71773},
     "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 74393, "rules": 21080},
     "Copilot": {"always-loaded": 31852, "entry-file": 10887, "orchestrator": 74269, "rules": 20876},
-    "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 90263},
+    "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 72180},
     "KimiCode": {"always-loaded": 695981, "entry-file": 24801, "harness-roster": 671737, "orchestrator": 76322},
     "Mammouth": {"always-loaded": 691238, "entry-file": 24798, "harness-roster": 666997, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 705658, "entry-file": 24862, "harness-roster": 681353, "orchestrator": 89928},
+    "Opencode": {"always-loaded": 705658, "entry-file": 24862, "harness-roster": 681353, "orchestrator": 71845},
     "ZCode": {"always-loaded": 693854, "entry-file": 25700, "harness-roster": 668711, "orchestrator": 74965},
 }
 

@@ -505,14 +505,20 @@ def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
         tool_format: mechanism key — ``"json"`` or ``"yaml_text_block"``.
 
     Returns:
-        The serialized artifact as text (trailing newline for ``json``).
+        The serialized artifact as text (``json``: compact single line with
+        trailing newline).
 
     Raises:
         ValueError: on an unknown format key (never silently falsifies a
             provider's format); the message lists known keys only.
     """
     if tool_format == "json":
-        return json.dumps(definition, indent=2, ensure_ascii=False) + "\n"
+        # Compact separators (G7, #1161): pure token cost for the model, the
+        # data is identical; the block becomes one long line.
+        # Limit: one ~31-40 KB line; line-wise file readers may truncate it (system prompt unaffected); json.loads consumers fine.
+        return json.dumps(
+            definition, ensure_ascii=False, separators=(",", ":")
+        ) + "\n"
     if tool_format == "yaml_text_block":
         if _yaml is None:
             raise ValueError(

@@ -2,9 +2,15 @@
 
 > Stand: agent-meta v0.27.x | Quelle: [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
 
-> **Veraltet (teilweise):** Modellstand, `.gemini/hooks` und Kontextdatei-Angaben sind laut Studie
-> `docs/analysis/2026-10-11-context-budget-provider-study.md` §3.7 nicht mehr belegt. Korrigiert
-> sind nur Sub-Agenten, Rules und `context.fileName`; der Rest ist **UNVERIFIED**.
+> **Veraltet (teilweise):** Modellstand und Kontextdatei-Angaben sind laut Studie
+> `docs/analysis/2026-10-11-context-budget-provider-study.md` §3.7 nicht mehr belegt, außer den
+> korrigierten Teilen (Sub-Agenten, Rules, Hook-Pfade (#1160), `context.fileName`); der Rest ist **UNVERIFIED**.
+
+> **Ziel-Oberfläche (#1160, G4-1):** Der Default (`agent-discovery: false`) zielt auf die
+> Gemini-CLI-Oberfläche `.gemini/*`; Antigravity lädt `.gemini/agents/` nicht automatisch.
+> Die Antigravity-Oberfläche `.agents/*` ist opt-in über `agent-discovery: true`; ein
+> Default-Flip wartet auf einen Runtime-Probe (#854/#860). Offene Toolnamen-Inkonsistenzen
+> (G4-2/G4-3): siehe `config/provider-capabilities.yaml` → Gemini `special_notes`.
 
 ---
 
@@ -26,14 +32,14 @@ Weitere Modell-IDs: `gemini-2.5-pro`, `gemini-2.0-flash`.
 ```
 GEMINI.md                  ← Projekt-Kontext (analog zu CLAUDE.md)
 .gemini/
-  settings.json            ← Projekt-Konfiguration (Hooks, Model-Override)
+  settings.json            ← Projekt-Konfiguration (Skeleton mit `hooks: {}`, `context.fileName`)
   agents/                  ← Sub-Agenten (von agent-meta generiert)
     developer.md
     orchestrator.md
     ...
   commands/                ← Slash-Commands als .toml-Dateien
     doc-now.toml           → /doc-now
-  hooks/                   ← Hook-Skripte (referenziert in settings.json)
+  (Hooks: `.agents/hooks/` + `.agents/hooks.json`, nicht `.gemini/`)
 
 ~/.gemini/
   settings.json            ← User-Level-Konfiguration
@@ -53,9 +59,9 @@ Unterstützt `@./path/file.md` für Modularisierung.
 | Kontext-Datei | `CLAUDE.md` | `GEMINI.md` |
 | Config-Verzeichnis | `.claude/` | `.gemini/` |
 | Sub-Agenten | `.claude/agents/*.md` | `.gemini/agents/*.md` |
-| Rules (auto-load) | `.claude/rules/` | `.gemini/rules/` |
+| Rules (auto-load) | `.claude/rules/` | eingebettet in `AGENTS.md` |
 | Slash-Commands | `.claude/commands/*.md` | `.gemini/commands/*.toml` |
-| Hooks | `.claude/hooks/*.sh` + `settings.json` | `.gemini/hooks/*.sh` + `settings.json` |
+| Hooks | `.claude/hooks/*.sh` + `settings.json` | `.agents/hooks/*.sh` + `.agents/hooks.json` |
 | Frontmatter: model | `model:` | `model:` |
 | Frontmatter: memory | `memory:` | **Nicht unterstützt** |
 | Frontmatter: permissionMode | `permissionMode:` | **Nicht unterstützt** |
@@ -95,14 +101,12 @@ Entfernt im Vergleich zu Claude: `memory`, `permissionMode`.
 
 `.gemini/rules/` wird von **keinem** Harness gelesen (weder Gemini CLI noch Antigravity;
 siehe `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md` und Studie §3.7).
-agent-meta generiert dennoch:
-
-- Rule-Dateien in `.gemini/rules/` (inert, 17,880 B)
-- `has_rules: true` in `config/ai-providers.yaml`
+agent-meta schreibt das Verzeichnis daher nicht mehr (`has_rules: false`,
+`retired_rules_dirs` in `config/ai-providers.yaml`, #975); Rules stehen eingebettet in `AGENTS.md`.
 
 **Kontextdatei:** Gemini CLI lädt standardmäßig `GEMINI.md`. Ohne `context.fileName` in
-`.gemini/settings.json` wird `AGENTS.md` ignoriert — unsere generierte `settings.json`
-setzt den Key aktuell nicht, die CLI erhält daher keinen Projektkontext (Studie §3.7).
+`.gemini/settings.json` wird `AGENTS.md` ignoriert — die generierte `settings.json` setzt
+den Key seit #975 (`context_filename_settings_key`); Laufzeitwirkung UNVERIFIED (G4-4).
 
 **Workaround:** Wichtige Regeln als eigene `@./`-Referenzen in GEMINI.md einbinden:
 
@@ -147,7 +151,7 @@ Gemini CLI unterstützt 10 Lifecycle-Events:
 | `BeforeTool` / `AfterTool` | Um einzelne Tool-Calls |
 | `PreCompress` | Vor Kontext-Komprimierung |
 
-Hook-Konfiguration in `.gemini/settings.json`:
+Hook-Konfiguration in `.gemini/settings.json` (Upstream-CLI-Format, Beispiel — nicht agent-meta-Output):
 
 ```json
 {
@@ -164,8 +168,9 @@ Hook-Konfiguration in `.gemini/settings.json`:
 Kommunikation via JSON stdin/stdout (analog zu Claude Code Hooks).
 Projekt-Hooks werden fingerprinted — Gemini warnt bei Änderung (Security-Feature).
 
-agent-meta kopiert Hook-Skripte nach `.gemini/hooks/` und registriert aktivierte
-Hooks in `.gemini/settings.json` (analog zu Claude Code).
+agent-meta kopiert Hook-Skripte nach `.agents/hooks/` und registriert aktivierte Hooks
+in `.agents/hooks.json` (Antigravity-Schema, `hook_protocol: antigravity-hooks-json`), nicht in
+`.gemini/settings.json` (dort steht `hooks: {}`). Unter dem Default (Gemini-CLI-Oberfläche) liegen die generierten Hooks also in `.agents/hooks.json` (Antigravity-Schema), während die Gemini CLI Hooks aus `.gemini/settings.json` liest; ob die CLI die generierten Hooks lädt, ist **UNVERIFIED** (gleiche Oberflächen-Trennung wie G4-1, #854/#860). Der Matcher `"*"` ist Absicht (matcht alle Tools; G4-6 widerlegt).
 
 ---
 
@@ -203,16 +208,16 @@ model-overrides:
 | `.gemini/agents/*.md` | ✅ Überschrieben bei jedem sync, stale gelöscht |
 | `GEMINI.md` (managed block) | ✅ Aktualisiert bei jedem sync |
 | `GEMINI.md` (Rest) | ❌ Einmalig angelegt, dann manuell |
-| `.gemini/settings.json` | ❌ Einmalig angelegt (Skeleton) |
+| `.gemini/settings.json` | ⚠️ Skeleton einmalig angelegt; `context.fileName` wird bei jedem sync gemerged, Rest manuell |
 | `.gemini/commands/*.toml` | ✅ Aus `commands/` transformiert, stale gelöscht |
-| `.gemini/hooks/*.sh` | ✅ Kopiert, stale gelöscht |
-| Rules | ⚠️ Generiert in `.gemini/rules/`, stale gelöscht — von keinem Harness gelesen |
+| `.agents/hooks/*.sh` + `.agents/hooks.json` | ✅ Kopiert/registriert, stale gelöscht |
+| Rules | ⚠️ Eingebettet in `AGENTS.md`; `.gemini/rules/` wird nicht mehr geschrieben (#975) |
 
 ---
 
 ## Bekannte Einschränkungen
 
-1. **Rules inert** — `.gemini/rules/` wird von sync.py befüllt, aber von keinem Harness gelesen
+1. **Rules eingebettet** — `.gemini/rules/` wird von keinem Harness gelesen, daher nicht mehr befüllt (#975)
 2. **Kein persistentes Agenten-Gedächtnis** — `memory:`-Feld wird entfernt
 3. **Kein permissionMode** — Berechtigungen über Google-Account gesteuert
 4. **Sub-Agenten strikt validiert** — `.gemini/agents/` ist nativ, das Schema ist `.strict()`; unsere Zusatz-Keys/Toolnamen sind ein offener Defekt (Studie §3.7)

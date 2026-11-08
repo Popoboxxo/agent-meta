@@ -138,6 +138,11 @@ providers:
     # OQ-1/AC-9: flag-gated, default-off. With agent-discovery: false the
     # current .gemini/* discovery paths and the gemini-settings MCP format
     # stay byte-for-byte; true enables the .agents/* discovery surface below.
+    # #1160 (G4-1): default targets the Gemini CLI surface (.gemini/agents),
+    # which Antigravity does not auto-load (per Antigravity docs; UNVERIFIED at
+    # runtime); Antigravity is opt-in via true.
+    # Default flip deferred until a runtime probe (#854/#860); see
+    # provider-capabilities.yaml Gemini special_notes (also G4-2/G4-3).
     surface-version: "v1"
     agent-discovery: false
     model-format: "{model}"

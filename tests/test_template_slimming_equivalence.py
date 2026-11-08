@@ -207,6 +207,10 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   same orchestrator/use-orchestrator deltas.
 * Merge of main (#1157/#1162 orchestrator 8.11.0) into #1158: ``orchestrator``
   golden = main's golden plus G4's hunks, version 8.11.1; other goldens unchanged.
+* Issue #1161 step 2 (G7): the ``orchestrator`` golden's ``route_intent`` JSON
+  block is re-serialized compactly (``separators=(",", ":")``, one line instead
+  of L214-1887); ``json.loads`` of old and new block is equal, every other byte
+  is unchanged. Other goldens and ``compact-golden`` unchanged.
 * Issue #1159 (G5, K-08/K-09): seventeen goldens patched per line. The project
   ``EXTRA_DONTS`` rule now points to ``agent-meta.config.example.yaml`` instead
   of the non-existent "CLAUDE.md Variablen-Tabelle" (exactly that one line in
