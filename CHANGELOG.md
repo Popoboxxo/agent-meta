@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.8] - 2026-11-08
+
 ### Changed
 - **Token diet (#1161):** branch-guard rule trimmed (limits moved to docs/concepts/branch-guard-known-limits.md); route_intent JSON rendered compact for json-format providers, about -18.8 KB per orchestrator (-3.8k tokens Claude, -4.3k Codex/Gemini/Opencode).
 - **`sync.py --check` fails on `[ERROR]` (#1155)**: `--check` (also `--dry-run --check`) now exits 1 when the run recorded any `[ERROR]` finding, e.g. `active-set.dangling-dispatch`; plain sync stays exit 0. Migration: CI jobs running `sync.py --dry-run --check` turn red on these findings — fix the reported finding (or drop `--check` if you only want the report).
