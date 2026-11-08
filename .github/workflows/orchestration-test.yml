@@ -48,7 +48,8 @@ name: Orchestration Tests
 #     a loaded 3.12 runner (runs 41381909910 / 41491331808 / PR #1112), so the
 #     old 30 min cancelled healthy runs. The shard job proved 45 works; the
 #     `test` job hit the same wall at 97 % of shard 3/3 and gets the same room.
-#   - `refresh-durations`: 60 (one full suite run, unserialised).
+#   - `refresh-durations`: 120 (one full suite run, unserialised; the first
+#     dispatch, run 42493197179, was cancelled at the old 60-minute ceiling).
 #   - `changes` and `orchestration-gate`: 5.
 #
 # Why the heavy-fixture placement is explicit instead of duration-based:
@@ -465,7 +466,11 @@ jobs:
   refresh-durations:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # One unserialised full suite on a 2-core runner. The first dispatch
+    # (run 42493197179) was cancelled at exactly this ceiling, so 60 was too
+    # tight: the same work spread over the three `test` shards already needs
+    # ~60 min of runner time. 120 leaves headroom for a loaded runner.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
