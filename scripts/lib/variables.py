@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from .io import SyncError
@@ -507,6 +508,51 @@ def _conditional_active(variables: dict, var: str) -> bool:
     return variables.get(var, default) == "true"
 
 
+# --- compiled conditional patterns (issue #1138) ---------------------------
+# The strip pass used to build its three regexes as *strings* inside the
+# per-variable loop and hand them to ``re.sub``. CPython caches only
+# ``re._MAXCACHE`` (512) patterns, while the working set is ~3 x the number of
+# conditional variables (DOD_*, ROLE_*_ACTIVE for every role, ORCH_*, ...), so
+# the cache thrashed and nearly every call recompiled: cProfile counted
+# 143,441 ``re._compile`` calls for ONE single-provider ``--init``
+# (85 s of 99 s, issue #1138).
+#
+# The only input to a pattern is the variable NAME, so compiling once per name
+# per process is a pure cache: the same three patterns are then reused by every
+# template, every pass and every caller. Semantics are unchanged -- same
+# pattern strings, same DOTALL flag, same order of application.
+_SIMPLE_BODY = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
+_UNLESS_BODY = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
+
+
+@lru_cache(maxsize=None)
+def _conditional_patterns(var: str) -> tuple:
+    """Compiled ``if`` / ``unless`` / ``if-else`` patterns for one variable."""
+    var_pattern = re.escape(var)
+    pattern_if = re.compile(
+        rf"\{{{{#if {var_pattern}\}}}}\n?({_SIMPLE_BODY})\{{{{/if\}}}}\n?",
+        re.DOTALL,
+    )
+    pattern_unless = re.compile(
+        rf"\{{{{#unless {var_pattern}\}}}}\n?({_UNLESS_BODY})\{{{{/unless\}}}}\n?",
+        re.DOTALL,
+    )
+    pattern_if_else = re.compile(
+        rf"\{{{{#if {var_pattern}\}}}}\n?({_SIMPLE_BODY})\{{{{else\}}}}\n?"
+        rf"({_SIMPLE_BODY})\{{{{/if\}}}}\n?",
+        re.DOTALL,
+    )
+    return pattern_if, pattern_unless, pattern_if_else
+
+
+# Var-independent final-cleanup patterns, compiled once instead of per call.
+_ORPHAN_IF = re.compile(r"\{\{#if\s+\w+\}\}")
+_ORPHAN_ENDIF = re.compile(r"\{\{/if\}\}")
+_ORPHAN_ELSE = re.compile(r"\{\{else\}\}")
+_ORPHAN_UNLESS = re.compile(r"\{\{#unless\s+\w+\}\}")
+_ORPHAN_ENDUNLESS = re.compile(r"\{\{/unless\}\}")
+
+
 def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """Remove conditional blocks that are inactive in this project.
 
@@ -559,7 +605,18 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     for _pass in range(max_passes):
         made_change = False
         for var in conditional_vars:
-            var_pattern = re.escape(var)
+            # Issue #1138: a variable whose markers are not in the text cannot
+            # change it. This substring test is a fast scan, while each of the
+            # three regexes below walks the whole document; after the first pass
+            # only a handful of variables still match, so passes 2..10 now skip
+            # the bulk of them. Same semantics: no marker => no possible match.
+            if (
+                f"{{{{#if {var}}}}}" not in text
+                and f"{{{{#unless {var}}}}}" not in text
+            ):
+                continue
+
+            pattern_if, pattern_unless, pattern_if_else = _conditional_patterns(var)
 
             # Process simple-if FIRST (before if-else) to prevent
             # cross-block matching: a simple {{#if A}}...{{/if}} should
@@ -581,10 +638,8 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
             # innermost blocks match. This makes stripping resolve nested blocks
             # inner-to-outer regardless of the (set-derived) variable iteration
             # order — otherwise output is non-deterministic across processes.
-            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
-            pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?({_simple_body})\{{{{/if\}}}}\n?"
             old_text = text
-            text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
+            text = pattern_if.sub(replace_if, text)
             if text != old_text:
                 made_change = True
 
@@ -599,10 +654,8 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                     return stripped + "\n"
                 return stripped
 
-            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
-            pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?({_unless_body})\{{{{/unless\}}}}\n?"
             old_text = text
-            text = re.sub(pattern_unless, replace_unless, text, flags=re.DOTALL)
+            text = pattern_unless.sub(replace_unless, text)
             if text != old_text:
                 made_change = True
 
@@ -622,10 +675,8 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
             # other blocks (e.g. DOD simple-if capturing orchestrator's {{else}}).
             # Both branches refuse to cross nested opening markers so if-else
             # blocks also resolve inner-to-outer (order-independent, see above).
-            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
-            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?({_ife_body})\{{{{/if\}}}}\n?"
             old_text = text
-            text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
+            text = pattern_if_else.sub(replace_if_else, text)
             if text != old_text:
                 made_change = True
 
@@ -633,12 +684,13 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
             break
 
     # Final cleanup: remove any remaining orphaned template markers
-    # (e.g. from nested {{#unless A}}{{#unless B}}...{{/unless}}{{/unless}})
-    text = re.sub(r'\{\{#if\s+\w+\}\}', '', text)
-    text = re.sub(r'\{\{/if\}\}', '', text)
-    text = re.sub(r'\{\{else\}\}', '', text)
-    text = re.sub(r'\{\{#unless\s+\w+\}\}', '', text)
-    text = re.sub(r'\{\{/unless\}\}', '', text)
+    # (e.g. from nested {{#unless A}}{{#unless B}}...{{/unless}}{{/unless}}).
+    # Compiled once at module level (issue #1138).
+    text = _ORPHAN_IF.sub('', text)
+    text = _ORPHAN_ENDIF.sub('', text)
+    text = _ORPHAN_ELSE.sub('', text)
+    text = _ORPHAN_UNLESS.sub('', text)
+    text = _ORPHAN_ENDUNLESS.sub('', text)
 
     return text
 
