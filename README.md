@@ -1,7 +1,7 @@
 # agent-meta
 
-[![agent-meta v2.0.0-beta.7](https://img.shields.io/badge/agent--meta-v2.0.0--beta.7-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0-beta.7)
-[![Version](https://img.shields.io/badge/version-2.0.0--beta.7-blue.svg)](CHANGELOG.md)
+[![agent-meta v2.0.0-beta.8](https://img.shields.io/badge/agent--meta-v2.0.0--beta.8-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0-beta.8)
+[![Version](https://img.shields.io/badge/version-2.0.0--beta.8-blue.svg)](CHANGELOG.md)
 [![Code health](https://api.repowise.dev/badge/health/popoboxxo/agent-meta.svg)](https://repowise.dev/repo/popoboxxo/agent-meta)
 [![Python](https://img.shields.io/badge/python-3.9%2B-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)](LICENSE)
@@ -38,7 +38,7 @@ configuration, into provider-specific agent, rule, hook and command files for yo
 
 ## Key facts
 
-- **Version:** 2.0.0-beta.7 (see `VERSION`, [CHANGELOG.md](CHANGELOG.md)).
+- **Version:** 2.0.0-beta.8 (see `VERSION`, [CHANGELOG.md](CHANGELOG.md)).
 - **Runtime:** Python 3.9+. The only runtime dependency is PyYAML (`requirements.txt`, see
   [ADR 0001](docs/adr/0001-pyyaml-runtime-ausnahme.md)). Everything else is standard library.
   Optional: `questionary` enables arrow-key navigation in `--setup`.
@@ -58,7 +58,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 git submodule update --init --recursive
 
 # 2. Optional: pin a release tag (example)
-cd .agent-meta && git checkout v2.0.0-beta.7 && cd ..
+cd .agent-meta && git checkout v2.0.0-beta.8 && cd ..
 
 # 3. Install the runtime dependency
 pip install -r .agent-meta/requirements.txt
@@ -649,7 +649,7 @@ Roles: `knowledge-curator` (schema), `knowledge-ingestor` (ingest), `knowledge-q
 ```bash
 cd .agent-meta
 git fetch --tags
-git checkout <tag>        # e.g. v2.0.0-beta.7
+git checkout <tag>        # e.g. v2.0.0-beta.8
 cd ..
 python .agent-meta/scripts/sync.py --dry-run   # review the changes
 python .agent-meta/scripts/sync.py             # apply

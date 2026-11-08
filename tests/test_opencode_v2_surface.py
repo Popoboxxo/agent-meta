@@ -5483,10 +5483,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # merged trees -- `ac01-baseline` = main's a75074b1 (#1159 moved 0 keys);
 # `slimming-golden` = main's compact orchestrator.md JSON block plus #1159's 17
 # role lines (-> 2ba04df6); `compact-golden` unchanged (c5c43c00).
+# Release 2.0.0-beta.8 (VERSION bump 2.0.0-beta.7 -> 2.0.0-beta.8): version
+# strings only -- `ac01-baseline` (82 of 1096 hashes; a75074b1 -> 736a8c93) and
+# `compact-golden` (the `agent-meta vX` stamp; c5c43c00 -> 7bf087ac) re-pinned;
+# `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "a75074b1cfe8e0f46474f04ca5f779f69da0f6c2ec491b81c138374790c99e51",
+    "ac01-baseline": "736a8c93454ae95b381250d0898be9cb7aed5c0cb264dcf900d5ebd8a685fa98",
     "slimming-golden": "2ba04df64ee0a361f205b771b353aab0ec8197a74ea12af3570539aaaca9ed06",
-    "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
+    "compact-golden": "7bf087ac57b4a89f8c2209cabb730c3892b5f3d62ddf307efa14ca1fb785a7b3",
 }
 
 
