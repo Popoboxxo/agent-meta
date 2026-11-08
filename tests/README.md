@@ -135,15 +135,19 @@ prüfbar. Inhaltliche Abdeckung je Szenario: `tests/scenarios/registry.md`.
 
 | Workflow / Job | Was läuft | Parallelität |
 |----------------|-----------|--------------|
-| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12, Timeout 45 min | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
-| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 45 min | `-n 0` |
-| `orchestration-test.yml` → `compat-311` | TOML-Boundary + Code-Hygiene-Dateien sowie zwei subprozess-lastige Sync-Module (`test_provider_matrix_sync.py`, `test_sync_validation_gate.py`) auf Python 3.11 | `-n 0` |
+| `orchestration-test.yml` → `changes` | Docs-only-PR-Filter (`run_tests`); ein manueller Dispatch schaltet die Suiten ab, damit nur `refresh-durations` läuft | – |
+| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien; Python 3.12 auf allen drei Shards, Python 3.9 nur auf Shard 1, Timeout 45 min. Der Rest wird per `--splitting-algorithm=least_duration` gegen `.test_durations` geschnitten, sobald die Datei existiert, sonst per Count-Split | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
+| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 45 min. Zusätzlich auf **3.9 / Shard 1** der ehemalige `compat-311`-Satz (TOML-Boundary + Code-Hygiene, u. a. `test_provider_matrix_sync.py`, `test_sync_validation_gate.py`) — `tomli` liegt unter 3.11, dort kann die Grenze regressieren | `-n 0` |
+| `orchestration-test.yml` → `refresh-durations` | Nur bei `workflow_dispatch`: kompletter Suite-Lauf mit `--store-durations`, Baseline wird als Artefakt hochgeladen (kein Push, Workflow bleibt auf `contents: read`) | `-n 2 --dist loadfile` |
+| `validate.yml` → `changes` | Pfad-Filter `run_scenarios`: Scenarios werden für PRs übersprungen, die nur `docs/`, `tests/` (außer `tests/scenarios/`), `.github/` oder `*.md` anfassen | – |
 | `validate.yml` → `scenarios` | `tests/scenarios/run.sh` in 4 Shards | kein pytest |
 | `validate.yml` → `validate` | Sync-Output erzeugen, Drift-Gate, `--validate`, Frontmatter-Lint | kein pytest |
 
-Damit sind die Endpunkte 3.9 und 3.12 vollständig abgedeckt (Count-Shards,
-Heavy-Slices **und** Subprozess-Gruppen), 3.11 nur mit den version-spezifischen
-Gates.
+Damit sind die Endpunkte 3.9 und 3.12 abgedeckt: 3.12 vollständig (drei
+Count-/Durations-Shards, Heavy-Slices und Subprozess-Gruppen), 3.9 vollständig
+für die laufzeitkritischen Subprozess-Gruppen plus einen Test-Shard und die
+TOML-Grenze. Python 3.11 hat keine eigene Job-Meile mehr: `tomllib` ab 3.11
+wird durch 3.12 abgedeckt, `tomli` darunter durch 3.9.
 
 `sync.py --validate` läuft bewusst in **beiden** Workflows: hier im
 `test`-Job auf 3.9 und 3.12 (gemessen 12–38 s pro Aufruf, deckt das

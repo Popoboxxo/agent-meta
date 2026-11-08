@@ -17,7 +17,57 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Skips the scenario suite only for PRs whose changed files cannot affect it
+  # (unit tests, docs, workflow plumbing). Main runs and schedule stay full.
+  # Rationale: the 4 scenario shards are 40 of the 45 runner-minutes of this
+  # workflow (run 42488240658: 7.6-11.6 min per shard, `validate` 0.9 min).
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run_scenarios: ${{ steps.filter.outputs.run_scenarios }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect changes that can affect the scenario suite
+        id: filter
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+            # Fail safe: an empty/failed diff keeps the scenarios on.
+            if [ -n "$files" ]; then
+              run=false
+              while IFS= read -r f; do
+                case "$f" in
+                  # First match wins: anything the sync/template pipeline reads
+                  # forces the scenarios on, even when the same prefix would be
+                  # skipped by a later pattern.
+                  tests/scenarios/*|agents/*|rules/*|snippets/*|templates/*|hooks/*|scripts/*|config/*|.meta-config/*|requirements*.txt|VERSION|CHANGELOG.md) run=true ;;
+                  # Cannot affect the shell scenario harness.
+                  docs/*|tests/*|.github/*|*.md) ;;
+                  *) run=true ;;
+                esac
+              done <<< "$files"
+            fi
+          fi
+          echo "run_scenarios=$run"
+          echo "run_scenarios=$run" >> "$GITHUB_OUTPUT"
+
   scenarios:
+    needs: changes
+    if: needs.changes.outputs.run_scenarios == 'true'
     runs-on: ubuntu-latest
     # 88 scenarios sequentially ≈ 46 min wall clock; 4 shards ≈ 12 min each,
     # in-shard parallelism (SCENARIO_JOBS) cuts that to roughly half of the
@@ -112,7 +162,7 @@ jobs:
   # Single required check for this workflow. `if: always()` is mandatory: without
   # it a failed need makes the gate itself `skipped`, which counts as passed.
   validate-gate:
-    needs: [scenarios, validate]
+    needs: [changes, scenarios, validate]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

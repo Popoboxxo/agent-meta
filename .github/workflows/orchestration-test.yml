@@ -15,18 +15,32 @@ name: Orchestration Tests
 #     (per module), not per test. Placement weights are per file.
 #
 # Structure now:
-#   - `test` job: two fully tested endpoints (compatibility floor 3.9, ceiling
-#     3.12) x 3 shards. Each shard first runs its explicit
+#   - `test` job: compatibility ceiling 3.12 x 3 shards, compatibility floor
+#     3.9 x 1 shard. Each shard first runs its explicit
 #     `HEAVY_FIXTURE_SHARD_<n>` slice (the 17 measured setup-dominated files,
-#     disjoint per shard), then the count-based remainder (`--splits 3`) with
-#     all 32 explicitly placed files (15 subprocess + 17 heavy-fixture)
-#     ignored.
+#     disjoint per shard), then the remainder (`--splits 3`) with all 32
+#     explicitly placed files (15 subprocess + 17 heavy-fixture) ignored.
+#     The remainder is split by measured duration when `.test_durations` is
+#     committed (`--splitting-algorithm=least_duration`) and by test count
+#     otherwise.
 #   - `subprocess-shard` job: the 15 sync.py-driving modules split into three
-#     disjoint groups (78 / 183 / 190 tests), still `-n 0`, now 3 parallel
-#     groups per endpoint instead of one serial 451-test list. The groups are
-#     module-disjoint, so no module is spread across jobs and their
-#     subprocesses cannot stack up inside one job.
-#   - `compat-311`: cheap targeted TOML-boundary + code-hygiene job.
+#     disjoint groups (78 / 183 / 190 tests), still `-n 0`, 3 parallel groups
+#     per endpoint (3.9 and 3.12). The groups are module-disjoint, so no module
+#     is spread across jobs and their subprocesses cannot stack up inside one
+#     job. This is where the 3.9 floor is fully exercised.
+#   - `refresh-durations`: manual (`workflow_dispatch`) producer of the
+#     `.test_durations` baseline; uploads an artifact, never pushes.
+#
+# Runner-minute budget (measured on run 42488240635, main, 2026-11-08):
+#   before: 15 jobs / 245 runner-minutes / 32.5 min wall. Long pole was
+#   `test (3.12, 3)`, 32.2 min, against 20.4 min for shard 1 -- a count-split
+#   artefact, not a work artefact. The 3.9 legs duplicated all six jobs
+#   (106 runner-minutes) and `compat-311` spent 9.6 minutes on nine files.
+#   This change: 3.9 keeps the subprocess groups + one test shard, the
+#   `compat-311` nine-file set moves into the 3.9 `subprocess-shard` leg (the
+#   TOML boundary that matters is `tomli` BELOW 3.11, so it is covered where it
+#   can actually regress; 3.12 already exercises the `tomllib` branch), and the
+#   shard split becomes duration-based once the baseline is present.
 #
 # Timeout budget (`timeout-minutes` is only a backstop; the per-subprocess
 # timeouts in tests/timeouts.py are the real guard):
@@ -34,7 +48,7 @@ name: Orchestration Tests
 #     a loaded 3.12 runner (runs 41381909910 / 41491331808 / PR #1112), so the
 #     old 30 min cancelled healthy runs. The shard job proved 45 works; the
 #     `test` job hit the same wall at 97 % of shard 3/3 and gets the same room.
-#   - `compat-311`: 30 (targeted files only).
+#   - `refresh-durations`: 60 (one full suite run, unserialised).
 #   - `changes` and `orchestration-gate`: 5.
 #
 # Why the heavy-fixture placement is explicit instead of duration-based:
@@ -119,6 +133,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual refresh of the shard-balance baseline (`.test_durations`): runs the
+  # full suite once with `--store-durations` and uploads the file as an
+  # artifact. No token write scope is requested, so the file is committed by a
+  # maintainer from the artifact/download-URL (see the job comment).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -154,7 +173,11 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           run=true
-          if [ "$EVENT" = "pull_request" ]; then
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            # A manual dispatch exists to refresh `.test_durations`; the sharded
+            # suites would only duplicate that run and burn runner minutes.
+            run=false
+          elif [ "$EVENT" = "pull_request" ]; then
             files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
             # Fail safe: an empty/failed diff keeps the tests on.
             if [ -n "$files" ]; then
@@ -184,6 +207,16 @@ jobs:
       matrix:
         python-version: ['3.9', '3.12']
         shard: [1, 2, 3]
+        # Only the 3.12 leg runs all three shards. The 3.9 leg (compatibility
+        # floor) keeps shard 1 of this job plus all three `subprocess-shard`
+        # groups, where the runtime-sensitive work lives (sync.py children,
+        # TOML/render paths). Measured saving: the two dropped legs were
+        # 18.1 / 18.8 min of a 245 runner-minute run (run 42488240635).
+        exclude:
+          - python-version: '3.9'
+            shard: 2
+          - python-version: '3.9'
+            shard: 3
 
     steps:
       - name: Checkout
@@ -297,14 +330,29 @@ jobs:
           python -m pytest ${{ steps.partition.outputs.heavy }}
           -q -n 2 --dist loadfile --durations=10 -ra
 
-      # Everything not explicitly placed is still split by test count
-      # (pytest-split default): no `.test_durations` baseline is committed.
-      - name: Run count-based remainder (shard ${{ matrix.shard }}/3)
-        run: >-
-          python -m pytest tests/ -q -n 2 --dist loadfile
-          ${{ steps.partition.outputs.ignore }}
-          --splits 3 --group ${{ matrix.shard }}
-          --durations=10 -ra
+      # Everything not explicitly placed is split by measured duration when a
+      # `.test_durations` baseline is present, and by test count otherwise
+      # (`--splits`, pytest-split default). The baseline removes the count-split
+      # imbalance: on run 42488240635 the count split produced 20.4 / 23.8 /
+      # 32.2 min (3.12) -- 60 % spread with the long pole defining the whole
+      # workflow. Refresh the file with the `refresh-durations` job (workflow
+      # dispatch) after suite-size changes; a missing file keeps CI green on the
+      # count split instead of failing.
+      - name: Run remainder (shard ${{ matrix.shard }}/3, duration-balanced if baseline present)
+        shell: bash
+        run: |
+          durations=()
+          if [ -f .test_durations ]; then
+            durations=(--durations-path=.test_durations --splitting-algorithm=least_duration)
+            echo "Using .test_durations baseline ($(python -c 'import json,sys;print(len(json.load(open(".test_durations"))))') entries)."
+          else
+            echo "No .test_durations baseline -- falling back to count-based split."
+          fi
+          python -m pytest tests/ -q -n 2 --dist loadfile \
+            ${{ steps.partition.outputs.ignore }} \
+            "${durations[@]}" \
+            --splits 3 --group ${{ matrix.shard }} \
+            --durations=10 -ra
 
       # Repo-wide and expensive, and shard-independent, so run it once per
       # Python version (2x) instead of in all 6 shard jobs.
@@ -380,41 +428,14 @@ jobs:
           done
           python -m pytest $modules -n 0 -v --tb=short -ra --durations=10
 
-  # Python 3.11 sits strictly between the fully-tested floor (3.9) and
-  # ceiling (3.12). Its only genuine version-specific boundary is TOML
-  # parsing: `tomli` is installed below 3.11, stdlib `tomllib` from 3.11 on
-  # (see tests/requirements.txt). This job pins that boundary plus the
-  # version-agnostic code-hygiene gates.
-  #
-  # `-n 0` on purpose: two of the nine files below (test_provider_matrix_sync,
-  # test_sync_validation_gate) launch sync.py repeatedly, including the
-  # repo-wide `--validate` suite. Serial keeps their subprocesses from
-  # competing for the assumed 2 cores. Its 30 min ceiling is unchanged: it runs
-  # only the targeted files, while the serial subprocess shard needs the larger
-  # backstop documented above.
-  compat-311:
-    needs: changes
-    if: needs.changes.outputs.run_tests == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
-
-      - name: Install test dependencies
-        run: pip install -r tests/requirements.txt
-
-      - name: TOML boundary + code hygiene (3.11)
+      # The TOML boundary + code-hygiene set that used to be its own
+      # `compat-311` job (9.6 min of a 245 runner-minute run, for nine files).
+      # It belongs on the 3.9 leg: `tomli` is installed BELOW 3.11 and stdlib
+      # `tomllib` from 3.11 on, so the branch that can actually regress is the
+      # `tomli` one -- and 3.12 already exercises `tomllib` in the `test` job.
+      # `-n 0` because two of the nine files launch sync.py repeatedly.
+      - name: TOML boundary + code hygiene (3.9 only)
+        if: matrix.python-version == '3.9' && matrix.shard == 1
         run: >-
           python -m pytest -q -n 0
           tests/test_toml_writer.py
@@ -427,10 +448,58 @@ jobs:
           tests/test_python_compat_consistency.py
           tests/test_import_acyclicity.py
 
+  # Shard-balance baseline (`.test_durations`). The `test` job switches to
+  # `--splitting-algorithm=least_duration` as soon as this file exists, which is
+  # the single biggest wall-clock lever: the count split produced
+  # 20.4 / 23.8 / 32.2 min on run 42488240635, so the long pole defined the
+  # whole workflow while two runners were already idle.
+  #
+  # Deliberately a separate, manual (`workflow_dispatch`) job:
+  #   * it needs one complete suite run -- exactly the cost the sharded jobs
+  #     avoid -- so it must not run per push/PR;
+  #   * it uploads the file as an artifact instead of pushing it, keeping this
+  #     workflow on `permissions: contents: read` (no write token in CI). Commit
+  #     the artifact contents to `.test_durations` on main by hand;
+  #   * a stale or missing baseline only affects balance, never pass/fail.
+  # Refresh after a suite-size change (test modules added or removed).
+  refresh-durations:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run full suite and record per-test durations
+        run: >-
+          python -m pytest tests/ -q -n 2 --dist loadfile
+          --store-durations --durations-path=.test_durations
+          --durations=20 -ra
+
+      - name: Upload baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-durations
+          path: .test_durations
+          if-no-files-found: error
+
   # Single required check for this workflow. `if: always()` is mandatory: without
   # it a failed need makes the gate itself `skipped`, which counts as passed.
   orchestration-gate:
-    needs: [changes, test, subprocess-shard, compat-311]
+    needs: [changes, test, subprocess-shard]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
