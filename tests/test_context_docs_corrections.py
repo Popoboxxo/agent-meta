@@ -174,3 +174,22 @@ def test_changelog_mentions_964_items():
     assert section.startswith(f"## [{_RELEASE}]")
     assert "--context-report" in section
     assert "#964" in section
+
+
+def test_branch_guard_limits_moved_to_concept_doc():
+    # #1161: the rule keeps both anchored headings and points at the doc that
+    # carries the full known-limits text moved out of the always-on rule.
+    rule = _read("rules/1-generic/branch-guard.md")
+    doc = _read("docs/concepts/branch-guard-known-limits.md")
+    assert "## Guard-Terminologie: Convention Boundary vs. Security Boundary" in rule
+    assert "## Bekannte Grenzen" in rule
+    assert "docs/concepts/branch-guard-known-limits.md" in rule
+    for gap in (
+        '1. `eval "git commit ..."` wird nicht erkannt.',
+        "2. Direkte Schreibzugriffe auf `.git/` werden nicht geprüft.",
+        "3. Andere Git-Tools (`hub`, `gh repo ...`) sind nicht erfasst.",
+        "4. Command-Substitution und Indirektion",
+    ):
+        assert gap in doc, gap
+    for ref in ("#551", "#592", "#809", "#595", "Bewusster Trade-off"):
+        assert ref in doc, ref

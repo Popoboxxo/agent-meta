@@ -5467,9 +5467,16 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Merge of main (#1151 G1, #1156 G2, #1157/#1162 G3, `orchestrator` 8.11.0) into
 # #1158 G4 (`orchestrator` -> 8.11.1): digests recomputed from the merged trees
 # (ac01 -> 9df232ba, slimming -> 6598edb7, compact -> c5c43c00).
+# Issue #1161 (G7, branch-guard rule trimmed, limits moved to a concept doc):
+# `ac01-baseline` re-pinned per entry — 9 of 1096 hashes (3 branch-guard rule
+# renders, 6 AGENTS.md; 9df232ba -> 7c993f7f); `slimming-golden`/`compact-golden`
+# unchanged (compact pointer-izes the rule). Log: `tests/test_ac01_render_identity.py`.
+# Issue #1161 step 2 (G7, compact route_intent JSON): `ac01-baseline` re-pinned per entry --
+# 4 of 1096 hashes (json-provider orchestrators; 7c993f7f -> a75074b1); `slimming-golden`
+# orchestrator.md JSON block re-serialized (6598edb7 -> 59224e04); `compact-golden` unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "9df232ba8019a290447cf07c60183725bb49b2c8233803298042ccae1d33b55e",
-    "slimming-golden": "6598edb7c2a06a4aece8aec7002e724e24aad35402d8621bc7e5f7043dd76c9c",
+    "ac01-baseline": "a75074b1cfe8e0f46474f04ca5f779f69da0f6c2ec491b81c138374790c99e51",
+    "slimming-golden": "59224e04795e8c9bb887c3c2074d67955fdf41bc26b19a5ba4d8ed538d73d994",
     "compact-golden": "c5c43c002deaf6859f4edd30f0a6f844ca6f98fcef4a2b4fbb832690f9000659",
 }
 

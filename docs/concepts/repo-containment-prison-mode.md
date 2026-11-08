@@ -603,7 +603,7 @@ des Arbeitsbaums, und jede Repo-Kopie muss `.tmp` ausschließen und Symlinks unv
 
 | Thema | Referenz |
 |---|---|
-| Zentraldefinition Convention vs. Security Boundary + bekannte Guard-Grenzen | [`../../.claude/rules/branch-guard.md`](../../.claude/rules/branch-guard.md) |
+| Zentraldefinition Convention vs. Security Boundary + bekannte Guard-Grenzen | [`../../.claude/rules/branch-guard.md`](../../.claude/rules/branch-guard.md), Volltext: [`branch-guard-known-limits.md`](branch-guard-known-limits.md) |
 | Wrapper/Impl-Split + `bash -n`-Selbstheilung (#630) | [`../../hooks/1-generic/orchestrator-guard.sh`](../../hooks/1-generic/orchestrator-guard.sh), [`../../hooks/1-generic/orchestrator-guard-impl.sh`](../../hooks/1-generic/orchestrator-guard-impl.sh) |
 | Hook-Test-Muster | [`../../tests/test_orchestrator_guard_hook.py`](../../tests/test_orchestrator_guard_hook.py) |
 | Support-/Drift-Check-Muster für Guards | [`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py) |

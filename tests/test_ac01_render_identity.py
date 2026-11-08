@@ -975,6 +975,33 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``TaskStop``, 8.11.1); patched **per entry** from ``render_matrix_hashes`` -- not via ``--write``.
   Net: 45 keys vs ``main``, 30 vs the G4 head. ``AC01_EXCEPTIONS`` is NOT extended.
 
+- Issue #1161 (G7 token diet, 2026-11-07, ``chore/token-diet``): ``rules/1-generic/branch-guard.md``
+  keeps both anchored headings but trims ``## Guard-Terminologie`` to the two definitions and
+  ``## Bekannte Grenzen`` to a pointer; the full text moved verbatim to
+  ``docs/concepts/branch-guard-known-limits.md``. Exactly **9 of 1096 hashes moved; 0
+  added/removed**: the three rule renders (``Claude/.claude/rules/branch-guard.md``
+  ``504c5ceb…`` -> ``f231e99f…``, ``Continue/.continue/rules/branch-guard.md`` ``ba868b11…`` ->
+  ``1489c60a…``, ``Copilot/.github/instructions/branch-guard.instructions.md`` ``f533e9cb…`` ->
+  ``797d2250…``) and the six ``AGENTS.md`` embedding the rule (``Codex`` ``af21d605…`` ->
+  ``01f721e1…``, ``Gemini`` ``a07ca418…`` -> ``dbe42e7d…``, ``KimiCode`` ``bbdf7721…`` ->
+  ``15bf6db1…``, ``Mammouth`` ``faff25fb…`` -> ``0b7db94b…``, ``Opencode`` ``441342f4…`` ->
+  ``1d388688…``, ``ZCode`` ``7427ae46…`` -> ``811090f6…``). Patched **per entry** from
+  ``render_matrix_hashes`` -- not via ``--write``. AC-T4: ac01 ``9df232ba…`` -> ``7c993f7f…``;
+  ``slimming-golden``/``compact-golden`` unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1161 step 2 (G7, compact ``route_intent`` JSON): ``render_routing_tool_definition``
+  serializes the ``json`` format with ``separators=(",", ":")`` instead of ``indent=2`` (same
+  data, the block becomes one line; -18,839 B per matrix orchestrator). Exactly **4 of 1096
+  hashes moved; 0 added/removed** -- the orchestrator renders of the four ``json`` providers
+  (``Claude/.claude/agents/orchestrator.md`` ``9d6de73b…`` -> ``9ce45f0b…``,
+  ``Codex/.codex/agents/orchestrator.toml`` ``67070c9a…`` -> ``96136789…``,
+  ``Gemini/.gemini/agents/orchestrator.md`` ``9774d27d…`` -> ``695cbaa3…``,
+  ``Opencode/.opencode/agents/orchestrator.md`` ``6962a82b…`` -> ``7cbfaedd…``). YAML-format
+  providers unchanged; the MATRIX entry of ``generated-file-hashes.json`` is unchanged (the repo's own ``.meta-config/generated-file-hashes.json`` changes by 3 entries). Patched
+  **per entry** from ``render_matrix_hashes`` -- not via ``--write``. ``slimming-golden``
+  ``orchestrator.md``: only the JSON block re-serialized (L214-1887 -> one line, data equal);
+  ``compact-golden`` unchanged (line block, no JSON). AC-T4: ac01 ``7c993f7f…`` -> ``a75074b1…``,
+  slimming ``6598edb7…`` -> ``59224e04…``. ``AC01_EXCEPTIONS`` is NOT extended.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
