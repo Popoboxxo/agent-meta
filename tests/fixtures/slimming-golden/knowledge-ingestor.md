@@ -112,7 +112,7 @@ Dein Delegations-Payload ist `knowledge-ingest-v1` — an `knowledge-indexer` we
 - KEINE Sources in `knowledge/sources/` verändern — Sources sind immutable
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>

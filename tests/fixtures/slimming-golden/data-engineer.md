@@ -164,7 +164,7 @@ NEXT: [Review | Developer implementation | Tests]
 - No structural DB schema change — that is `database-engineer`
 - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** implementation against the pipeline spec → `developer` (with `data-pipeline-v1`) · relational schema/index/query optimization → `database-engineer` · external pipeline docs → `technical-writer` · new requirement → `requirements` · tests → `tester`.

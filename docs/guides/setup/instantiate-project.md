@@ -111,7 +111,7 @@ git submodule update --init --recursive
 
 ```bash
 mkdir -p .meta-config
-cp .agent-meta/howto/agent-meta.config.example.json .meta-config/project.yaml
+cp .agent-meta/templates/configs/agent-meta.config.example.json .meta-config/project.yaml
 ```
 
 Pflichtfelder:

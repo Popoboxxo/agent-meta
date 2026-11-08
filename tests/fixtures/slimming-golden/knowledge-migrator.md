@@ -94,7 +94,7 @@ Tasks können als A2A-Envelope (JSON) ankommen. Dein Delegations-Payload ist `kn
 - KEINE automatische Fortsetzung nach Phase 1 ohne Freigabe
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>

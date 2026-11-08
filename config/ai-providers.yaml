@@ -413,6 +413,7 @@ providers:
       # artifact carrying `system` is not a sync-time finding.
       - system
       reject-fields: []
+    # Flat by design: one cheap model for nano..powerful; only max differs.
     model-tiers:
       nano: opencode-go/deepseek-v4.1-flash
       fast: opencode-go/deepseek-v4.1-flash

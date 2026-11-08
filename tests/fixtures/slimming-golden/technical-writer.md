@@ -124,7 +124,7 @@ NEXT: [Review | Developer change | Documenter (internal)]
 - No passive filler — active, task-oriented language
 - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** internal team docs → `documenter` · data-pipeline docs → coordinate with `data-engineer` · API contract/OpenAPI spec → `api-specialist` · code change needed → `developer`.

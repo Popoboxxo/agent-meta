@@ -71,7 +71,6 @@ presets:
   # Maximale Token-Einsparung — nur absolut essenzielle Rules (branch-guard,
   # commit-conventions, language, use-orchestrator) werden in den Kontext
   # eingebettet. Alle anderen sind nur als separate Rule-Dateien verfügbar.
-  # Empfohlen für rapid-prototyping Projekte.
   silent:
     lifecycle-tasks:
       alwaysApply: false

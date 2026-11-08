@@ -140,7 +140,7 @@ NEXT: [Review | Requirements (formal REQ) | ui-ux-designer]
 - Never write code or assign REQ-IDs (that is `requirements`)
 - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** formal, traceable requirement with REQ-ID → `requirements` · implementation → coordinate via `orchestrator` (reference in text) · design/UX of a story → `ui-ux-designer` · concept exploration of an idea → `ideation`.

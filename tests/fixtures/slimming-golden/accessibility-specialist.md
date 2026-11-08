@@ -156,7 +156,7 @@ NEXT: [Review | Developer fix | Documenter]
 - No flow automation — that is `e2e-tester`
 - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 **Delegation (reference only):** implement fix → `developer` (with WCAG criterion + location) · design/UX change → `ui-ux-designer` · flow automation/E2E → `e2e-tester` · external a11y docs → `technical-writer` · document audit report → `documenter`.

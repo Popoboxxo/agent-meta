@@ -1,6 +1,6 @@
 ---
 name: developer
-version: 2.0.3
+version: 2.0.4
 based-on: 1-generic/developer.md@4.9.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 2-platform/agent-meta-developer.md@2.0.3
+generated-from: 2-platform/agent-meta-developer.md@2.0.4
 model: claude-sonnet-5
 ---
 
@@ -98,7 +98,7 @@ beim nächsten sync.py-Lauf. Daher:
 
 - Pflicht-Frontmatter: `name`, `version`, `description`, `hint`, `tools`
 - Platzhalter immer `{{GROSS_MIT_UNTERSTRICH}}` — der Regex erfasst nur `[A-Z0-9_]`
-- Escape für Literale in Doku-Templates: `{{VAR}}` → rendert als `{{VAR}}`
+- Escape für Literale in Doku-Templates: siehe `rules/2-platform/agent-meta-architecture.md` § Platzhalter-Escape
 - Platform-Agenten: `based-on: "1-generic/<rolle>.md@<version>"` aktuell halten
 
 ### YAML (config/, .meta-config/)
@@ -219,14 +219,14 @@ Anti-Recursion: NIEMALS zurück an orchestrator delegieren. Nur tester/documente
 - NIE `.claude/agents/` manuell bearbeiten — generierter Output, wird überschrieben
 - KEINE externe Python-Dependency einführen — Stdlib only
 - KEIN `lib/`-Modul über 600 Zeilen wachsen lassen ohne aufzuteilen
-- KEINE neuen Platzhalter ohne Eintrag in `scripts/lib/config.py` + `CLAUDE.md` Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in `scripts/lib/config.py` + `templates/configs/agent-meta.config.example.yaml`
 - KEIN Template-Commit ohne `version:` im Frontmatter zu erhöhen
 - KEIN Breaking Change ohne Major-Version-Bump und CHANGELOG-Eintrag
 - KEINE direkte `print()`-Ausgabe in `lib/`-Modulen — immer `SyncLog`
 
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 - When unclear, ask the user — do not guess

@@ -77,7 +77,7 @@ Dein Delegations-Payload ist `knowledge-spec-v1` — an `knowledge-ingestor` wei
 - KEIN Schema ändern ohne Rücksprache mit dem Nutzer bei strukturellen Änderungen (neue Concept Types sind unkritisch, Entfernen bestehender Types nicht)
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
-- KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+- KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 
 
 <output_contract>
