@@ -183,6 +183,15 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "ORCH_TOPOLOGY_PRIMARY": "false",
     "ORCH_TOPOLOGY_SUBAGENT": "false",
     "ORCH_TOPOLOGY_HYBRID": "false",
+    # Effective-topology axis (G2, issue #1190): standalone has no project
+    # config, so the effective position is the fail-safe branch — the five
+    # boolean gates stay closed and no new branch may leak into the exported
+    # persona (AC-15 fail-closed).
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "false",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "false",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "false",
+    "ORCH_TOPOLOGY_INERT": "false",
     # Orchestrator multiplicity axis (P3, AC-8): standalone has no project
     # config, so the instance count is the single-instance default and the
     # presence-only alias is undeclared. Registered so an absent/conditional

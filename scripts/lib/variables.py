@@ -67,6 +67,14 @@ _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+    # Effective-topology axis (G2, issue #1190, AC-15): opt-in exactly like
+    # the declared position. Absent must read INACTIVE so a consumer project
+    # that never configures the effective axis renders the historic branch.
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
     # Orchestrator multiplicity axis (P3, AC-8): opt-in exactly like the
     # position flags. An absent value must read as inactive so a consumer
     # project without ``max-instances``/``singleton`` keeps the historic
@@ -86,6 +94,21 @@ _TOPOLOGY_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+})
+
+#: The five boolean flags of the *effective* topology axis (G2, issue #1190).
+#: Opt-in: an absent value must read inactive (AC-15 fail-closed), so the names
+#: are statically whitelisted here in addition to ``_FALSE_DEFAULT_CONDITIONALS``
+#: — without a whitelist entry the orphaned-marker cleanup would keep both
+#: branches of an absent flag. The two string flags (``ORCH_TOPOLOGY_EFFECTIVE``,
+#: ``ORCH_TOPOLOGY_EFFECTIVE_SOURCE``) are audit-only and stay out of every
+#: boolean registration.
+_TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
 })
 
 #: P3 instance flags registered in the strip whitelist. Unlike the topology
@@ -634,6 +657,9 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # variables dict does not carry them yet (absent => inactive, AC-18).
     conditional_vars.update({k for k in variables if k.startswith("ORCH_TOPOLOGY_")})
     conditional_vars.update(_TOPOLOGY_CONDITIONAL_FLAGS)
+    # G2 effective axis: statically whitelisted so an absent flag resolves to
+    # its (inactive) else branch instead of keeping both branches (AC-15).
+    conditional_vars.update(_TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS)
     # P3 instance flags (AC-8): statically whitelisted so an absent value is
     # inactive even when the variables dict does not carry it yet.
     conditional_vars.update(_INSTANCE_CONDITIONAL_FLAGS)
