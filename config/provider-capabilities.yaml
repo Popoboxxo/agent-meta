@@ -178,7 +178,7 @@ capabilities:
     text_mentions: false
     hooks: false
     commands: true
-    runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
+    runtime_gate: permission            # v1: native permission layer blocks Main-Chat writes (PARTIAL, no delegation provenance). v2: tier resolves to plugin via surface-has-plugins (artifact observe-only) plus permissions[] deny; enforce stays P6-gated
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["task"]
     structured_handoff: true

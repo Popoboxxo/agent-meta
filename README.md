@@ -250,6 +250,22 @@ settings such as `orchestrator.mode` are rules to the model, not enforced restri
 
 Continue and Copilot have no per-agent model tiers; they are managed centrally.
 
+### Opencode surfaces: v1 and v2
+
+Opencode has two configuration surfaces: **v1 (default)** and **v2 (opt-in)**. Select one per project
+in `.meta-config/project.yaml`:
+
+```yaml
+provider-options:
+  Opencode:
+    surface-version: v2
+```
+
+v2 writes `experimental.subagent_depth`, `permissions[]` and `mcp.servers`, adds the `plugins` key and
+an observe-only runtime-gate plugin whose enforcement comes from the `permissions[]` deny. A session
+restart is recommended after switching surfaces so the new configuration is loaded. Full details,
+v2-only options and known limits: [docs/providers/opencode.md](docs/providers/opencode.md).
+
 ## Agents and platforms
 
 ### Role templates
