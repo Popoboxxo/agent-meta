@@ -115,8 +115,61 @@
 
 ## Plans
 
-- [Plan: Issue #456 – Admin UI Remote Access](plans/am-issue-456-remote-admin-auth.md) — Concrete implementation plan for configurable bind-host, token auth, and host allowlist for the Admin UI server. 8 ordered steps. `plan`
-- [Plan: Planner-Pipeline-Integration — 3 Bugs (Ghost-Entries, plan_ref-Validierung, deklarative Kopplung)](plans/am-fix-planner-pipeline-ghost-entries.md) — Framework-Fix für delegation_table.py tier-filter, plan_ref-Validierungsmechanismus in pipelines.py, und deklarative Planner↔Pipeline-Kopplung via produces-Feld. 4 Schritte. `plan`
+> Sortierung: Status-Gruppen **Offen/In Arbeit → Pausiert/Blockiert/Entwurf → Done**, innerhalb der Gruppen neueste zuerst (undatierte am Gruppenende). Quelle: `docs/plans/` + `knowledge/wiki/plans/` (Source of Truth). Dieser Abschnitt katalogisiert **externe Source-of-Truth-Dokumente — kein OKF-Page-Katalog**: die verlinkten Dateien sind keine Wiki-Seiten mit OKF-Frontmatter. Nicht indiziert: `archive/**`, `-status.md`-Begleitdateien, Audits/Reports, Preflight-, Diff-Manifest-, Stacking- und Baseline-Dokumente.
+
+### Offen / In Arbeit (20)
+
+- [Fleet-Server F2 (Schreibpfad, Phase 3+4)](../../docs/plans/2026-10-23-fleet-server-f2-plan.md) — Schreibpfad des Fleet-Servers: Registry, Enrollment, Heartbeat und Audit. Status: **geplant** (Spec-Approval offen). `plan`
+- [Fleet-Server F1 (Read-Only-Dashboard + Config-Ansicht)](../../docs/plans/2026-10-23-fleet-server-f1-plan.md) — Read-only Fleet-Dashboard und Config-Ansicht (Phase 1+2). Status: **geplant** (Spec-Approval offen). `plan`
+- [Context Profiles — Phase 2 (Profil `compact`, Config-Optimizer)](../../docs/plans/2026-10-17-context-profiles-phase2-plan.md) — Profil `compact`, Config-Optimizer, Applier und Rolle `meta-optimizer`. Status: **APPROVED**; 2a–2e umgesetzt, 2f gated. #977 `plan`
+- [Context Profiles — Phase 0/1](../../docs/plans/2026-10-11-context-profiles-plan.md) — Mess-/Prüfmodule, Active-Set-Konsumenten und Provider-Kanal-Fixes. Status: **geplant**. #977 `plan`
+- [Bugfix-Batch 2 (System-Review 2026-10-07)](../../docs/plans/2026-10-07-bugfix-batch-2.md) — Bugfix-Batch aus dem System-Review 2026-10-07. Status: **APPROVED** (2026-10-08). `plan`
+- [Bugfix-Wave — 52 Issues, 8 Cluster](../../docs/plans/2026-10-06-bugfix-wave-plan.md) — Wellen-Implementierungsplan mit Task-Zerlegung, Rollen-Tier und Akzeptanzkriterien je Issue-Gruppe. Status: **APPROVED** (2026-10-06). `plan`
+- [Literature-Anchored Role Enrichment — O'Reilly Cybersecurity Month 2026](../../docs/plans/2026-10-04-oreilly-cybersecurity-2026-role-enrichment.md) — Security-Belege aus 19 O'Reilly-Bänden für 4 primäre und 6 sekundäre Rollen. Status: **geplant** (Plan ohne Done-Marke). `plan`
+- [Priorisierter Issue-Backlog — Ausführungsplan](../../docs/plans/2026-10-04-prioritized-issue-backlog-plan.md) — Priorisierte Ausführungsreihenfolge des Issue-Backlogs inkl. Aufwandsschätzung. Status: **proposed** (2026-10-04). `plan`
+- [Admin-UI + Project-Level `surface-version` Gap Closure](../../docs/plans/2026-10-03-admin-ui-opencode-surface-plan.md) — Schließt G1–G5 für Opencode `surface-version: v2` (Resolver, Server-Validierung, Admin-UI). Status: **geplant** (Amendment APPROVED 2026-10-03). `plan`
+- [Bugfix Block #744 / #749 / #750](../../docs/plans/2026-09-15-bugfix-block-744-749-750.md) — Bugfix-Block für drei Issues. Status: **planned** (Spec APPROVED 2026-09-15; commit/push vom Nutzer zurückgehalten). `plan`
+- [Framework-Support für `reference_standards`](../../docs/plans/2026-09-15-reference-standards.md) — Optionales Frontmatter-Feld `reference_standards`: Erkennung, Validierung, provider-agnostisches Stripping. Status: **geplant** (Spec APPROVED 2026-09-15). `plan`
+- [Context-File Modes (Phase 1 / Phase 2)](../../docs/plans/2026-09-13-context-file-modes.md) — Kontext-Topologie, Adapter-Registry und Per-Provider-Render. Status: **Phase 1 done, Phase 2 geplant/zurückgestellt** (2026-09-14). `plan`
+- [Literature-Anchored Agent Improvements (#769–#780)](../../docs/plans/2026-09-12-literature-anchored-agent-improvements-plan.md) — Triage und Implementierungsplan für 243 Literatur-Vorschläge über 9 Rollengruppen. Status: **geplant** (Design-Gates D1–D9 bestätigt 2026-09-13). `plan`
+- [Agent-Eval-Plan v2 (#523)](../../docs/plans/2026-09-06-issue-523-agent-eval-plan-v2.md) — promptfoo-basiertes Agent-Eval-Framework, Restscope R1–R8. Status: **geplant** (wartet auf erneuten Concept-Review). #523 `plan`
+- [Consolidated Backlog Roadmap P0–P4 (#674)](../../docs/plans/2026-09-05-issue-674-roadmap.md) — Ausführungsreihenfolge für 55 Backlog-Items in 8 priorisierten Batches. Status: **proposed**. #674 `plan`
+- [CI- und Test-Verbesserungsplan](../../docs/plans/ci-test-improvement-plan.md) — CI-/Test-Verbesserungsplan (Revision 2): Workflows, Testsuite, Hooks und Repo-Settings. Status: **APPROVED** (2026-10-29). `plan`
+- [Plan: Issue #540 — Context-File-Overhead-Kompression](../../docs/plans/issue-540-context-compression.md) — Kompression des Kontextdatei-Overheads. Status: **geplant**. #540, #192, #457 `plan`
+- [admin-server.py Split — Backlog](../../docs/plans/admin-server-split-backlog.md) — Backlog-Eintrag für den Split von `scripts/admin-server.py` (~5330 Zeilen) nach dem `scripts/lib`-Muster. Status: **open**. `plan`
+- [Plan: Issue #456 – Admin UI Remote Access](plans/am-issue-456-remote-admin-auth.md) — Konfigurierbarer Bind-Host, Token-Auth und Host-Allowlist für den Admin-UI-Server (8 Schritte). Status: **planned** (2026-08-10). #456 `plan`
+- [Plan: Planner-Pipeline-Integration — 3 Bugs](plans/am-fix-planner-pipeline-ghost-entries.md) — Fix für Ghost-Entries, `plan_ref`-Validierung und deklarative Planner↔Pipeline-Kopplung via `produces` (5 Schritte). Status: **planned** (2026-08-10). `plan`
+
+### Pausiert / Blockiert / Entwurf (3)
+
+- [Welle 4 — Fortsetzungsplan (Tracking)](../../docs/plans/2026-10-30-wave-4-continuation-plan.md) — Tracking der offenen Welle-4-Punkte (Test-Hygiene) mit Ist-Stand, nächster Aktion und Gate. Status: **Entwurf**. #945, #1050, #1051, #971, #192 `plan`
+- [Admin-UI Network-Mode + Status #899/#855](../../docs/plans/2026-10-07-admin-ui-network-and-manager-plan.md) — Kombinierte Spec + Implementierungsplan für Network-Mode und Manager. Status: **DRAFT** (wartet auf Nutzerfreigabe). #897, #896 `plan`
+- [Design: Vereinheitlichter Plugin-Katalog](../../docs/plans/2026-09-05-plugin-catalog-unification.md) — Zusammenführung von External-Tools- und MCP-Registry zu einem Plugin-Katalog. Status: **DRAFT** (wartet auf User-Review). `plan`
+
+### Done (22)
+
+- [System-Audit-Remediation 2026-11-06](../../docs/plans/2026-11-06-system-audit-remediation-plan.md) — Remediation der Audit-Gruppen G1–G7. Status: **done (Ledger stale; #1155 nur teilweise, Folge-Issue offen)** — Fixes in CHANGELOG 2.0.0-beta.8. #1151, #1154/#1155, #1157–#1161 `plan`
+- [Orchestrator-Topologie P3 (Multi-Instanz)](../../docs/plans/2026-11-04-orchestrator-topology-p3-plan.md) — `max-instances`, `singleton` und Multi-Instanz-Identität. Status: **done** (2026-11-05, PR #1133). #1077 `plan`
+- [Orchestrator-Topologie v1 (P0–P2 + P4)](../../docs/plans/2026-11-04-orchestrator-topology-v1-plan.md) — Topologie-Achse, Resolver und Konsistenz-Checks. Status: **done** (2026-11-04, Merge `44f39ebc`). #1077 `plan`
+- [Bug Batch Implementation Plan](../../docs/plans/2026-10-31-bug-batch-plan.md) — 22 Batch-Issues in 9 gemergten PRs (#1071–#1095). Status: **done** (2026-11-04). `plan`
+- [Test Environments Implementation Plan](../../docs/plans/2026-10-31-test-environments-plan.md) — Deklarierbare Test-Umgebungen (lokal/remote/both) mit Remote-Freigabeprotokoll. Status: **done** (2026-11-01). `plan`
+- [Release Checklist Implementation Plan](../../docs/plans/2026-10-31-release-checklist-plan.md) — Strukturierte Release-Checkliste (`mode: off|advisory|strict`). Status: **done** (2026-10-31). #1082 `plan`
+- [Welle 4 / P1 — Timeout-Contract + Hook-Slice-Isolation](../../docs/plans/2026-10-31-wave-4-p1-timeout-contract-plan.md) — Timeout-Contract und Hook-Slice-Isolation. Status: **done** (2026-10-31, PR #1103). `plan`
+- [Bugfix-Welle 3 (Rest-Welle)](../../docs/plans/2026-10-29-bugfix-wave-3-plan.md) — Rest-Welle der Bugfixes. Status: **done** (2026-10-30, PRs #1047/#1048). `plan`
+- [Tmp-Sink-Injektion Implementation Plan](../../docs/plans/2026-10-24-tmp-sink-injection-plan.md) — Tmp-Sink-Injektion für Agenten-Kontexte. Status: **done** (2026-10-24, PR #1023, Nachweis #1024). `plan`
+- [Opencode v2-Support (Phasen C0–D)](../../docs/plans/2026-10-22-opencode-v2-support-plan.md) — Provider-Support für Opencode v2. Status: **done** (PRs #1011–#1018, Release #1019). #1007 `plan`
+- [Opencode-Einstiegspunkt (#1006)](../../docs/plans/2026-10-22-opencode-entrypoint-1006-plan.md) — Einstiegspunkt-Plan für Opencode. Status: **done** (PR #1010). #1006 `plan`
+- [Provider-Audit Gap Closure + Opencode v2 Support](../../docs/plans/2026-09-30-provider-audit-opencode-v2-plan.md) — Provider-Audit-Gap-Closure und Opencode-v2-Support (Phasen C0–D). Status: **done** (2026-10-03, 2.0.0-beta.1, #845) — 77/77 Checkboxen gesetzt. `plan`
+- [Dynamic Routing + Template Slimming](../../docs/plans/2026-09-19-dynamic-routing-template-slimming-plan.md) — Dynamisches Routing und Template-Slimming. Status: **done** (PR #833, alle 68 Checkboxen gesetzt). `plan`
+- [Progress / Ledger System Implementation Plan](../../docs/plans/2026-09-13-progress-ledger-system.md) — Resume-Pfad, maschineller Ledger-Writer mit Drift-Check und zweistufiges Task-Review. Status: **done (Ledger stale)** — umgesetzt laut CHANGELOG 1.2.0-beta.2. `plan`
+- [Konfigurierbare Progress-/Checkpoint-Pfade](../../docs/plans/2026-09-13-progress-paths-config.md) — `progress.dir` und `progress.checkpoint-dir` als Projekt-Keys. Status: **done (Ledger stale)** — umgesetzt laut CHANGELOG 1.2.0-beta.2. `plan`
+- [Stale Role Cleanup (B1 → B3 → B2)](../../docs/plans/2026-09-13-stale-role-cleanup.md) — Fail-closed-Löschpfad, Managed-Block-Beweis und Admin-UI-Cleanup-Pfad. Status: **done**. `plan`
+- [OpenCode Runtime Gate (Problem A)](../../docs/plans/2026-09-13-opencode-runtime-gate.md) — Runtime-Gate für Opencode. Status: **done** (Phase 0 complete; Phase 1 `won't-do`). `plan`
+- [Plan — Issue #763: HACS Entity-Namen + Registry-Migration](../../docs/plans/2026-09-12-issue-763-hacs-entity-rules-plan.md) — Englische Entity-Namen via `translation_key` und Entity-Registry-Migration bei Rename. Status: **done** (Commit `019d2985`). #763 `plan`
+- [Audit Batch Triage & Implementation Plan #712, #730–#743](../../docs/plans/2026-09-11-audit-batch-730-743-plan.md) — Triage und Umsetzung in Work-Packages WP0–WP7. Status: **done** (PRs #748–#762). #712, #730–#743 `plan`
+- [Phase 4d SE-Cascade Follow-ups & Design-Artefakte](../../docs/plans/2026-09-06-issue-674-phase4d-followups.md) — Teilumsetzung dokumentiert, Restarbeit als issue-fertige Follow-ups. Status: **done** (Doku). #207, #548, #452, #534, #317, #318 `plan`
+- [Phase 4b Harness Dependencies & Follow-ups](../../docs/plans/2026-09-06-issue-674-phase4b-harness-dependencies.md) — Agent-meta-seitige Phase-4b-Arbeit geliefert, Runtime-Teile als Harness-Abhängigkeiten dokumentiert. Status: **done** (Doku). #264–#267, #506, #517 `plan`
+- [Neue Provider Codex, ZCode & Kimi Code](../../docs/plans/2026-09-04-provider-codex-zcode.md) — Framework-Support für drei neue Provider. Status: **done** (implementiert 2026-09-04/05). `plan`
 
 ## Sources (Session Conclusions)
 
