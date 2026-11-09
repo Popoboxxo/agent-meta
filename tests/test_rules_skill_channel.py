@@ -115,6 +115,7 @@ def test_sync_rules_channel_skill_writes_skill_md_not_rules_dir(tmp_path):
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
         provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
 
     skill_path = project_root / ".claude" / "skills" / "sync-interface" / "SKILL.md"
@@ -145,6 +146,7 @@ def test_sync_rules_channel_skill_content_preserved_verbatim(tmp_path):
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
         provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
 
     text = (project_root / ".claude" / "skills" / "sync-interface" / "SKILL.md").read_text(encoding="utf-8")
@@ -164,6 +166,7 @@ def test_sync_rules_channel_skill_ignored_for_gemini(tmp_path):
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
         provider="Gemini", provider_config=provider_config, variables={},
         rules_dir=".gemini/rules",
+        active_set=frozenset(),
     )
 
     assert not (project_root / ".gemini" / "skills" / "sync-interface" / "SKILL.md").exists()
@@ -179,6 +182,7 @@ def test_sync_rules_channel_skill_reverts_to_rules_dir_when_disabled(tmp_path):
     sync_rules(
         agent_meta_root, project_root, {"rules": {"sync-interface": {"channel": "skill"}}},
         SyncLog(), dry_run=False, provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
     skill_path = project_root / ".claude" / "skills" / "sync-interface" / "SKILL.md"
     rule_path = project_root / ".claude" / "rules" / "sync-interface.md"
@@ -190,6 +194,7 @@ def test_sync_rules_channel_skill_reverts_to_rules_dir_when_disabled(tmp_path):
     sync_rules(
         agent_meta_root, project_root, {}, SyncLog(), dry_run=False,
         provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
     assert not skill_path.exists()
     assert not skill_path.parent.exists()
@@ -205,6 +210,7 @@ def test_sync_rules_channel_skill_dry_run_does_not_write(tmp_path):
     sync_rules(
         agent_meta_root, project_root, {"rules": {"sync-interface": {"channel": "skill"}}},
         SyncLog(), dry_run=True, provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
     assert not (project_root / ".claude" / "skills" / "sync-interface" / "SKILL.md").exists()
     assert not (project_root / ".claude" / "rules" / "sync-interface.md").exists()
@@ -225,6 +231,7 @@ def test_sync_rules_channel_skill_shares_index_with_external_skills(tmp_path):
     sync_rules(
         agent_meta_root, project_root, {"rules": {"sync-interface": {"channel": "skill"}}},
         SyncLog(), dry_run=False, provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
 
     managed = set(index_path.read_text(encoding="utf-8").split())

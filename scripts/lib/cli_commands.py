@@ -300,7 +300,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         if pc["has_rules"]:
             sync_rules(agent_meta_root, test_repo_path, config, log, dry_run,
                        variables=test_variables, rules_dir=pc.get("rules_dir"),
-                       provider=provider, provider_config=provider_config)
+                       provider=provider, provider_config=provider_config,
+                       active_set=active_set)
             sync_speech_mode(agent_meta_root, test_repo_path, config, log, dry_run,
                              rules_dir=pc.get("rules_dir"))
         if pc["has_hooks"]:

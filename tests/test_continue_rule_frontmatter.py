@@ -69,6 +69,7 @@ def test_continue_rules_gain_lazy_frontmatter(tmp_path):
     sync_rules(
         root, project, {}, SyncLog(), dry_run=False, variables={},
         rules_dir=_RULES_DIR, provider="Continue", provider_config=_CONTINUE_PC,
+        active_set=frozenset(),
     )
 
     for name in ("branch-guard.md", "language.md"):
@@ -86,6 +87,7 @@ def test_frontmatter_is_capability_driven_not_provider_literal(tmp_path):
     sync_rules(
         root, project, {}, SyncLog(), dry_run=False, variables={},
         rules_dir=".rules", provider="Other", provider_config=_PLAIN_PC,
+        active_set=frozenset(),
     )
 
     text = (project / ".rules" / "branch-guard.md").read_text(encoding="utf-8")

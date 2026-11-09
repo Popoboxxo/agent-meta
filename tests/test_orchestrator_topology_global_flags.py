@@ -101,7 +101,8 @@ def test_provider_scoped_render_overrides_the_global_value():
     assert global_vars["ORCH_TOPOLOGY_PRIMARY"] == "true"
 
     scoped = _merged_rule_vars(
-        _REPO_ROOT, _REPO_ROOT, config, "Claude", {}, global_vars
+        _REPO_ROOT, _REPO_ROOT, config, "Claude", {}, global_vars,
+        active_set=frozenset(),
     )
     assert scoped["ORCH_TOPOLOGY"] == "subagent"
     assert scoped["ORCH_TOPOLOGY_SUBAGENT"] == "true"
@@ -111,7 +112,8 @@ def test_provider_scoped_render_overrides_the_global_value():
 
     # Another provider keeps the project declaration (no cross-provider leak).
     other = _merged_rule_vars(
-        _REPO_ROOT, _REPO_ROOT, config, "Gemini", {}, global_vars
+        _REPO_ROOT, _REPO_ROOT, config, "Gemini", {}, global_vars,
+        active_set=frozenset(),
     )
     assert other["ORCH_TOPOLOGY"] == "primary"
     assert other["ORCH_TOPOLOGY_PRIMARY"] == "true"
@@ -121,7 +123,10 @@ def test_provider_scoped_render_overrides_the_global_value():
 
 
 def test_merged_rule_vars_without_variables_builds_flags_fail_closed():
-    merged = _merged_rule_vars(_REPO_ROOT, _REPO_ROOT, {}, "Claude", {}, None)
+    merged = _merged_rule_vars(
+        _REPO_ROOT, _REPO_ROOT, {}, "Claude", {}, None,
+        active_set=frozenset(),
+    )
 
     _assert_all_positions_false(merged)
     assert merged["ORCH_TOPOLOGY_EXPLICIT"] == "false"

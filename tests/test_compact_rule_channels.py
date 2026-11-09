@@ -303,6 +303,7 @@ def test_reference_rules_stay_reachable_for_the_provider(tmp_path):
     sync_embedded_rule_files(
         _REPO_ROOT, project, config, SyncLog(), dry_run=False,
         variables=variables, provider=_PROVIDER, provider_config=provider_config,
+        active_set=frozenset(),
     )
 
     # Rule files a native rules channel would carry (the check inspects them).

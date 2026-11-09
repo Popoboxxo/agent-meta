@@ -101,6 +101,7 @@ def test_embedded_rule_files_written_for_opencode(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Opencode",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     for name in ("sync-interface", "architecture", "conventions", "admin-ui"):
         skill = tmp_path / ".opencode" / "skills" / name / "SKILL.md"
@@ -120,6 +121,7 @@ def test_embedded_rule_files_written_for_weak_provider(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="ZCode",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert (tmp_path / ".zcode" / "skills" / "sync-interface" / "SKILL.md").exists()
 
@@ -131,6 +133,7 @@ def test_embedded_rule_files_noop_for_native_rules_provider(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Claude",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert not (tmp_path / ".claude" / "skills").exists()
 
@@ -143,6 +146,7 @@ def test_embedded_rule_files_written_for_unread_rules_dir_provider(env, tmp_path
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Gemini",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert (tmp_path / ".gemini" / "skills" / "submodule-protection" / "SKILL.md").exists()
 
@@ -339,6 +343,7 @@ def test_orphaned_rule_is_swept_from_repo_config_skills_dir(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], rules_dir=rules_dir,
         provider="Claude", provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     # The per-writer cleanup cannot remove the orphan: its stem left the
     # rules universe, and the merge-mode index keeps unowned entries.

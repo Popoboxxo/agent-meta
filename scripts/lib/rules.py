@@ -242,6 +242,8 @@ def _merged_rule_vars(
     provider: str,
     pc: dict,
     variables: dict | None,
+    *,
+    active_set,
 ) -> dict:
     """Build the merged variable dict used to substitute rule content.
 
@@ -249,6 +251,10 @@ def _merged_rule_vars(
     substitute identical placeholders (extension/snippets paths, orchestrator
     mode flags, MCP guardrails list). `variables` (project variables) win
     over provider defaults, mirroring the historic merge order.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17), required keyword: the
+    effective-topology seam must see exactly the same set the emission side
+    used (AC-30), so it is never resolved or defaulted here.
     """
     provider_vars = {
         'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
@@ -276,7 +282,7 @@ def _merged_rule_vars(
         resolve_topology,
         topology_explicit,
     )
-    from .variables import _instance_flags
+    from .variables import _instance_flags, _provider_topology_flags
 
     _provider_capabilities = load_provider_capabilities(agent_meta_root).get(provider, {})
     _topology_resolution = resolve_topology(
@@ -290,6 +296,19 @@ def _merged_rule_vars(
         _topology_resolution.declared or "",
         explicit=topology_explicit(config, provider),
         source=_topology_resolution.source,
+    ))
+
+    # Effective-topology axis (G3/G2, issue #1190): the declared position above
+    # answers "did the user write it?". This seam reports what the provider can
+    # actually do — resolved once, with the per-sync ActiveSet the emission
+    # side used (AC-30). The provider-less basis from config.py is never read
+    # here (AC-30 ratchet).
+    provider_vars.update(_provider_topology_flags(
+        config,
+        provider,
+        agent_meta_root=agent_meta_root,
+        mode=_orch_mode,
+        active_set=active_set,
     ))
 
     # Orchestrator multiplicity axis (P3, AC-9): re-resolve the EFFECTIVE
@@ -478,6 +497,7 @@ def sync_embedded_rule_files(
     *,
     provider: str,
     provider_config: dict | None = None,
+    active_set,
 ):
     """Render non-embedded rules as separate SKILL.md files (issue #192 Phase 2).
 
@@ -517,7 +537,8 @@ def sync_embedded_rule_files(
     from .platform import substitute_platform
 
     merged_vars = _merged_rule_vars(
-        agent_meta_root, project_root, config, provider, pc, variables
+        agent_meta_root, project_root, config, provider, pc, variables,
+        active_set=active_set,
     )
 
     platforms = config.get("platforms", [])
@@ -579,9 +600,11 @@ def sync_rules(
     dry_run: bool,
     platform_vars: dict | None = None,
     variables: dict | None = None,
+    *,
     rules_dir: str | None = None,
     provider: str = "Claude",
     provider_config: dict | None = None,
+    active_set,
 ):
     """Copy rule files from agent-meta/rules/ layers to <rules_dir>/ in the project.
 
@@ -605,7 +628,8 @@ def sync_rules(
 
     pc = (provider_config or {}).get(provider, {})
     merged_vars = _merged_rule_vars(
-        agent_meta_root, project_root, config, provider, pc, variables
+        agent_meta_root, project_root, config, provider, pc, variables,
+        active_set=active_set,
     )
 
     platforms = config.get("platforms", [])

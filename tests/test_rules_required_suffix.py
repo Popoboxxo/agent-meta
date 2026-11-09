@@ -59,6 +59,7 @@ def test_sync_rules_writes_required_suffix_with_frontmatter(tmp_path):
     sync_rules(
         root, project, {}, SyncLog(), dry_run=False, variables={},
         rules_dir=_RULES_DIR, provider="Copilot", provider_config=_PROVIDER_CONFIG,
+        active_set=frozenset(),
     )
 
     target = project / _RULES_DIR / f"branch-guard{_SUFFIX}"
@@ -81,6 +82,7 @@ def test_sync_rules_managed_cleanup_removes_legacy_unsuffixed_file(tmp_path):
     sync_rules(
         root, project, {}, SyncLog(), dry_run=False, variables={},
         rules_dir=_RULES_DIR, provider="Copilot", provider_config=_PROVIDER_CONFIG,
+        active_set=frozenset(),
     )
 
     assert (rules_dir / f"branch-guard{_SUFFIX}").is_file()
@@ -97,6 +99,7 @@ def test_sync_rules_without_suffix_capability_keeps_plain_md(tmp_path):
     sync_rules(
         root, project, {}, SyncLog(), dry_run=False, variables={},
         rules_dir=".rules", provider="Other", provider_config=provider_config,
+        active_set=frozenset(),
     )
 
     assert (project / ".rules" / "branch-guard.md").is_file()

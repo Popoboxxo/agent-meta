@@ -124,13 +124,15 @@ def test_merged_rule_vars_resolves_effective_instance_count(tmp_path):
     }
 
     claude = _merged_rule_vars(
-        _REPO_ROOT, tmp_path, config, "Claude", {}, None
+        _REPO_ROOT, tmp_path, config, "Claude", {}, None,
+        active_set=frozenset(),
     )
     assert claude["ORCH_MAX_INSTANCES"] == "4"
     assert claude["ORCH_TOPOLOGY_EXPLICIT"] == "true"
 
     continue_vars = _merged_rule_vars(
-        _REPO_ROOT, tmp_path, config, "Continue", {}, None
+        _REPO_ROOT, tmp_path, config, "Continue", {}, None,
+        active_set=frozenset(),
     )
     assert continue_vars["ORCH_MAX_INSTANCES"] == "1"
 

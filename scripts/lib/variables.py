@@ -10,7 +10,8 @@ re-introducing the historic agents ↔ config ↔ context import cycle
     (substitute() delegates its replacement pass to the shared escape-safe
     core in substitution.py — issue #476)
   * Orchestrator-mode flags  — _resolve_orch_mode(), _orch_mode_flags()
-  * Topology flags          — _topology_flags() (IC-4)
+  * Topology flags          — _topology_flags() (IC-4),
+    _effective_topology_flags()/_provider_topology_flags() (G2/G3)
 
 This module depends only on the neutral low-level layer (io, log) and the
 stdlib. It must never import agents/config/context/rules or any higher-level
@@ -425,6 +426,40 @@ def _effective_topology_flags(
         ),
         "ORCH_TOPOLOGY_INERT": "true" if mode == "main-chat" else "false",
     }
+
+
+def _provider_topology_flags(
+    config: dict,
+    provider: str,
+    *,
+    agent_meta_root: Path,
+    mode: str,
+    active_set,
+) -> dict[str, str]:
+    """Return the provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags (G2/G3).
+
+    The single render seam for the effective axis: the already-resolved
+    position + the per-sync ActiveSet are passed to the render seams; no
+    fourth resolver. ``resolve_topology`` is the ONE resolver and is called
+    exactly once here; ``active_set`` is a required keyword (never resolved
+    here, never defaulted — the caller owns the per-sync ActiveSet) and
+    ``mode`` arrives already resolved by ``_resolve_orch_mode``.
+
+    Provider differences come from the capability data and the provider
+    registry only — this helper never branches on a provider name.
+    """
+    from .providers import load_provider_capabilities, load_providers_config
+    from .topology import resolve_topology
+
+    resolution = resolve_topology(
+        config,
+        provider,
+        provider_config=load_providers_config(agent_meta_root),
+        capabilities=load_provider_capabilities(agent_meta_root).get(provider, {}),
+        mode=mode,
+        active_set=active_set,
+    )
+    return _effective_topology_flags(resolution, mode=mode)
 
 
 def _instance_flags(max_instances, *, singleton_declared: bool) -> dict:

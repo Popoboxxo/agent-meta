@@ -1471,7 +1471,7 @@ def _sync_stage_per_provider(
             sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                        platform_vars=platform_vars, variables=provider_variables,
                        rules_dir=pc.get("rules_dir"), provider=provider,
-                       provider_config=provider_config)
+                       provider_config=provider_config, active_set=active_set)
             sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                              rules_dir=pc.get("rules_dir"))
         _cleanup_retired_rules_dirs(project_root, config, provider_config, providers,
@@ -1487,7 +1487,8 @@ def _sync_stage_per_provider(
             # rules_read_channels itself. No provider names.
             sync_embedded_rule_files(agent_meta_root, project_root, config, log,
                                      args.dry_run, variables=provider_variables,
-                                     provider=provider, provider_config=provider_config)
+                                     provider=provider, provider_config=provider_config,
+                                     active_set=active_set)
         # MCP: generate rule files + provider configs + collect gitignore entries
         try:
             mcp_extras = generate_mcp_artifacts(

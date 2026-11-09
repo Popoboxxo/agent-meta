@@ -808,6 +808,7 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
     sync_rules(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False, variables=variables,
         rules_dir=rules_dir, provider=provider, provider_config=provider_config,
+        active_set=frozenset(),
     )
 
     for name, full_marker in _PLATFORM_RULE_FULL_MARKERS.items():
@@ -867,6 +868,7 @@ def test_540_compact_opencode_separates_platform_rules_via_file_channel(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False,
         variables=variables, provider="Opencode",
         provider_config=_load_providers(REPO_ROOT),
+        active_set=frozenset(),
     )
     for name, anchor in (
         ("sync-interface", "## Branch-Guard-Erweiterung für agent-meta"),

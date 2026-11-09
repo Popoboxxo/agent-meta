@@ -54,6 +54,7 @@ def test_rules_write_empty_index_and_clean_stale_entry(tmp_path: Path) -> None:
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
         provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
 
     index_path = rules_dir / ".agent-meta-managed"
