@@ -301,6 +301,33 @@ def _tmp_sink_edit_allow_paths(
     return (f"{relative}/**",)
 
 
+#: Roles whose agent-level write-scope lock is bound to the ROLE, not to the
+#: runtime position it happens to occupy. The orchestrator is the Main-Chat
+#: counterpart ("Router, not Worker", SPEC-orchestrator-topology-2026-11-03): a
+#: spawned orchestrator stays a router, so running it as a subagent (or a
+#: degraded hybrid) must not hand back a write-anywhere permission. Role names
+#: are framework data — never a provider-name branch (provider-agnostic policy).
+_WRITE_SCOPE_LOCKED_ROLES = frozenset({'orchestrator'})
+
+
+def _keeps_write_scope_lock(role: str, mode: str | None) -> bool:
+    """Whether ``role`` rendered in ``mode`` keeps its agent-level write lock.
+
+    Two independent reasons keep the lock in place:
+
+    * ``mode == "primary"`` — the emitted entry point must not write anywhere
+      while the runtime gate is active (#1006, IC-3/ADR-5): a primary agent
+      with a write-anywhere permission defeats the Main-Chat gate.
+    * the role is position-independent (:data:`_WRITE_SCOPE_LOCKED_ROLES`). The
+      orchestrator's "Router, not Worker" contract holds in every topology, so
+      ``topology: subagent`` / ``hybrid`` must not regress it to a writer.
+
+    Every other role keeps the historic behaviour: locked only as the emitted
+    primary entry. The predicate is role-based and provider-agnostic.
+    """
+    return mode == 'primary' or role in _WRITE_SCOPE_LOCKED_ROLES
+
+
 def _apply_agent_transform(
     content: str,
     spec: dict,
@@ -506,9 +533,12 @@ def _apply_agent_transform(
         subagent_depth = None
         if spec.get('inject-subagent-depth'):
             subagent_depth = required_depth_int(_caps)
-        # Write-scope lock (#1006, IC-3/ADR-5): the primary entry must not keep
-        # a write-anywhere permission while the runtime gate is active — a
-        # primary agent that can write anywhere defeats the Main-Chat gate.
+        # Write-scope lock (#1006, IC-3/ADR-5): the entry point must not keep a
+        # write-anywhere permission while the runtime gate is active — an agent
+        # that can write anywhere defeats the Main-Chat gate. The decision which
+        # roles are locked lives in `_keeps_write_scope_lock`: the emitted
+        # primary entry plus the position-independent orchestrator role
+        # (`topology: subagent` must not turn the router into a writer).
         # The gate decision has one source of truth (`lib/isolation`), imported
         # lazily here to avoid a load-time cycle.
         # SPEC-OPENCODE-V2-SUPPORT Amendment B3 (AC-C14 applies to the agent
@@ -522,13 +552,14 @@ def _apply_agent_transform(
         # `capabilities` and `plugin_mode` are resolved HERE (Amendment
         # B3-Folge): the transform itself never loads them. Without an
         # effective strict gate no deny is emitted (AC-C16 b).
-        # Known boundary: the lock keys off the DERIVED `mode` above. A project
-        # override template that declares `mode: primary` for a role the
-        # registry does not name as `primary-role` inherits the template value
-        # further down (`mode or template_fm["mode"]`) but is NOT locked here.
+        # Known boundary: the lock keys off the DERIVED `mode` above for roles
+        # outside `_WRITE_SCOPE_LOCKED_ROLES`. A project override template that
+        # declares `mode: primary` for a role the registry does not name as
+        # `primary-role` inherits the template value further down
+        # (`mode or template_fm["mode"]`) but is NOT locked here.
         deny_edit = False
         edit_allow_paths: tuple[str, ...] = ()
-        if mode == 'primary':
+        if _keeps_write_scope_lock(role, mode):
             from . import isolation
             from . import providers as providers_lib
             from . import runtime_gate

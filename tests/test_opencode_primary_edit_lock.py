@@ -259,3 +259,123 @@ def test_default_call_is_byte_identical() -> None:
     assert _default_render(deny_edit=False) == _GOLDEN_UNLOCKED
     # The parameter default must take the same path as the explicit `False`.
     assert _default_render() == _GOLDEN_UNLOCKED
+
+
+# ---------------------------------------------------------------------------
+# Topology independence — the orchestrator stays "Router, not Worker"
+# ---------------------------------------------------------------------------
+#
+# Running the orchestrator as a spawned subagent (`orchestrator.topology:
+# subagent`, issue #1190) demotes `mode: primary` -> `mode: subagent`. The
+# agent-level write lock must NOT follow that demotion: the lock is a property
+# of the ROLE (router), not of the position. Every other role keeps the
+# historic coupling to `mode: primary`.
+
+_SUBAGENT_TOPOLOGY = {"orchestrator": {"mode": "strict", "topology": "subagent"}}
+_PRIMARY_TOPOLOGY = {"orchestrator": {"mode": "strict", "topology": "primary"}}
+
+
+def _orchestrator_content() -> str:
+    """Template-shaped content with the real orchestrator tool set (no Bash)."""
+    return _agent_content(("TodoWrite", "Agent", "Read", "Write"))
+
+
+def _frontmatter(output: str) -> dict:
+    parsed = yaml.safe_load(output.split("---", 2)[1])
+    assert isinstance(parsed, dict), parsed
+    return parsed
+
+
+def _render_v2(
+    role: str = "orchestrator",
+    project_config: dict | None = None,
+    content: str | None = None,
+) -> str:
+    """Render through the native v2 surface (project `surface-version: v2`)."""
+    config = copy.deepcopy(_PROVIDER_CONFIG)
+    config["Opencode"]["surface-version"] = "v2"
+    config["Opencode"]["agent-transform"]["frontmatter-mechanism"] = (
+        "opencode-native-v2"
+    )
+    entry = config["Opencode"]
+    ext = entry.get("agent_ext", ".md")
+    return transform_agent_content_for_provider(
+        content if content is not None else _orchestrator_content(),
+        "Opencode",
+        role,
+        role,
+        "desc",
+        f"1-generic/{role}.md@0.101.0",
+        project_config if project_config is not None else {},
+        REPO_ROOT,
+        REPO_ROOT,
+        REPO_ROOT / entry["agents_dir"] / f"{role}{ext}",
+        config,
+        SyncLog(),
+    )
+
+
+def test_orchestrator_subagent_topology_keeps_scoped_edit_lock() -> None:
+    """`mode: subagent` must not hand the orchestrator a write-anywhere scope."""
+    fm = _frontmatter(_render(project_config=_SUBAGENT_TOPOLOGY))
+
+    assert fm["mode"] == "subagent"
+    assert fm["permission"]["edit"] == _SCOPED
+    assert list(fm["permission"]["edit"]) == ["*", ".tmp/**", ".meta-viz/**"], (
+        "the root deny must come first — last match wins in Opencode"
+    )
+
+
+def test_orchestrator_primary_topology_lock_is_unchanged() -> None:
+    """Regression: `topology: primary` renders the historic scoped lock."""
+    fm = _frontmatter(_render(project_config=_PRIMARY_TOPOLOGY))
+
+    assert fm["mode"] == "primary"
+    assert fm["permission"]["edit"] == _SCOPED
+
+
+def test_non_orchestrator_subagent_topology_has_no_lock() -> None:
+    """Every other role keeps the historic coupling: no primary -> no lock."""
+    permission = _permission(
+        _render(role="developer", project_config=_SUBAGENT_TOPOLOGY),
+    )
+
+    assert permission["edit"] == "allow"
+
+
+def test_non_orchestrator_rendering_is_byte_identical_under_subagent_topology() -> None:
+    """The topology must not leak into a non-orchestrator artifact."""
+    assert _render(role="developer", project_config=_SUBAGENT_TOPOLOGY) == (
+        _render(role="developer", project_config={})
+    )
+
+
+def test_orchestrator_subagent_topology_locks_v2_surface() -> None:
+    """The v2 permission list gets the same treatment as the v1 map."""
+    fm = _frontmatter(_render_v2(project_config=_SUBAGENT_TOPOLOGY))
+
+    assert fm["mode"] == "subagent"
+    permissions = fm["permissions"]
+    assert permissions[0] == {"action": "edit", "resource": "*", "effect": "deny"}
+    assert {"action": "edit", "resource": ".tmp/**", "effect": "allow"} in permissions
+    assert {
+        "action": "edit", "resource": ".meta-viz/**", "effect": "allow",
+    } in permissions
+    assert {"action": "shell", "resource": "*", "effect": "deny"} in permissions
+    assert {"action": "subagent", "resource": "*", "effect": "allow"} in permissions
+    # No surviving `edit: allow` on `*`.
+    assert {"action": "edit", "resource": "*", "effect": "allow"} not in permissions
+
+
+def test_non_orchestrator_subagent_topology_keeps_v2_edit_allow() -> None:
+    fm = _frontmatter(
+        _render_v2(role="developer", project_config=_SUBAGENT_TOPOLOGY),
+    )
+
+    assert {"action": "edit", "resource": "*", "effect": "allow"} in fm["permissions"]
+
+
+def test_non_orchestrator_v2_rendering_is_byte_identical_under_subagent_topology() -> None:
+    assert _render_v2(role="developer", project_config=_SUBAGENT_TOPOLOGY) == (
+        _render_v2(role="developer", project_config={})
+    )
