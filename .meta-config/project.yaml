@@ -319,6 +319,7 @@ orchestrator:
   handoff:
     protocol: a2a-v1
   mode: strict
+  topology: subagent
   delegation:
     max_depth: 10
 viz:
