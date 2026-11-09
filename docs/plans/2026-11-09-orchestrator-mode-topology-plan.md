@@ -2,7 +2,7 @@
 pipeline_stages:
   implement: 1
 status: DRAFT
-revision: 3
+revision: 4
 date: 2026-11-09
 base-commit: aaed14c2
 branch: docs/1190-orchestrator-topology
@@ -14,11 +14,16 @@ trace:
 
 # Orchestrator `mode` × `topology` — Umsetzungsplan (#1190)
 
-> **Status: DRAFT** · **Revision: 3** · Issue **#1190** · Klasse **XL / Architectural** · Datum 2026-11-09
+> **Status: DRAFT** · **Revision: 4** · Issue **#1190** · Klasse **XL / Architectural** · Datum 2026-11-09
 > Review 1 (`docs/reviews/2026-11-09-orchestrator-mode-topology-review.md`, vor Revision 2) ist
 > vollständig eingearbeitet; Nachweis in §16 „Review-Auflösung (2026-11-09)".
 > Re-Review 1 (`docs/reviews/2026-11-09-orchestrator-mode-topology-rereview.md`, vor Revision 3) ist
 > mit RVW2-1190-01…-13 ebenfalls eingearbeitet; Nachweis in §16, Block „Re-Review 1".
+> **Revision 4** arbeitet die drei **User-Entscheidungen vom 2026-11-09** ein (`DECIDED 2026-11-09`:
+> D-OQ1, D-OQ2, D-OQ3 — Spec §14). Neu: Positionsmodell-Task (T18), Positions-Paritätstests für
+> Opencode (T19), explizite Deklaration `orchestrator.topology: subagent` als eigener Umsetzungsschritt
+> **nach** dem Code-Fix (T20) und daraus folgend das Abschluss-Gate als T21; Szenarien `100`–`104` auf
+> die neuen Positionen umgestellt.
 > Die Spec steht auf `Status: DRAFT`; der Plan startet erst nach `Status: APPROVED`
 > (Master-Rule `spec-plan-workflow`).
 > **spec-id:** `SPEC-orchestrator-mode-topology-2026-11-09`
@@ -26,7 +31,8 @@ trace:
 > (`docs/specs/2026-11-04-orchestrator-topology-spec.md`, D1–D10, AC-1…AC-20 — bleibt gültig,
 > wird **nicht** neu aufgerollt)
 > **Design-Quelle:** `docs/specs/2026-11-03-orchestrator-topology-design.md` (Rev. 4)
-> **Entscheidungen:** D-Q1…D-Q5 der Spec (§4), neun Lücken G1…G9 (§5), 31 ACs (§8)
+> **Entscheidungen:** D-Q1…D-Q5 und D-OQ1…D-OQ3 der Spec (§4, §14), neun Lücken G1…G9 (§5),
+> **37 ACs** (§8)
 
 **Spec:** docs/specs/2026-11-09-orchestrator-mode-topology-design.md
 
@@ -35,7 +41,10 @@ Einstiegshinweis — verzweigen auf **eine** effektive Orchestrator-Topologie (d
 `resolve_topology`-Auflösung, derselbe per-Sync-`ActiveSet`), der `# CRITICAL GATE` nennt die
 Position statt einer unausführbaren Pflicht, und die drei neuen Checks diagnostizieren `main-chat` ×
 abgeleitetes `primary`, den Entry-Point-Mismatch und das wirkungslose `direct-dispatch-enabled` —
-jeweils ohne rc≠0 auf gültigen Configs.
+jeweils ohne rc≠0 auf gültigen Configs. Zusätzlich (`DECIDED 2026-11-09`) werden die **drei
+Positionen** POS-1/POS-2/POS-3 dokumentiert und je Position getestet, und dieses Repo deklariert
+seine Position am Ende **explizit** als `strict × subagent` (`orchestrator.topology: subagent`),
+sodass „derived vs. declared" auch hier keine Divergenz mehr erzeugt.
 
 **Architecture:** Ein neuer reiner Helfer `_effective_topology_flags` in `variables.py` erzeugt fünf
 Bool- und zwei String-Flags aus einer `TopologyResolution`; ein zweiter Helfer
@@ -43,7 +52,9 @@ Bool- und zwei String-Flags aus einer `TopologyResolution`; ein zweiter Helfer
 die Seams weiter (kein vierter Resolver, keine Neuauflösung pro Aufruf). Die Templates verzweigen
 dreiwertig (`EFFECTIVE_PRIMARY` → `EFFECTIVE_EXPLICIT` → historischer else-Zweig). Der v2-Reconcile
 bekommt `topology=` als Durchreich-Parameter. Neue Diagnostik ist additiv in `consistency/` und
-WARNING/INFO-only.
+WARNING/INFO-only. Die **Position** ist keine Config-Achse, sondern eine Emission-/Render-Ableitung
+aus `mode` + `effective` (Spec §3.8.2); die Deklaration dieses Repos ist eine einzelne Config-Zeile
+plus Regeneration (T20) und wird als letzter Schritt vor dem Abschluss-Gate gefahren.
 
 **Tech Stack:** Python 3.9 (stdlib; einzige dokumentierte Ausnahme PyYAML,
 `docs/adr/0001-pyyaml-runtime-ausnahme.md`), Markdown-Templates mit `{{#if}}`-Conditionals, YAML-
@@ -59,14 +70,17 @@ Frontmatter, `pytest`, `python3 scripts/sync.py`.
    (Exit-Code von `--validate`, `--check`, Topologie-Testfamilie). Zitate auf Baseline-Dateien
    entstehen erst **nach** M0; es gibt keine vorab eingefrorene Baseline.
 4. K-1 und K-2 sind mit Spec Rev. 2 erledigt (§13) — keine offene Entscheidung vor T1.
+5. Die drei User-Entscheidungen vom 2026-11-09 sind in Spec Rev. 4 eingearbeitet (`DECIDED 2026-11-09`:
+   D-OQ1/D-OQ2/D-OQ3). **T20 ist die einzige Config-Änderung dieses Plans** und läuft ausdrücklich
+   **nach** T19 (Code-Fix); sie ist kein Bestandteil der Spec (Spec §7).
 
-**Größe:** 18 Tasks in 9 Meilensteinen. S = ≤40 LOC / ≤2 h, M = ≤1 Tag / ≤150 LOC,
-L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T12, T13, T18),
-**8 × M** (T4, T5, T6, T7, T8, T14, T16, T17), **1 × L** (T15).
+**Größe:** 21 Tasks in 12 Meilensteinen. S = ≤40 LOC / ≤2 h, M = ≤1 Tag / ≤150 LOC,
+L = >1 Tag. Summe (Rev. 4): **10 × S** (T1, T2, T3, T9, T10, T11, T12, T13, T20, T21),
+**10 × M** (T4, T5, T6, T7, T8, T14, T16, T17, T18, T19), **1 × L** (T15).
 
 ---
 
-## 1. Zielbild in fünf Sätzen
+## 1. Zielbild
 
 1. `mode` und `topology` werden an **allen** Render-Seams gleich aufgelöst: die *effektive*
    Topologie (`resolve_topology(...)`) steuert Emission, Rules, Context, Agent-Templates,
@@ -84,6 +98,10 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
    Doku-Widersprüche sind einzeln aufgelöst, und der Default-Render bleibt für `topology`
    ungesetzt ∧ `effective == "subagent"` byte-identisch; abgeleitetes `primary` ist die
    beabsichtigte Änderung mit eigener Golden-Fixture.
+6. (`DECIDED 2026-11-09`) Die drei **Positionen** POS-1/POS-2/POS-3 sind definiert, gemappt
+   (`mode × topology → Position`) und je Position getestet; dieses Repo deklariert am Ende
+   `strict × subagent` **explizit** — die Position mit 1 Hop, ehrlichem `gate-inactive` und ohne
+   Abwertung gegenüber `primary`, das als dritte, optionale Position gleichwertig dokumentiert bleibt.
 
 ---
 
@@ -95,7 +113,8 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
   `scripts/lib/isolation.py:857-862`); `sync --check` bleibt rc 0 (AC-16/AC-27). **Abgeleitetes**
   `primary` (Key ungesetzt, `effective == "primary"`, in diesem Repo der Fall) ist dagegen die
   **beabsichtigte** Änderung aus AC-17 und hat eine eigene Golden-Fixture; ein **deklariertes**
-  `topology: primary` ebenso (§8).
+  `topology: primary` ebenso, und ein **deklariertes** `topology: subagent` (Zustand dieses Repos ab
+  T20) ebenfalls (§8, AC-36).
 - **Ein Resolver.** Ausschließlich `scripts/lib/topology.py::resolve_topology` (Zeile 186) und
   `topology_explicit` (Zeile 101). Kein vierter Resolver (Risiko R-3 der Spec, §9.2).
 - **Ein `ActiveSet` pro Provider und Lauf.** `_provider_topology_flags` bekommt `active_set` als
@@ -112,10 +131,19 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
   (`:2013-2037`) füllt die neuen Flags einmal provider-los; dieser Wert ist nur der Ausgangspunkt.
   Kein Render-Seam darf `ORCH_TOPOLOGY_EFFECTIVE*` aus dieser Basis lesen, ohne dass
   `_provider_topology_flags` ihn überschreibt (Ratchet-Test, AC-30).
+- **Positions-Parität statt Einheitslogik (`DECIDED 2026-11-09`, D-OQ2).** Jede Position wird
+  **einzeln** generiert und getestet (`POS-1` Main-Chat, `POS-2` Subagent, `POS-3` Session-Einstieg).
+  Unterschiede entstehen ausschließlich über Capability-Flags und Config-Keys — kein
+  `if provider == "…"`, keine gemeinsame Sonderbehandlung mehrerer Provider. Keine Position wird als
+  „nicht empfohlen" markiert.
+- **Dieses Repo deklariert seine Position explizit — aber erst in T20 (`DECIDED 2026-11-09`, D-OQ1).**
+  Die Zeile `orchestrator.topology: subagent` in `.meta-config/project.yaml` ist die **einzige**
+  Config-Änderung des Plans. Sie läuft **nach** dem Code-Fix (T19), wird regeneriert, committet und
+  ist rückrollbar (Zeile entfernen ⇒ Ableitung greift wieder). Bis T20 bleibt die Position abgeleitet.
 - **Regeneration ist ein Task-Schritt, kein Nachgedanke.** Jeder Task, der gerenderte Artefakte
-  ändert (T4–T10, T14), endet mit `python3 scripts/sync.py`, Diff-Prüfung der regenerierten Dateien
-  und Commit. Die `--check`-Gates von M1/M3/M8 und T18 sind erst **nach** dieser Regeneration
-  einfahrbar (AC-31).
+  ändert (T4–T10, T14, T19, T20), endet mit `python3 scripts/sync.py`, Diff-Prüfung der regenerierten
+  Dateien und Commit. Die `--check`-Gates von M1/M3/M9/M10 und T21 sind erst **nach** dieser
+  Regeneration einfahrbar (AC-31).
 - **Provider-Agnostik.** Verzweigung nur über Flags/`effective`/Capability-Daten; kein
   `if provider == "..."`, kein Provider-Name im Fließtext einer neuen Bedingung
   (`config/provider-capabilities.yaml:206-209`, `:263-266` sind die einzige Wahrheit).
@@ -165,6 +193,8 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
 | `scripts/lib/consistency/topology.py` | ändern | zwei neue WARNINGs (`:62-71`, `:186-403`) | T11, T12 |
 | `scripts/lib/consistency/orchestrator_strict.py` | ändern | INFO `direct-dispatch-inert` (`:36-39`, `:182-250`) | T13 |
 | `scripts/lib/isolation.py` | ändern | `reconcile_opencode_surface_gate(..., topology=None)` (`:1751-1761`); Durchreichung an `_opencode_entry_point` (`:1826-1830`) und `_opencode_v2_gate_permissions` (`:1840-1843`, `:1457`); ursachenbewusste Warnungen (`:1351-1405`, `:1881-1889`) | T14 |
+| `scripts/lib/provider_transform.py` | prüfen, nur bei rotem Test ändern | Positions-Parität: Frontmatter-`mode` fällt bei `effective != "primary"` auf `subagent` (`:494-499`, `:1052`, `:1298`); `main-chat` emittiert die Rolle nicht | T19 |
+| `.meta-config/project.yaml` | ändern | **eine** Zeile `orchestrator.topology: subagent` (nach `:311`) — explizite Deklaration dieses Repos, rückrollbar | T20 |
 
 ### Tests
 
@@ -179,28 +209,29 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
 | `tests/test_entry_hint_topology.py` | neu | G5 + `main-chat` unverändert | T10 |
 | `tests/test_orchestrator_topology_checks.py` | neu | drei neue Check-IDs inkl. Negativfälle | T11, T12, T13 |
 | `tests/test_isolation_v2_topology_reconcile.py` | neu | G7 v2 + `subagent`, kein Deny, eine Warnung | T14 |
+| `tests/test_opencode_positions.py` | neu | Positions-Parität: je ein Test für POS-1, POS-2, POS-3 (v1 + v2) | T19 |
 | `tests/test_orchestrator_mode_topology_matrix.py` | neu | 24 Zellen × Surfaces (Szenario-Logik) | T15, T17 |
-| `tests/test_orchestrator_topology_docs.py` | ändern | Matrix-Doc-Test (AC-6/7/8/10/11) + 11-Befund-Test | T15, T16 |
+| `tests/test_orchestrator_topology_docs.py` | ändern | Matrix-Doc-Test (AC-6/7/8/10/11) + 11-Befund-Test + Positions-/Mapping-Test + #1182-Bedingung | T15, T16, T18 |
 | `tests/test_provider_transform_topology_generic.py` | neu | Claude/Gemini-Emission (AC-24) | T15 |
 | `tests/scenarios/registry.md` | ändern | Einträge `100`–`104` (`:46-132`, `:176`), `103` als `BLOCKED (#1182)` | T17 |
-| `tests/scenarios/configs/100-*`, `101-*`, `102-*`, `104-*.project.yaml` | neu | je ein ausführbares Szenario (`100`, `101`, `102`, `104`) | T17 |
-| `tests/scenarios/configs/blocked-103-advisory-subagent.project.yaml` | neu | Szenario `103`, **außerhalb** des `10*`-Matches (blockiert durch #1182) | T17 |
-| `tests/scenarios/asserts/100-*`, `101-*`, `102-*`, `104-*.sh` | neu | konkrete Assertions | T17 |
+| `tests/scenarios/configs/100-strict-subagent-opencode-v2.project.yaml`, `101-strict-primary-opencode-v2.project.yaml`, `102-main-chat-derived-primary.project.yaml`, `104-claude-strict-subagent.project.yaml` | neu | je ein ausführbares Szenario (`100`=POS-2 Default, `101`=POS-3, `102`=POS-1, `104`=Claude POS-2) | T17 |
+| `tests/scenarios/configs/blocked-103-advisory-subagent.project.yaml` | neu | Szenario `103` (POS-2), **außerhalb** des `10*`-Matches (blockiert durch #1182) | T17 |
+| `tests/scenarios/asserts/100-strict-subagent-opencode-v2.sh` … `104-claude-strict-subagent.sh` | neu | konkrete Assertions je Szenario | T17 |
 | `tests/scenarios/asserts/blocked-103-advisory-subagent.sh` | neu | Assertion des `BLOCKED`-Szenarios (nicht ausgeführt) | T17 |
 
 ### Doku
 
 | Datei | neu/ändern | Zweck | Task |
 |---|---|---|---|
-| `docs/concepts/active/orchestrator-topology.md` | ändern | 24-Zellen-Matrix, Derived-Zeile, P3-Status (`:75-79`, `:91-96`) | T15 |
-| `docs/adr/0002-orchestrator-mode-topology.md` | neu | ADR (MADR-minimal, D-Q1…D-Q5) | T16 |
-| `README.md` | ändern | Key-Tabelle + Mermaid (`:210`, `:410-419`) | T16 |
+| `docs/concepts/active/orchestrator-topology.md` | ändern | 24-Zellen-Matrix **mit Positions-Spalte**, Derived-Zeile, P3-Status (`:75-79`, `:91-96`); Positionsmodell POS-1/POS-2/POS-3 als eigener Abschnitt | T15, T18 |
+| `docs/adr/0002-orchestrator-mode-topology.md` | neu | ADR (MADR-minimal, D-Q1…D-Q5 **und** D-OQ1…D-OQ3) | T16 |
+| `README.md` | ändern | Key-Tabelle + Mermaid (`:210`, `:410-419`): zwei Opencode-Positionen statt einer Aussage | T16, T18 |
 | `CLAUDE.md` | ändern | Singleton-Satz qualifizieren (`:102`) | T16 |
 | `AGENTS.md` | **nicht** editieren | generiert; Änderung kommt über G1 | T7 |
 | `.claude/rules/use-orchestrator.md` | **nicht** editieren | generiert; Änderung kommt über T7 | T7 |
-| `docs/CODEBASE_OVERVIEW.md` | ändern | §13.2 qualifizieren (`:1724-1727`) | T16 |
+| `docs/CODEBASE_OVERVIEW.md` | ändern | §13.2 qualifizieren (`:1724-1727`); beide Opencode-Positionen benennen | T16, T18 |
 | `docs/concepts/active/singleton-orchestrator-architecture.md` | ändern | Status-Hinweis (`:8-14`) | T16 |
-| `docs/concepts/active/main-chat-orchestrator-mode.md` | ändern | offener Hook-Punkt (`:109` vs. `:178`) | T16 |
+| `docs/concepts/active/main-chat-orchestrator-mode.md` | ändern | offener Hook-Punkt (`:109` vs. `:178`); POS-1 als Position einordnen | T16, T18 |
 | `docs/concepts/runtime-gate-tiers.md` | ändern | INFO-Check-ID im Severity-Abschnitt (`:135-151`) | T13 |
 
 ---
@@ -209,7 +240,7 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
 
 | MS | Inhalt | Tasks | Zwischentest-Gate |
 |---|---|---|---|
-| **M0** | **Baseline erzeugen und dokumentieren** (erster Schritt, keine Code-Änderung): `python3 scripts/sync.py --check` (erwartet rc 0), `python3 scripts/sync.py --validate` (Exit-Code notieren), `python3 -m pytest tests/ -k topology` (Pass/Fail-Zahlen notieren); Ergebnis als kurzer Block in §17 „Baseline (M0)" eintragen | — | Alle drei Befehle sind **ausgeführt** und ihr Ergebnis steht in §17; erst danach dürfen T13/T18 diese Werte zitieren |
+| **M0** | **Baseline erzeugen und dokumentieren** (erster Schritt, keine Code-Änderung): `python3 scripts/sync.py --check` (erwartet rc 0), `python3 scripts/sync.py --validate` (Exit-Code notieren), `python3 -m pytest tests/ -k topology` (Pass/Fail-Zahlen notieren); Ergebnis als kurzer Block in §17 „Baseline (M0)" eintragen | — | Alle drei Befehle sind **ausgeführt** und ihr Ergebnis steht in §17; erst danach dürfen T13/T21 diese Werte zitieren |
 | **M1** | Flags + Registrierungen (G2-Kern) | T1–T3 | `tests/test_orchestrator_topology_effective_flags.py`, `…_conditionals.py` grün; **danach** `python3 scripts/sync.py` + Diff-Prüfung; `--check` rc 0 erwartet (Default-Render unverändert) |
 | **M2** | Provider-Parität Rules/Context/Agents (G3) | T4–T6 | `tests/test_orchestrator_topology_render_parity.py` grün (3 Provider × 2 Topologien, Zwei-Sharer-Fall); **danach** `python3 scripts/sync.py` + Diff-Prüfung der regenerierten Artefakte + Commit |
 | **M3** | Wortlaut (G1, G2-Nutzung, G4, G5) | T7–T10 | alle vier Wortlaut-Testdateien grün; **danach** `python3 scripts/sync.py`, Diff-Prüfung (`AGENTS.md`, `.claude/rules/use-orchestrator.md`, `.claude/agents/*`), Commit, **dann** `--check` rc 0 |
@@ -217,7 +248,10 @@ L = >1 Tag. Summe (Rev. 2, korrigiert): **9 × S** (T1, T2, T3, T9, T10, T11, T1
 | **M5** | v2-Reconcile (G7) | T14 | `tests/test_isolation_v2_topology_reconcile.py` grün; `tests/test_orchestrator_topology_entrypoint.py` 0 failed; `python3 scripts/sync.py` + Diff-Prüfung `opencode.json` |
 | **M6** | Matrix (G8/G9-Teil 1) | T15 | `tests/test_orchestrator_topology_docs.py`, `…matrix.py`, `…generic.py` grün |
 | **M7** | Doku-Angleichung + ADR (G9) | T16 | 11-Befund-Test grün; `docs/adr/0002` vorhanden |
-| **M8** | Szenarien + Abschluss | T17, T18 | `tests/scenarios/run.sh 10` → **4× PASS** (`103` läuft außerhalb des Matches als `BLOCKED`); Vollsuite 0 failed; `--check` rc 0 |
+| **M8** | Positionsmodell-Doku (`DECIDED 2026-11-09`, D-OQ1/D-OQ3) | T18 | Positions- und Mapping-Doku-Tests grün |
+| **M9** | Positions-Parität Opencode (D-OQ2) | T19 | `tests/test_opencode_positions.py` grün (je ein Test pro Position, v1 **und** v2); `python3 scripts/sync.py` + Diff-Prüfung + Commit |
+| **M10** | Szenarien | T17 | `tests/scenarios/run.sh 10` → **4× PASS** (`100`, `101`, `102`, `104`; `103` läuft außerhalb des Matches als `BLOCKED`) |
+| **M11** | Explizite Deklaration + Abschluss | T20, T21 | `orchestrator.topology: subagent` gesetzt, regeneriert, `--check` rc 0; Vollsuite 0 failed; `--validate` rc wie in M0 |
 
 Jeder Meilenstein endet mit `python3 -m pytest <berührte Dateien> --basetemp="$PYTEST_BASETEMP"` grün
 **und** — sobald der Meilenstein gerenderte Artefakte verändert — `python3 scripts/sync.py`,
@@ -708,19 +742,25 @@ und den Wert an `_opencode_entry_point(..., topology=topology)` (`:1826-1830`) s
 Surface-Tabellen in der Concept-Doc; Consumes Spec §12.2–§12.6 als Datenquelle.
 **Test-zuerst:**
 `test_matrix_has_24_rows` — vier Surface-Tabellen × sechs `mode`×`topology`-Kombinationen
-(`strict/advisory/main-chat` × `primary/subagent`), jede Zeile mit Urteil (AC-6).
-`test_verdict_vocabulary_is_closed` — nur `RECOMMENDED|ALLOWED|DEGRADED|FORBIDDEN`; `dito`-Zellen
-sind innerhalb ihrer Tabelle auf eine Zelle mit eigener `datei:zeile`-Referenz auflösbar (AC-6).
+(`strict/advisory/main-chat` × `primary/subagent`), jede Zeile mit Urteil und Positionsangabe
+(AC-6).
+`test_verdict_vocabulary_is_closed` — das **erste Token** der Urteilszelle ist ausschließlich
+`RECOMMENDED|ALLOWED|DEGRADED|FORBIDDEN` (Zusätze wie „(optional, 0 Hop)" sind erlaubt); jede Zeile
+trägt eine Positions-ID aus `{POS-1, POS-2, POS-3}`; `dito`-Zellen sind innerhalb ihrer Tabelle auf
+eine Zelle mit eigener `datei:zeile`-Referenz auflösbar (AC-6).
 `test_exactly_one_recommended_per_surface` — Menge exakt
-`{(v1, strict, primary), (v2, strict, primary), (Claude, strict, subagent), (Gemini, strict, subagent)}`
-(AC-7).
-`test_v2_recommendation_names_observe_and_deny` — Begründungssatz nennt `observe` **und**
-`permissions`-Deny, nicht das Plugin als Erzwingungsinstanz (AC-8).
-`test_cost_section_has_hop_definition_threshold_and_estimate` — (a) „Hop ∈ `subagent`, 0 Hop unter
-`primary`", (b) „S ≤2 Dateien → direkter Dispatch", (c) eine `ESTIMATE`-Zahl **mit** Messmethode
+`{(v1, strict, subagent), (v2, strict, subagent), (Claude, strict, subagent), (Gemini, strict,
+subagent)}` (AC-7, `DECIDED 2026-11-09` D-OQ1); `strict × primary` ist auf v1/v2 `ALLOWED` und nicht
+abgewertet.
+`test_v2_rows_name_tier_facts_and_recommendation_basis` — die `RECOMMENDED`-Zeile nennt
+Session-Ownership **und** `gate-inactive` (kein Deny); die `ALLOWED`-Zeile `strict × primary` nennt
+`observe` **und** `permissions`-Deny, nicht das Plugin als Erzwingungsinstanz (AC-8).
+`test_cost_section_has_hop_definition_threshold_and_estimate` — (a) „POS-3 = 0 Hop, POS-2 = 1 Hop,
+POS-1 = 0 Hop", (b) „S ≤2 Dateien → direkter Dispatch", (c) eine `ESTIMATE`-Zahl **mit** Messmethode
 und ohne Messbehauptung (AC-10).
-`test_single_user_recommendation_is_strict_primary` — mit Begründung „gleiche Governance, kein Hop"
-(AC-11).
+`test_single_user_recommendation_is_strict_subagent_with_primary_option` — Default
+`strict × subagent` (POS-2) **und** `strict × primary` (POS-3) als gleichwertige Option mit
+„gleiche Governance, kein Hop, dafür Session-Start-Bindung" (AC-11).
 `test_gemini_primary_degrades_with_one_warning` — Resolver-Fall: `topology: primary` + Gemini-Zelle
 ⇒ `effective == "subagent"` + genau eine `orchestrator-topology.degraded` (AC-9).
 `test_emission_matrix_body` (in `…matrix.py`, parametrisiert über 24 Zellen) — pro Zelle:
@@ -762,58 +802,198 @@ schlägt fehl (Rev. 2 / R-15; Ursache ist ein doppelter `GATE_*`-Treffer, kein z
 (B-2/B-3).
 `test_adr_records_dq1_to_dq5` — `docs/adr/0002-…` existiert, enthält D-Q1…D-Q5 als
 Entscheidungen mit Konsequenzen (MADR-minimal, `se-cascade-adr-standard`) (AC-28).
+`test_adr_records_doq1_to_doq3` — derselbe ADR enthält D-OQ1, D-OQ2 und D-OQ3 mit dem Datum
+`2026-11-09` und je einer Konsequenz (Default `strict × subagent`, Gate-Tier je Surface,
+#1182-Bedingung) (AC-28).
 **Implementierung:** elf Einzeländerungen (B-1…B-11, Spec §9.1) plus ADR.
 **Verifikation:** `python3 -m pytest tests/test_orchestrator_topology_docs.py --basetemp="$PYTEST_BASETEMP"`
 → **grün**; `python3 -m pytest tests/test_orchestrator_topology_docs.py tests/test_orchestrator_topology_consistency.py --basetemp="$PYTEST_BASETEMP"` → 0 failed.
 **Depends on:** T15 · **Größe:** M
 
-### Task 17: Szenarien 100–104 (G8, Szenario-Teil, AC-29)
+### Task 17: Szenarien `100`–`104` auf das Positionsmodell ausgerichtet (G8, AC-29)
 
-**Files:** `tests/scenarios/registry.md:46-132`, `:176`; neu
-`tests/scenarios/configs/100-…`…`104-…project.yaml` + `tests/scenarios/asserts/100-…sh`…`104-…sh`
-sowie `tests/scenarios/configs/blocked-103-advisory-subagent.project.yaml` +
+**Files:** `tests/scenarios/registry.md` (`:46-132`, `:176`); neu
+`tests/scenarios/configs/100-strict-subagent-opencode-v2.project.yaml`,
+`101-strict-primary-opencode-v2.project.yaml`, `102-main-chat-derived-primary.project.yaml`,
+`104-claude-strict-subagent.project.yaml`; neu
+`tests/scenarios/asserts/100-strict-subagent-opencode-v2.sh` … `104-claude-strict-subagent.sh`; das
+blockierte Szenario liegt **außerhalb** des `10*`-Matches:
+`tests/scenarios/configs/blocked-103-advisory-subagent.project.yaml` +
 `tests/scenarios/asserts/blocked-103-advisory-subagent.sh`.
-**Interfaces:** Produces vier ausführbare Szenarien (`100`, `101`, `102`, `104`) + ein dokumentiertes
-`BLOCKED`-Szenario; Consumes die Geräte aus T7/T8/T14/T15.
+**Interfaces:** Produces vier ausführbare Szenarien (`100`, `101`, `102`, `104`) und ein
+dokumentiertes `BLOCKED`-Szenario (`103`); Consumes die Geräte aus T7/T8/T14/T15/T19. Die
+Szenario-Nummern sind die **einzige** Zuordnung — sie werden nirgends anders vergeben.
+
+**Zuordnung (verbindlich, `DECIDED 2026-11-09` D-OQ1/D-OQ3):**
+
+| Szenario | Config | Position | Erwartung |
+|---|---|---|---|
+| `100` | Opencode v2, `mode: strict`, `topology: subagent` (**neuer Default**) | POS-2 | kein `default_agent`, `mode: subagent` im Agenten-Frontmatter, keine `permissions[]`-Tripel, genau eine Log-Warnung mit den §6.4-Teilstrings |
+| `101` | Opencode v2, `mode: strict`, `topology: primary` | POS-3 | `default_agent == "orchestrator"`, `mode: primary`, zwei `permissions`-Tripel, `--validate` rc 0 |
+| `102` | `mode: main-chat`, kein `topology`, `primary-role` gesetzt | POS-1 | genau eine `orchestrator-topology.main-chat-derived-primary`-Warnung, rc 0, **kein** generierter Orchestrator-Agent, **kein** `default_agent` |
+| `103` | `mode: advisory`, `topology: subagent`, `context-profile: compact` | POS-2 | **BLOCKED (#1182)** — nicht ausgeführt, Katalog `BLOCKED (#1182)`, Name außerhalb `10*` |
+| `104` | Claude, `mode: strict`, `topology: subagent` | POS-2 | `hook`-Tier-Text, kein Entry-Point auf den Orchestrator, keine Orphan-Platzhalter |
+
 **Test-zuerst (Assertions):**
-`100-strict-primary-opencode-v2` — `surface-version: v2`, `mode: strict`, `topology: primary`:
-`default_agent == "orchestrator"`, `mode: primary` im Agenten-Frontmatter, zwei
-`permissions`-Tripel, `--validate` rc 0.
-`101-strict-subagent` — `topology: subagent`, `strict`: kein `default_agent`, keine Tripel, genau
-eine Log-Warnung mit den §6.4-Teilstrings, Regeltext byte-identisch zum `subagent`-Golden.
-`102-main-chat-derived-primary` — `mode: main-chat`, kein `topology`, `primary-role` gesetzt: genau
-eine `orchestrator-topology.main-chat-derived-primary`-Warnung, rc 0, kein Orchestrator-Agent.
+`100-strict-subagent-opencode-v2` — kein `default_agent` in `opencode.json`, `mode: subagent` im
+Agenten-Frontmatter, `permissions`-Tripel **abwesend**, genau eine Warnung mit
+`opencode-v2 gate (permissions deny) NOT written for provider` **und**
+`effective orchestrator topology is 'subagent'` (AC-29/AC-35).
+`101-strict-primary-opencode-v2` — `default_agent == "orchestrator"`, `mode: primary`, zwei
+`permissions`-Tripel (POS-3-Regression, AC-29).
+`102-main-chat-derived-primary` — genau eine `orchestrator-topology.main-chat-derived-primary`-Warnung,
+`--validate` rc 0, kein `orchestrator`-Agent, kein `default_agent` (AC-29/AC-34).
 `blocked-103-advisory-subagent` — **blockiert durch #1182** (`context-profile: compact` bricht für
-`advisory` ab). Die Konfiguration liegt **außerhalb** des `10*`-Matches
-(`blocked-103-…`), wird im Katalog als `BLOCKED (#1182)` geführt und **nicht** ausgeführt.
-`run.sh` kennt **kein** `SKIP` (`run.sh:231`); eine Skip-Konvention wird hier **nicht** eingeführt.
-`104-claude-strict-subagent` — Claude, `mode: strict`, kein `topology`: kein Orchestrator-Subagent
-als Entry, `hook`-Tier-Text, keine Orphan-Platzhalter.
+`advisory` ab); Config liegt außerhalb des `10*`-Matches, Katalog führt `BLOCKED (#1182)`, das Skript
+wird **nicht** ausgeführt. `run.sh` kennt **kein** `SKIP` (`run.sh:231`) — eine Skip-Konvention wird
+nicht eingeführt (AC-29/AC-37).
+`104-claude-strict-subagent` — Claude, `mode: strict`, `topology: subagent`: kein Orchestrator als
+Entry, `hook`-Tier-Text, keine Orphan-Platzhalter (AC-29).
 **Implementierung:** vier Configs nach dem Muster von
 `tests/scenarios/configs/69-opencode-v2-surface.project.yaml`, fünf Assert-Skripte (cwd = Temp-Dir,
 `REPO_ROOT`/`$1`), Katalogzeilen `100`–`104` (davon `103` als `BLOCKED` mit Namensnennung
-`blocked-103-…`).
-**Verifikation:** `tests/scenarios/run.sh 10` → **4× PASS** (`100`, `101`, `102`, `104`); `--validate`
-je ausgeführtem Szenario rc 0; ein `grep`-Test stellt sicher, dass `blocked-103-…` nicht vom
-`10*`-Match erfasst wird.
+`blocked-103-…`). Die Nummern `100`/`101` sind gegenüber Rev. 3 **getauscht** (Default ist jetzt
+`subagent`, D-OQ1) — es gibt keine Altbelegung.
+**Verifikation:** `tests/scenarios/run.sh 10` → **4× PASS** (`100`, `101`, `102`, `104`);
+`--validate` je ausgeführtem Szenario rc 0; ein `grep`-Test stellt sicher, dass `blocked-103-…` nicht
+vom `10*`-Match erfasst wird.
+**Depends on:** T15, T16, T19 · **Größe:** M
+
+### Task 18: Positionsmodell + Mapping-Doku (`DECIDED 2026-11-09`, D-OQ1/D-OQ3; AC-32/AC-37)
+
+**Files:** `docs/concepts/active/orchestrator-topology.md` (neuer Abschnitt „Positionen" vor der
+Matrix), `README.md` (`:210`, `:410-419`), `docs/CODEBASE_OVERVIEW.md` (`:1724-1727`),
+`docs/concepts/active/main-chat-orchestrator-mode.md` (`:109`, `:178`);
+`tests/test_orchestrator_topology_docs.py` (ändern).
+**Interfaces:** Produces die drei Positions-Definitionen (`POS-1`, `POS-2`, `POS-3`), die
+Mapping-Tabelle `mode` × `topology` → Position (zehn Zeilen) und `EXPECTED_POSITION_MAP:
+dict[tuple[str, str], str]` im Doku-Test; Consumes Spec §3.8.1/§3.8.2 und die Matrix aus T15.
+**Test-zuerst:**
+`test_position_model_has_three_positions` — die Concept-Doc definiert genau `POS-1`, `POS-2`,
+`POS-3`, je mit den sieben Feldern aus Spec §3.8.1; keine Position fehlt, keine vierte existiert
+(AC-32).
+`test_position_mapping_has_ten_rows_without_empty_cells` — die Mapping-Tabelle hat zehn
+`mode`×`topology`-Zeilen, jede mit Positionsangabe aus `{POS-1, POS-2, POS-3, keine Position}`, und
+**keine** Zelle ist leer (AC-32).
+`test_positions_are_defined_before_they_are_used` — jede in der Matrix (T15) verwendete Positions-ID
+ist in der Concept-Doc **vor** der Matrix definiert (Reihenfolge-Prüfung, AC-32).
+`test_readme_explains_both_opencode_positions` — `README.md` nennt `mode: main-chat` (POS-1) **und**
+`topology: subagent` (POS-2) als gleichwertige Opencode-Positionen; die Mermaid-Darstellung hat für
+`primary` und `subagent` je einen Knoten (B-2/B-3 der Spec bleiben erfüllt, AC-32).
+`test_codebase_overview_names_both_positions` — `docs/CODEBASE_OVERVIEW.md` beschreibt beide
+Positionen statt einer absoluten Aussage (AC-32).
+`test_advisory_subagent_carries_1182_condition_everywhere` — jede Stelle, die `advisory` × `subagent`
+empfiehlt (Concept-Doc, `README.md`), trägt im selben Absatz „#1182" (AC-37).
+**Implementierung:** Positions-Abschnitt aus Spec §3.8.1/§3.8.2 übernehmen (deutsch, gleiche
+Tabellenspalten), in `README.md` die Kurzfassung in Englisch ergänzen (beide Positionen, `POS-3` als
+optional), in `docs/CODEBASE_OVERVIEW.md` den Singleton-Absatz topologie-qualifizieren. Keine
+Code-Änderung.
+**Verifikation:** `python3 -m pytest tests/test_orchestrator_topology_docs.py --basetemp="$PYTEST_BASETEMP"`
+→ **rot (6 failed)** vor, **grün** nach der Doku-Änderung; `tests/test_orchestrator_topology_docs.py`
+und `tests/test_orchestrator_mode_topology_matrix.py` gemeinsam 0 failed.
 **Depends on:** T15, T16 · **Größe:** M
 
-### Task 18: Abschluss-Gate: Byte-Identität + Vollsuite (AC-16/AC-26/AC-27)
+### Task 19: Opencode-Generierung je Position (D-OQ2; AC-33/AC-34/AC-35/AC-36)
+
+**Files:** neu `tests/test_opencode_positions.py`; `scripts/lib/provider_transform.py` (`:494-499`,
+`:1052`, `:1298`) und `scripts/lib/isolation.py` (`:864-924`, `:926-970`) **nur**, wenn ein Test rot
+wird.
+**Interfaces:** Consumes `resolve_topology` (T1), `role_emitted_for_provider`
+(`scripts/lib/active_set.py:206-217`), `_opencode_entry_point` und
+`reconcile_opencode_surface_gate(..., topology=…)` (T14). Produces die drei Positions-Tests plus den
+Determinismus-Test für die deklarierte Position.
+**Test-zuerst:**
+`test_opencode_main_chat_position_generates_clean` (**POS-1**) — `mode: main-chat`: keine generierte
+`orchestrator`-Datei, `opencode.json` ohne von der Sync geschriebenen `default_agent`, keine
+`permissions[]`-Tripel; ein **verwalteter** Alt-Wert wird per State-Rollback zurückgenommen; ein
+**nutzereigener** Wert bleibt und erzeugt genau eine `opencode.default-agent.dangling`-Warnung
+(`isolation.py:910-924`). Parametrisiert über `surface-version: v1` **und** `v2` (AC-34).
+`test_opencode_subagent_position_generates_clean` (**POS-2**) — `topology: subagent`: Frontmatter
+`mode: subagent` und **nicht** `mode: primary` (`provider_transform.py:1052`, `:1298`), kein
+`default_agent`, keine Tripel; v1: genau eine Log-Warnung **und** ein Finding
+(`gate-inactive`, §6.4-Zählregel), v2: genau die ursachenbewusste Log-Warnung aus G7, **kein**
+Finding. Parametrisiert über v1/v2 (AC-35).
+`test_opencode_primary_position_generates_clean` (**POS-3**) — `topology: primary`: `mode: primary`,
+`default_agent: orchestrator`, Write-Scope-Lock und Deny vorhanden (Regressionsschutz, AC-33).
+`test_explicit_subagent_topology_changes_output_deterministically` — deklariert vs. abgeleitet:
+`ORCH_TOPOLOGY == "subagent"`, `ORCH_TOPOLOGY_EFFECTIVE_SOURCE == "project"`,
+`ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT == "true"` gegenüber `""`/`"derived"`/`"false"`; zwei Renderings mit
+vertauschter Provider-Reihenfolge sind byte-identisch; die Textdifferenz liegt **nur** im expliziten
+Zweig (zwei Golden-Fixtures, AC-36).
+`test_no_position_is_tested_in_a_combined_case` — Quelltext-Grep auf `tests/test_opencode_positions.py`:
+kein Testname enthält zwei Positions-IDs; die drei `*_position_generates_clean`-Tests existieren
+(AC-33).
+**Implementierung:** Test-zuerst; erwartet wird **grün** für POS-1/POS-3 (heutiges Verhalten trägt),
+**rot** höchstens für POS-2, falls das Frontmatter-`mode` bei `effective != "primary"` aus dem
+Template statt auf `subagent` fällt. Fix ist lokal in `provider_transform.py` (der `mode`-Fallback
+`:1052`, `:1298` bleibt die einzige Stelle) bzw. im Entry-Point-Rollback in `isolation.py` — **kein**
+neuer Resolver, **kein** Provider-Name im Code.
+**Verifikation:** `python3 -m pytest tests/test_opencode_positions.py --basetemp="$PYTEST_BASETEMP"`
+→ **grün**; `tests/test_provider_transform_topology.py`, `tests/test_opencode_primary_edit_lock.py`
+0 failed; danach `python3 scripts/sync.py`, Diff-Prüfung der Agent-Dateien und `opencode.json`,
+Commit, **dann** `--check` rc 0 (AC-31).
+**Depends on:** T14, T18 · **Größe:** M
+
+### Task 20: Explizite Deklaration `orchestrator.topology: subagent` (D-OQ1; AC-36/AC-31)
+
+**Files:** `.meta-config/project.yaml` (Orchestrator-Block, eine Zeile nach `:311`); regenerierte
+Artefakte (`AGENTS.md`, `.claude/rules/use-orchestrator.md`, `.claude/agents/*.md`,
+`.opencode/agents/*.md`, `opencode.json`); `tests/test_opencode_positions.py` (aus T19, zwei
+zusätzliche Tests).
+**Interfaces:** Produces die **deklarierte** Position dieses Repos (`source == "project"`,
+`ORCH_TOPOLOGY == "subagent"`) und die daraus folgende Regeneration; Consumes die Render-Seams aus
+T4–T10 und die Positions-Parität aus T19. Kein Schema-Change (Spec §6.1), kein neuer Key.
+**Test-zuerst:**
+`test_repo_declares_subagent_explicitly` — `.meta-config/project.yaml` enthält im
+`orchestrator`-Block `topology: subagent`; **keine** `provider-overrides` sind dafür nötig
+(AC-36).
+`test_repo_render_is_the_explicit_branch` — gerendert mit der Repo-Config: `ORCH_TOPOLOGY ==
+"subagent"`, `ORCH_TOPOLOGY_EXPLICIT == "true"`, `ORCH_TOPOLOGY_EFFECTIVE_SOURCE == "project"`, und
+`AGENTS.md`/`.claude/agents/orchestrator.md` tragen den expliziten `subagent`-Zweig
+(Golden-Fixture aus T8/AC-36).
+`test_repo_has_no_derived_position_warnings` — `python3 scripts/sync.py --validate` erzeugt **kein**
+`orchestrator-topology.main-chat-derived-primary` und **kein**
+`orchestrator-topology.strict-primary-entry-mismatch`; `strict`- und `subagent`-Zustand bleiben
+rc-kompatibel zu M0/§17 (AC-36).
+`test_declaration_is_deterministic` — zwei aufeinanderfolgende `python3 scripts/sync.py`-Läufe
+erzeugen byte-identische Artefakte; `--check` rc 0 (AC-31).
+**Implementierung:** genau eine Zeile `topology: subagent` im `orchestrator`-Block von
+`.meta-config/project.yaml` (nach dem `mode: strict`-Eintrag, `:311`), dann `python3 scripts/sync.py`,
+Diff-Prüfung, Commit. **Keine** weitere Config-Änderung, kein `provider-overrides`.
+**Erwartetes, beabsichtigtes Warnbild danach:** auf diesem Repo erscheint im Sync-Log
+`orchestrator-topology.gate-inactive` (v1 + POS-2: kein `default_agent`, kein Deny) — das ist die
+ehrliche Meldung aus §6.4 der Spec, **kein** Fehler; rc bleibt 0. Ebenso darf der v1-Consistency-Check
+`runtime gate is wanted for provider` (Tier `permission`) genau einmal feuern; er ist WARNING.
+**Rollback (verbindlich):** Zeile entfernen, `python3 scripts/sync.py` erneut ausführen, Diff gegen
+den Stand vor T20 prüfen — der Baum fällt auf die **abgeleitete** `primary`-Position zurück
+(Golden-Fixture aus T8/T21, AC-17). Der Rollback ist ein eigener Commit (`revert`-Charakter), kein
+Force-Push; **kein** Push/Tag/Branch durch den Executor.
+**Verifikation:** `python3 -m pytest tests/test_opencode_positions.py --basetemp="$PYTEST_BASETEMP"`
+→ **grün**; `python3 scripts/sync.py` → Diff zeigt **nur** die beabsichtigte Änderung (Topologie-Zweige
+in `AGENTS.md`, `.claude/rules/use-orchestrator.md`, Agent-Dateien), `python3 scripts/sync.py --check`
+→ **rc 0**, `--validate` → Exit-Code wie in M0/§17; Commit `feat(orchestrator): declare subagent
+topology explicitly` (≤72 Zeichen, ohne BOM, Secret-Scan vorher).
+**Depends on:** T17, T19 · **Größe:** S
+
+### Task 21: Abschluss-Gate: Byte-Identität + Vollsuite (AC-16/AC-26/AC-27)
 
 **Files:** keine neuen Dateien; Test-Ergänzung in
 `tests/test_orchestrator_topology_effective_flags.py` und `tests/test_orchestrator_topology_docs.py`.
-**Interfaces:** Consumes die Golden-Fixtures aus M0 (§17) und T7/T8; Produces den Abschlussnachweis
-(Byte-Identität, Schema-Diff, Vollsuite).
+**Interfaces:** Consumes die Golden-Fixtures aus M0 (§17), T7/T8 und die deklarierte Position aus T20;
+Produces den Abschlussnachweis (Byte-Identität, Schema-Diff, Vollsuite).
 **Test-zuerst:**
 `test_unset_topology_subagent_render_is_byte_identical` — Golden-Fixture: Rendering für alle aktiven
 Provider **ohne** `topology`-Key **und** mit `effective == "subagent"` ist byte-gleich zum
 Baseline-Stand `aaed14c2` (AC-16/AC-27).
 `test_derived_primary_render_matches_intentional_golden` — ohne `topology`-Key, abgeleitetes
-`primary` (dieses Repo): weicht **beabsichtigt** ab und entspricht der neuen Golden-Fixture
+`primary` (Zustand **vor** T20): weicht **beabsichtigt** ab und entspricht der neuen Golden-Fixture
 (Gate-Text, `orchestrator.md`/`_reference-agent.md`, Singleton-Block); keine
 Byte-Identitäts-Zusage (AC-17, Rev. 3 / RVW2-1190-01).
 `test_declared_primary_render_matches_new_golden` — deklariertes `topology: primary` weicht
 **beabsichtigt** ab und entspricht der neuen Golden-Fixture (AC-27).
+`test_declared_subagent_render_matches_new_golden` — deklariertes `topology: subagent` (der Zustand
+dieses Repos ab T20) entspricht der Golden-Fixture aus T8/T19 und unterscheidet sich deterministisch
+vom abgeleiteten Fall (AC-36).
 `test_schema_has_no_new_properties` — Diff-Assertion gegen den Stand vor der Umsetzung:
 `config/project-config.schema.json` hat dieselben `properties` (nur `description`-Texte dürfen
 abweichen) (AC-26).
@@ -824,7 +1004,7 @@ im Default (AC-16).
 die in M0/§17 dokumentierte Testzahl der Topologie-Familie bleibt unverändert grün; 19 Dateien
 matchen `tests/*topology*.py`); `python3 scripts/sync.py --check` → **rc 0**; `python3 scripts/sync.py
 --validate` → Exit-Code wie in M0/§17 dokumentiert.
-**Depends on:** T1–T17 · **Größe:** S
+**Depends on:** T1–T17, T18–T20 · **Größe:** S
 
 ---
 
@@ -843,6 +1023,11 @@ matchen `tests/*topology*.py`); `python3 scripts/sync.py --check` → **rc 0**; 
 | **`ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT`** | `true`\|`false` | `source != "derived"` (Spec Rev. 2) | ja |
 | **`ORCH_TOPOLOGY_EFFECTIVE_{PRIMARY,SUBAGENT,HYBRID}`** | genau eines `true` | `resolution.effective` | ja |
 | **`ORCH_TOPOLOGY_INERT`** | `true`\|`false` | `mode == "main-chat"` | ja |
+
+**Position ist kein Flag und kein Key (`DECIDED 2026-11-09`, D-OQ1).** `POS-1`/`POS-2`/`POS-3` werden
+aus `mode` + `effective` abgeleitet (Spec §3.8.2) und in Doku/Tests verwendet; es gibt **kein**
+`ORCH_POSITION_*`-Flag und keinen `position`-Key. Die Deklaration dieses Repos (`topology: subagent`,
+T20) nutzt ausschließlich den bestehenden Key `orchestrator.topology`.
 
 ### 6.2 Funktionen
 
@@ -890,7 +1075,9 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 - **Erwartung (Test):** `EXPECTED_MATRIX: dict[tuple[str, str, str], str]` in
   `tests/test_orchestrator_topology_docs.py` — Schlüssel `(surface, mode, topology)`,
   Wert `RECOMMENDED|ALLOWED|DEGRADED|FORBIDDEN`. 24 Einträge, Test vergleicht Doc-Parsing gegen
-  diese Struktur (AC-6/AC-7).
+  diese Struktur (AC-6/AC-7). Die **Positions-Spalte** (`POS-1`/`POS-2`/`POS-3`) wird zusätzlich als
+  `EXPECTED_POSITION_MAP: dict[tuple[str, str], str]` geparst (T18/AC-32); sie ist **nicht** Teil des
+  Urteils-Schlüssels.
 - **Produktionsdaten unverändert:** `config.py:435-463` (`ORCHESTRATOR_TOPOLOGY_MATRIX`,
   `orchestrator_topology_cell`) bleibt die normative Zell-Semantik für den Validator.
 
@@ -905,24 +1092,27 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
    `tests/test_orchestrator_topology_validator.py`, `tests/test_orchestrator_topology_resolver.py`,
    `tests/test_topology_capability_invariant.py`,
    `tests/test_opencode_primary_edit_lock.py`, `tests/test_provider_transform_topology.py`.
-2. **Neue Testdateien (10):** `test_orchestrator_topology_effective_flags.py`,
+2. **Neue Testdateien (11):** `test_orchestrator_topology_effective_flags.py`,
    `test_orchestrator_topology_render_parity.py`, `test_use_orchestrator_topology_rendering.py`,
    `test_orchestrator_template_topology_wording.py`, `test_singleton_block_topology.py`,
    `test_entry_hint_topology.py`, `test_orchestrator_topology_checks.py`,
    `test_isolation_v2_topology_reconcile.py`, `test_orchestrator_mode_topology_matrix.py`,
-   `test_provider_transform_topology_generic.py` (Rev. 3 / RVW2-1190-10).
+   `test_provider_transform_topology_generic.py` (Rev. 3 / RVW2-1190-10) sowie
+   `test_opencode_positions.py` (Rev. 4, D-OQ2).
 3. **Matrix-Tests:** 24 Zellen (4 Surfaces × 6 Kombinationen) in
    `test_orchestrator_mode_topology_matrix.py`; je Zelle vier Assertions
    (`effective`, Frontmatter-`mode`/Lock, Deny-Form, Warnbild) = **24 × 4 = 96** parametrisierte
    Fälle. `hybrid` ist **keine** eigene Zeile (degradiert immer, `provider-capabilities.yaml:209`).
 4. **Zwischentests je Meilenstein:** M1 → T1/T2/T3-Dateien; M2 → Parity; M3 → vier
    Wortlaut-Dateien; M4 → Checks; M5 → Reconcile; M6 → Doc/Matrix/Generic; M7 → Doc-Test;
-   M8 → Szenarien.
-5. **Genau ein Szenariotest am Ende (M8):** `tests/scenarios/run.sh 10` mit `100`, `101`, `102`,
-   `104`; `103` (advisory×subagent) ist **blockiert durch #1182** und liegt als
-   `blocked-103-advisory-subagent` **außerhalb** des `10*`-Matches, im Katalog als `BLOCKED`
-   geführt. `run.sh` kennt kein `SKIP` (`run.sh:231`) — eine Skip-Konvention wird nicht eingeführt
-   (AC-29).
+   M8 → Positions-/Mapping-Doku; M9 → `test_opencode_positions.py`; M10 → Szenarien; M11 → Deklaration
+   + Abschluss.
+5. **Genau ein Szenariotest am Ende (M10):** `tests/scenarios/run.sh 10` mit `100`, `101`, `102`,
+   `104` (`100` = `strict × subagent` = neuer Default, `101` = `strict × primary`, `102` =
+   `main-chat`, `104` = Claude `strict × subagent`); `103` (advisory×subagent) ist **blockiert durch
+   #1182** und liegt als `blocked-103-advisory-subagent` **außerhalb** des `10*`-Matches, im Katalog
+   als `BLOCKED` geführt. `run.sh` kennt kein `SKIP` (`run.sh:231`) — eine Skip-Konvention wird nicht
+   eingeführt (AC-29).
    **Nummernwahl:** der Katalog führt `88`–`93` (`tests/scenarios/registry.md:127-132`) und endet
    bei `87` in der Nachtragsliste (`:168-176`); kein Eintrag ≥ `100` existiert. Die Aussage
    „`94`–`99` sind für die Config-Welle reserviert" ist eine **Annahme** aus der Config-Welle
@@ -935,15 +1125,17 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 
 ## 8. Migration & Rollback
 
-- **Keine Config-Migration.** Keine neuen Keys (§6.1 der Spec); `config/project-config.schema.json`
-  bleibt strukturell unverändert (AC-26). Ausnahme nur, falls **OQ-1** bejaht wird: dann **eine**
-  Zeile `orchestrator.topology: primary` in `.meta-config/project.yaml` (nach Zeile 311) —
-  Folgeaufgabe, nicht Teil dieses Plans.
+- **Genau eine Config-Änderung — und sie ist ein eigener Task (`DECIDED 2026-11-09`, D-OQ1).** Keine
+  neuen Keys (§6.1 der Spec); `config/project-config.schema.json` bleibt strukturell unverändert
+  (AC-26). T20 setzt **eine** Zeile `orchestrator.topology: subagent` in `.meta-config/project.yaml`
+  (nach Zeile 311) — **nach** dem Code-Fix (T19), mit Regeneration, Commit und Rollback
+  (Zeile entfernen ⇒ Ableitung greift wieder; Golden-Fixture aus T8/T21). Es ist **keine**
+  `primary`-Deklaration: der Default dieses Repos ist `strict × subagent`.
 - **Default-Verhalten byte-identisch — nur für `topology` ungesetzt ∧ `effective == "subagent"`:**
   kein `topology`-Key **und** alle aktiven Renderer lösen `subagent` auf ⇒ gleiche Emission
   (`provider_transform.py:488-499`), gleicher `subagent`-Regelzweig (T7-Golden), gleicher
   Singleton-Text (T9-Golden), **gleicher** Einstiegshinweis (`agents.py:174`, in Rev. 3 bewusst
-  unverändert). Nachweis: T18-Golden-Fixture + `sync --check` rc 0.
+  unverändert). Nachweis: T21-Golden-Fixture + `sync --check` rc 0.
 - **Abgeleitetes `primary` (Key ungesetzt) ändert sich beabsichtigt:** in diesem Repo leitet der
   Resolver `primary` ab (`topology.py:135-140`), deshalb ersetzt der `EFFECTIVE_PRIMARY`-Zweig den
   heutigen else-Zweig — Gate-Text (G1), `orchestrator.md`/`_reference-agent.md`/a2a
@@ -951,14 +1143,19 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
   Texts, **keine** Byte-Identitäts-Zusage (AC-17, Rev. 3 / RVW2-1190-01).
 - **Deklariertes `topology: primary` ändert sich ebenfalls beabsichtigt:** derselbe
   `EFFECTIVE_PRIMARY`-Zweig ersetzt den heutigen expliziten Zweig. Dafür gilt eine
-  **Golden-Fixture des neuen Texts** (T8/T18), keine Byte-Identitäts-Zusage (AC-27).
+  **Golden-Fixture des neuen Texts** (T8/T21), keine Byte-Identitäts-Zusage (AC-27).
+- **Deklariertes `topology: subagent` (dieses Repo ab T20) ändert sich beabsichtigt:** der
+  explizite `subagent`-Zweig ersetzt den heutigen else-Zweig; `ORCH_TOPOLOGY_EFFECTIVE_SOURCE` wird
+  `project` statt `derived`, `ORCH_TOPOLOGY_EXPLICIT` `true` statt `false`. Golden-Fixture aus
+  T8/T19, Determinismus-Test in T20 (AC-36). **Rollback:** Zeile entfernen + `sync` ⇒ Baum fällt auf
+  den abgeleiteten Zustand zurück.
 - **Rollback = Revert der Flag-/Wortlaut-/Check-Änderungen.** Alle neuen Flags sind additiv; ein
   Revert entfernt sie, ohne dass Configs oder Capability-Daten angefasst werden müssen. Die
   fail-closed-Registrierung macht einen Teil-Revert ungefährlich (fehlende Flags ⇒ historischer
   Zweig), aber nicht byte-sicher — deshalb Revert **je Meilenstein/Task-Commit**.
 - **Keine Capability-Änderung:** `topology_support`/`topology_degrade`/`topology_verified_state`
   bleiben unangetastet (Spec §7, `config/provider-capabilities.yaml:206-209`, `:263-266`).
-- **Doku-Rollback:** T15/T16 sind reine Textänderungen; ein Revert stellt die alte Matrix/Aussagen
+- **Doku-Rollback:** T15/T16/T18 sind reine Textänderungen; ein Revert stellt die alte Matrix/Aussagen
   wieder her, ohne Codefolgen.
 
 ---
@@ -973,13 +1170,16 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 | P-4 | **Doku-Drift:** elf Stellen, davon zwei gegenläufige Statusaussagen (B-7/B-8) | Widerspruch bleibt sichtbar, Doku-Test schlägt fehl | T16 arbeitet die Liste einzeln ab; Test pinnt „keine absolute Aussage ohne Qualifier" |
 | P-5 | **#1182-Abhängigkeit:** `advisory` + `context-profile: compact` bricht am fehlenden `CRITICAL GATE`-Heading | Szenario 103 nicht lauffähig; Team-Empfehlung praktisch blockiert | G1 benennt die Sektion **nicht** um (T7-Test); Szenario 103 als `BLOCKED` markiert; Empfehlung mit Blockerhinweis |
 | P-6 | **Warnungs-Flut** auf Bestandsprojekten (R-1 der Spec) | Checks werden ignoriert | Jede Bedingung an Präsenz/Widerspruch gebunden: D-Q1 nur `main-chat` + derived `primary`, D-Q5 nur `main-chat` **und** präsenter Key; Dedup je Check-ID/Provider/Lauf (`_append_once`, `consistency/topology.py:164-183`) |
-| P-7 | **Byte-Identität bricht** durch neue Conditional-Flags (R-2) | `sync --check`-Drift auf allen Consumern | Vier Registrierungen + Golden-Fixtures (T2/T18); `EFFECTIVE_EXPLICIT` bewusst `source != "derived"` (K-1), sonst kippt jeder Default |
+| P-7 | **Byte-Identität bricht** durch neue Conditional-Flags (R-2) | `sync --check`-Drift auf allen Consumern | Vier Registrierungen + Golden-Fixtures (T2/T21); `EFFECTIVE_EXPLICIT` bewusst `source != "derived"` (K-1), sonst kippt jeder Default |
 | P-8 | **Vierter Resolver** (R-3) | Emission/Rendering driften erneut | `_provider_topology_flags` ist der einzige neue Pfad und ruft ausschließlich `resolve_topology` |
 | P-9 | **Merge-Konflikte** mit #1187/#1186/#1188/#1181 | halb gefixte Zustände | Serialisierungsregel §12 |
+| P-10 | **Positionen werden vermischt:** ein Test/eine Doku-Aussage behandelt `main-chat` und `subagent` gemeinsam, dadurch bleibt eine Position ungetestet | eine der beiden first-class-Opencode-Positionen bricht unbemerkt (D-OQ2) | Je Position ein eigener Test (T19), Quelltext-Grep gegen kombinierte Fälle, Positions-Spalte in Matrix und Mapping (T18/AC-32/AC-33) |
+| P-11 | **Explizite Deklaration driftet zurück:** ein späterer Edit entfernt `orchestrator.topology: subagent` und die derived-vs-declared-Divergenz kehrt zurück | Lücken 2/4/5 werden im Alltag wieder sichtbar; D-Q1 feuert erneut | T20-Test `test_repo_declares_subagent_explicitly` pinnt die Zeile; Determinismus-Test + `--check` rc 0 als Regressionsschutz (AC-36) |
+| P-12 | **`advisory × subagent` wird als freigegeben gelesen** (D-OQ3) | Team stellt vor #1182 um und läuft in den compact-Bruch | Bedingung an jeder Empfehlungsstelle (T18/AC-37); Szenario `103` bleibt `BLOCKED` |
 
 ---
 
-## 10. AC → Task-Traceability (alle 31)
+## 10. AC → Task-Traceability (alle 37)
 
 | AC | Kurzinhalt | Task(s) | Test |
 |---|---|---|---|
@@ -989,17 +1189,17 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 | AC-4 | WARN `strict-primary-entry-mismatch` | T12 | `test_strict_primary_without_entry_point_warns` |
 | AC-5 | Lock bei `primary`, kein Lock + `gate-inactive` bei `subagent` | T14, T15 | `test_v2_primary_still_writes_the_triples` (Regression `test_opencode_primary_edit_lock.py`) |
 | AC-6 | 24 Matrix-Zeilen, Urteile, `dito`-Auflösung | T15 | `test_matrix_has_24_rows`, `…verdict_vocabulary_is_closed` |
-| AC-7 | genau eine `RECOMMENDED` je Surface | T15 | `test_exactly_one_recommended_per_surface` |
-| AC-8 | v2-Begründung nennt `observe` + Deny | T15 | `test_v2_recommendation_names_observe_and_deny` |
+| AC-7 | genau eine `RECOMMENDED` je Surface, Menge = alle `strict × subagent`; `strict × primary` bleibt `ALLOWED` | T15 | `test_exactly_one_recommended_per_surface` |
+| AC-8 | v2: `RECOMMENDED` nennt Session-Ownership + `gate-inactive`, `ALLOWED` nennt `observe` + Deny | T15 | `test_v2_rows_name_tier_facts_and_recommendation_basis` |
 | AC-9 | Gemini `primary` → `subagent` + `degraded` | T15 | `test_gemini_primary_degrades_with_one_warning` |
 | AC-10 | Kostenabschnitt: Hop-Definition, S-Schwelle, ESTIMATE | T15 | `test_cost_section_has_hop_definition_threshold_and_estimate` |
-| AC-11 | Single-User-Empfehlung `strict × primary` | T15 | `test_single_user_recommendation_is_strict_primary` |
+| AC-11 | Single-User-Default `strict × subagent`, `strict × primary` als gleichwertige Option | T15 | `test_single_user_recommendation_is_strict_subagent_with_primary_option` |
 | AC-12 | INFO `direct-dispatch-inert` nur unter `main-chat`, ein INFO pro Lauf, Kanal `--validate` | T13 | `test_direct_dispatch_key_present_under_main_chat_is_info`, `test_info_is_emitted_once_per_run_not_per_provider`, `test_key_under_strict_produces_no_finding` |
 | AC-13 | kein Finding ohne Key / unter `strict`/`advisory`; Präsenz-Semantik | T13 | `test_absent_key_produces_no_finding`, `…advisory_mode_produces_no_finding`, `…presence_not_truthiness` |
 | AC-14 | Gate verzweigt nur über `EFFECTIVE_PRIMARY` | T7, T8 | `test_gate_rule_has_no_provider_or_declared_condition` |
 | AC-15 | fünf Bool-Flags in vier Registrierungen; zwei String-Flags nur `_BUILTIN_VARS` | T1, T2 | `test_each_registration_is_load_bearing`, `test_string_flags_are_not_conditionals` |
-| AC-16 | Default byte-identisch nur bei `effective == "subagent"`; `EFFECTIVE` nie `none` | T3, T18 | `test_unset_topology_subagent_render_is_byte_identical`, `…_never_none` |
-| AC-17 | derived `primary` ohne „nur main_chat"-Satz, beabsichtigte Änderung mit Golden | T8, T18 | `test_derived_primary_has_no_main_chat_only_claim`, `test_derived_primary_render_matches_intentional_golden` |
+| AC-16 | Default byte-identisch nur bei `effective == "subagent"`; `EFFECTIVE` nie `none` | T3, T21 | `test_unset_topology_subagent_render_is_byte_identical`, `…_never_none` |
+| AC-17 | derived `primary` ohne „nur main_chat"-Satz, beabsichtigte Änderung mit Golden | T8, T21 | `test_derived_primary_has_no_main_chat_only_claim`, `test_derived_primary_render_matches_intentional_golden` |
 | AC-18 | Provider-Override paritätisch in Agent-Templates | T6 | `test_agent_templates_carry_provider_scoped_effective_flags` |
 | AC-19 | Singleton-Block topologieabhängig, `NIEMALS` bleibt | T9 | `test_primary_block_names_the_session_entry` |
 | AC-20 | Einstiegshinweis dreiwertig + neutraler Shared-File-Text; `subagent` unverändert | T5, T10 | `test_hint_primary_names_the_entry`, `test_hint_subagent_keeps_historic_wording`, `…shared_hint_is_provider_neutral` |
@@ -1008,12 +1208,18 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 | AC-23 | drei `_opencode_entry_point`-Aufrufe + beide Reconcile-Aufrufer mit `topology=` (Trefferzahlen + Objekt-Identität) | T14 | `test_all_three_entry_point_calls_pass_topology`, `test_both_reconcile_callers_pass_topology`, `test_reconcile_passes_the_resolved_object_downstream` |
 | AC-24 | Testliste G8 deckt die sieben Flächen inkl. `ROLE_ORCHESTRATOR_ACTIVE` unter `main-chat` (konkrete Assertion) | T1, T4–T10, T14, T15 | Summe der neuen Dateien; `test_role_orchestrator_active_under_main_chat_prose` (T10) |
 | AC-25 | elf Doku-Befunde einzeln (B-9 als Render-Widerspruch), Datei-Scope + Ausnahmen | T16 | `test_no_absolute_singleton_claim_without_topology_qualifier`, `test_gate_render_is_single_variant_per_file` |
-| AC-26 | keine neuen Schema-Properties | T18 | `test_schema_has_no_new_properties` |
-| AC-27 | `--check` byte-identisch nur bei `ungesetzt ∧ effective == "subagent"`; derived **und** deklariert `primary` = beabsichtigte Änderung mit Golden | T18, T8 | Vollsuite + `--check`/`--validate`, `test_derived_primary_render_matches_intentional_golden`, `test_declared_primary_render_matches_new_golden` |
-| AC-28 | ADR D-Q1…D-Q5 + Matrix im Concept | T15, T16 | `test_adr_records_dq1_to_dq5` |
-| AC-29 | Szenarien 100–104: 4 ausführbar, 103 als `BLOCKED` außerhalb `10*` | T17 | `tests/scenarios/run.sh 10` → 4 PASS + Grep-Test auf Namensschema |
+| AC-26 | keine neuen Schema-Properties | T21 | `test_schema_has_no_new_properties` |
+| AC-27 | `--check` byte-identisch nur bei `ungesetzt ∧ effective == "subagent"`; derived **und** deklariert `primary` = beabsichtigte Änderung mit Golden | T21, T8 | Vollsuite + `--check`/`--validate`, `test_derived_primary_render_matches_intentional_golden`, `test_declared_primary_render_matches_new_golden` |
+| AC-28 | ADR D-Q1…D-Q5 **und** D-OQ1…D-OQ3 + Matrix im Concept | T15, T16 | `test_adr_records_dq1_to_dq5`, `test_adr_records_doq1_to_doq3` |
+| AC-29 | Szenarien: `100`=`strict × subagent`, `101`=`primary`, `102`=`main-chat`, `104`=Claude, `103` als `BLOCKED` außerhalb `10*` | T17 | `tests/scenarios/run.sh 10` → 4 PASS + Grep-Test auf Namensschema |
 | AC-30 | ein `ActiveSet` für Emission + drei Render-Seams; kein Seam liest die provider-lose Basis | T3, T4, T5, T6 | `test_rules_passes_the_shared_active_set`, `test_context_uses_the_shared_active_set`, `test_agents_use_the_shared_active_set`, `test_no_render_seam_reads_the_global_basis` |
-| AC-31 | Regeneration + Commit je emissionsrelevantem Task; danach `--check` rc 0 | T4–T10, T14, T18 | Verifikationsschritt jedes Tasks + M1/M3/M8/T18 |
+| AC-31 | Regeneration + Commit je emissionsrelevantem Task; danach `--check` rc 0 | T4–T10, T14, T19, T20, T21 | Verifikationsschritt jedes Tasks + M1/M3/M9/M10/T21 |
+| AC-32 | Positionsmodell + Mapping-Doku (drei Positionen, zehn Zeilen), beide Opencode-Positionen in README/CODEBASE_OVERVIEW | T18 | `test_position_model_has_three_positions`, `test_position_mapping_has_ten_rows_without_empty_cells`, `test_readme_explains_both_opencode_positions`, `test_codebase_overview_names_both_positions` |
+| AC-33 | je **ein** Test pro Position (POS-1/POS-2/POS-3), v1 **und** v2 | T19 | `test_opencode_main_chat_position_generates_clean`, `test_opencode_subagent_position_generates_clean`, `test_opencode_primary_position_generates_clean`, `test_no_position_is_tested_in_a_combined_case` |
+| AC-34 | POS-1: kein dangling `default_agent`, keine Rolle, keine Tripel | T19, T17 | `test_opencode_main_chat_position_generates_clean`, Szenario `102` |
+| AC-35 | POS-2: kein `mode: primary`, kein `default_agent`, ehrliches `gate-inactive` | T19, T17 | `test_opencode_subagent_position_generates_clean`, Szenario `100` |
+| AC-36 | deklariertes `topology: subagent` ändert die Ausgabe deterministisch (declared vs. derived) | T19, T20, T21 | `test_explicit_subagent_topology_changes_output_deterministically`, `test_repo_render_is_the_explicit_branch`, `test_declared_subagent_render_matches_new_golden` |
+| AC-37 | `advisory × subagent` überall als #1182-abhängig markiert | T18, T17 | `test_advisory_subagent_carries_1182_condition_everywhere`, Szenario `103` (`BLOCKED`) |
 
 ---
 
@@ -1022,13 +1228,13 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 | Issue | Status | Bezug zu diesem Plan |
 |---|---|---|
 | **#1190** | offen | Haupt-Issue; Quelle der D-Q1…D-Q5 |
-| **#1077** | closed | Mechanismus (`topology`-Enum, D1–D10, P3). **Nicht** neu aufrollen — T1–T18 ändern weder Enum noch Degradierung |
-| **#1182** | offen | Blockiert `advisory` + `context-profile: compact` und Szenario `103`. G1 darf `# CRITICAL GATE` nicht umbenennen (T7-Test) |
+| **#1077** | closed | Mechanismus (`topology`-Enum, D1–D10, P3). **Nicht** neu aufrollen — T1–T21 ändern weder Enum noch Degradierung |
+| **#1182** | offen | Blockiert `advisory` + `context-profile: compact` und Szenario `103`; **`DECIDED 2026-11-09` (D-OQ3):** `advisory × subagent` wird erst nach dem Fix empfohlen, bis dahin ist `strict × subagent` die Team-Empfehlung. G1 darf `# CRITICAL GATE` nicht umbenennen (T7-Test) |
 | **#1007** | offen | V2-Surface-Matrix. T14 ist bewusst klein und lokal; die v2-Empfehlung stützt sich auf `docs/concepts/runtime-gate-tiers.md:36-55`, nicht auf #1007-Ergebnisse |
 | **#1090** | closed | Dangling `default_agent` in `main-chat`; liefert `role_emitted_for_provider` (`isolation.py:920-924`). D-Q1 ist die Rückrichtung |
 | **#794** | closed | Main-Chat-Mutationen ohne Gate (kein Runtime-Gate) — Motiv für die ehrliche Tier-Zusage (T15-Matrix) |
 | **#683** | closed | `strict` blockierte delegierte Implementer — Motiv für „Nutzungsfehler statt Config-Fehler" (T7) |
-| **#1210** | offen | Guard kann einen Sentinel keiner Rolle zuordnen; begrenzt, wie stark D-Q2 (c) erzwungen werden kann. Keine Abhängigkeit, gleicher Ehrlichkeits-Maßstab (kein Runtime-Test in T18) |
+| **#1210** | offen | Guard kann einen Sentinel keiner Rolle zuordnen; begrenzt, wie stark D-Q2 (c) erzwungen werden kann. Keine Abhängigkeit, gleicher Ehrlichkeits-Maßstab (kein Runtime-Test in T21) |
 | **#1187** | offen | Projekt-Kontext-Injektion; berührt `agents/1-generic/*.md` und `variables.py` → Konfliktfläche (§12) |
 | **#1186 / #1188 / #1181** | offen | Schema-Blöcke / Issue-Label-Taxonomie / Commit-Authority — Konfliktflächen (§12) |
 | **#1209 / #1006 / #885** | offen / closed / closed | **real bestätigt** (Review-Befund W5): #1209 Artifact-Mode-Gating (Konfliktfläche `variables.py`), #1006 Entry-Point-Invariante (Vorgänger von G7), #885 Framework-Conformity-Audit (Kontext der Doku-Befunde). Keine Erfindung, keine neue Abhängigkeit |
@@ -1040,12 +1246,13 @@ instances-clamped}` (`consistency/topology.py:65-71`), `orchestrator-strict.no-h
 
 | Datei | Dieses Vorhaben | Kollidiert mit | Serialisierung |
 |---|---|---|---|
-| `config/project-config.schema.json` | **keine** Property-Änderung (AC-26); nur `description` optional | **#1186** (artifact-locations), **#1188** (issue-label-taxonomy) legen neue Blöcke an (`:2469-2492` ist der Orchestrator-Block) | Dieses Vorhaben **zuletzt** und **text-only**; Schema-Diff muss leer sein (T18) |
+| `config/project-config.schema.json` | **keine** Property-Änderung (AC-26); nur `description` optional | **#1186** (artifact-locations), **#1188** (issue-label-taxonomy) legen neue Blöcke an (`:2469-2492` ist der Orchestrator-Block) | Dieses Vorhaben **zuletzt** und **text-only**; Schema-Diff muss leer sein (T21) |
 | `scripts/lib/config.py` | T3 (Rumpf von `_build_orch_variables`, `:2013-2037`) | **#1186** (Validierung neuer Blöcke), **#1187** | Nicht parallel schneiden; T3 berührt nur den Orchestrator-Block, kein Validator-Code |
 | `scripts/lib/agent_sync.py` | T6 (`_build_provider_vars`, `:489-554`), T9 (`:969-986`) | **#1181** (Commit-Authority für Edit-only-Rollen; Body nennt nur `agents/1-generic/documenter.md`, der Seam liegt plausibel hier — im Body **nicht belegt**) | Getrennte Commits; T6/T9 berühren Provider-Vars/Singleton-Block, #1181 eher den Commit-Block |
 | `scripts/lib/variables.py` | T1/T2 (`:54-93`, `:311-356`, `:575-598`) | **#1209** (Artifact-Mode-Gating), **#1187** (Context-Injection-Scope) fassen `_build_variables`/Flag-Registrierung an | Reihenfolge: #1187/#1209 zuerst, dann T1/T2 (additiv, aber heiße Datei) |
 | `agents/1-generic/*.md` | T8 (`orchestrator.md:19`, `_reference-agent.md:24`) | **#1187** (Projekt-Kontext in vielen Templates), **#1209** (Output-Pfad-Gating) | `orchestrator.md` ist in allen drei Vorhaben betroffen → **eine** Datei, drei Themen, Serialisierung Pflicht; `_reference-agent.md` mit #1187 abstimmen |
-| `.meta-config/project.yaml` | **keine** Änderung (OQ-1 = Folgeaufgabe) | **#1186/#1188** (neue Blöcke), **#1187** | Solange OQ-1 offen ist: keine Änderung ⇒ kein Konflikt |
+| `.meta-config/project.yaml` | **eine** Zeile `orchestrator.topology: subagent` (T20, nach dem Code-Fix, rückrollbar) | **#1186/#1188** (neue Blöcke), **#1187** | T20 zuletzt; die Zeile liegt im bestehenden `orchestrator`-Block, kein neuer Block, kein Schema-Effekt |
+| `docs/concepts/active/orchestrator-topology.md` | T15 (Matrix mit Positions-Spalte), T18 (Positions-Abschnitt) | **#1007** (v2-Surface-Matrix) | T15/T18 sind Doku-only; die Positions-Spalte ist additiv, keine Umdeutung bestehender Zellen |
 | `rules/1-generic/use-orchestrator.md` | T7 | **#1182** (compact verlangt Sektion `CRITICAL GATE`) | T7 ändert nur Sektionsinhalt, nie den Sektionstitel; #1182-Fix danach |
 | `scripts/lib/isolation.py` | T14 (zwei Durchreichungen) | **#1007** (v2-Surface) | T14 zuerst (klein, lokal) |
 | `scripts/lib/consistency/topology.py` | T11/T12 (drei IDs) | — | Check-ID-Doku (`runtime-gate-tiers.md:135-151`, Concept-Doc) mitpflegen |
@@ -1059,18 +1266,19 @@ Datei seit dem Plan-Baseline `aaed14c2` von einem anderen Vorhaben geändert wor
 
 ## 13. Offene Entscheidungen
 
-### Aus der Spec (OQ-1…OQ-3)
+### Aus der Spec (OQ-1…OQ-5) — **`DECIDED 2026-11-09`**
 
-| # | Frage | Empfehlung | Blockadewirkung je Task |
+| # | Frage | Entscheidung | Blockadewirkung je Task |
 |---|---|---|---|
-| **OQ-1** | Soll dieses Repo `orchestrator.topology: primary` **explizit** deklarieren? | **Ja** — löst B-5/B-6/B-11 und macht D-Q1 hier gegenstandslos (Spec §9.3) | **Keine Task blockiert.** T11-Test nutzt eine synthetische Config; T16 formuliert B-11 so, dass beide Zustände korrekt beschrieben sind. Bei „ja": eine Folgeaufgabe (eine Zeile in `.meta-config/project.yaml` nach `:311`) |
-| **OQ-2** | Bleibt `strict × subagent` eine dokumentierte Zelle? | **Ja, als `ALLOWED (gate suspended)`** — nicht verbieten (D-Q2-Tabelle, Spec §4-D-Q2) | **Blockiert T15/AC-6/AC-7** (Urteilsvokabular der vier `strict × subagent`-Zellen). Ohne Entscheidung bleibt T15 auf `DRAFT` stehen |
+| **OQ-1** | Soll dieses Repo `orchestrator.topology` **explizit** deklarieren? | **Ja, `subagent`** (D-OQ1) — löst B-5/B-6/B-11, beseitigt die derived-vs-declared-Divergenz und macht D-Q1 hier gegenstandslos (Spec §9.3) | **Keine Task blockiert.** Umsetzung ist **T20** (eine Zeile, nach T19, mit Rollback). T11 nutzt eine synthetische Config |
+| **OQ-2** | Bleibt `strict × subagent` eine dokumentierte Zelle? | **Ja — erlaubt und empfohlen** (D-OQ2), keine Abwertung | **Entblockt T15/AC-6/AC-7**: die `RECOMMENDED`-Menge ist jetzt `{(v1, strict, subagent), (v2, strict, subagent), (Claude, strict, subagent), (Gemini, strict, subagent)}`; `strict × primary` bleibt `ALLOWED` |
 | **OQ-3** | Namespace der neuen Check-IDs | **Bereits entschieden** durch Spec §6.2: `orchestrator-topology.` für Positionsbefunde, `orchestrator-strict.` für Gate-Befunde | **Keine Blockade** — T11–T13 setzen §6.2 um |
-| OQ-4 (Kontext) | Wird #1182 vor der Team-Empfehlung gefixt? | Empfehlung mit Blockerhinweis ausliefern | Blockiert **Szenario 103** (T17), kein AC |
-| OQ-5 (Kontext) | Kurzmatrix in `README.md`? | Ja, Kurzfassung; volle Matrix im Concept-Doc | Blockiert **nichts**; bei „nein" entfällt nur der README-Teil von T16 |
+| OQ-4 | Wird #1182 vor der Team-Empfehlung gefixt? | **Erst nach #1182** (D-OQ3); bis dahin `strict × subagent` | Blockiert **Szenario `103`** (T17) und die Team-Empfehlung (AC-37), **kein** Task |
+| OQ-5 | Kurzmatrix in `README.md`? | Ja, Kurzfassung mit **beiden** Opencode-Positionen; volle Matrix im Concept-Doc | Blockiert **nichts**; bei „nein" entfällt nur der README-Teil von T16/T18 |
 
-**ACs, die auf OQ-Entscheidungen warten: 2** (AC-6, AC-7 → OQ-2). OQ-1/OQ-3/OQ-5 blockieren kein
-AC; OQ-4 blockiert Szenario `103`.
+**ACs, die auf OQ-Entscheidungen warten: 0.** Alle fünf Fragen sind am 2026-11-09 entschieden
+(Spec §9.3, §14); AC-7/AC-11/AC-29/AC-32…AC-37 sind daraus abgeleitet. Offen bleibt allein die
+externe Terminierung von #1182 (kein Entscheid dieses Vorhabens).
 
 ### Zusätzliche Plan-Klärungen (vor T1 zu bestätigen)
 
@@ -1099,15 +1307,19 @@ Push/Tag/Branch-Management durch den Executor (das ist `git`-Rolle).
 
 ## 15. Self-Review
 
-- Jeder Task mappt auf **eine** Rolle (`developer` für T1–T18; `documenter` optional für T16-Text,
+- Jeder Task mappt auf **eine** Rolle (`developer` für T1–T21; `documenter` optional für T16/T18-Text,
   dann als eigener Task zu splitten — aktuell bewusst beim `developer`, weil der Doc-Test die
   Assertion liefert).
 - Jedes Akzeptanzkriterium ist messbar: Testname + Assertion oder Befehl + erwarteter Exit-Code.
-  AC-29…AC-31 sind ergänzt und in §10 einem Task zugeordnet.
-- `Files:`/`Interfaces:` vollständig (18 von 18 Tasks); innerhalb einer Parallel-Gruppe überlappt
-  keine Datei (T4/T5/T6 sind sequenziell, nicht parallel, weil sie denselben Helfer aus T1 nutzen).
+  AC-29…AC-37 sind ergänzt und in §10 einem Task zugeordnet (AC-31…AC-37 aus Rev. 4).
+- `Files:`/`Interfaces:` vollständig (21 von 21 Tasks); innerhalb einer Parallel-Gruppe überlappt
+  keine Datei (T4/T5/T6 sind sequenziell, nicht parallel, weil sie denselben Helfer aus T1 nutzen;
+  T17–T20 sind ebenfalls sequenziell).
 - `pipeline_stages` deckt die `plan-driven`-Stage `implement` der `feature-lifecycle`-Pipeline ab
   (`config/role-defaults.yaml:2678-2688`); T1 ist der erste Implementierungsschritt.
+- **Positions-Konsistenz (Rev. 4):** Szenario-IDs (`100`–`104`), Positions-IDs (`POS-1`–`POS-3`) und
+  Task-IDs (T1–T21) sind je genau einmal definiert; die Reihenfolge ist `T18` (Doku) →
+  `T19` (Positions-Parität) → `T17` (Szenarien) → `T20` (Deklaration) → `T21` (Abschluss).
 - Keine Platzhalter im Sinne von `spec_plan_no_placeholder` (auch das Wort mit den drei
   Großbuchstaben ist im Plan nicht mehr enthalten, Rev. 3 / RVW2-1190-07); jede Code-Referenz mit
   `datei:zeile` aus dieser Runde.
@@ -1115,7 +1327,7 @@ Push/Tag/Branch-Management durch den Executor (das ist `git`-Rolle).
 - Byte-Identität, beabsichtigte Änderung und Golden-Fixtures sind getrennt: AC-16/AC-27 gelten nur
   für `topology` ungesetzt ∧ `effective == "subagent"`; abgeleitetes und deklariertes `primary`
   haben je eine eigene Fixture (RVW2-1190-01).
-- Re-Planning nach jedem Meilenstein (M0…M8): Annahmen prüfen, Reihenfolge bestätigen, Plan
+- Re-Planning nach jedem Meilenstein (M0…M11): Annahmen prüfen, Reihenfolge bestätigen, Plan
   fortschreiben — der Plan ist nicht eingefroren.
 
 ---
@@ -1132,18 +1344,18 @@ Die Spec-Seite derselben Befunde steht in Spec §14.
 | RVW-1190-03 | T14 auf `reconcile_opencode_surface_gate` + `_opencode_v2_gate_permissions` umgeschrieben; `sync_pipeline.py` und `cli_commands.py` in File Map, Files-Zeile und Tests | §File Structure, T14, §6.2 |
 | RVW-1190-04 | T13 bleibt in `orchestrator_strict.py`; T11/T12 in `topology.py`; je ein Ablagetest; AC-21 entsprechend | T11, T12, T13, §6.3 |
 | RVW-1190-05 | T5/T10: Zwei-Sharer-Test mit Assertion auf den tatsächlich gerenderten Text; K-4 neu gefasst (Rev. 3: gemischte Sharer ⇒ neutral, gleichpositionierte ⇒ Positions-Text) | T5, T10, §13 K-4 |
-| RVW-1190-06 | Regenerationsschritt in T4–T10 und T14; M1/M2/M3/M5/M8 und T18 um `sync` + Diff + Commit + `--check` erweitert; AC-31 | §Global Constraints, M0–M8, T4–T10, T14, T18, AC-31 |
+| RVW-1190-06 | Regenerationsschritt in T4–T10 und T14; M1/M2/M3/M5/M8 und T21 um `sync` + Diff + Commit + `--check` erweitert; AC-31 | §Global Constraints, M0–M8, T4–T10, T14, T21, AC-31 |
 | RVW-1190-07 | `active_set` Pflicht-Keyword; `sync_rules`/`sync_embedded_rule_files`/`sync_context_for_provider`/`_build_provider_vars` mit Durchreichung; drei Paritätstests; AC-30 | T4, T5, T6, §6.2, AC-30 |
 | RVW-1190-08 | K-1/K-2 auf „in Spec Rev. 2 übernommen" degradiert; T1/T8 ohne Bestätigungsvorbehalt | §13, T1, T8 |
 | RVW-1190-09 | Kopf trägt `**Goal:**`, `**Architecture:**`, `**Tech Stack:**`, `**Spec:**` (Regex-konform), `## Global Constraints`, `## File Structure`, `pipeline_stages`; `_classify`-Folgen in der Spec | Plan-Kopf, §Global Constraints, §File Structure, Spec §13 |
 | RVW-1190-10 | T14 prüft die Log-Warnung mit den §6.4-Teilstrings und schließt ein v2-Finding aus; v1-Zählregel als eigener Test | T14, §6.3, Spec §6.4 |
-| RVW-1190-11 | alle `.tmp/`-Zitate entfernt; M0 erzeugt die Baseline; §17 als Ablage | Voraussetzungen 3, M0, T13, T18, §17 |
+| RVW-1190-11 | alle `.tmp/`-Zitate entfernt; M0 erzeugt die Baseline; §17 als Ablage | Voraussetzungen 3, M0, T13, T21, §17 |
 | RVW-1190-12 | T9-Signatur `_singleton_constraint_block(effective, *, inert)`; `ORCH_TOPOLOGY_INERT` dort verdrahtet; `_EFFECTIVE_SOURCE` als Audit-Flag | T9, §6.2, §6.1 |
 | RVW-1190-13 | 103 heißt `blocked-103-advisory-subagent` und liegt außerhalb `10*`; M8 = 4 PASS; kein SKIP | T17, M8, „Teststrategie", AC-29 |
 | RVW-1190-14 | `test_role_orchestrator_active_under_main_chat_prose` in T10; AC→Task-Zeile AC-24 ergänzt | T10, §10 AC-24 |
 | RVW-1190-15 | T16-Test `test_gate_render_is_single_variant_per_file` (B-9 als Render-Widerspruch) | T16 |
 | RVW-1190-16 | AC-23 im Plan auf drei Aufrufstellen + `None`-Ausnahme an `:869`; eigener Caller-Test | T14, §10 AC-23 |
-| RVW-1190-17 | §8 trennt Byte-Identität (`ungesetzt ∧ effective == "subagent"`, Rev. 3 geschärft) von abgeleitetem/deklariertem `primary` (Golden-Fixture); T8/T18 haben den Golden-Test | §8, T8, T18, AC-16, AC-27 |
+| RVW-1190-17 | §8 trennt Byte-Identität (`ungesetzt ∧ effective == "subagent"`, Rev. 3 geschärft) von abgeleitetem/deklariertem `primary` (Golden-Fixture); T8/T21 haben den Golden-Test | §8, T8, T21, AC-16, AC-27 |
 | RVW-1190-18 | T11 pingt die Override-Remediation aus Spec §4-D-Q1 | T11 |
 | RVW-1190-19 | H-Map steht in Spec §13 (Plan verweist) | Spec §13, §1 Zielbild |
 | RVW-1190-20 | 7 neue Flags; Injektionsbedingung mit `not role.endswith("-iteration")`; „Gate #5" als bewusst konserviert; „cannot run as a subagent" als `ISSUE` | T2, T9, §6.1 |
@@ -1164,7 +1376,7 @@ derselben Befunde steht in Spec §14.
 
 | Befund-ID | Änderung im Plan | Stelle |
 |---|---|---|
-| RVW2-1190-01 (BLOCKER) | Byte-Identität nur noch `ungesetzt ∧ effective == "subagent"`; abgeleitetes `primary` als beabsichtigte Änderung mit eigener Golden-Fixture; `subagent`-Hinweis **nicht** geändert (T10 zurückgenommen) | „Global Constraints", §8, T7, T8, T10, T18, §10 AC-16/17/27 |
+| RVW2-1190-01 (BLOCKER) | Byte-Identität nur noch `ungesetzt ∧ effective == "subagent"`; abgeleitetes `primary` als beabsichtigte Änderung mit eigener Golden-Fixture; `subagent`-Hinweis **nicht** geändert (T10 zurückgenommen) | „Global Constraints", §8, T7, T8, T10, T21, §10 AC-16/17/27 |
 | RVW2-1190-02 (MAJOR) | T10: Entscheidung aus `build_agent_hints` nach `context._position_aware_agent_hints` verlegt; `position`-Parameter; gemischte Sharer ⇒ neutral, gleichpositionierte ⇒ Positions-Text; K-4 auf **eine** Regel | T10, §6.2, K-4, §10 AC-20 |
 | RVW2-1190-03 (MAJOR) | T5: Context-Seam ist `_sync_stage_contexts` (Stage 4), `active_set`-Pflichtkette bis `sync_context_for_provider`, Aufrufer `cli_commands.py:1543`; Test-Aufrufer als Folgeschritt | T5, „Global Constraints", File-Map (`context.py`, `sync_pipeline.py`, `cli_commands.py`), §6.2, §10 AC-30 |
 | RVW2-1190-04 (MAJOR) | T7 pinnt den qualifizierten Delegations-Weg; neuer Negativtest gegen die absolute Aussage („erfüllt dieses Gate nicht") | T7, §10 AC-3 |
@@ -1178,6 +1390,17 @@ derselben Befunde steht in Spec §14.
 | RVW2-1190-12 (NIT) | `_opencode_v2_gate_permissions` durchgängig `:1408`; `INERT` einheitlich `mode == "main-chat"` | File-Map, T14, T1, K-3, §6.1 |
 | RVW2-1190-13 (MINOR) | T10-Prosa-Assertion, T14-Trefferzahlen/Monkeypatch-Zähler, T16-Datei-Scope konkretisiert | T10, T14, T16, §10 AC-23/24/25 |
 
+### User-Entscheidungen (2026-11-09) — D-OQ1…D-OQ3
+
+Gegenstand: die drei Nutzer-Entscheidungen zu #1190 vom 2026-11-09 (Spec §14, Block
+„User-Entscheidungen"). Die Spec-Seite derselben Änderungen steht dort.
+
+| ID | Änderung im Plan | Stelle |
+|---|---|---|
+| **D-OQ1** (Default dieses Repos = `strict × subagent`, beide Opencode-Positionen first-class) | Größen-/Meilenstein-Struktur auf 21 Tasks / 12 Meilensteine umgestellt; Positionsmodell-Task **T18** (Doku + Mapping), Determinismus-Test in **T19**, explizite Deklaration als **T20**, Abschluss-Gate zu **T21**; Szenario `100` ist jetzt `strict × subagent`; OQ-1 entschieden | Plan-Kopf, „Global Constraints", File Structure (`.meta-config/project.yaml`), M8–M11, T17, T18, T19, T20, T21, §8, §13 |
+| **D-OQ2** (`strict × subagent` bleibt erlaubt und empfohlen; Gate-Tier je Surface; Opencode generiert je Position sauber) | Neuer Task **T19** mit drei Positions-Tests (POS-1/POS-2/POS-3) und dem Verbot kombinierter Fälle; neues Testmodul `tests/test_opencode_positions.py`; `provider_transform.py` als Prüf-/Fix-Ort in die File-Map; AC-7/AC-8 in §10 nachgeführt | File Structure, T19, §6.1, §6.4, §7, §9 (P-10), §10 |
+| **D-OQ3** (`advisory × subagent` erst nach #1182) | Szenario `103` bleibt `BLOCKED (#1182)`; Bedingung in §7, §11 und §12; AC-37 plus Doku-Test `test_advisory_subagent_carries_1182_condition_everywhere` | T17, T18, §7, §11, §12, §13, §10 (AC-37), P-12 |
+
 ---
 
 ## 17. Baseline (M0)
@@ -1188,8 +1411,8 @@ Format des Eintrags (drei Zeilen, je Befehl eine):
 | Befehl | Exit | Notiz |
 |---|---|---|
 | `python3 scripts/sync.py --check` | zu erheben in M0 | erwartet `0`; bei ≠ 0 ist die Arbeitskopie vor T1 nicht sauber |
-| `python3 scripts/sync.py --validate` | zu erheben in M0 | Referenz für T13/T18 |
+| `python3 scripts/sync.py --validate` | zu erheben in M0 | Referenz für T13/T21 |
 | `python3 -m pytest tests/ -k topology` | zu erheben in M0 | Pass/Fail-Zahlen der Topologie-Familie (19 Dateien matchen `tests/*topology*.py`) |
 
 Zusätzlich notiert M0 den Commit-Hash der Arbeitsbasis (`aaed14c2`) und ob `git status` clean ist.
-Erst nach diesem Eintrag dürfen T13/T18 „wie in §17 dokumentiert" zitieren.
+Erst nach diesem Eintrag dürfen T13/T21 „wie in §17 dokumentiert" zitieren.
