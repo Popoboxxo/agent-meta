@@ -1410,14 +1410,26 @@ Gegenstand: die drei Nutzer-Entscheidungen zu #1190 vom 2026-11-09 (Spec §14, B
 
 ## 17. Baseline (M0)
 
-Wird in **M0** erzeugt und hier eingetragen — vorher enthält dieser Abschnitt bewusst keine Zahlen.
+**Erhoben am 2026-11-09 in M0** (Branch `feat/1190-orchestrator-mode-topology`, keine Code-Änderung).
 Format des Eintrags (drei Zeilen, je Befehl eine):
 
 | Befehl | Exit | Notiz |
 |---|---|---|
-| `python3 scripts/sync.py --check` | zu erheben in M0 | erwartet `0`; bei ≠ 0 ist die Arbeitskopie vor T1 nicht sauber |
-| `python3 scripts/sync.py --validate` | zu erheben in M0 | Referenz für T13/T21 |
-| `python3 -m pytest tests/ -k topology` | zu erheben in M0 | Pass/Fail-Zahlen der Topologie-Familie (19 Dateien matchen `tests/*topology*.py`) |
+| `python3 scripts/sync.py --check` | `0` | `0 action(s) \| 464 skipped \| 5 warning(s)`; alle fünf Warnungen sind vorbestehend und nicht topologiebedingt (`active-set.gate-dropped`, `CLAUDE.personal.md` legacy, 2× `mcp.secret-empty`, `context.over-soft-cap` für `AGENTS.md`/Gemini). Arbeitskopie damit **sauber vor T1**; `--check` bleibt die Referenz für die Byte-Identitäts-Invariante (AC-16/AC-27) |
+| `python3 scripts/sync.py --validate` | `0` | `[PASS] All checks passed` im ersten Block; Gesamtbilanz **1 WARNING, 1 INFO, 0 ERROR** (`repo-containment.no-hook-support` = WRN, `orchestrator-strict.no-hook-support` = INF). Referenzwert für T13/T21: „`--validate` rc wie in M0" = `0` bei 0 ERROR |
+| `python3 -m pytest tests/ -k topology` | `0` | **253 passed**, 0 failed, 0 errors, 7841 deselected, 26 warnings, 38,67 s (Kommando mit `PYTEST_BASETEMP=$(pwd)/.tmp/pytest`, kein `rtk pytest`). **19** Dateien matchen `tests/*topology*.py` (wie erwartet); die `-k topology`-Auswahl berührt **25** Testdateien. Kein Vorlauf-Rot in der Topologie-Familie |
 
-Zusätzlich notiert M0 den Commit-Hash der Arbeitsbasis (`aaed14c2`) und ob `git status` clean ist.
+**Basis-Commit:** `git rev-parse HEAD` = `a41745ed5757e4e9bc1ec18a3aa54cc28d5d0a82` (`a41745e`),
+Branch `feat/1190-orchestrator-mode-topology`.
+> **Abweichung zum Plan-Kopf (kein Blocker):** Der Plan nennt `base-commit: aaed14c2` (:8, :73 sowie im
+> ursprünglichen M0-Platzhalter dieses Abschnitts)
+> — das ist der **historische Plan-Basisstand**, auf dem der Plan-Text entstand. Der Ausführungs-Branch
+> ist auf dem **aktuellen `main` @ `a41745e`** aufgesetzt, weil das freigegebene Plan-Dokument erst
+> **nach** `aaed14c2` committet wurde. Alle drei Baseline-Werte oben sind gegen `a41745e` gemessen und
+> damit die gültige Referenz für T13/T21.
+
+**`git status`:** vor und nach M0 **clean** (`git status --porcelain` liefert keine Zeile).
+`.tmp/` ist gitignoriert (`.gitignore:35`), die Pytest-Artefakte unter `.tmp/pytest` erzeugen daher
+keinen Working-Tree-Eintrag.
+
 Erst nach diesem Eintrag dürfen T13/T21 „wie in §17 dokumentiert" zitieren.
