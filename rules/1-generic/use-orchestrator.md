@@ -2,6 +2,8 @@
 {{#if GATE_ENFORCED}}
 # CRITICAL GATE
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+NICHT erzwungen (Prompt + Permission-Layer).
 {{/if}}
 {{#if GATE_PARTIAL}}
 # CRITICAL GATE (runtime-partially enforced)
