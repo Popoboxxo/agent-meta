@@ -1,7 +1,8 @@
 ---
 pipeline_stages:
   implement: 3
-status: DRAFT
+status: APPROVED
+approved: 2026-11-09
 revision: "4"
 date: 2026-11-09
 issue: 1186
@@ -16,11 +17,10 @@ trace:
 
 # Artifact-Locations-Matrix für alle Artefakt-Klassen (Issue #1186) — Implementation Plan
 
-> **Status: DRAFT** — Dieser Plan implementiert nichts und committet nichts.
-> Er ist bewusst **DRAFT**, weil die zugehörige Spec
-> `docs/specs/2026-11-09-artifact-locations-matrix-spec.md` auf HEAD `aaed14c2`
-> ebenfalls `Status: DRAFT` trägt (Spec `:3`). Ausführung erst nach
-> `Status: APPROVED` der Spec (Master-Rule `spec-plan-workflow`).
+> **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat). Dieser Plan ist der
+> Ausführungsauftrag für die zugehörige Spec
+> `docs/specs/2026-11-09-artifact-locations-matrix-spec.md`, die `Status: APPROVED` trägt
+> (approved 2026-11-09). Die Umsetzung ist damit autorisiert (Master-Rule `spec-plan-workflow`).
 > **Klasse:** XL (Spec §1: Umfang >20 Dateien, Querschnitt über
 > Config-Vertrag + Schreibvertrag + Variablen-Vertrag, nicht umkehrbar ohne
 > Migration).
@@ -1620,7 +1620,7 @@ werden für sie als Konstante `files` exportiert (K-1, T6), damit §3.4
 
 ## 15. Review-Auflösung (2026-11-09)
 
-Alle Befunde des Reviews vom 2026-11-09 sind eingearbeitet. Status bleibt **DRAFT**.
+Alle Befunde des Reviews vom 2026-11-09 sind eingearbeitet. Damals **DRAFT**, seit 2026-11-09 **APPROVED**.
 Drei Punkte sind ausgelagert: **#1198, #1199, #1200** (real angelegt; Zuordnung der
 Nummern zu den drei Punkten trägt das Wave-Overview nach — keine erfundene Titel-Zuordnung).
 
@@ -1643,7 +1643,7 @@ Nummern zu den drei Punkten trägt das Wave-Overview nach — keine erfundene Ti
 
 ### 15.1 Runde 2 — Revision 2 (2026-11-09)
 
-Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Status bleibt **DRAFT**.
+Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Damals **DRAFT**, seit 2026-11-09 **APPROVED**.
 
 | Befund-ID | Änderung | Stelle |
 |---|---|---|
@@ -1659,7 +1659,7 @@ Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Status bleibt 
 ### 15.2 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt **DRAFT**.
+Wave-Specs/-Pläne. Damals **DRAFT**, seit 2026-11-09 **APPROVED**.
 
 | Befund | Änderung | Stelle |
 |---|---|---|

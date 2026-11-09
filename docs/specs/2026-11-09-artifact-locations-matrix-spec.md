@@ -1,7 +1,6 @@
 # Artifact-Locations-Matrix für alle Artefakt-Klassen (Issue #1186) — Spec
 
-> Status: **DRAFT** — nicht freigegeben. Der Approval-Marker `Status: APPROVED (Datum)`
-> wird ausschließlich vom User gesetzt, nie vom Spec-Autor.
+> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat).
 > Datum: 2026-11-09
 > Revision: 2 (Review-Auflösung 2026-11-09)
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 (`unmanaged` statt `project-state`),
@@ -1241,7 +1240,7 @@ Einzige begründete Abweichung: `scripts/lib/standalone.py` (D-9, §7.2 OQ-7).
 
 ## 11. Review-Auflösung (2026-11-09)
 
-Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet; Status bleibt `DRAFT`.
+Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet; damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 Drei Punkte sind als **Follow-up** ausgelagert und im Wave-Overview als Issues **#1198,
 #1199, #1200** angelegt (Zuordnung der Nummern zu den drei Punkten trägt das Wave-Overview
 nach — hier bewusst keine erfundene Titel-Zuordnung).
@@ -1265,7 +1264,7 @@ nach — hier bewusst keine erfundene Titel-Zuordnung).
 
 ### 11.1 Runde 2 — Revision 2 (2026-11-09)
 
-Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Status bleibt `DRAFT`.
+Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund-ID | Änderung | Stelle |
 |---|---|---|
@@ -1282,7 +1281,7 @@ Formale Blocker und fachliche Befunde der zweiten Korrekturrunde. Status bleibt 
 ### 11.2 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt `DRAFT`.
+Wave-Specs/-Pläne. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund | Änderung | Stelle |
 |---|---|---|

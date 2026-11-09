@@ -1,14 +1,14 @@
 # Project-Context-Injection Scope — Implementation Plan
 
-> **Status:** DRAFT
+> **Status:** APPROVED — Approved: 2026-11-09 (User-Freigabe via main_chat)
 > **Issue:** [#1187](https://github.com/Popoboxxo/agent-meta/issues/1187) — feat(config): project-context-injection scope (core | +orchestrator | +whitelist | all)
 > **Revision:** 3 (Entscheidungen D5–D8 eingearbeitet, 2026-11-09)
-> **Spec:** `docs/specs/2026-11-09-project-context-injection-scope-spec.md` (spec-id `SPEC-project-context-injection-scope-2026-11-09`, Revision 4, **Status: DRAFT** — Freigabe vor Task-Beginn einholen)
+> **Spec:** `docs/specs/2026-11-09-project-context-injection-scope-spec.md` (spec-id `SPEC-project-context-injection-scope-2026-11-09`, Revision 4, **Status: APPROVED** — approved 2026-11-09)
 > **Klasse:** **L** (cross-cutting in `sync`-Rendering; ~14 produktive Dateien + 4 neue Testdateien; kein neues Subsystem)
 > **Datum:** 2026-11-09 · **Basis:** Branch `docs/config-wave-plans-1181-1188`, HEAD `aaed14c2`, agent-meta `v2.0.0-beta.8`
 > **Kanonische Welle:** `#1187 → #1186 → #1188 → #1181 → #1141` → Whitelist-Ableitung (eigenes Follow-up). Dieser Plan ist **Schritt 1** der Welle und setzt die Rollen-Schleife neu auf, auf der #1186/#1188/#1181 aufsetzen.
 > **Voraussetzungen:**
-> 1. Spec von `main_chat`/Daniel auf `Status: APPROVED` gesetzt. OQ-1…OQ-7 sind beantwortet: OQ-2…OQ-5 durch die Entscheidungen **D5–D8** (Spec §13, `DECIDED 2026-11-09`), OQ-1/OQ-6/OQ-7 bereits in Spec-Revision 2 (§8.2).
+> 1. **Erfüllt (2026-11-09):** Spec von `main_chat`/Daniel auf `Status: APPROVED` gesetzt (Freigabe erteilt, approved: 2026-11-09). OQ-1…OQ-7 sind beantwortet: OQ-2…OQ-5 durch die Entscheidungen **D5–D8** (Spec §13, `DECIDED 2026-11-09`), OQ-1/OQ-6/OQ-7 bereits in Spec-Revision 2 (§8.2).
 > 2. Baseline bestätigt: `.tmp/issue-dump/baseline-validate.txt` (PASS, 1 Warnung), `.tmp/issue-dump/baseline-check.txt` (DRY-RUN, 3 bestehende Warnungen).
 > 3. Kein paralleler Branch auf `scripts/lib/agent_sync.py` (#1188/#1181), `scripts/lib/sync_pipeline.py` (#1186/#1181), `config/project-config.schema.json`, `docs/ui/admin-ui.html` (Konfliktflächen §10 der Spec).
 > 4. Python ≥ 3.9, stdlib-only; `pytest` vorhanden; `PYTEST_BASETEMP` in der Shell gesetzt (Konvention aus `docs/plans/2026-10-31-release-checklist-plan.md:23`).
@@ -670,7 +670,7 @@ Entschieden gegen die echten Issue-Texte (`.tmp/issue-dump/issue-*.json`).
 
 ## 13. Review-Auflösung (2026-11-09)
 
-Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Status bleibt `DRAFT`; Plan-Revision 2
+Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Damals `DRAFT`, seit 2026-11-09 `APPROVED`; Plan-Revision 2
 (Review) und Revision 3 (Entscheidungen D5–D8, §14) bei Spec-Revision 4.
 
 | Befund-ID | Änderung | Betroffene Stelle |
@@ -710,7 +710,7 @@ Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Status bleibt `DR
 
 ## 14. Entscheidungsprotokoll (2026-11-09)
 
-Vom User entschiedene offene Fragen (Spec §13). Status bleibt `DRAFT`; die Entscheidungen sind
+Vom User entschiedene offene Fragen (Spec §13). Damals `DRAFT`, seit 2026-11-09 `APPROVED`; die Entscheidungen sind
 verbindlich und ersetzen die früheren Empfehlungen in §12. Marker `DECIDED 2026-11-09` steht auch am
 jeweiligen Änderungsort.
 
@@ -722,8 +722,8 @@ jeweiligen Änderungsort.
 | **D8** | OQ-5: Pointer-Text Englisch oder Projektsprache? | Pointer-Text ist konfigurierbar, Default **Englisch**: `pointer-language` (`en`\|`de`\|`project`, Default `en`) und `pointer-text` (Override, erlaubtes Token `{context_file}`, genau einmal, einzeilig). `project` leitet aus `COMMUNICATION_LANGUAGE` ab; unbekannte Sprache → `en` + WARN `pointer-language-fallback`; Fremd-Token/≠ 1 × `{context_file}`/Zeilenumbruch = harter Sync-Fehler. Texte/Konstanten liegen in `config.py`, der Renderer konsumiert nur `_PROJECT_CONTEXT_POINTER`; `pointer-missing` vergleicht gegen den aufgelösten Text. | T1, T2, T4, T6, T8, T11, T13, T15 Schritt 7 (Lauf H); §5.1, §5.2, §5.3, §5.4, §9 |
 
 **Konsequenz für §12:** OQ-2…OQ-5 sind geschlossen; OQ-1/OQ-6/OQ-7 waren bereits in Revision 2
-geschlossen. Es bleiben **keine** offenen Entscheidungen — die Spec-Freigabe ist der einzige
-verbleibende Schritt.
+geschlossen. Es bleiben **keine** offenen Entscheidungen — die Spec-Freigabe ist am 2026-11-09
+erfolgt.
 
 **Rest-Auslegung (bewusst nicht entschieden, kein Blocker):** Ob `orchestrator-roles`-Einträge, die
 zwar in `role-defaults.yaml`, aber **ohne** generisches Template existieren, als Fehler statt WARN
@@ -734,4 +734,4 @@ bestehenden `roles_without_template`-Meldung.
 
 ## 15. Ausführungsnachweis
 
-> Wird bei der Ausführung befüllt (Datum, HEAD, Szenario-Logzeilen, Testläufe). Bis dahin leer — **kein** Platzhalter für Implementierungsdetails, nur das Ergebnisprotokoll.
+> **Noch leer — wird bei Umsetzung gefüllt** (Datum, HEAD, Szenario-Logzeilen, Testläufe). Es ist ein Ergebnisprotokoll, **kein** Platzhalter für Implementierungsdetails.

@@ -1,13 +1,14 @@
 ---
 pipeline_stages:
   implement: 1
-status: DRAFT
+status: APPROVED
+approved: 2026-11-09
 revision: "1.4"
 review: "2026-11-09 — RVW-1181-01 … -06 (§15) + RVW2-1181-01 … -05 + RVW2-X-01 (§15) + K1–K8 (§15.1) + Nutzerentscheidungen D16–D23 (§15.2)"
 date: 2026-11-09
 issue: "#1181"
 spec: docs/specs/2026-11-09-commit-authority-grant-spec.md
-spec-status: DRAFT
+spec-status: APPROVED
 spec-revision: "1.4"
 klasse: L
 base-commit: aaed14c2
@@ -22,18 +23,17 @@ trace:
 
 # Projektseitiger Commit-Authority-Grant für Edit-only-Rollen (Issue #1181) — Implementation Plan
 
-> **Status: DRAFT** — Dieser Plan implementiert nichts und committet nichts. Er ist die
+> **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat). Dieser Plan ist die
 > Umsetzungsplanung zur Spec `docs/specs/2026-11-09-commit-authority-grant-spec.md`
-> (`Status: DRAFT`, Rev. 1.4, Klasse L).
+> (`Status: APPROVED`, approved 2026-11-09, Rev. 1.4, Klasse L).
 >
 > **Entschieden (2026-11-09):** Alle offenen Fragen der Spec sind durch den Nutzer entschieden
 > (**D16–D23**, §15.2). Der Plan setzt diese Entscheidungen verbindlich um; es gibt keine
-> verbleibende OQ, auf die ein Task wartet. Der `Status` bleibt `DRAFT` (kein `APPROVED` der Spec).
+> verbleibende OQ, auf die ein Task wartet.
 >
-> **Voraussetzung (Master-Rule `spec-plan-workflow`):** Die Spec trägt noch **kein**
-> `Status: APPROVED`. Task-Ausführung startet erst, wenn `concept-reviewer`/der Nutzer die
-> Spec freigegeben hat; dieser Plan kann parallel zum Review als Umsetzungsvorschlag dienen,
-> ist aber selbst ungeprüft (`Status: DRAFT`).
+> **Freigabe (Master-Rule `spec-plan-workflow`):** Die Spec trägt `Status: APPROVED`
+> (approved 2026-11-09). Die Task-Ausführung ist damit autorisiert; dieser Plan ist der
+> Ausführungsauftrag.
 >
 > **Quellen:** Spec §1–§13 (Rev. 1.4); `.tmp/issue-dump/issue-1181.json` (maßgeblich),
 > `issue-1142.json`, `issue-1151.json`, `issue-1172.json`; Baseline `baseline-validate.txt`
@@ -1440,7 +1440,7 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
   Provider und **kein** `Bash` (fail-safe statt Prosa-Grant); ist der Guard deaktiviert, wird
   ebenfalls nichts gerendert und `--validate` endet rc 1.
 - **Formwechsel:** Es gab nie eine ausgelieferte Skalarform (`documenter: direct`) — die Spec war
-  und ist `DRAFT`, und **D23** akzeptiert die Objektform als einzige Form. Ein Projekt, das die
+  damals `DRAFT` und ist seit 2026-11-09 `APPROVED`; **D23** akzeptiert die Objektform als einzige Form. Ein Projekt, das die
   nicht freigegebene Zwischenform gesetzt hat, bekommt
   `auto_commit.authority_overrides.documenter: expected {authority: direct,
   acknowledge_full_shell: true}` und den Fail-Safe; das ist laut, nicht still.
@@ -1576,7 +1576,7 @@ OQ und keine Blockadewirkung mehr.
 ### 15.1 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt `DRAFT`.
+Wave-Specs/-Pläne. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund | Änderung im Plan | Stelle |
 |---|---|---|
@@ -1633,8 +1633,9 @@ bleiben unverändert; neu sind ausschließlich Tests und Präzisierungen (N-5…
   bleibt keine offene OQ.
 - **Rollback:** drei Ebenen (Key entfernen / `mode: off` / Code-Revert), alle ohne Datenverlust,
   Allowlist v1 bleibt lesbar; `hook_state.py` ist additiv und kann mit dem Hook-Revert bleiben.
-- **Grenze:** Die Spec ist `DRAFT`; dieser Plan ist ebenfalls `DRAFT` und darf nicht vor
-  `Status: APPROVED` der Spec ausgeführt werden (Master-Rule `spec-plan-workflow`).
+- **Grenze:** Spec und Plan sind seit 2026-11-09 `APPROVED`; die Umsetzung ist autorisiert
+  (Master-Rule `spec-plan-workflow`). Die inhaltlichen Grenzen aus §5 (Nicht-Ziele) bleiben
+  unverändert.
 
 **Trace-Anker:** `SPEC-COMMIT-AUTHORITY-GRANT-2026-11-09` · Issue #1181 ·
 `pipeline_stages: implement: 1`.

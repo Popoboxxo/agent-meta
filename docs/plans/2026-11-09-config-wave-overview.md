@@ -1,6 +1,6 @@
 # Config-Welle #1187 / #1186 / #1188 / #1181 — Wave-Overview
 
-> **Status: DRAFT**
+> **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat)
 > **Datum:** 2026-11-09 · **Basis:** Branch `docs/config-wave-plans-1181-1188`, HEAD `aaed14c2`,
 > agent-meta `v2.0.0-beta.8`
 > **Autor:** `planner` (Subagent der Wave, Auftrag des Orchestrators)
@@ -39,13 +39,13 @@ fünf vs. vier Präzedenzstufen).
 
 | Issue | Spec | Plan | Klasse | Umfang (verifiziert) | Status |
 |---|---|---|---|---|---|
-| **#1187** Project-Context-Injection-Scope | `docs/specs/2026-11-09-project-context-injection-scope-spec.md` | `docs/plans/2026-11-09-project-context-injection-scope-plan.md` | **L** | **15 Tasks / 4 Meilensteine**; T2 ist durch die D5/D6/D8-Validierung auf **L** gewachsen | `DRAFT` |
-| **#1186** Artifact-Locations-Matrix | `docs/specs/2026-11-09-artifact-locations-matrix-spec.md` | `docs/plans/2026-11-09-artifact-locations-matrix-plan.md` | **XL** | **24 Tasks / 6 Meilensteine** (T1–T21, T23, T24 im PR; **T22 = Follow-up** nach #1141); T23/T24 sind neu aus D1 | `DRAFT` |
-| **#1188** Issue-Label-Taxonomie | `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` | `docs/plans/2026-11-09-issue-label-taxonomy-plan.md` | **XL** | **30 Pflicht-Tasks / 8 Meilensteine** (18 Testdateien); **T30 ist Pflicht-Task** (D12) | `DRAFT` |
-| **#1181** Commit-Authority-Grant | `docs/specs/2026-11-09-commit-authority-grant-spec.md` | `docs/plans/2026-11-09-commit-authority-grant-plan.md` | **L** | **16 Tasks / 6 Meilensteine** | `DRAFT` |
+| **#1187** Project-Context-Injection-Scope | `docs/specs/2026-11-09-project-context-injection-scope-spec.md` | `docs/plans/2026-11-09-project-context-injection-scope-plan.md` | **L** | **15 Tasks / 4 Meilensteine**; T2 ist durch die D5/D6/D8-Validierung auf **L** gewachsen | `APPROVED` |
+| **#1186** Artifact-Locations-Matrix | `docs/specs/2026-11-09-artifact-locations-matrix-spec.md` | `docs/plans/2026-11-09-artifact-locations-matrix-plan.md` | **XL** | **24 Tasks / 6 Meilensteine** (T1–T21, T23, T24 im PR; **T22 = Follow-up** nach #1141); T23/T24 sind neu aus D1 | `APPROVED` |
+| **#1188** Issue-Label-Taxonomie | `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` | `docs/plans/2026-11-09-issue-label-taxonomy-plan.md` | **XL** | **30 Pflicht-Tasks / 8 Meilensteine** (18 Testdateien); **T30 ist Pflicht-Task** (D12) | `APPROVED` |
+| **#1181** Commit-Authority-Grant | `docs/specs/2026-11-09-commit-authority-grant-spec.md` | `docs/plans/2026-11-09-commit-authority-grant-plan.md` | **L** | **16 Tasks / 6 Meilensteine** | `APPROVED` |
 
-**Kein Artefakt dieser Welle trägt `Status: APPROVED`.** Der Approval-Marker wird ausschließlich
-vom User bzw. `concept-reviewer` gesetzt (§10). **Offene Fragen gibt es keine mehr** — alle 23
+**Alle acht Artefakte dieser Welle tragen `Status: APPROVED`** — Freigabe erteilt durch den User am
+2026-11-09 (via `main_chat`, §10). **Offene Fragen gibt es keine mehr** — alle 23
 Entscheidungen D1–D23 sind am 2026-11-09 gefallen und in die vier Specs/Pläne eingearbeitet (§9).
 
 ---
@@ -354,22 +354,22 @@ Keine Zeile dieser Tabelle ist offen; ein Widerspruch dazu braucht eine Spec-Rev
 
 ---
 
-## 10. Approval-Gate
+## 10. Approval-Gate — APPROVED 2026-11-09
 
-1. **Alle vier Specs und alle vier Pläne tragen `Status: DRAFT`.** Kein Dokument dieser Welle
-   ist `APPROVED`; der Marker wird ausschließlich vom User bzw. `concept-reviewer` gesetzt.
-2. **Keine Implementierung vor `Status: APPROVED`** (Master-Rule `spec-plan-workflow`). Bis dahin
-   sind die Pläne belastbare Vorarbeit, kein Ausführungsauftrag.
+1. **Alle vier Specs und alle vier Pläne tragen `Status: APPROVED`** — Freigabe erteilt durch den
+   User am 2026-11-09 (via `main_chat`). Die Pläne sind damit **Ausführungsauftrag**, nicht mehr
+   nur belastbare Vorarbeit.
+2. **Umsetzung autorisiert** (Master-Rule `spec-plan-workflow`): Die Freigabe-Voraussetzung ist
+   erfüllt; jede Umsetzung startet auf einem eigenen `feat/…`-Branch.
 3. **Es gibt keine offenen OQ mehr.** Alle 23 Entscheidungen D1–D23 sind am 2026-11-09 gefallen und
-   in die vier Specs/Pläne eingearbeitet (§9). Verbleibend ist ausschließlich die
-   `APPROVED`-Setzung durch den User — und zwar **mindestens eine Spec vor dem jeweiligen
-   `feat/…`-Branch**. Es gibt keine inhaltliche Vorbedingung, die noch zu klären wäre.
+   in die vier Specs/Pläne eingearbeitet (§9). Es gibt keine inhaltliche Vorbedingung, die noch zu
+   klären wäre.
 4. **Branch-Guard:** je Issue ein eigener `feat/…`-Branch
    (`feat/1187-project-context-scope`, `feat/1186-artifact-locations-matrix`,
    `feat/1188-issue-label-taxonomy`, `feat/1181-commit-authority-grant`). **Nie** direkt auf
    `main`/`master`; der Branch `docs/config-wave-plans-1181-1188` trägt nur Doku.
-5. **Freigabe-Reihenfolge:** #1187 zuerst (kleinster Eingriff), dann #1186, #1188, #1181; #1141
-   erst nach #1181. Ein Approval von #1186 vor #1187 ist zulässig, die **Umsetzung** bleibt
+5. **Freigabe-/Umsetzungsreihenfolge:** `#1187 → #1186 → #1188 → #1181`; #1141 erst nach #1181.
+   Die Freigabe ist für alle vier erteilt, die **Umsetzung** bleibt in dieser Reihenfolge
    serialisiert.
 6. **Nach jedem gemergten Issue** wird dieses Overview nachgezogen (Status `IN PROGRESS` bzw.
    `complete`, neue Findings, verschobene Nummern) — es ist nicht eingefroren.

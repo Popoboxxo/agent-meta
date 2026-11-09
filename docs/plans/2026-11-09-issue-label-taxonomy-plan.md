@@ -1,5 +1,6 @@
 ---
-status: DRAFT
+status: APPROVED
+approved: 2026-11-09
 issue: 1188
 issue-url: "https://github.com/Popoboxxo/agent-meta/issues/1188"
 spec: docs/specs/2026-11-09-issue-label-taxonomy-spec.md
@@ -20,19 +21,19 @@ trace:
 
 # Deklarative Issue-Label-Taxonomie mit steckbaren Tracker-Adaptern (#1188) — Umsetzungsplan
 
-> Status: **DRAFT** — dieser Plan implementiert nichts, committet nichts und aktiviert
+> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat). Dieser Plan ist der
+> Ausführungsauftrag; er implementiert selbst nichts und aktiviert
 > in `.meta-config/project.yaml` dieses Repos **nichts**.
-> **Quelle:** `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` (`Status: DRAFT`,
-> Spec-ID `SPEC-issue-label-taxonomy-2026-11-09`, 22 ACs + AC-2b, IC-1…IC-7, D1/D2/D4).
-> **Vorbedingung für die Umsetzung:** Die Spec ist heute **nicht freigegeben**. Nach
-> Master-Rule `spec-plan-workflow` startet die Implementierung erst mit
-> `Status: APPROVED`. Die inhaltlichen Voraussetzungen sind erfüllt: Q1, Q2, Q3, Q4, Q7, Q8 und Q9
-> sind am 2026-11-09 entschieden (D9–D15, Abschnitt „Entscheidungsprotokoll (2026-11-09)"). Bis zur
-> Freigabe ist dieser Plan die belastbare Vorarbeit, kein Ausführungsauftrag.
+> **Quelle:** `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` (`Status: APPROVED`,
+> approved 2026-11-09, Spec-ID `SPEC-issue-label-taxonomy-2026-11-09`, 22 ACs + AC-2b, IC-1…IC-7, D1/D2/D4).
+> **Umsetzungsfreigabe:** Die Spec ist am 2026-11-09 **freigegeben**. Nach
+> Master-Rule `spec-plan-workflow` ist die Implementierung damit autorisiert. Die inhaltlichen
+> Voraussetzungen sind erfüllt: Q1, Q2, Q3, Q4, Q7, Q8 und Q9
+> sind am 2026-11-09 entschieden (D9–D15, Abschnitt „Entscheidungsprotokoll (2026-11-09)").
 >
 > **Revision 2 (Review-Einarbeitung 2026-11-09):** RVW-1188-01 (BLOCKER), -02 … -06 (MAJOR) und
 > drei WARNs sind eingearbeitet; Auflösungstabelle am Dokumentende („Review-Auflösung
-> (2026-11-09)"). Der Plan bleibt `DRAFT`.
+> (2026-11-09)"). Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 > **Revision 3 (Review-Runde 2, 2026-11-09):** RVW2-1188-01 … -04 und die Querschnittsbefunde
 > RVW2-X-01/-02 sind eingearbeitet (Prune-Kandidatenformel, beide `project.yaml.example` in T1,
 > Golden-Test statt `git diff`, Stufe 3 vs. 5). Die Auflösungstabelle ist entsprechend ergänzt.
@@ -45,7 +46,7 @@ trace:
 > Template-Schalter, `--apply` schreibt / `git` committet, Retry nur bei `429`, Triage-Labels als
 > Nicht-Taxonomie). Betroffene Tasks: T1, T9, T13, T15, T16, T17, T18, T21, T25, T30. T30 ist damit
 > **kein bedingter Task mehr**; Testdateien 17 → 18, Tasks 29 Pflicht + 1 bedingt → **30 Pflicht**.
-> Protokoll: Abschnitt „Entscheidungsprotokoll (2026-11-09)". Der Plan bleibt `DRAFT`.
+> Protokoll: Abschnitt „Entscheidungsprotokoll (2026-11-09)". Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 **Goal:** Eine deklarative Label-Taxonomie (`type` / `area` / `priority`) ersetzt die drei
 divergierenden, hartkodierten Label-Tabellen in `feedback`, `meta-feedback` und
@@ -89,7 +90,7 @@ Diff-Zeilen · **L** > 3 Dateien, neues Modul > 250 Zeilen oder schema-/ui-über
 ## Voraussetzungen
 
 1. **Spec freigegeben:** `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` trägt
-   `Status: APPROVED`. Heute: DRAFT. Ohne Freigabe bleibt dieser Plan DRAFT.
+   `Status: APPROVED` (approved 2026-11-09). Freigabe erteilt; dieser Plan ist der Ausführungsauftrag.
 2. **Q1, Q2, Q3, Q4, Q7, Q8, Q9 entschieden (2026-11-09):** D9 (Repository-Präzedenzkette),
    D14 (Retry nur bei `429`), D10 (kein Rename in v1), D11 (`docs/issue-labels.md` in
    `generated-file-hashes.json`), D15 (Triage-Labels als Nicht-Taxonomie), D12
@@ -376,10 +377,9 @@ marker-tragende (oder `force: true`).
 
 ## pipeline_stages
 
-Dieser Plan ist **noch an keine `plan-driven`-Stage gebunden**: Er ist DRAFT, die Spec ist
-DRAFT, und die Wave `docs/config-wave-plans-1181-1188` führt ihn nicht über die
-`feature-lifecycle`-Pipeline aus. Beim Übergang `DRAFT → IN PROGRESS` (nach Spec-Freigabe)
-wird das Frontmatter ergänzt:
+Dieser Plan ist **noch an keine `plan-driven`-Stage gebunden**: Die Wave
+`docs/config-wave-plans-1181-1188` führt ihn nicht über die
+`feature-lifecycle`-Pipeline aus. Beim Übergang zu `IN PROGRESS` wird das Frontmatter ergänzt:
 
 ```yaml
 pipeline_stages:
@@ -1224,7 +1224,7 @@ fest.
   Plan-Tabelle „Nicht abdeckbare bzw. nur teilweise abdeckbare ACs" — kein AC-Text wurde
   umgeschrieben.
 - 18 Testdateien, keine leere Tabellenzelle, keine `<…>`-Auslassung in `Files:`/`Interfaces:`.
-- `pipeline_stages` ist bewusst **nicht** gebunden (DRAFT, kein Pipeline-Lauf) und wird beim
+- `pipeline_stages` ist bewusst **nicht** gebunden (kein Pipeline-Lauf) und wird beim
   Übergang zu `IN PROGRESS` nachgetragen.
 - **Platzhalter-Selbstprüfung:** keine Platzhalter-Marker, keine `<…>`-Auslassungen in
   Pflichtfeldern.
@@ -1233,15 +1233,15 @@ fest.
 
 ## Abschlusskriterien dieses Plans
 
-1. Spec `Status: APPROVED`; die inhaltlichen Entscheidungen Q1/Q2/Q3/Q4/Q7/Q8/Q9 liegen vor
+1. Spec `Status: APPROVED` (approved 2026-11-09 — erfüllt); die inhaltlichen Entscheidungen Q1/Q2/Q3/Q4/Q7/Q8/Q9 liegen vor
    (D9–D15, 2026-11-09).
 2. Alle acht Meilenstein-Gates grün, jedes einzeln.
 3. `python3 scripts/sync.py --validate` → rc 0, **ohne** Netzwerk.
 4. `python3 -m pytest tests --basetemp="$PYTEST_BASETEMP" -q` → grün (volle Suite).
 5. `tests/test_issue_labels_scenario_1188.py` grün in `.tmp/scenario-labels-1188/`.
 6. `.meta-config/project.yaml` dieses Repos unverändert: `git diff --name-only aaed14c2..HEAD -- .meta-config/project.yaml` ist leer — fester Basis-Commit statt Arbeitsbaum-Diff (RVW2-1188-03).
-7. `--validate-spec-plan` meldet **genau ein** ERROR-Finding: `spec_plan_approval_marker`
-   (Spec ist DRAFT). Das ist das gewollte Gate und verschwindet mit `Status: APPROVED`.
+7. `--validate-spec-plan` meldet **kein** ERROR-Finding `spec_plan_approval_marker` mehr
+   (Spec `Status: APPROVED`, approved 2026-11-09). Das Gate ist damit geschlossen.
    Task↔Test-Traceability ist in diesem Repo aus (`rapid-prototyping`,
    `config/dod-presets.yaml:63` `spec-plan-traceability: false`), daher entstehen keine
    weiteren Findings aus den `T<n>`-IDs; der Plan-Graph ist kantenrein
@@ -1265,13 +1265,14 @@ Spec (§13) und in diesem Plan eingearbeitet; Abweichungen brauchen eine Spec-Re
 | **D15** | **Q7** — Triage-Labels | `TRIAGE_LABELS = ("triage", "needs-info")` als Framework-Konstante; `render_triage_labels()` rendert daraus `{{ISSUE_TRIAGE_LABELS}}`. Keine vierte Achse (D2), kein Projekt-Override, kein Soll-Label, kein `prune`-Ziel. `docs/issue-labels.md` führt sie unter „Nicht Teil der Taxonomie"; Regel 4 nimmt sie von der Literal-Prüfung aus | K-18, T9, T13, T25, AC-6-Trace |
 
 **Nicht Teil dieser Entscheidungen:** ein `renames`-Schema-Schlüssel (D10 reserviert nur die
-Ausgabezeile) und jede Änderung an `Status: DRAFT`.
+Ausgabezeile) und jede Statusänderung des Dokuments (die Freigabe `DRAFT → APPROVED` erfolgte
+separat am 2026-11-09).
 
 ---
 
 ## Review-Auflösung (2026-11-09)
 
-Alle Review-Befunde zu #1188, mit Änderung und Fundstelle im Plan. Der Plan bleibt `DRAFT`.
+Alle Review-Befunde zu #1188, mit Änderung und Fundstelle im Plan. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund-ID | Änderung | Stelle |
 |---|---|---|
@@ -1310,6 +1311,6 @@ Alle Review-Befunde zu #1188, mit Änderung und Fundstelle im Plan. Der Plan ble
 | **K8** | **Nicht betroffen**: kein bestehender `_KEYS`-Block | geprüft: T1 |
 
 **Nicht geändert (bewusst):** kein neuer Task, keine Umnummerierung (30 Tasks bleiben), keine
-AC-Umschreibung; `pipeline_stages` bleibt ungebunden (DRAFT). F-5 ist ein Issue-**Entwurf**; die
+AC-Umschreibung; `pipeline_stages` bleibt ungebunden (kein Pipeline-Lauf). F-5 ist ein Issue-**Entwurf**; die
 im Wave-Kontext als real bestätigten Nummern #1201–#1204 werden nicht zugeordnet, solange die
 Titel nicht abgeglichen sind.

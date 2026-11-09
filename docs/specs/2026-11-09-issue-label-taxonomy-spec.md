@@ -1,6 +1,6 @@
 # Issue #1188 — Deklarative Issue-Label-Taxonomie mit steckbaren Tracker-Adaptern — Spec
 
-> **Status:** DRAFT (nicht freigegeben)
+> **Status:** APPROVED — Approved: 2026-11-09 (User-Freigabe via main_chat)
 > **Klasse:** **XL / cross-cutting** — neue Config-Sektion, neuer Resolver, deklarativer HTTP-Executor gegen fremde Tracker-APIs, vier Rollen-Templates, neuer Consistency-Check, Admin-UI-Pane, generierte Doku.
 > **Datum:** 2026-11-09
 > **Autor:** `concept-specifier` (Subagent der Wave `docs/config-wave-plans-1181-1188`)
@@ -10,10 +10,10 @@
 > **Maßgebliche Quelle:** `.tmp/issue-dump/issue-1188.json` (identisch mit dem GitHub-Body, am 2026-11-09 gegengeprüft)
 > **Weitere Quellen:** `issue-1187.json`, `issue-1186.json`, `issue-1181.json` (Konfliktflächen) · `issue-1167/1141/957/1168.json` (Backlog) · `.tmp/issue-dump/baseline-validate.txt`, `baseline-check.txt` (Baseline: `[PASS]`, `EXIT=0`; 1 Warning `repo-containment.no-hook-support`)
 > **Verifikations-Legende:** **CONFIRMED** = am Code mit `datei:zeile` belegt · **PARTIAL** = Kernaussage stimmt, Detail weicht ab · **ISSUE-CLAIM** = Aussage aus dem Issue, hier nicht erneut geprüft · **REFUTED** = widerlegt
-> **Revision 2 (Review-Einarbeitung 2026-11-09):** RVW-1188-01 (BLOCKER), -02 … -06 (MAJOR) sowie drei WARNs sind eingearbeitet. Auflösungstabelle: §12 „Review-Auflösung (2026-11-09)". Status bleibt `DRAFT`.
-> **Revision 3 (Review-Runde 2, 2026-11-09):** RVW2-1188-01 … -04 (Prune-Kandidatenformel, Beispiel-Dateien, Testgüte/Abschlusskriterium, Stufen-Nummerierung) sowie die Querschnittsbefunde RVW2-X-01 (Ziel-Dateimatrix) und RVW2-X-02 (Klassifikation der State-Datei durch #1186 als `unmanaged`) sind eingearbeitet. Status bleibt `DRAFT`.
-> **Revision 4 (Szenario-Konflikte K1–K8, 2026-11-09):** K1 (`unmanaged` statt `project-state`), K2 (eine kanonische `separator`-Form, `defaults.label-separator` entfernt), K4 (Regel 6 auf zwei realisierbare Bedingungen), K6 (`$defs`-Notiz) sind eingearbeitet; K3/K5/K7/K8 betreffen dieses Dokument nicht. Auflösungstabelle: §12.1. Status bleibt `DRAFT`.
-> **Revision 5 (Nutzer-Entscheidungen D9–D15, 2026-11-09):** Die offenen Fragen Q1, Q2, Q3, Q4, Q7, Q8 und Q9 sind **entschieden und eingearbeitet** (§13 „Entscheidungsprotokoll (2026-11-09)"): Repository-Präzedenzkette (D9/Q1), kein Rename in v1 (D10/Q3), `docs/issue-labels.md` in `generated-file-hashes.json` (D11/Q4), Template-Schalter `templates.{mode,force}` in IC-1 (D12/Q8), `--apply` schreibt / `git` committet (D13/Q9), Retry nur bei `429` mit `Retry-After` (D14/Q2), Triage-Labels als Nicht-Taxonomie (D15/Q7). Status bleibt `DRAFT`; es fehlt nur noch `Status: APPROVED`.
+> **Revision 2 (Review-Einarbeitung 2026-11-09):** RVW-1188-01 (BLOCKER), -02 … -06 (MAJOR) sowie drei WARNs sind eingearbeitet. Auflösungstabelle: §12 „Review-Auflösung (2026-11-09)". Status damals `DRAFT` (Freigabe seit 2026-11-09 `APPROVED`).
+> **Revision 3 (Review-Runde 2, 2026-11-09):** RVW2-1188-01 … -04 (Prune-Kandidatenformel, Beispiel-Dateien, Testgüte/Abschlusskriterium, Stufen-Nummerierung) sowie die Querschnittsbefunde RVW2-X-01 (Ziel-Dateimatrix) und RVW2-X-02 (Klassifikation der State-Datei durch #1186 als `unmanaged`) sind eingearbeitet. Status damals `DRAFT` (Freigabe seit 2026-11-09 `APPROVED`).
+> **Revision 4 (Szenario-Konflikte K1–K8, 2026-11-09):** K1 (`unmanaged` statt `project-state`), K2 (eine kanonische `separator`-Form, `defaults.label-separator` entfernt), K4 (Regel 6 auf zwei realisierbare Bedingungen), K6 (`$defs`-Notiz) sind eingearbeitet; K3/K5/K7/K8 betreffen dieses Dokument nicht. Auflösungstabelle: §12.1. Status damals `DRAFT` (Freigabe seit 2026-11-09 `APPROVED`).
+> **Revision 5 (Nutzer-Entscheidungen D9–D15, 2026-11-09):** Die offenen Fragen Q1, Q2, Q3, Q4, Q7, Q8 und Q9 sind **entschieden und eingearbeitet** (§13 „Entscheidungsprotokoll (2026-11-09)"): Repository-Präzedenzkette (D9/Q1), kein Rename in v1 (D10/Q3), `docs/issue-labels.md` in `generated-file-hashes.json` (D11/Q4), Template-Schalter `templates.{mode,force}` in IC-1 (D12/Q8), `--apply` schreibt / `git` committet (D13/Q9), Retry nur bei `429` mit `Retry-After` (D14/Q2), Triage-Labels als Nicht-Taxonomie (D15/Q7). Status damals `DRAFT`; die Freigabe `Status: APPROVED` wurde am 2026-11-09 durch den User erteilt.
 
 ---
 
@@ -1030,17 +1030,17 @@ gemockten Tracker und keinen `project.yaml`-Sync-Variantenlauf braucht.
 
 **Rückverfolgbarkeit der Entscheidungen:** D1 → §6/AC-1/AC-6 · D2 → §6/§4.1/Nicht-Ziele · D3 → §4.5/IC-3/AC-3 · D4 → §4.6/IC-4/AC-4 · D5 → §4.2 (`conventional`)/§4.10/AC-2/AC-6 · **D9** → §4.11/IC-1 `repository`/AC-16 · **D10** → IC-5/AC-10 · **D11** → §4.9/IC-7/AC-22 · **D12** → §4.9/IC-1 `templates`/AC-22 · **D13** → IC-4/IC-8/AC-4 · **D14** → §4.11/IC-4/AC-18+AC-19 · **D15** → §4.10/AC-6.
 
-**Offene Punkte vor dem Freigabe-Marker:** keine inhaltlichen mehr. Q1, Q2, Q3, Q4, Q7, Q8 und Q9
+**Offene Punkte vor der Freigabe:** keine inhaltlichen mehr. Q1, Q2, Q3, Q4, Q7, Q8 und Q9
 sind am 2026-11-09 entschieden und in §13 protokolliert (D9, D14, D10, D11, D15, D12, D13); Q5 und
-Q6 waren bereits in Revision 2 entschieden (IC-1 bzw. §4.7/K-5). Es fehlt ausschließlich der
-Statuswechsel `DRAFT → APPROVED` durch den Nutzer.
+Q6 waren bereits in Revision 2 entschieden (IC-1 bzw. §4.7/K-5). Der Statuswechsel
+`DRAFT → APPROVED` durch den Nutzer ist am 2026-11-09 erfolgt.
 
 ---
 
 ## 12. Review-Auflösung (2026-11-09)
 
 Alle Befunde aus dem Review zu #1188 (Runde 1: `RVW-1188-*`; Runde 2: `RVW2-*`), mit Änderung und
-Fundstelle. Status der Spec bleibt `DRAFT`.
+Fundstelle. Status der Spec damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund-ID | Änderung | Stelle |
 |---|---|---|
@@ -1066,15 +1066,15 @@ Fundstelle. Status der Spec bleibt `DRAFT`.
 | **RVW2-X-02** (Querschnitt) | Die Klassifikation der State-Datei ist eine #1186-Pflicht, nicht nur eine #1188-Notiz: die State-Datei steht als eigene Matrix-Zeile, und §11.1 sagt explizit, dass **#1186** sie klassifizieren muss — als `unmanaged` (K1; die frühere `project-state`-Kategorie ist gestrichen) | §11-Tabelle (neue Zeile `.meta-config/issue-labels-state.json`), **§11.1** (Manifest-Bullet) |
 
 **Nicht geänderte Punkte (bewusst):** Die AC-Texte 1–22 + AC-2b bleiben wörtlich (Issue-Übernahme);
-alle Neuinterpretationen stehen ausschließlich im Abschnitt „AC-Interpretationen". `Status: DRAFT`
-bleibt. Es wurden **keine** Issue-Nummern erfunden: F-5 ist als Entwurf markiert, die im
+alle Neuinterpretationen stehen ausschließlich im Abschnitt „AC-Interpretationen". `Status` war
+damals `DRAFT` und ist seit 2026-11-09 `APPROVED`. Es wurden **keine** Issue-Nummern erfunden: F-5 ist als Entwurf markiert, die im
 Wave-Kontext als real bestätigten Nummern #1201–#1204 werden hier **nicht** zugeordnet, solange
 die Titel nicht abgeglichen sind.
 
 ### 12.1 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt `DRAFT`.
+Wave-Specs/-Pläne. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund | Änderung | Stelle |
 |---|---|---|
@@ -1092,7 +1092,7 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 ## 13. Entscheidungsprotokoll (2026-11-09)
 
 Vom Nutzer entschiedene offene Fragen. Jede Zeile ist **bindend** und im Dokument oben eingearbeitet;
-Abweichungen brauchen eine neue Spec-Revision. `Status` bleibt `DRAFT` (nur der Freigabe-Marker fehlt).
+Abweichungen brauchen eine neue Spec-Revision. `Status` war damals `DRAFT`; der Freigabe-Marker wurde am 2026-11-09 gesetzt.
 
 | D-Nr | Frage | Entscheidung (`DECIDED 2026-11-09`) | Stelle |
 |---|---|---|---|

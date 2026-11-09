@@ -1,6 +1,6 @@
 # Project-Context-Injection Scope — Spec
 
-> Status: **DRAFT**
+> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat)
 > Revision: 2 (Review-Auflösung 2026-11-09)
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 eingearbeitet (`unmanaged` statt
 > `project-state`); K2–K8 geprüft und für dieses Dokument nicht betroffen (§12.1).
@@ -676,7 +676,7 @@ Begründung: #1187 ist der kleinste Eingriff und setzt die Rollen-Schleife neu a
 
 ## 12. Review-Auflösung (2026-11-09)
 
-Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Status bleibt `DRAFT`; Revision 2.
+Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Damals `DRAFT`, seit 2026-11-09 `APPROVED`; Revision 2.
 
 | Befund-ID | Änderung | Betroffene Stelle |
 |---|---|---|
@@ -701,7 +701,7 @@ Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Status bleibt `DR
 ### 12.1 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt `DRAFT`.
+Wave-Specs/-Pläne. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund | Änderung | Stelle |
 |---|---|---|
@@ -718,7 +718,7 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 
 ## 13. Entscheidungsprotokoll (2026-11-09)
 
-Vom User entschiedene offene Fragen. Status bleibt `DRAFT`; die Entscheidungen sind **verbindlich**
+Vom User entschiedene offene Fragen. Damals `DRAFT`, seit 2026-11-09 `APPROVED`; die Entscheidungen sind **verbindlich**
 und ersetzen die früheren „Vorschlag"-Einträge in §8.2. Jede Zeile trägt den Marker
 `DECIDED 2026-11-09` auch am jeweiligen Änderungsort im Dokument.
 
@@ -731,4 +731,4 @@ und ersetzen die früheren „Vorschlag"-Einträge in §8.2. Jede Zeile trägt d
 
 **Auswirkung auf die Offenen Fragen:** OQ-2…OQ-5 sind damit **geschlossen** (§8.2 verweist auf dieses
 Protokoll). OQ-1, OQ-6 und OQ-7 waren bereits in Revision 2 aufgelöst (§8.2). Es bleiben **keine**
-offenen Fragen in dieser Spec; die Freigabe (`Status: APPROVED`) ist der einzige verbleibende Schritt.
+offenen Fragen in dieser Spec; die Freigabe (`Status: APPROVED`) wurde am 2026-11-09 durch den User erteilt.

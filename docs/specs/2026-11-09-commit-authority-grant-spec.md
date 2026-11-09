@@ -1,7 +1,8 @@
 ---
 spec-id: SPEC-COMMIT-AUTHORITY-GRANT-2026-11-09
 title: Projektseitiger Commit-Authority-Grant für Edit-only-Rollen
-status: DRAFT
+status: APPROVED
+approved: 2026-11-09
 revision: "1.4"
 review: "2026-11-09 — RVW-1181-01 … -06 + RVW2-1181-01 … -05 + RVW2-X-01 (§12); Szenario-Konflikte K1–K8 (§12.1); Nutzerentscheidungen D16–D23 (§13)"
 klasse: L (Bounded, mit Review-Loop) — Begründung im Kopfblock unten
@@ -19,9 +20,8 @@ quellen: >
 
 # Projektseitiger Commit-Authority-Grant für Edit-only-Rollen — Spec
 
-> **Status: DRAFT** — kein `APPROVED`. Der Approval-Marker wird ausschließlich vom Nutzer bzw.
-> `concept-reviewer` gesetzt, nie vom Autor. Diese Datei enthält Interface-Contracts und
-> Akzeptanzkriterien, **keine** Implementierung und keinen Plan.
+> **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat). Diese Datei enthält
+> Interface-Contracts und Akzeptanzkriterien, **keine** Implementierung und keinen Plan.
 > Trace-Anker: `spec-id: SPEC-COMMIT-AUTHORITY-GRANT-2026-11-09`.
 >
 > **Issue:** [#1181 — feat: supported way to grant commit authority to Edit-only roles](https://github.com/Popoboxxo/agent-meta/issues/1181)
@@ -1037,7 +1037,7 @@ wird in **#1186** klassifiziert — nicht in #1181.
 ### 12.1 Szenario-Konflikte K1–K8 (2026-11-09)
 
 Auflösung der acht Befunde aus `.tmp/scenario-config-wave/RESULT.md`, konsistent über alle vier
-Wave-Specs/-Pläne. Status bleibt `DRAFT`.
+Wave-Specs/-Pläne. Damals `DRAFT`, seit 2026-11-09 `APPROVED`.
 
 | Befund | Änderung | Stelle |
 |---|---|---|
@@ -1069,11 +1069,11 @@ gelten in Spec **und** Plan identisch.
 | **D22** | OQ-P2 — Rolle nicht in `roles:` = Fehler? | **Nein, INFO.** `authority_override_notices` liefert die INFO-Zeile ``<role>=direct ignored — role is not active (not listed in `roles:` or dropped by the active set)`` (§4.6); ERROR bleibt ausschließlich für read-only/unbekannte Templates und nicht durchsetzbare Grants. | §3.6, §4.3, §10 (N-7) |
 | **D23** | OQ-P3 — Skalar-Kurzform akzeptieren? | **Nein, nur Objektform mit Pflicht-Ack:** `{authority: direct, acknowledge_full_shell: true}`. Skalar-Kurzform wird **nicht** akzeptiert; fehlendes/falsches Ack = Violation + kein Grant. | §3.1, §4.1, §4.3, §10 (N-2) |
 
-**Statuswirkung:** Die Entscheidungen ändern den `Status` **nicht** — die Spec bleibt `DRAFT`.
+**Statuswirkung:** Die Entscheidungen ändern den `Status` **nicht** — damals blieb die Spec `DRAFT`; die Freigabe `APPROVED` erfolgte am 2026-11-09 durch den User.
 Sie entfernen die Eskalationsmarker aus §7.2 und binden sie an konkrete Abschnitte, damit Plan und
 Implementierung nicht mehr auf eine Review-Runde warten müssen.
 
 ---
 
 **Trace-Anker:** `spec-id: SPEC-COMMIT-AUTHORITY-GRANT-2026-11-09`
-**Status:** DRAFT — keine Freigabe, keine Umsetzung. Offene Fragen: keine (D16–D23 entschieden).
+**Status:** APPROVED — Approved: 2026-11-09 (User-Freigabe via main_chat); Umsetzung autorisiert. Offene Fragen: keine (D16–D23 entschieden).
