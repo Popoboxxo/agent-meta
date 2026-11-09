@@ -167,7 +167,9 @@ provider-options:
     prompt-mode: slim
   Copilot: {}
   Mammouth: {}
-  Opencode: {}
+  Opencode:
+    surface-version: v2
+    experimental-subagent-depth: 3
   Codex: {}
   KimiCode: {}
   ZCode: {}
