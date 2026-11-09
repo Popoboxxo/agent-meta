@@ -4,6 +4,10 @@
 > Revision: 2 (Review-Auflösung 2026-11-09)
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 eingearbeitet (`unmanaged` statt
 > `project-state`); K2–K8 geprüft und für dieses Dokument nicht betroffen (§12.1).
+> Revision: 4 (Entscheidungen D5–D8, 2026-11-09) — OQ-2/OQ-3/OQ-4/OQ-5 vom User entschieden:
+> `orchestrator-roles` konfigurierbar (§3.1.1), `exclude` gewinnt mit WARN statt `SyncError`
+> (§3.1.2), AC7-Auslegung bestätigt (§7), Pointer-Text konfigurierbar mit Default Englisch
+> (§3.2.1). Protokoll: §13.
 > Datum: 2026-11-09
 > Klasse: **L** (cross-cutting in einem Subsystem: `sync`-Rendering; ~12 produktive Dateien + Tests; keine neue Subsystem-Grenze, kein Provider-Sonderpfad). **Kein XL**: es entsteht kein neues Modul mit eigenem Lifecycle, und die Änderung ist an genau zwei Konfigurations-/Render-Stellen entschieden (`config.py`, `agent_sync.py`).
 > Issue: [#1187 — feat(config): project-context-injection scope (core | +orchestrator | +whitelist | all)](https://github.com/Popoboxxo/agent-meta/issues/1187)
@@ -133,7 +137,18 @@ project-context-injection:
   mode: all                 # all | core+orchestrator | core+whitelist | core
   whitelist: []             # Rollennamen; nur bei mode: core+whitelist ausgewertet
   orchestrator: inherit     # inherit | include | exclude
+  orchestrator-roles: []    # Rollennamen; FEHLT der Key, gilt die Default-Ableitung (§3.1.1);
+                            # ein explizites [] bedeutet „keine Orchestrator-Rolle"
+  pointer-language: en      # en | de | project
+  # pointer-text: "Project context: read `{context_file}` first — …"   # optional, überschreibt
+  #                                                                     pointer-language (§3.2.1)
 ```
+
+**Fehlender Key ≠ leerer Wert (verbindlich):** `orchestrator-roles` hat **keinen** Schema-Default.
+Fehlt der Key, leitet der Resolver die Default-Menge ab (§3.1.1); steht dort `[]`, ist die Menge
+bewusst leer. Deshalb darf weder das Schema noch `--fill-defaults`/`--init` ein `orchestrator-roles: []`
+materialisieren — sonst würde ein reiner Default-Fill die Semantik des nächsten Syncs ändern
+(Begründung in §4.1). Dasselbe gilt für `pointer-text` (kein Default, Ableitung aus `pointer-language`).
 
 Die vier Modi und ihre Wirkung (Spalte „Kontextdatei" = Kanal aus §2.3, **immer** unverändert):
 
@@ -150,21 +165,115 @@ Die vier Modi und ihre Wirkung (Spalte „Kontextdatei" = Kanal aus §2.3, **imm
 |---|---|---|---|---|
 | `inherit` | exkludiert | exkludiert | inkludiert (Default-Verhalten des Modus) | inkludiert |
 | `include` | **inkludiert** (wirkt wie `core+orchestrator`) | inkludiert | inkludiert | inkludiert |
-| `exclude` | exkludiert | exkludiert | **Validierungsfehler** (Modus verlangt Orchestrator) | **Validierungsfehler** (Modus `all` heißt überall) |
+| `exclude` | exkludiert | exkludiert | exkludiert + **WARN** `exclude-overrides-mode` (Modus degeneriert zu `core`, §3.1.2) | exkludiert + **WARN** `exclude-overrides-mode` („alle außer Orchestrator", §3.1.2) |
 
-**Lesart der Achse (verbindlich):** `inherit` bedeutet „Modus-Default", **nicht** „inkludieren". Für `core+whitelist` heißt das: `inherit` und `exclude` inkludieren **keine** Orchestrator-Rolle; nur `include` fügt die Orchestrator-Menge zur Whitelist hinzu. `core` + `include` wirkt wie `core+orchestrator`. Für `core+orchestrator`/`all` ist `exclude` ein Fehler (Tabelle oben). Diese Lesart ist die einzige, die mit den Tests in Plan-T5 (`core+whitelist` → Whitelist ∪ Orchestrator-Menge **nur** bei `include`) und mit AC5 übereinstimmt.
+**Kein `exclude`-Wert ist ein harter Fehler (D6 — DECIDED 2026-11-09).** Die frühere Regel
+„`exclude` + `core+orchestrator`/`all` = Validierungsfehler" ist gestrichen; `exclude` gewinnt
+immer, der Sync läuft weiter und meldet den Widerspruch als WARN (§3.1.2, §5.2).
 
-**Orchestrator-Rollenmenge:** Rollenname `orchestrator` **plus** jeder für einen aktiven Provider in `providers.<P>.primary-role` genannte Rollenname (dedupliziert). Begründung: `primary-role` ist der reale Einstiegspunkt eines Providers; das Schema beschreibt diese Ableitung selbst (`config/project-config.schema.json:2485`). Provider ohne `primary-role` tragen nur `orchestrator` bei. Die Menge wird **nicht** über Provider-Namen verzweigt.
+**Lesart der Achse (verbindlich):** `inherit` bedeutet „Modus-Default", **nicht** „inkludieren". Für `core+whitelist` heißt das: `inherit` und `exclude` inkludieren **keine** Orchestrator-Rolle; nur `include` fügt die Orchestrator-Menge zur Whitelist hinzu. `core` + `include` wirkt wie `core+orchestrator`. Diese Lesart ist die einzige, die mit den Tests in Plan-T5 (`core+whitelist` → Whitelist ∪ Orchestrator-Menge **nur** bei `include`) und mit AC5 übereinstimmt.
+
+#### 3.1.1 Orchestrator-Rollenmenge (D5 — DECIDED 2026-11-09)
+
+Die Menge der Orchestrator-Rollen ist **konfigurierbar** und wird in dieser Reihenfolge aufgelöst:
+
+| Fall | Menge |
+|---|---|
+| `orchestrator-roles` **fehlt** | Default: `{orchestrator} ∪ {providers.<P>.primary-role für jeden aktiven Provider}` — deterministisch (`tuple(sorted(set(...)))`), dedupliziert |
+| `orchestrator-roles: [role-a, role-b]` | **ersetzt** den Default vollständig; `orchestrator` und `primary-role`-Rollen sind **nur** enthalten, wenn sie explizit gelistet sind (kein stilles Dazumischen) |
+| `orchestrator-roles: []` | leere Menge — keine Rolle ist Orchestrator-Rolle (zulässig, §3.1.2) |
+
+Begründung Default: `primary-role` ist der reale Einstiegspunkt eines Providers; das Schema
+beschreibt diese Ableitung selbst (`config/project-config.schema.json:2485`). Datenquelle ist die
+Provider-Registry `config/ai-providers.yaml` (heute trägt nur `Opencode` `primary-role: orchestrator`,
+`:268`); Provider ohne `primary-role` tragen nur `orchestrator` bei. Die Menge wird **nicht** über
+Provider-Namen verzweigt (Provider-Agnostik, §4.5).
+
+Validierung:
+
+| Regel | Verhalten |
+|---|---|
+| Rollenname unbekannt (nicht in `build_role_map`, `scripts/lib/roles.py:80`) | **harter Sync-Fehler** `project-context-injection.orchestrator-roles-unknown` mit **allen** unbekannten Namen (sortiert, kommagetrennt) |
+| Duplikate / Nicht-String | Schema-Fehler (`uniqueItems`, `items.type`) |
+| leere Liste | zulässig; bei `mode: core+orchestrator` zusätzlich WARN `empty-orchestrator-set` (§3.1.2) |
+| Eintrag ohne generisches Template | zulässig, aber wirkungslos → WARN `orchestrator-role-no-template` (§5.2) |
+
+#### 3.1.2 `exclude` gewinnt, aber mit WARN (D6 — DECIDED 2026-11-09)
+
+`orchestrator: exclude` ist in **jedem** Modus zulässig. Es gibt **keinen** `SyncError`-Pfad mehr für
+`exclude`; die Orchestrator-Menge wird ausgenommen und der Widerspruch als WARN benannt. Pro Sync-Lauf
+wird **höchstens eine** dieser WARNs ausgegeben (Priorität: `exclude-overrides-mode` vor
+`empty-orchestrator-set`):
+
+| Bedingung | WARN-ID | Ergebnis |
+|---|---|---|
+| `orchestrator: exclude` **und** `mode ∈ {all, core+orchestrator}` | `project-context-injection.exclude-overrides-mode` | Orchestrator-Rollen ohne Block/Pointer; alle anderen Rollen gemäß Modus. Bei `all` = „alle außer Orchestrator", bei `core+orchestrator` = Modus degeneriert zu `core` |
+| `mode: core+orchestrator`, `orchestrator: exclude`, aufgelöste Menge leer | `project-context-injection.exclude-overrides-mode` (eine WARN, kein zweites Ereignis) | keine Rolle erhält den Block |
+| `mode: core+orchestrator`, `orchestrator ≠ exclude`, `orchestrator-roles: []` | `project-context-injection.empty-orchestrator-set` | keine Rolle erhält den Block; Modus degeneriert zu `core` |
+| `mode: core` + `exclude`, `mode: core+whitelist` + `exclude`, `mode: core` + `include` bei leerer Menge | keine WARN | `exclude` deckt sich mit dem Modus-Default; `include` ist optional und darf leer laufen |
+
+**Exakter WARN-Text (verbindlich, wird in Plan-T2/T5/T15 assertiert).** `mode=…` ist der aufgelöste
+Modus, die Klammer enthält `", ".join(sorted(orchestrator_roles))` oder `none`:
+
+```
+project-context-injection.exclude-overrides-mode: mode=all + orchestrator=exclude — orchestrator roles (orchestrator, senior-developer) excluded; exclude wins
+project-context-injection.exclude-overrides-mode: mode=core+orchestrator + orchestrator=exclude — orchestrator roles (orchestrator) excluded; exclude wins
+project-context-injection.empty-orchestrator-set: mode=core+orchestrator + orchestrator-roles=[] — no role receives the block (mode degenerates to core)
+```
+
+Die WARN wird **einmal pro Sync-Lauf** über `log.warn` ausgegeben (`build_variables`-Pre-Warnings,
+`scripts/lib/cli_commands.py:691-692`), nicht pro Provider und nicht pro Rolle.
 
 ### 3.2 Pointer-Zeile (Pflicht, damit `core` kein Kontextverlust ist)
 
-Jede Rolle, die den Block **nicht** erhält, bekommt **genau eine** physische Zeile, die die reale Kontextdatei des Providers nennt. Wortlaut (eine Zeile, Englisch wie die Templates):
+Jede Rolle, die den Block **nicht** erhält, bekommt **genau eine** physische Zeile, die die reale Kontextdatei des Providers nennt. Default-Wortlaut (Sprach-Default `en`, konfigurierbar nach §3.2.1):
 
 ```
 Project context: read `{context_file}` first — it is the single source for project-specific facts (embedded here only when `project-context-injection.mode` includes this role).
 ```
 
 - `{context_file}` ist der aufgelöste Wert aus `pc["context_file"]` (`scripts/lib/agent_sync.py:515`, Datenquelle `config/ai-providers.yaml`, §2.4). **Kein** `{{CONTEXT_FILE}}` innerhalb des Werts — die Substitution ist einpassig (`scripts/lib/variables.py:698`), verschachtelte Platzhalter würden nicht expandiert.
+
+#### 3.2.1 Pointer-Text und Pointer-Sprache (D8 — DECIDED 2026-11-09)
+
+Der Pointer-Text ist konfigurierbar. Auflösungs-Präzedenz (höchste zuerst):
+
+| Stufe | Quelle | Ergebnis |
+|---|---|---|
+| 1 | `project-context-injection.pointer-text` (String) | überschreibt den Sprach-Default **vollständig**; nur das Token `{context_file}` ist erlaubt |
+| 2 | `project-context-injection.pointer-language` | `en` → englischer Default (Wortlaut oben), `de` → deutscher Default (unten), `project` → Ableitung aus `COMMUNICATION_LANGUAGE` (Tabelle unten) |
+| 3 | kein Key | `en` (Default, §4.2) |
+
+Deutscher Default (eine Zeile, gleiche Token-Semantik):
+
+```
+Projektkontext: lies zuerst `{context_file}` — sie ist die einzige Quelle für projektspezifische Fakten (hier nur eingebettet, wenn `project-context-injection.mode` diese Rolle einschließt).
+```
+
+Ableitung für `pointer-language: project` (Wert aus `variables.COMMUNICATION_LANGUAGE`, `scripts/lib/config.py:221`, Fallback `Deutsch`; Vergleich case-insensitiv, getrimmt):
+
+| `COMMUNICATION_LANGUAGE` | Pointer-Sprache |
+|---|---|
+| `de`, `deutsch`, `german`, `ger` | `de` |
+| `en`, `englisch`, `english`, `eng` | `en` |
+| alles andere oder leer | `en` + WARN `project-context-injection.pointer-language-fallback` (§5.2) |
+
+Validierung (harte Fehler, §5.1):
+
+| Regel | Verhalten |
+|---|---|
+| `pointer-language ∉ {en, de, project}` | harter Sync-Fehler `project-context-injection.pointer-language-unknown` mit dem Wert |
+| `pointer-text` enthält ein Token ∉ {`{context_file}`} | harter Sync-Fehler `project-context-injection.pointer-text-unknown-token` mit **allen** gefundenen Tokens (sortiert) |
+| `pointer-text` enthält `{context_file}` **nicht genau einmal** | harter Sync-Fehler `project-context-injection.pointer-text-context-file-count` (AC3 verlangt genau eine Nennung der realen Datei) |
+| `pointer-text` enthält einen Zeilenumbruch | harter Sync-Fehler `project-context-injection.pointer-text-multiline` (AC3 verlangt **eine** physische Zeile) |
+| `pointer-text: ""` (leerer String) | Schema-Fehler (`minLength: 1`, §4.1) |
+
+**Token-Semantik:** Erlaubt ist ausschließlich das Literal `{context_file}` (einfache geschweifte
+Klammern, kein Doppel-Brace). Jedes verbleibende `{`/`}` nach dem Entfernen der erlaubten Tokens ist
+ein Fehler — dadurch ist die spätere Formatierung (`.format(context_file=…)`) kollisionsfrei und
+`{{`-Escapes werden nicht stillschweigend akzeptiert. Der gerenderte Pointer-Text wird **pro Provider**
+gebildet (er enthält `pc["context_file"]`) und als interne Träger-Variable `_PROJECT_CONTEXT_POINTER`
+an den Renderer gegeben (§4.3).
 
 **Eine** Mechanik (entschieden; ersetzt die frühere, widersprüchliche Formulierung „an der Stelle des Platzhalters"):
 
@@ -193,11 +302,13 @@ Fallbacks für Rollen **ohne** Block-Vorkommen (dann entfallen Schritte 1–2):
 | Whitelist bei anderem Modus | `whitelist` wird bei `mode != core+whitelist` ignoriert, aber **nicht** als Fehler behandelt; Sync-Log `note` „whitelist ignored (mode=…)" |
 | Eintrag ohne Platzhalter | Whitelist-Eintrag, dessen Template kein `{{PROJECT_CONTEXT}}` enthält, ist wirkungslos → Konsistenz-**Warnung** (nicht Fehler), siehe §5.4 |
 | Duplikate / Nicht-String | Schema-Fehler (`uniqueItems`, `items.type: string`) |
+| `orchestrator-roles` | gleiche Registry-Prüfung wie die Whitelist, aber **eigener** Fehler-Code (`orchestrator-roles-unknown`, §3.1.1) — die Meldungen dürfen nicht vermischt werden |
 
 ### 3.4 Präzedenz
 
 1. `project-context-injection` in `.meta-config/project.yaml` (Projekt)
-2. Schema-Default `mode: all`, `whitelist: []`, `orchestrator: inherit`
+2. Schema-Defaults: `mode: all`, `whitelist: []`, `orchestrator: inherit`, `pointer-language: en`;
+   `orchestrator-roles` und `pointer-text` haben **keinen** Default (Abwesenheit = Ableitung, §3.1.1/§3.2.1)
 
 Es gibt **bewusst keine** Preset-Ebene (anders als #1186/#1188): der Scope ist ein einzelner Enum plus Liste, ein Preset würde nur eine dritte Auflösungsstufe ohne Nutzen einführen. Ein `--explain`-Analogon ist deshalb nicht Teil dieser Spec.
 
@@ -216,6 +327,11 @@ project-context-injection: mode=<mode> injected=<n>/<total> roles, pointer=<m>, 
 - Zusätzlich `--check`-Ausgabe: dieselbe Zeile, damit die Entscheidung vor dem Schreiben sichtbar ist.
 
 ### 3.6 Design-Entscheidungen
+
+> **Namensraum:** `D-1`…`D-5` sind **Design-Entscheidungen** dieses Dokuments (Bindestrich). Die im
+> Entscheidungsprotokoll §13 vergebenen IDs `D5`–`D8` (ohne Bindestrich) sind die **vom User
+> entschiedenen** offenen Fragen. `D-5` (Diagnose-Flags) und `D5` (Orchestrator-Achse) sind
+> verschiedene Einträge.
 
 ```
 DECISION D-1  (Render-Ort)
@@ -285,6 +401,22 @@ Datei: `config/project-config.schema.json`, neue Top-Level-Property (Position: b
       "type": "string",
       "enum": ["inherit", "include", "exclude"],
       "default": "inherit"
+    },
+    "orchestrator-roles": {
+      "type": "array",
+      "description": "Explicit orchestrator role set; REPLACES the derived default (orchestrator + active providers' primary-role). Absent key = derived default; [] = no orchestrator role. No schema default on purpose (a materialized [] would change the next sync's semantics).",
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+      "uniqueItems": true
+    },
+    "pointer-language": {
+      "type": "string",
+      "enum": ["en", "de", "project"],
+      "default": "en"
+    },
+    "pointer-text": {
+      "type": "string",
+      "description": "Overrides the language default completely. Exactly one '{context_file}' token, single physical line, no other braces. No schema default on purpose.",
+      "minLength": 1
     }
   },
   "additionalProperties": false
@@ -292,7 +424,8 @@ Datei: `config/project-config.schema.json`, neue Top-Level-Property (Position: b
 ```
 
 - `additionalProperties: false` ist Pflicht (Fehler in der Sektion dürfen nicht still durchfallen). `whitelist`/`orchestrator` bleiben auch dann gültig, wenn sie im gewählten Modus wirkungslos sind (§3.3) — sie werden nicht modusabhängig validiert (Draft-07-Enum bleibt einfach prüfbar).
-- **Materialisierung (entschärft):** Die Sektion hat **keinen** Default auf Top-Level-Ebene — die Defaults stehen in `properties.mode/whitelist/orchestrator.default` (§4.1), und der einzige Nested-Fill-Zweig behandelt ausschließlich `dod.*` (`scripts/lib/config.py:1379-1389`). Ein normaler `sync.py`-Lauf materialisiert sie deshalb **ohnehin nicht**. Der Eintrag in `_SYNC_SKIPPED_DEFAULT_KEYS` (`scripts/lib/config.py:183-191`) ist ein **reiner Regressionsschutz** für den Fall, dass die Nested-Materialisierung künftig verallgemeinert wird — kein heute wirksamer Fix. `--fill-defaults`/`--init` dürfen die Sektion materialisieren.
+- **Kein `default` für `orchestrator-roles` und `pointer-text` (D5/D8).** `[]` ist ein **bedeutungstragender** Wert („keine Orchestrator-Rolle") und `pointer-text` würde einen Text-Block in jede Consumer-`project.yaml` frieren. Ein Schema-Default würde beim `--fill-defaults`/`--init` materialisiert und den nächsten Sync still verändern. `mode`/`whitelist`/`orchestrator`/`pointer-language` behalten ihre Defaults, weil jeder Default dort mit „Key fehlt" identisch wirkt.
+- **Materialisierung (entschärft):** Die Sektion hat **keinen** Default auf Top-Level-Ebene — die Defaults stehen in `properties.*.default` (§4.1), und der einzige Nested-Fill-Zweig behandelt ausschließlich `dod.*` (`scripts/lib/config.py:1379-1389`). Ein normaler `sync.py`-Lauf materialisiert sie deshalb **ohnehin nicht**. Der Eintrag in `_SYNC_SKIPPED_DEFAULT_KEYS` (`scripts/lib/config.py:183-191`) ist ein **reiner Regressionsschutz** für den Fall, dass die Nested-Materialisierung künftig verallgemeinert wird — kein heute wirksamer Fix. `--fill-defaults`/`--init` dürfen die Sektion materialisieren, aber **nicht** `orchestrator-roles`/`pointer-text` (kein Default vorhanden).
 
 ### 4.2 Config-Key-Namen (stabil)
 
@@ -301,8 +434,11 @@ Datei: `config/project-config.schema.json`, neue Top-Level-Property (Position: b
 | `project-context-injection.mode` | enum, 4 Werte | `all` | Scope |
 | `project-context-injection.whitelist` | `string[]` | `[]` | Rollennamen (nur `core+whitelist`) |
 | `project-context-injection.orchestrator` | enum, 3 Werte | `inherit` | Orchestrator-Achse |
+| `project-context-injection.orchestrator-roles` | `string[]`, unique, Pattern `^[a-z0-9][a-z0-9-]*$` | **kein Default** (fehlt = Ableitung §3.1.1; `[]` = leere Menge) | explizite Orchestrator-Rollen (D5) |
+| `project-context-injection.pointer-language` | enum `en` \| `de` \| `project` | `en` | Pointer-Sprache (D8) |
+| `project-context-injection.pointer-text` | String, ≥ 1 Zeichen | **kein Default** (fehlt = Sprach-Default §3.2.1) | überschreibt den Sprach-Default vollständig (D8) |
 
-Es werden **keine** weiteren Keys eingeführt (kein `enabled`, kein `preset`, keine per-Rolle-Overrides).
+Es werden **keine** weiteren Keys eingeführt (kein `enabled`, kein `preset`, kein Pointer-Text pro Rolle oder pro Provider).
 
 ### 4.3 Aufgelöste Variablen (öffentlich für Tests/Templates)
 
@@ -312,6 +448,8 @@ Es werden **keine** weiteren Keys eingeführt (kein `enabled`, kein `preset`, ke
 | `PROJECT_CONTEXT_MODE` | `all` \| `core+orchestrator` \| `core+whitelist` \| `core` | `scripts/lib/config.py` (`build_variables`) | **neu** in `placeholders.py:12-45` |
 | `PROJECT_CONTEXT_INJECTED` | `"true"` \| `"false"` | pro Rolle, `agent_sync.py` | **neu** in `placeholders.py:12-45` |
 | `CONTEXT_FILE` | Provider-Kontextdatei | bereits vorhanden, `agent_sync.py:515` | bereits in `placeholders.py:38` |
+| `_PROJECT_CONTEXT_SCOPE` | `dict`: `mode`, `whitelist`, `orchestrator`, `orchestrator_roles` (tuple), `pointer_text` (String), `pointer_language` (aufgelöst), `present` | `config.build_variables` | intern (führender Unterstrich ⇒ von `derive_builder_vars` ausgefiltert, `placeholders.py:305-306`) |
+| `_PROJECT_CONTEXT_POINTER` | gerenderter Pointer-Text **dieses** Providers (`{context_file}` ersetzt) | `agent_sync._build_provider_vars` (pro Provider) | intern; vom Renderer und vom Konsistenz-Check `pointer-missing` genutzt, **kein** Template-Platzhalter |
 
 `PROJECT_CONTEXT` behält seinen Namen und seine Position in der Variablen-Map — Templates bleiben unverändert (D-1).
 
@@ -320,7 +458,7 @@ Es werden **keine** weiteren Keys eingeführt (kein `enabled`, kein `preset`, ke
 | Vertrag | Umsetzung |
 |---|---|
 | Sektion schreibbar | `"project-context-injection"` in `PROJECT_WRITABLE_SECTIONS` (`scripts/admin-server.py:234-259`) aufnehmen; ohne das antwortet `PUT /api/config/project/section` mit HTTP 400 (`:5241-5255`) |
-| Pane | neuer Editor in `docs/ui/admin-ui.html` (Muster: `auto_commit`-Pane `:7650-7761`, Speichern über `saveProjectSection` `:5960-5962`); Felder: Modus-Select, Whitelist (Mehrfachauswahl aus der Rollen-Registry), Orchestrator-Select, read-only Effekt-Vorschau „Rolle → injiziert ja/nein" |
+| Pane | neuer Editor in `docs/ui/admin-ui.html` (Muster: `auto_commit`-Pane `:7650-7761`, Speichern über `saveProjectSection` `:5960-5962`); Felder: Modus-Select, Whitelist (Mehrfachauswahl aus der Rollen-Registry), Orchestrator-Select, Orchestrator-Rollen (Mehrfachauswahl, leer = „keine"; ein zusätzlicher Schalter „Default-Ableitung" lässt den Key **weg**), Pointer-Sprache (Select `en`/`de`/`project`), Pointer-Text (einzeilig, mit Token-Hinweis `{context_file}`), read-only Effekt-Vorschau „Rolle → injiziert ja/nein" |
 | Round-Trip | GET→PUT der Sektion darf keine anderen Sektionen verändern (bestehender Guard `:5257-5274`) |
 | Kein UI-Zwang | Ohne Admin-UI-Pane bleibt der Key in `project.yaml` voll funktionsfähig (AC1 verlangt beides) |
 
@@ -339,33 +477,44 @@ Es werden **keine** weiteren Keys eingeführt (kein `enabled`, kein `preset`, ke
 
 ### 5.1 Harter Sync-Fehler
 
-- unbekannter Whitelist-Rollenname (§3.3) → Meldung enthält alle unbekannten Namen.
-- `mode: core+orchestrator` + `orchestrator: exclude`.
-- `mode: all` + `orchestrator: exclude`.
-- unbekannter `mode`/`orchestrator`-Wert → Schema-Validierung (`scripts/lib/config.py:695` Draft7Validator), sofern `jsonschema` installiert ist; ohne `jsonschema` greift die zusätzliche stdlib-Prüfung im Resolver (gleiche Meldung, damit das Verhalten nicht von einer optionalen Dependency abhängt).
+- unbekannter Whitelist-Rollenname (§3.3) → Meldung enthält alle unbekannten Namen (`whitelist-unknown-role`).
+- unbekannter Rollenname in `orchestrator-roles` (§3.1.1) → Meldung enthält alle unbekannten Namen (`orchestrator-roles-unknown`).
+- `pointer-text` mit unbekanntem Token (`pointer-text-unknown-token`), ohne genau ein `{context_file}` (`pointer-text-context-file-count`), mit Zeilenumbruch (`pointer-text-multiline`) — §3.2.1.
+- `pointer-language` außerhalb `{en, de, project}` → `pointer-language-unknown` (§3.2.1).
+- unbekannter `mode`/`orchestrator`-Wert → Schema-Validierung (`scripts/lib/config.py:695` Draft7Validator), sofern `jsonschema` installiert ist; ohne `jsonschema` greift die zusätzliche stdlib-Prüfung im Resolver (gleiche Meldung, damit das Verhalten nicht von einer optionalen Dependency abhängt): `mode-unknown` bzw. `orchestrator-unknown`.
+- **Gestrichen (D6):** `mode: all` + `orchestrator: exclude` und `mode: core+orchestrator` + `orchestrator: exclude` sind **keine** Fehler mehr; sie werden zu WARN (§3.1.2, §5.2).
 
 ### 5.2 Warnungen (kein Abbruch)
 
-- `whitelist` gesetzt, aber Modus ≠ `core+whitelist`.
-- Whitelist-Eintrag ohne `{{PROJECT_CONTEXT}}`-Vorkommen (Wirkungslosigkeit).
+- `whitelist` gesetzt, aber Modus ≠ `core+whitelist` (`whitelist-no-effect`).
+- Whitelist-Eintrag ohne `{{PROJECT_CONTEXT}}`-Vorkommen (Wirkungslosigkeit, `whitelist-no-effect`).
+- `orchestrator-roles`-Eintrag, dessen Template kein `{{PROJECT_CONTEXT}}` enthält (`orchestrator-role-no-template`, §5.4).
+- `orchestrator: exclude` bei `mode ∈ {all, core+orchestrator}` → `project-context-injection.exclude-overrides-mode` (Text in §3.1.2).
+- `mode: core+orchestrator` mit leerer Orchestrator-Menge (ohne `exclude`) → `project-context-injection.empty-orchestrator-set` (Text in §3.1.2).
+- `pointer-language: project` mit nicht abbildbarer `COMMUNICATION_LANGUAGE` → `project-context-injection.pointer-language-fallback: COMMUNICATION_LANGUAGE='Klingonisch' has no pointer text — falling back to 'en'` (der konfigurierte Wert steht in einfachen Anführungszeichen).
 - Rolle ohne `<context>`-Sektion, in die der Pointer eingefügt werden müsste (§3.2) → `note`; Rolle ohne `<context>` **und** ohne `</workflow>` (13 `se-*` + `mammouth-expert`) → Pointer am Dateiende plus `note`.
+- Alle **Sync**-WARNs (Zeilen 490–493) werden **einmal pro Sync-Lauf** ausgegeben (`build_variables`-Pre-Warnings, `scripts/lib/cli_commands.py:691-692`), nicht pro Provider. `whitelist-no-effect` und `orchestrator-role-no-template` sind dagegen **Konsistenz-Check**-WARNs (§5.4) und erscheinen in `--validate`/`--check`, nicht als `log.warn`.
 
 ### 5.3 Renderer-Reihenfolge (Invariante)
 
-1. Modus/Whitelist/Orchestrator auflösen (projektweit, einmal).
-2. Pro Rolle `PROJECT_CONTEXT_INJECTED` bestimmen (Modus × Whitelist × Orchestrator-Menge).
-3. `merged_vars["PROJECT_CONTEXT"]` = Absatz oder `""`.
-4. `substitute(...)` (`agent_sync.py:730`) — Konditionale werden **danach** gestrippt (`:737`), deshalb muss der `{{#if PROJECT_CONTEXT_INJECTED}}`-Wert vorher gesetzt sein.
-5. Label-Cleanup + Pointer-Zeile: nur wenn `PROJECT_CONTEXT_INJECTED == "false"`. Erst die leer gewordene `**Project context:**`-Zeile entfernen, dann die Pointer-Zeile einfügen (§3.2). Rollen ohne Block-Vorkommen erhalten nur den Pointer über die Fallback-Tabelle (§3.2).
-6. Delta-Zähler fortschreiben (§3.5).
+1. Modus/Whitelist/Orchestrator/`orchestrator-roles`/`pointer-language`/`pointer-text` auflösen (projektweit, einmal, `config.resolve_project_context_scope`). Der Pointer-Text wird hier **noch nicht** formatiert (kein Provider bekannt).
+2. Pro Provider `_PROJECT_CONTEXT_POINTER` = `pointer_text.format(context_file=pc["context_file"])` (`agent_sync._build_provider_vars`).
+3. Pro Rolle `PROJECT_CONTEXT_INJECTED` bestimmen (Modus × Whitelist × Orchestrator-Menge).
+4. `merged_vars["PROJECT_CONTEXT"]` = Absatz oder `""`.
+5. `substitute(...)` (`agent_sync.py:730`) — Konditionale werden **danach** gestrippt (`:737`), deshalb muss der `{{#if PROJECT_CONTEXT_INJECTED}}`-Wert vorher gesetzt sein.
+6. Label-Cleanup + Pointer-Zeile: nur wenn `PROJECT_CONTEXT_INJECTED == "false"`. Erst die leer gewordene `**Project context:**`-Zeile entfernen, dann `_PROJECT_CONTEXT_POINTER` einfügen (§3.2). Rollen ohne Block-Vorkommen erhalten nur den Pointer über die Fallback-Tabelle (§3.2).
+7. Delta-Zähler fortschreiben (§3.5); `len(pointer)` ist die Länge des **aufgelösten** Pointer-Texts dieses Providers.
 
 ### 5.4 Konsistenz-Checks (neue IDs)
 
 | Check-ID | Schwere | Prüfung |
 |---|---|---|
-| `project-context-injection.pointer-missing` | WARN | Rolle hat `PROJECT_CONTEXT_INJECTED=false`, aber keine Pointer-Zeile im gerenderten Artefakt |
+| `project-context-injection.pointer-missing` | WARN | Rolle hat `PROJECT_CONTEXT_INJECTED=false`, aber keine Pointer-Zeile im gerenderten Artefakt. Vergleichsstring ist der **aufgelöste** Pointer (`_PROJECT_CONTEXT_POINTER`, inkl. Sprache/Override) — nicht der englische Default, sonst wäre jeder deutsche Pointer ein False-Positive (D8) |
 | `project-context-injection.whitelist-no-effect` | WARN | Whitelist-Eintrag ohne Vorkommen, oder Modus ≠ `core+whitelist` |
+| `project-context-injection.orchestrator-role-no-template` | WARN | `orchestrator-roles`-Eintrag existiert in der Rollen-Registry, aber seine Template-Datei enthält kein `{{PROJECT_CONTEXT}}` → Eintrag wirkungslos (D5) |
 | `project-context-injection.mode-unknown` | ERROR | unbekannter Modus (Redundanz zur Schema-Prüfung, damit `--validate` auch ohne `jsonschema` hart ist) |
+
+Die harten Fehler aus §5.1 (`orchestrator-roles-unknown`, `pointer-language-unknown`, `pointer-text-*`) sind **Resolver**-Fehler und werden über `SyncError` (rc 1) durchgesetzt, nicht als zusätzliche Check-IDs — `--validate` führt den Resolver nicht zwingend aus, und ein doppelter Prüfpfad wäre eine zweite Wahrheit. `mode-unknown` bleibt die einzige `--validate`-sichtbare ERROR-ID dieses Issues.
 
 Registrierung im Konsistenz-Lauf: `scripts/consistency-check.py` (Import-Block ab `:42`). Bestehende Checks, die **nicht** erweitert werden: `context.dangling-pointer` (`scripts/lib/consistency/context_budget.py:293-340`) prüft ausschließlich Skill-Pointer — der neue Datei-Pointer wird durch `pointer-missing` abgedeckt, nicht durch eine stille Erweiterung dieses Checks.
 
@@ -375,6 +524,7 @@ Registrierung im Konsistenz-Lauf: `scripts/consistency-check.py` (Import-Block a
 
 - **Kein** Inhalt: `variables.PROJECT_CONTEXT` und alle Fallbacks (`config.py:1860-1861`) bleiben unverändert.
 - **Kein** Per-Rolle-Custom-Text (dafür existieren `agents/3-project/<role>-ext.md`).
+- **Kein** Pointer-Text pro Rolle oder pro Provider: `pointer-text` ist **ein** projektweiter String, der pro Provider nur das `{context_file}`-Token erhält (§3.2.1).
 - **Keine** rückwirkende Bereinigung bestehender Consumer-Projekte (Re-Sync schreibt neu, es werden keine Dateien umgeschrieben).
 - **Kein** Eingriff in den Kontextdatei-Kanal (`context.py:1176`) oder in Standalone-Rendering (`standalone.py:61`).
 - **Keine** Preset-Ebene, kein `--explain`, keine Modus-übergreifende Migration.
@@ -395,6 +545,22 @@ Wortlaut unverändert aus [#1187](https://github.com/Popoboxxo/agent-meta/issues
 - [ ] 6. The sync log reports the measured token/character delta per mode.
 - [ ] 7. A role with `mode: core` still passes the existing prompt-quality checks (no empty required sections).
 
+**AC1-Erweiterung (D5/D8 — DECIDED 2026-11-09):** Der AC-Wortlaut nennt drei Keys; `orchestrator-roles`, `pointer-language` und `pointer-text` sind **zusätzliche** Keys derselben Sektion und werden vom selben Schema-/Whitelist-/Round-Trip-Nachweis erfasst (der Issue-Wortlaut bleibt unverändert).
+
+**AC7-Auslegung (D7 — DECIDED 2026-11-09 — verbindlich):** AC7 ist erfüllt, wenn **alle drei**
+Bedingungen gleichzeitig gelten:
+
+1. `python3 scripts/sync.py --validate` ist grün (`[PASS] All checks passed.` inkl. der bekannten
+   `active-set.gate-dropped`-Notiz, §2.8),
+2. der Check `project-context-injection.pointer-missing` meldet **0** Findings,
+3. keine leeren Pflichtsektionen — geprüft durch die **bestehenden** Frontmatter- und
+   Platzhalter-Checks (`scripts/consistency-check.py:42-58`, `scripts/lib/consistency/placeholders.py:12`),
+   ohne neue Prüf-Logik.
+
+Es wird **kein** neuer Check „prompt quality" eingeführt. Der abweichende AC-Wortlaut („existing
+prompt-quality checks") wird **redaktionell** im Issue #1187 nachgezogen; das ist keine Änderung
+dieser Spec und keine Task in #1187.
+
 ---
 
 ## 8. Risiken & offene Fragen
@@ -408,6 +574,11 @@ Wortlaut unverändert aus [#1187](https://github.com/Popoboxxo/agent-meta/issues
 | Golden-Test friert die heutige Doppel-/Dreifach-Renderung ein | bewusst (D-4); F1 adressiert es separat nach AC2-Freigabe |
 | Neue Sektion wird beim Sync in `project.yaml` materialisiert | Sektion hat keinen Top-Level-Default; `_SYNC_SKIPPED_DEFAULT_KEYS` ist nur Regressionsschutz (§4.1). Test: `grep -c '^project-context-injection:' .meta-config/project.yaml` == 0 nach einem Plain-Sync — **nicht** Byte-Identität der ganzen Datei (strukturelle Auto-Fills ändern sie ohnehin). |
 | 15 Rollen ohne Platzhalter erhalten keinen Pointer | Renderer-Postpass mit dreistufigem Fallback (§3.2): `intern-developer` → vor `</workflow>`, 13 `se-*` + `mammouth-expert` → Dateiende; `pointer-missing` prüft das Ergebnis |
+| `orchestrator-roles: []` schaltet die Injektion still ab (leere Menge ist zulässig) | Semantik ist explizit (§3.1.1) und wird bei `mode: core+orchestrator` mit WARN `empty-orchestrator-set` benannt; Test `test_scope_empty_orchestrator_roles_allowed` + `test_exclude_and_empty_set_warn` |
+| `--fill-defaults`/`--init` materialisiert `orchestrator-roles: []` und ändert damit den nächsten Sync | Schema hat **keinen** Default für `orchestrator-roles`/`pointer-text` (§4.1); Test `test_schema_orchestrator_roles_and_pointer_text_have_no_default` |
+| `pointer-text` mit Fremd-Token, mehreren `{context_file}` oder Zeilenumbruch zerstört AC3 („genau eine Zeile") | vier harte Validierungsregeln (§3.2.1) + vier Unit-Tests in Plan-T2 |
+| `pointer-language: project` + nicht abbildbare `COMMUNICATION_LANGUAGE` | WARN `pointer-language-fallback` + Englisch (§3.2.1); Test `test_pointer_language_project_unknown_falls_back_with_warn` |
+| `exclude`-WARN wird pro Provider statt pro Lauf ausgegeben (Duplikat) | WARN entsteht in `build_variables`-Pre-Warnings (`cli_commands.py:691-692`), also **einmal pro Lauf**; Test zählt `log.warnings` == 1 |
 | Konflikt mit der Config-Welle (#1187/#1186/#1188/#1181) auf denselben Dateien | §10 Serialisierung (kanonische Reihenfolge) |
 | Admin-UI-Pane wird gebaut, aber Sektion fehlt in der Whitelist → 400 | AC1 koppelt beide; Test über `PUT /api/config/project/section` |
 
@@ -416,10 +587,10 @@ Wortlaut unverändert aus [#1187](https://github.com/Popoboxxo/agent-meta/issues
 | # | Frage | Vorschlag / Eskalation |
 |---|---|---|
 | OQ-1 | AC3 verlangt „exactly one pointer line per role" — auch für die **15 Rollen ohne Platzhalter**. Soll der Renderer dort wirklich eine Zeile einfügen (Sektions-Heuristik), oder gilt AC3 nur für Rollen mit Block-Vorkommen? | **Aufgelöst (Review 2026-11-09):** AC3 gilt für alle 98 Rollen. §3.2 benennt die 15 Rollen exakt und definiert den dreistufigen Fallback; die frühere „Sektions-Heuristik"-Unschärfe ist damit beseitigt. Verbleibende Auslegung nur noch redaktionell (AC-Wortlaut im Issue nachtragen). |
-| OQ-2 | Gehören `providers.<P>.primary-role`-Rollen zur Orchestrator-Achse oder nur die Rolle `orchestrator`? | **Vorschlag:** ja, aufnehmen (§3.1). Ohne das verliert ein Provider mit abweichender `primary-role` in `core` seinen Einstiegspunkt. |
-| OQ-3 | Ist `all` + `orchestrator: exclude` ein Fehler oder eine stille Verengung auf „alle außer Orchestrator"? | **Vorschlag:** harter Fehler (§3.1) — ein widersprüchlicher Modus ist die gleiche Fußangel wie ein unbekannter Whitelist-Name. |
-| OQ-4 | AC7 nennt „the existing prompt-quality checks (no empty required sections)". Ein Check mit diesem Namen existiert nicht; vorhanden sind Frontmatter-, Platzhalter- und `context.*`-Checks (`scripts/consistency-check.py:42-58`, `placeholders.py:12`, `context_budget.py:293/540`). | **Vorschlag:** AC7 als „`--validate` bleibt grün + `project-context-injection.pointer-missing` = 0" interpretieren. Präzisierung im Issue nachtragen. |
-| OQ-5 | Soll der Pointer-Text Englisch sein (wie die Templates) oder Projektsprache? | **Vorschlag:** Englisch, konsistent mit dem restlichen `<context>`-Block; Lokalisierung ist ein separates Thema. |
+| OQ-2 | Gehören `providers.<P>.primary-role`-Rollen zur Orchestrator-Achse oder nur die Rolle `orchestrator`? | **Entschieden 2026-11-09 (D5, §3.1.1):** Die Achse ist **konfigurierbar**. Default = `{orchestrator} ∪ {providers.<P>.primary-role aktiver Provider}` (deterministisch, dedupliziert). Ein explizites `orchestrator-roles` **ersetzt** den Default vollständig (kein Dazumischen); `[]` ist zulässig und bedeutet „keine Orchestrator-Rolle"; unbekannte Rollennamen = harter Sync-Fehler. |
+| OQ-3 | Ist `all` + `orchestrator: exclude` ein Fehler oder eine stille Verengung auf „alle außer Orchestrator"? | **Entschieden 2026-11-09 (D6, §3.1.2):** **Kein** harter Fehler. `exclude` gewinnt, die Orchestrator-Rollen werden ausgenommen, der Sync läuft weiter und gibt eine **WARN** `project-context-injection.exclude-overrides-mode` aus, die Widerspruch und Ergebnis benennt. Der bisherige `SyncError`-Pfad entfällt für **alle** Modi; `core` + `exclude` bleibt unverändert gültig. |
+| OQ-4 | AC7 nennt „the existing prompt-quality checks (no empty required sections)". Ein Check mit diesem Namen existiert nicht; vorhanden sind Frontmatter-, Platzhalter- und `context.*`-Checks (`scripts/consistency-check.py:42-58`, `placeholders.py:12`, `context_budget.py:293/540`). | **Entschieden 2026-11-09 (D7, §7):** AC7 = `sync.py --validate` grün **und** `project-context-injection.pointer-missing == 0` **und** keine leeren Pflichtsektionen (bestehende Frontmatter-/Platzhalter-Checks). Der Issue-Text wird redaktionell nachgezogen; **kein** neuer Check in dieser Spec. |
+| OQ-5 | Soll der Pointer-Text Englisch sein (wie die Templates) oder Projektsprache? | **Entschieden 2026-11-09 (D8, §3.2.1):** Pointer-Text ist konfigurierbar, **Default Englisch**. `pointer-language` (`en`\|`de`\|`project`, Default `en`) wählt den Sprach-Default; `project` leitet aus `COMMUNICATION_LANGUAGE` ab, unbekannte Sprache → Fallback Englisch + WARN. `pointer-text` überschreibt den Sprach-Default vollständig; unbekannte Tokens/mehrzeilig = harter Sync-Fehler. |
 
 ---
 
@@ -484,16 +655,22 @@ Begründung: #1187 ist der kleinste Eingriff und setzt die Rollen-Schleife neu a
 
 | AC | Spec-Abschnitt | Absicherung |
 |---|---|---|
-| AC1 (Schema + Admin-UI-Schreibbarkeit) | §4.1, §4.2, §4.4 | Schema-Test (valide/invalide), `PUT /api/config/project/section`-Round-Trip, Assertion `"project-context-injection" in PROJECT_WRITABLE_SECTIONS` |
+| AC1 (Schema + Admin-UI-Schreibbarkeit) | §4.1, §4.2, §4.4 | Schema-Test (valide/invalide, inkl. `orchestrator-roles`/`pointer-language`/`pointer-text`), `PUT /api/config/project/section`-Round-Trip, Assertion `"project-context-injection" in PROJECT_WRITABLE_SECTIONS` |
 | AC2 (`all` byte-identisch) | §3.1, §3.6 D-1/D-4, §6 | Golden-Test Fixture-Projekt: Diff der gerenderten Agenten = leer; zusätzlich „Sektion wird nicht materialisiert" (`grep -c '^project-context-injection:' .meta-config/project.yaml` == 0, §4.1 — im Szenario **Lauf A**, nicht Lauf B; **nicht** Byte-Identität der ganzen Datei, weil strukturelle Auto-Fills sie ändern) |
-| AC3 (`core`: 0 Blöcke, 1 Pointer, reale Datei) | §3.2, §5.3, §8.2 OQ-1 | Test pro Provider: Pointer enthält den `context_file`-Wert aus `ai-providers.yaml`; Zählung `PROJECT_CONTEXT_INJECTED=false` + genau eine Pointer-Zeile pro Rollen-Artefakt (83 mit Block, 15 über Fallback: `intern-developer` → `</workflow>`, 13 `se-*` + `mammouth-expert` → Dateiende); `pointer-missing` = 0 |
+| AC3 (`core`: 0 Blöcke, 1 Pointer, reale Datei) | §3.2, §3.2.1, §5.3, §8.2 OQ-1 | Test pro Provider: Pointer enthält den `context_file`-Wert aus `ai-providers.yaml`; Zählung `PROJECT_CONTEXT_INJECTED=false` + genau eine Pointer-Zeile pro Rollen-Artefakt (83 mit Block, 15 über Fallback: `intern-developer` → `</workflow>`, 13 `se-*` + `mammouth-expert` → Dateiende); `pointer-missing` = 0; Sprache/Override-Fälle (D8) |
 | AC4 (`core+whitelist`, unbekannter Name = Fehler) | §3.3, §5.1 | Unit-Test: unbekannter Name → Sync-Abbruch mit Namen in der Meldung; bekannter Name → Block nur dort |
-| AC5 (`core+orchestrator`) | §3.1 (Orchestrator-Achse), §3.2 | Test: Block in `orchestrator` (+ `primary-role`-Rollen), in keiner anderen Rolle |
+| AC5 (`core+orchestrator`) | §3.1 (Orchestrator-Achse), §3.1.1, §3.2 | Test Default-Menge: Block in `orchestrator` (+ `primary-role`-Rollen), in keiner anderen Rolle; Test Override: `orchestrator-roles: [senior-developer]` → Block **nur** in `senior-developer` (auch `orchestrator` nicht); Test `[]` → niemand; Test `exclude` → WARN + kein Block |
 | AC6 (Delta im Sync-Log) | §3.5 | Test: Log-Zeile `project-context-injection: mode=… injected=n/total chars saved=k`; bei `all` ist `k == 0` |
-| AC7 (Prompt-Qualität bei `core`) | §5.4, §8.2 OQ-4 | `sync.py --validate` bleibt grün; `pointer-missing` = 0; Frontmatter-/Platzhalter-Checks unverändert grün |
+| AC7 (Prompt-Qualität bei `core`) | §5.4, §7 (AC7-Auslegung), §8.2 OQ-4 | `sync.py --validate` bleibt grün; `pointer-missing` = 0; Frontmatter-/Platzhalter-Checks unverändert grün (D7, drei Bedingungen) |
 | Issue-Requirement „Default bleibt `all`" | §3.1, §4.1 | Schema-Default `all` + Golden-Test AC2 |
 | Issue-Requirement „Delegation-Contract unverändert" | §4.5 | `schemas/a2a-handoff.schema.json` unverändert — Diff gegen den eingefrorenen Basis-Hash `git diff --name-only aaed14c2..HEAD -- schemas/a2a-handoff.schema.json` ist leer (nicht `HEAD`, sonst nach dem Commit vakuum-grün) |
 | Issue-Requirement „Provider-aware Pointer" | §2.4, §3.2 | Test über alle 9 Provider in `config/ai-providers.yaml`; Gemini-Fall explizit (`AGENTS.md`, nicht `GEMINI.md`) |
+| **D5** `orchestrator-roles` konfigurierbar | §3.1.1, §4.1, §4.2 | 5 Resolver-/Schema-Tests: Default-Menge pro Provider-Set, expliziter Override ersetzt vollständig, unbekannte Rolle = `SyncError`, leere Liste zulässig, Schema ohne `default` |
+| **D6** `exclude` gewinnt mit WARN | §3.1.2, §5.1, §5.2 | Kein `SyncError` mehr; WARN-Text-Assertion (`exclude-overrides-mode`), genau **eine** WARN pro Lauf; Szenario-Lauf F |
+| **D7** AC7-Auslegung (drei Bedingungen) | §7 (AC7-Auslegung), §5.4 | `--validate` grün + `pointer-missing` = 0 + bestehende Frontmatter-/Platzhalter-Checks; **kein** neuer Check |
+| **D8** Pointer-Text und -Sprache | §3.2.1, §4.1, §4.2, §5.1 | 5 Tests: Default (`en`), `de`, `project` (inkl. Fallback-WARN), `pointer-text`-Override, unbekannter Token/mehrzeilig = `SyncError` |
+
+**Keine AC ohne Task.** Umgekehrt gilt: T3, T14 sind Voraussetzungen (Registrierung/Doku), keine eigenen ACs.
 
 ---
 
@@ -517,7 +694,7 @@ Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Status bleibt `DR
 | Querschnitt: Szenario-IDs | `94` für #1181 reserviert, `95`–`98` für #1187, `99` für #1186. | Plan T15, §6 |
 | Querschnitt: `docs/issue-labels.md` / `.meta-config/issue-labels-state.json` | Beide von #1188 erzeugt; in #1186 zu klassifizieren (`project-docs.files.issue-labels` bzw. **`unmanaged`**, K1 — `project-state` ist gestrichen) — Querschnittsnotiz, keine Task in #1187. | Spec §10 (Notiz) |
 | Finding #1197 | Mehrfach-Rendering-Finding ist jetzt #1197 und wird dort zitiert (statt „Nummer wird nachgetragen"). | Spec §9.2; Plan §11 |
-| **RVW2-1187-01** (MAJOR) | Plan-Lauf F prüfte `mode: core` + `orchestrator: exclude` als Fehler, obwohl §3.1 (`:151`) das erlaubt (exkludiert). Lauf F im Plan auf `core+orchestrator`/`all` + `exclude` umgestellt und an `test_scope_core_orchestrator_plus_exclude_is_error`/`test_scope_all_plus_exclude_is_error` gekoppelt; `core` + `exclude` ist gültig. | Spec §3.1 (bestätigt); Plan T15 Schritt 7 |
+| **RVW2-1187-01** (MAJOR) | Plan-Lauf F prüfte `mode: core` + `orchestrator: exclude` als Fehler, obwohl §3.1 (`:151`) das erlaubt (exkludiert). Lauf F im Plan auf `core+orchestrator`/`all` + `exclude` umgestellt; `core` + `exclude` ist gültig. **Überholt durch D6 (§13):** seit 2026-11-09 ist `exclude` in **keinem** Modus ein Fehler (WARN statt `SyncError`). | Spec §3.1 (bestätigt), §3.1.2; Plan T2, T15 Schritt 7 |
 | **RVW2-1187-02** (MINOR) | Materialisierungs-Assertion im Plan von Lauf B auf Lauf A verschoben — Lauf B setzt die Sektion selbst. | Plan T15 Schritte 2/8; Spec §11 AC2 |
 | **RVW2-X-01** (MAJOR) | Konfliktmatrix in §10 und Plan §2 auf die verbindliche Zielmatrix gezogen (siehe Zeile „Querschnitt: Konfliktmatrix"); neue Matrix-Zeilen für `sync_pipeline.py`, `docs/issue-labels.md` und `.meta-config/issue-labels-state.json`. | Spec §10; Plan §2 |
 
@@ -536,3 +713,22 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 | **K6** | **Nicht betroffen**: die Schema-Sektion nutzt keine `$defs` | geprüft: §4.1 |
 | **K7** | **Nicht betroffen**: neue Top-Level-Sektion `project-context-injection` bleibt kebab-case; kein snake_case-Bestandsblock berührt | geprüft: §4.1 |
 | **K8** | **Nicht betroffen**: kein `_KEYS`-Block | geprüft: §4.1 |
+
+---
+
+## 13. Entscheidungsprotokoll (2026-11-09)
+
+Vom User entschiedene offene Fragen. Status bleibt `DRAFT`; die Entscheidungen sind **verbindlich**
+und ersetzen die früheren „Vorschlag"-Einträge in §8.2. Jede Zeile trägt den Marker
+`DECIDED 2026-11-09` auch am jeweiligen Änderungsort im Dokument.
+
+| D-Nr | Frage | Entscheidung (`DECIDED 2026-11-09`) | Stelle |
+|---|---|---|---|
+| **D5** | OQ-2: Gehören `primary-role`-Rollen zur Orchestrator-Achse, oder nur die Rolle `orchestrator`? | Neuer Key `project-context-injection.orchestrator-roles: []` (Liste von Rollennamen). **Fehlt** der Key, gilt der Default `{orchestrator} ∪ {providers.<P>.primary-role für alle aktiven Provider}` (deterministisch, dedupliziert). Ein Eintrag **ersetzt** den Default vollständig (kein stilles Dazumischen). Validierung: unbekannte Rolle = harter Sync-Fehler `orchestrator-roles-unknown`; leere Liste = zulässig (dann keine Orchestrator-Rolle). Schema, Resolver und Tests (Default-Menge pro Provider-Set, expliziter Override, unbekannte Rolle, leere Liste) sind in §3.1.1/§4.1/§4.2/§5.1/§11 verankert. | §3.1.1, §3.3, §4.1 (Schema), §4.2 (Keys), §5.1, §5.2, §8.1, §11 |
+| **D6** | OQ-3: Ist `mode: all` + `orchestrator: exclude` ein Fehler oder eine stille Verengung auf „alle außer Orchestrator"? | **Kein** harter Fehler. `mode: all` + `orchestrator: exclude` ist zulässig: die Orchestrator-Rollen werden ausgenommen („alle außer Orchestrator"), der Sync läuft weiter. Dabei wird eine **WARN** `project-context-injection.exclude-overrides-mode` ausgegeben, die Widerspruch und Ergebnis benennt (exakter Text in §3.1.2). Der bisherige `SyncError`-Pfad für `exclude` ist aus §3.1/§5.1 gestrichen; `core` + `exclude` bleibt gültig (ohne WARN). Die Orchestrator-Matrix in §3.1 und der Szenario-Lauf F im Plan sind angepasst. | §3.1 (Matrix), §3.1.2, §5.1, §5.2, §8.2 OQ-3 |
+| **D7** | OQ-4: Was bedeutet AC7 („existing prompt-quality checks")? | AC7 = `sync.py --validate` grün **und** `project-context-injection.pointer-missing == 0` **und** keine leeren Pflichtsektionen (bestehende Frontmatter-/Platzhalter-Checks). **Kein** neuer Check in dieser Spec; der Issue-Text wird redaktionell nachgezogen. | §7 (AC7-Auslegung), §5.4, §11 |
+| **D8** | OQ-5: Pointer-Text Englisch oder Projektsprache? | Pointer-Text wird konfigurierbar, Default **Englisch**. Neue Keys `project-context-injection.pointer-text` (String mit erlaubtem Token `{context_file}`) und `project-context-injection.pointer-language` (`en`\|`de`\|`project`, Default `en`). `pointer-language: project` leitet aus `COMMUNICATION_LANGUAGE` ab; unbekannte Sprache = Fallback Englisch + WARN. `pointer-text` überschreibt den Sprach-Default vollständig; unbekannte Tokens, ≠ 1 × `{context_file}` oder Zeilenumbruch = harter Sync-Fehler. Schema, Resolver, Tests (Default, `de`, `project`, Override, unbekannter Token) sind verankert. | §3.2.1, §4.1, §4.2, §4.3, §4.4, §5.1, §5.2, §8.1, §11 |
+
+**Auswirkung auf die Offenen Fragen:** OQ-2…OQ-5 sind damit **geschlossen** (§8.2 verweist auf dieses
+Protokoll). OQ-1, OQ-6 und OQ-7 waren bereits in Revision 2 aufgelöst (§8.2). Es bleiben **keine**
+offenen Fragen in dieser Spec; die Freigabe (`Status: APPROVED`) ist der einzige verbleibende Schritt.

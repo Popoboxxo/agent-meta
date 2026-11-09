@@ -37,15 +37,16 @@ fünf vs. vier Präzedenzstufen).
 
 ### 1.1 Status-Tabelle
 
-| Issue | Spec | Plan | Klasse | Status |
-|---|---|---|---|---|
-| **#1187** Project-Context-Injection-Scope | `docs/specs/2026-11-09-project-context-injection-scope-spec.md` | `docs/plans/2026-11-09-project-context-injection-scope-plan.md` | **L** | `DRAFT` |
-| **#1186** Artifact-Locations-Matrix | `docs/specs/2026-11-09-artifact-locations-matrix-spec.md` | `docs/plans/2026-11-09-artifact-locations-matrix-plan.md` | **XL** | `DRAFT` |
-| **#1188** Issue-Label-Taxonomie | `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` | `docs/plans/2026-11-09-issue-label-taxonomy-plan.md` | **XL** | `DRAFT` |
-| **#1181** Commit-Authority-Grant | `docs/specs/2026-11-09-commit-authority-grant-spec.md` | `docs/plans/2026-11-09-commit-authority-grant-plan.md` | **L** | `DRAFT` |
+| Issue | Spec | Plan | Klasse | Umfang (verifiziert) | Status |
+|---|---|---|---|---|---|
+| **#1187** Project-Context-Injection-Scope | `docs/specs/2026-11-09-project-context-injection-scope-spec.md` | `docs/plans/2026-11-09-project-context-injection-scope-plan.md` | **L** | **15 Tasks / 4 Meilensteine**; T2 ist durch die D5/D6/D8-Validierung auf **L** gewachsen | `DRAFT` |
+| **#1186** Artifact-Locations-Matrix | `docs/specs/2026-11-09-artifact-locations-matrix-spec.md` | `docs/plans/2026-11-09-artifact-locations-matrix-plan.md` | **XL** | **24 Tasks / 6 Meilensteine** (T1–T21, T23, T24 im PR; **T22 = Follow-up** nach #1141); T23/T24 sind neu aus D1 | `DRAFT` |
+| **#1188** Issue-Label-Taxonomie | `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` | `docs/plans/2026-11-09-issue-label-taxonomy-plan.md` | **XL** | **30 Pflicht-Tasks / 8 Meilensteine** (18 Testdateien); **T30 ist Pflicht-Task** (D12) | `DRAFT` |
+| **#1181** Commit-Authority-Grant | `docs/specs/2026-11-09-commit-authority-grant-spec.md` | `docs/plans/2026-11-09-commit-authority-grant-plan.md` | **L** | **16 Tasks / 6 Meilensteine** | `DRAFT` |
 
 **Kein Artefakt dieser Welle trägt `Status: APPROVED`.** Der Approval-Marker wird ausschließlich
-vom User bzw. `concept-reviewer` gesetzt (§10).
+vom User bzw. `concept-reviewer` gesetzt (§10). **Offene Fragen gibt es keine mehr** — alle 23
+Entscheidungen D1–D23 sind am 2026-11-09 gefallen und in die vier Specs/Pläne eingearbeitet (§9).
 
 ---
 
@@ -246,6 +247,10 @@ Vergleichspunkt für alle vier PRs.
 Befund erweitern. Der eine vorbestehende Testausfall bleibt bis #1208 rot und wird in jedem
 PR-Report als „vorbestehend" ausgewiesen.
 
+**Entscheidungen:** Die 23 Entscheidungen D1–D23 (§9) sind am 2026-11-09 in alle vier Specs/Pläne
+eingearbeitet; die erneute Verifikation dieses Protokolls (Status-Tabelle, Testzahlen,
+`--validate`/`--check`-Baseline) erfolgt nach dem Re-Commit.
+
 ---
 
 ## 8. Szenario-Validierung (Kurzfassung aus `.tmp/scenario-config-wave/RESULT.md`)
@@ -297,25 +302,55 @@ committet.
 
 ---
 
-## 9. Offene Entscheidungen für den User (priorisiert, max. 10)
+## 9. Entscheidungsprotokoll (2026-11-09) — D1…D23, alle `DECIDED`
 
-| # | Issue | ID | Frage | Empfehlung | Blockadewirkung |
-|---|---|---|---|---|---|
-| **1** | #1186 | OQ-1 | Ist `vv` eine eigene Klasse, eine `kind`-Variante von `reports`, oder eine 24. Zeile? | **Entschieden (D-7):** `reports.kind: vv`; SE-Pfade über abgeleitete Projektions-Variablen; `SE/VV/**` in `legacy[]` — nur noch Review-Bestätigung nötig | blockiert T4/T11, wenn revidiert |
-| **2** | #1186 | OQ-2 | `docs/conclusions` in den Defaults (AC-04) vs. Zählung in `analysis` (AC-12)? | **Entschieden (D-6):** Legacy-Zielverzeichnis + `.gitkeep`, keine Klasse | blockiert T8/T21 bei Revision |
-| **3** | #1186 | OQ-5 | Wie streng ist `scratch` ↔ `tmp-sink.path` gekoppelt? | Vorrang `classes.scratch.path` > `tmp-sink.path`; Divergenz = Consistency-**Fehler** | blockiert T4/T9 |
-| **4** | #1186 | OQ-7 | Bleibt der Standalone-Fallback-Block in #1186 (D-9-Abweichung von der Zielmatrix)? | **Ja**, sonst Regress in 26 Standalone-Personas; Reihenfolge verhindert Parallel-Edit | blockiert T6 |
-| **5** | #1187 | OQ-2 | Gehören `providers.<P>.primary-role`-Rollen zur Orchestrator-Achse? | **Ja** (§3.1); sonst verliert ein Provider in `core` seinen Einstiegspunkt | blockiert T5/T8 |
-| **6** | #1187 | OQ-3 | Ist `all` + `orchestrator: exclude` ein Fehler oder eine stille Verengung? | **Harter Fehler** (widersprüchlicher Modus) | blockiert T2/T15 |
-| **7** | #1187 | OQ-4 | AC7 nennt „existing prompt-quality checks" — der Check existiert nicht | AC7 als „`--validate` grün + `pointer-missing` = 0" interpretieren; Issue-Text nachtragen | blockiert T11-Abnahme |
-| **8** | #1188 | Q1 | Woher kommt die Repository-Identität, wenn `git.remote-url` leer ist? | **(c) CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`) + `repository.*`-Override**; Fehlermeldung nennt alle drei Wege | **blockiert T15 und M4/M5/M8** (dieses Repo hat keine `git:`-Sektion) |
-| **9** | #1188 | Q3 | Wie wird ein Rename erkannt, wenn der Tracker der einzige Zustand ist? | **(c) für v1:** kein stilles Rename; `create <neu>` + `info: rename-candidate <alt>`; explizite Map später | blockiert die IC-5-Freigabe, nicht T17 |
-| **10** | #1188 | Q9 | Wer committet `.meta-config/issue-labels-state.json` nach `--apply`? | `--apply` schreibt, `git`-Rolle committet; CI-`--apply` committet nie | muss vor erster CI-Nutzung entschieden sein |
+Alle 23 offenen Fragen der vier Specs sind am 2026-11-09 vom User entschieden und in den jeweiligen
+Abschnitt „Entscheidungsprotokoll (2026-11-09)" der Specs/Pläne eingearbeitet. Die Nummern sind
+wellenweit eindeutig: **D1–D4** → #1186, **D5–D8** → #1187, **D9–D15** → #1188, **D16–D23** → #1181.
+Keine Zeile dieser Tabelle ist offen; ein Widerspruch dazu braucht eine Spec-Revision.
 
-**Nicht in den Top-10, aber vor Freigabe zu bestätigen:** #1181 OQ-2 (keine Provider-Permission;
-Hook ist die Grenze) und OQ-3 (Persona-Konflikt `documenter`), OQ-4 (Schrumpf-Warnung = WARN, kein
-CI-Gate), OQ-6 (gemischtes Provider-Set ⇒ WARN, kein ERROR) sowie #1188 Q2 (ein Retry nur bei
-`429`).
+| D-Nr | Issue | Frage (kurz) | Entscheidung (`DECIDED 2026-11-09`) | betroffene Tasks |
+|---|---|---|---|---|
+| **D1** | #1186 | Kopplung `classes.scratch.path` ↔ `repo_containment.tmp-sink.path` | **Eine** Quelle: `artifact-locations.classes.scratch.path`. Der Temp-Mechanismus wandert in den Pfad-Mechanismus: `tmp-sink.path` ist **Legacy-Alias** und wird nur gelesen, solange die Klasse fehlt; sind beide gesetzt, müssen die Werte gleich sein — Divergenz = **harter Fehler** `artifact-locations.scratch-sink-divergence`. `TMP_SINK_PATH` bleibt, wird aber aus der Matrix gespeist; der Containment-Hook liest den **aufgelösten** Wert statt des Roh-Keys. Migration `--migrate-artifact-aliases [--write]` | T4, T5, T9, T15, **T23**, **T24** |
+| **D2** | #1186 | Gilt die Zielmatrix für `scripts/lib/standalone.py` ausnahmslos? | **Nein — die D-9-Ausnahme bleibt.** #1186 behält den additiven Standalone-Fallback-Block (54 Framework-Defaults), #1187 bleibt Datei-Federführer; die Reihenfolge `#1187 → #1186` verhindert den Parallel-Edit. Kein Follow-up-Issue | T6 |
+| **D3** | #1186 | ADR-Naming und Konfigurierbarkeit von `naming` | Naming ist **pro Klasse** konfigurierbar (String-Pattern mit geschlossener Token-Liste). Projekt-Default ADR: `ADR-<NNN>_<slug>.md`; `legacy[]` akzeptiert zusätzlich `NNNN-<slug>.md` und `ADR-<NNN>-<slug>.md`. Unbekannter/nicht anwendbarer Token = `artifact-locations.naming-invalid` | T1, T2, T4, T5, T15, T20, T23 |
+| **D4** | #1186 | `SE` oder `docs/se` als SE-Wurzel-Default | Default bleibt **`SE`**, keine Migration. Der Regeltext verweist auf `{{ARTIFACT_SE_ROOT}}` statt auf ein Literal; `docs/se/**` ist `legacy[]`-Muster (kein Default, kein zweiter Pfad) | T2, T4, T20 |
+| **D5** | #1187 | Gehören `providers.<P>.primary-role`-Rollen zur Orchestrator-Achse? | `orchestrator-roles: []` ist konfigurierbar; Default = `{orchestrator} ∪ primary-roles` der aktiven Provider (deterministisch, dedupliziert). Ein Eintrag **ersetzt** den Default vollständig; `[]` ist zulässig; unbekannte Rolle = harter Sync-Fehler | T1, T2, T5, T8, T13, T15 |
+| **D6** | #1187 | `mode: all` + `orchestrator: exclude` = Fehler oder stille Verengung? | **Kein Fehler.** `exclude` gewinnt („alle außer Orchestrator"), der Sync läuft weiter und gibt **WARN** `project-context-injection.exclude-overrides-mode` aus. Der `SyncError`-Pfad ist aus T2/T5/T15 entfernt; `core` + `exclude` bleibt ohne WARN gültig | T2, T5, T8, T15 |
+| **D7** | #1187 | Was bedeutet AC7 (der genannte „prompt-quality check" existiert nicht)? | AC7 = `sync.py --validate` grün **und** `pointer-missing == 0` **und** keine leeren Pflichtsektionen (bestehende Checks). Kein neuer Check; der Issue-Text wird redaktionell nachgezogen | T8, T11, T15 |
+| **D8** | #1187 | Pointer-Text Englisch oder Projektsprache? | Konfigurierbar mit Default **Englisch**: `pointer-language` (`en`\|`de`\|`project`) und `pointer-text` (Token `{context_file}` genau einmal, einzeilig). `project` leitet aus `COMMUNICATION_LANGUAGE` ab; unbekannt/leer → `en` + WARN `pointer-language-fallback`; Fremd-Token/≠ 1 × `{context_file}`/Zeilenumbruch = harter Fehler | T1, T2, T4, T6, T8, T11, T13, T15 |
+| **D9** | #1188 | Repository-Identität ohne `git.remote-url` | Präzedenzkette `issue-conventions.repository.{owner,repo}` **>** `git.remote-url` **>** CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`). Harter Fehler erst, wenn **alle drei** leer/unparsbar sind; die Meldung nennt alle drei Wege und gibt nie einen leeren `owner` aus | T1, T15 |
+| **D10** | #1188 | Wie wird ein Rename erkannt, wenn der Tracker der einzige Zustand ist? | **Kein Rename in v1.** Neuer Wert ⇒ `create <neu>`; das alte Label bleibt im Tracker, Meldung `info: rename-candidate <alt>`; kein `update.new_name`, keine `rename`-Ausgabezeile. Eine explizite `renames`-Map bleibt einer späteren Spec-Revision vorbehalten | T17 |
+| **D11** | #1188 | Drift-Ownership der generierten Doku | `docs/issue-labels.md` kommt in `.meta-config/generated-file-hashes.json` (Root-Level-Registrierung); manuelle Edits werden beim nächsten Sync überschrieben und gemeldet. **#957 spiegelt die Regel** für PR-Templates; dieselbe Registrierung gilt für die T30-Tracker-Templates | T25, T30 |
+| **D12** | #1188 | Wo sitzt der Template-Schalter? | `issue-conventions.templates.{mode: off\|scaffold\|manage, force: bool}` als geschlossener Unterabschnitt (Default `off`, `force: false`). **T30 wird Pflicht-Task** (kein bedingter Task, keine Schema-Erfindung) | T1, T30 |
+| **D13** | #1188 | Wer committet `.meta-config/issue-labels-state.json` nach `--apply`? | `--apply` **schreibt** und druckt den Pfad in der Ergebnis-Tabelle; kein `git`-Aufruf im CLI. Die **`git`-Rolle committet**; CI-`--apply`-Jobs committen **nie** | T21 |
+| **D14** | #1188 | Retry-Policy | Genau **ein** Retry, nur bei `429`, Wartezeit aus `Retry-After` (Cap 30 s, Default 1 s, injizierbarer `sleep`). `5xx`/Timeouts ohne Retry; `401`/`403` brechen nach dem ersten Fehlschlag ab; kein Backoff, keine Konfiguration in `project.yaml` | T16, T18 |
+| **D15** | #1188 | Sind Triage-Labels Teil der Taxonomie? | **Nein.** `TRIAGE_LABELS = ("triage", "needs-info")` als Framework-Konstante; `docs/issue-labels.md` führt sie unter „Nicht Teil der Taxonomie"; kein Projekt-Override, kein `prune`-Ziel, Regel 4 nimmt sie von der Literal-Prüfung aus | T9, T13, T25 |
+| **D16** | #1181 | Persona-Konflikt (`documenter` bleibt Referenzrolle) | **Akzeptiert, Persona unangetastet.** `agents/1-generic/documenter.md` wird nicht geändert; der Grant wird als **Commit-Recht** in der Grant-Zeile des `AUTO_COMMIT_BLOCK` ausgewiesen und in der Doku erklärt; Byte-Golden der Nicht-Grant-Rollen bleibt unverändert | T5, T11, T14 |
+| **D17** | #1181 | Auch Revoke-Werte akzeptieren? | **Nur `direct`, kein Revoke.** Entzug ausschließlich über `roles:`-Entfernung oder Entfernen des Override-Keys; `grant withdrawn` bleibt an die `roles:`-Entfernung gebunden, nur entfernter Key ⇒ `no Bash` | T1, T3, T7, T9, T13 |
+| **D18** | #1181 | Kommando-genaue Bash-Permission statt voller Shell? | **Nein: voller Bash + Hook-Härtung + ehrliche Doku** (keine „nur `git`"-Aussage). Der Guard blockt Sentinel-tragende Nicht-`git`-Kommandos; die Attributionslücke ist ausdrücklich als Grenze benannt und als **#1210** erfasst; Ack bleibt Pflicht | T8, T11, T13, T16 |
+| **D19** | #1181 | Schrumpf-Warnung als ERROR/CI-Gate? | **Nein, bleibt WARN.** Kein CI-Gate; das exakte Log-Format bleibt gepinnt; #1142 ist nur eine spätere Option | T9, T14 |
+| **D20** | #1181 | Grant unter `suggest`? | **Nein.** `resolve_commit_grant` liefert `(derived, False)`: kein `Bash`-Render, keine Grant-Zeile, kein Sentinel; Artefakt und `eligible_roles` bleiben mode-unabhängig | T6, T8, T11 |
+| **D21** | #1181 | Hook-loser Provider im gemischten Set = ERROR? | **Nein, WARN je Provider.** Auf Providern mit aktivem Guard wird gerendert, auf den übrigen bleibt die abgeleitete Authority + WARN. **ERROR nur**, wenn der Grant auf **keinem** Ziel-Provider wirken kann | T2, T6, T8, T12 |
+| **D22** | #1181 | Rolle außerhalb von `roles:` = Fehler? | **Nein, INFO.** `authority_override_notices` liefert die INFO-Zeile `<role>=direct ignored — role is not active…`; ERROR nur für read-only/unbekannte Templates und nicht durchsetzbare Grants | T2, T13 |
+| **D23** | #1181 | Skalar-Kurzform akzeptieren? | **Nein, nur Objektform mit Pflicht-Ack** `{authority: direct, acknowledge_full_shell: true}`. Fehlendes/falsches Ack = Violation + kein Grant | T1, T2, T7, T11 |
+
+### 9.1 Querschnittsnotizen zu den Entscheidungen
+
+- **D1 → neue Datei-Ownership in #1186:** `hooks/1-generic/repo-containment{,-impl}.sh` gehören
+  jetzt zu #1186 (T24). Die Pfad-Quelle wird auf die aufgelöste Matrix umgestellt
+  (`ARTIFACT_SCRATCH_DIR` → `classes.scratch.path` aus `artifact-locations.resolved.json` →
+  `repo_containment.tmp-sink.path` → `.tmp`); die lexikalischen Regeln und `hook_common.sh` bleiben
+  unangetastet. **Kein anderes Wellen-Issue editiert diesen Hook.**
+- **D3/D4 → Rollen-/Regel-Doku in #1186-T20:** T20 zieht Manager-Rolle, Regeltext
+  (`rules/1-generic/se-cascade-artifact-taxonomy.md` nutzt `{{ARTIFACT_SE_ROOT}}`), beide
+  `project.yaml.example` und Changelog nach. D3 ändert zusätzlich T1/T2/T4/T5/T15/T23 (Naming-Pattern).
+- **D11 → Kopplung an #957:** `generated-file-hashes.json` ist die gemeinsame Ownership-Frage;
+  #957 spiegelt die Registrierungs-Regel für PR-Templates. Serialisiert wird bei jeder
+  `.github/`-Erzeugung (§3, §5.3/#957).
+- **D18 → Verweis auf #1210:** Die Attributionslücke des PreToolUse-Payload (`agent_id` ohne
+  Agent-Namen) ist bewusst **nicht** Teil von #1181, sondern als #1210 erfasst und als
+  Nicht-Security-Boundary dokumentiert.
 
 ---
 
@@ -325,8 +360,10 @@ CI-Gate), OQ-6 (gemischtes Provider-Set ⇒ WARN, kein ERROR) sowie #1188 Q2 (ei
    ist `APPROVED`; der Marker wird ausschließlich vom User bzw. `concept-reviewer` gesetzt.
 2. **Keine Implementierung vor `Status: APPROVED`** (Master-Rule `spec-plan-workflow`). Bis dahin
    sind die Pläne belastbare Vorarbeit, kein Ausführungsauftrag.
-3. **Die zehn offenen Entscheidungen aus §9** sind vor oder mit dem Approval zu beantworten;
-   mindestens #1188-Q1 und #1186-OQ-5 haben harte Blockadewirkung.
+3. **Es gibt keine offenen OQ mehr.** Alle 23 Entscheidungen D1–D23 sind am 2026-11-09 gefallen und
+   in die vier Specs/Pläne eingearbeitet (§9). Verbleibend ist ausschließlich die
+   `APPROVED`-Setzung durch den User — und zwar **mindestens eine Spec vor dem jeweiligen
+   `feat/…`-Branch**. Es gibt keine inhaltliche Vorbedingung, die noch zu klären wäre.
 4. **Branch-Guard:** je Issue ein eigener `feat/…`-Branch
    (`feat/1187-project-context-scope`, `feat/1186-artifact-locations-matrix`,
    `feat/1188-issue-label-taxonomy`, `feat/1181-commit-authority-grant`). **Nie** direkt auf

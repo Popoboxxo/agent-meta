@@ -26,8 +26,9 @@ trace:
 > Spec-ID `SPEC-issue-label-taxonomy-2026-11-09`, 22 ACs + AC-2b, IC-1…IC-7, D1/D2/D4).
 > **Vorbedingung für die Umsetzung:** Die Spec ist heute **nicht freigegeben**. Nach
 > Master-Rule `spec-plan-workflow` startet die Implementierung erst mit
-> `Status: APPROVED` **und** entschiedenen Q1/Q3/Q9 (siehe Abschnitt „Offene Entscheidungen"). Bis dahin ist dieser Plan
-> die belastbare Vorarbeit, kein Ausführungsauftrag.
+> `Status: APPROVED`. Die inhaltlichen Voraussetzungen sind erfüllt: Q1, Q2, Q3, Q4, Q7, Q8 und Q9
+> sind am 2026-11-09 entschieden (D9–D15, Abschnitt „Entscheidungsprotokoll (2026-11-09)"). Bis zur
+> Freigabe ist dieser Plan die belastbare Vorarbeit, kein Ausführungsauftrag.
 >
 > **Revision 2 (Review-Einarbeitung 2026-11-09):** RVW-1188-01 (BLOCKER), -02 … -06 (MAJOR) und
 > drei WARNs sind eingearbeitet; Auflösungstabelle am Dokumentende („Review-Auflösung
@@ -38,6 +39,13 @@ trace:
 > **Revision 4 (Szenario-Konflikte K1–K8, 2026-11-09):** K1, K2, K4 und K6 sind eingearbeitet
 > (`unmanaged` statt `project-state`, eine `separator`-Objektform, kein `default`-Feld, `$defs`
 > bleibt). K3/K5/K7/K8 betreffen diesen Plan nicht. Auflösungstabelle am Dokumentende.
+> **Revision 5 (Nutzer-Entscheidungen D9–D15, 2026-11-09):** Die offenen Punkte Q1, Q2, Q3, Q4,
+> Q7, Q8 und Q9 sind entschieden und als **K-12 … K-18** in die Plan-Präzisierungen übernommen
+> (Repository-Präzedenzkette, kein Rename in v1, Drift-Baseline für `docs/issue-labels.md`,
+> Template-Schalter, `--apply` schreibt / `git` committet, Retry nur bei `429`, Triage-Labels als
+> Nicht-Taxonomie). Betroffene Tasks: T1, T9, T13, T15, T16, T17, T18, T21, T25, T30. T30 ist damit
+> **kein bedingter Task mehr**; Testdateien 17 → 18, Tasks 29 Pflicht + 1 bedingt → **30 Pflicht**.
+> Protokoll: Abschnitt „Entscheidungsprotokoll (2026-11-09)". Der Plan bleibt `DRAFT`.
 
 **Goal:** Eine deklarative Label-Taxonomie (`type` / `area` / `priority`) ersetzt die drei
 divergierenden, hartkodierten Label-Tabellen in `feedback`, `meta-feedback` und
@@ -74,7 +82,7 @@ Provider-Namen (`scripts/lib/consistency/provider_literals.py:1-17`).
 Code-Änderung auf `main`/`master`)
 **Größe je Task:** **S** ≤ 1 Datei und ≤ 60 Diff-Zeilen · **M** 2–3 Dateien oder ≤ 250
 Diff-Zeilen · **L** > 3 Dateien, neues Modul > 250 Zeilen oder schema-/ui-übergreifend
-**Aufwand:** 30 Tasks (29 Pflicht + 1 bedingt), 8 Meilensteine, 17 neue Testdateien,
+**Aufwand:** 30 Tasks (**alle Pflicht**), 8 Meilensteine, 18 neue Testdateien,
 2 neue Config-Dateien, 1 persistentes Zustands-Manifest, 3 neue Python-Module. Eine belastbare Zahl liefert der
 `effort-estimator` (Textverweis; hier bewusst nicht berechnet).
 
@@ -82,11 +90,15 @@ Diff-Zeilen · **L** > 3 Dateien, neues Modul > 250 Zeilen oder schema-/ui-über
 
 1. **Spec freigegeben:** `docs/specs/2026-11-09-issue-label-taxonomy-spec.md` trägt
    `Status: APPROVED`. Heute: DRAFT. Ohne Freigabe bleibt dieser Plan DRAFT.
-2. **Q1, Q3, Q9 entschieden** (Abschnitt „Offene Entscheidungen"). Q1 blockiert AC-16 im eigenen Repo (dieses Repo hat
-   **keine** `git:`-Sektion: `.meta-config/project.yaml` enthält nur
-   `conventions-preset: default` in `:394`; `git.remote-url` fällt damit auf den
-   Schema-Default `""` zurück, `config/project-config.schema.json:1753-1757`). Q9 (Commit-Ownership
-   des Manifests) blockiert T21 nicht, muss aber vor der ersten CI-Nutzung beantwortet sein.
+2. **Q1, Q2, Q3, Q4, Q7, Q8, Q9 entschieden (2026-11-09):** D9 (Repository-Präzedenzkette),
+   D14 (Retry nur bei `429`), D10 (kein Rename in v1), D11 (`docs/issue-labels.md` in
+   `generated-file-hashes.json`), D15 (Triage-Labels als Nicht-Taxonomie), D12
+   (`templates.{mode,force}` in IC-1), D13 (`--apply` schreibt, `git` committet). Q1 blockierte
+   AC-16 im eigenen Repo (dieses Repo hat **keine** `git:`-Sektion: `.meta-config/project.yaml`
+   enthält nur `conventions-preset: default` in `:394`; `git.remote-url` fällt damit auf den
+   Schema-Default `""` zurück, `config/project-config.schema.json:1753-1757`) — mit D9 löst
+   `repository.*` bzw. `GITHUB_REPOSITORY`/`CI_PROJECT_PATH` das auf. Q9 (Commit-Ownership) ist mit
+   D13 beantwortet und blockiert T21 nicht mehr.
 3. **Q5 bestätigt** (Spec-Entscheidung: `issue-conventions.platform-overrides.<adapter>`),
    sonst ist Stufe 1 der Präzedenz gegenstandslos.
 4. **Keine Aktivierung in diesem Repo:** `.meta-config/project.yaml` bleibt unverändert.
@@ -146,16 +158,19 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
   Repository-Identität auflösen; das passiert ausschließlich im `--labels`-Pfad
   (`issue_adapters.resolve_repository`). Grund: `derive_builder_vars` ruft die Builder mit
   leerem Config-Dict auf (`scripts/lib/consistency/placeholders.py:299-306`); eine frühe
-  Identitätsauflösung würde dort einen Fehler erzeugen und `--validate` brechen.
+  Identitätsauflösung würde dort einen Fehler erzeugen und `--validate` brechen. Die Auflösung
+  folgt der Präzedenzkette aus **K-12**.
 - **K-5 — Netzwerk-Zuschnitt (Q6 vorweggenommen).** Regeln 4–6 des Consistency-Checks laufen
   offline in `--validate`; Regeln 1–3 nur in `sync.py --labels [--check]`. `--validate` darf
   `urllib.request.urlopen` **nie** erreichen; Test patcht `urlopen` auf „raise". AC-5 wird
   deshalb als **Kontext-Split** gelesen (ein Modul, sechs IDs, zwei Aufrufkontexte), nicht als
   „sechs Regeln im Offline-Lauf" — Spec §4.7, nachgewiesen in T23/T24.
-- **K-6 — Keine Schema-Erfindung.** Optionale Issue-Templates (Spec §4.9) brauchen einen
-  `mode`-Schalter, den IC-1 (`additionalProperties: false`) nicht enthält. T30 bleibt
-  deshalb **bedingt** und startet erst nach einer Spec-Revision (Q8). Gleiches gilt für ein
-  explizites `renames`-Objekt, falls Q3 Option (a) gewählt wird.
+- **K-6 — Keine Schema-Erfindung (durch D12 überholt, siehe K-15).** Optionale Issue-Templates
+  brauchen einen `mode`-Schalter. Bis Revision 4 fehlte er in IC-1 (`additionalProperties: false`),
+  deshalb war T30 bedingt. Mit **D12** ist `issue-conventions.templates: {mode, force}` Spec-Vertrag
+  (Spec IC-1/§4.9) — T1 legt den Unterabschnitt an, T30 ist ein regulärer Task. Ein explizites
+  `renames`-Objekt bleibt **weiterhin außerhalb** dieses Plans: D10 reserviert die `rename`-Zeile,
+  aber der Schema-Schlüssel kommt erst mit einer eigenen Spec-Revision.
 - **K-7 — Label-Namen sind URL-Segmente (RVW-1188-01).** Der Executor baut jede URL über
   `build_target_url(adapter, identity, op, fields)` und setzt `{name}`, `{id}`, `{owner}`,
   `{repo}`, `{project_id}` **pro Segment** mit `urllib.parse.quote(value, safe="")` ein.
@@ -180,6 +195,47 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
   realisierbaren Bedingungen. Die Regel „genau ein `single`-Achsenwert pro Issue" ist eine
   **Laufzeitregel** und wird ausschließlich über AC-7 (`enforcement.single-axis-per-issue`,
   T18 `enforce_single_axis`) getestet — nicht als Schema-Negativtest.
+
+### Entscheidungen D9–D15 als Plan-Präzisierungen (2026-11-09)
+
+- **K-12 — Repository-Identität: Präzedenzkette (D9).** `resolve_repository()` probiert strikt in
+  dieser Reihenfolge und nimmt die erste **nicht-leere, parsebare** Quelle:
+  `issue-conventions.repository.{owner,repo}`/`project-id` → `git.remote-url` (vier Formen) →
+  `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`. Unparsbares wird übersprungen; erst wenn **alle drei**
+  fehlen oder unparsbar sind, `IssueConfigError` (Exit 2, kein API-Call). Die Meldung ist **eine**
+  Meldung, nennt alle drei Wege und enthält **nie** einen leeren `owner`/`repo`. Reine Datenlogik,
+  lazy (K-4), kein Shell-Aufruf (Repo-Containment). Tests: T15.
+- **K-13 — Kein Rename in v1 (D10).** Ein neuer Wert erzeugt `create <neu>`; kein
+  `update.new_name`-Aufruf. Steht der alte Wert im Manifest, wird er als
+  `info: rename-candidate <alt>` gemeldet. Der alte Wert verlässt nur das **Soll-Set**; das
+  Tracker-Label bleibt (kein Delete, kein Update). Die `rename`-Zeile bleibt im CLI-Vertrag
+  reserviert (Spec IC-5). Test: T17 `test_new_value_creates_and_reports_rename_candidate`.
+- **K-14 — `docs/issue-labels.md` ist drift-geprüft (D11).** Registrierung in
+  `.meta-config/generated-file-hashes.json` über eine explizite Root-Level-Ausnahme im Muster von
+  `PLATFORM_DEFAULTS_RESOLVED_REL` (`scripts/lib/generated_file_drift.py:49`, Scan `:383-393`,
+  Capture `:535-537`). Manuelle Edits werden beim Sync überschrieben (`.sync-backup-*`-Sicherung).
+  Die Baseline-Datei selbst wird vom Capture-Stage geschrieben, nicht handeditiert. Dieselbe Regel
+  gilt in #957 für PR-Templates; die Marker-Regel aus IC-7 bleibt zusätzlich bestehen.
+- **K-15 — Template-Schalter (D12).** `issue-conventions.templates: {mode: off|scaffold|manage,
+  force: bool}` (offener Default `off`, `force: false`) ist ab jetzt Schema-Vertrag (T1). Semantik:
+  `off` = nichts; `scaffold` = nur fehlende Dateien; `manage` = zusätzlich Dateien mit unserem
+  Marker; `force: true` = auch Dateien ohne Marker. Erzeugung ausschließlich capability-gesteuert
+  (`issue-forms`/`issue-templates`). T30 ist damit **Pflicht-Task**.
+- **K-16 — `--apply` schreibt, `git` committet (D13).** Kein `git`-Aufruf, kein Auto-Commit aus
+  `_handle_labels`. Die Ergebnis-Tabelle endet mit einer Zeile `wrote .meta-config/issue-labels-state.json`.
+  CI-`--apply`-Jobs committen nie. Test: T21 `test_apply_prints_manifest_path_in_result_table`,
+  `test_cli_never_invokes_git`.
+- **K-17 — Retry nur bei `429` (D14).** Genau ein Retry je Request, nur `429`, Wartezeit aus
+  `Retry-After` (Sekunden oder HTTP-Datum), gedeckelt auf 30 s, Default 1 s bei fehlendem/unparsbarem
+  Header. `5xx` und Timeouts: kein Retry, Fehler sammeln, weiter, Exit 1 (AC-18). `401`/`403`
+  brechen unverändert nach dem ersten Fehlschlag ab (AC-19). `sleep` wird injiziert
+  (`UrllibTransport(..., sleep=time.sleep)`), damit Tests nicht warten; kein Backoff, keine
+  Retry-Konfiguration in `project.yaml`. Tests: T16/T18.
+- **K-18 — Triage-Labels sind Nicht-Taxonomie (D15).** `TRIAGE_LABELS = ("triage", "needs-info")`
+  lebt als Framework-Konstante in `scripts/lib/issue_conventions.py`; `render_triage_labels()`
+  rendert daraus `{{ISSUE_TRIAGE_LABELS}}`. Kein Projekt-Override, keine vierte Achse (D2), kein
+  Soll-Label, kein `prune`-Ziel. Regel 4 des Consistency-Checks nimmt sie von der Literal-Prüfung
+  aus; `docs/issue-labels.md` führt sie unter „Nicht Teil der Taxonomie". Tests: T13/T25.
 
 ## Global Constraints
 
@@ -207,6 +263,12 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
   (Spec IC-8), geschrieben **nur** von `--apply`. Sie ist kein Diff-Cache; ohne sie gibt es
   keine **manifest-basierten** Löschkandidaten (K-9), `sync.prune-allow` wirkt unabhängig
   (IC-5, RVW2-1188-01). Kein Token, nur projizierte Namen + Hash.
+- **Commit-Ownership (D13/K-16):** kein Auto-Commit, kein `git`-Aufruf im CLI-Pfad; `--apply`
+  druckt die geänderte Datei in der Ergebnis-Tabelle, den Commit macht der `git`-Schritt.
+  CI-`--apply`-Jobs committen **nie**.
+- **Drift-Baseline (D11/K-14):** `docs/issue-labels.md` (und später die Tracker-Templates) wird in
+  `.meta-config/generated-file-hashes.json` registriert; manuelle Edits werden beim Sync
+  überschrieben und gemeldet. Die Baseline wird vom Capture-Stage geschrieben, nie handeditiert.
 - **Wave-Reihenfolge (verbindlich):** `#1187 → #1186 → #1188 → #1181`, danach `#1141`, die
   Whitelist-Ableitung aus dem Schema zuletzt. Dieser Plan setzt die drei Vorgänger-Issues als
   gemergt voraus (Spec §11); `docs/issue-labels.md` ist `project-docs` (§11.1 der Spec).
@@ -214,8 +276,8 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
   `tests/scenarios/registry.md` (der End-to-End-Test ist `tests/test_issue_labels_scenario_1188.py`).
 - **stdlib only:** keine neue Dependency, `tests/requirements.txt` und `pyproject.toml`
   bleiben unangetastet. `urllib.request` mit `timeout=` wie im Bestand
-  (`scripts/admin-server.py:2959-2963`, `:4388-4391`); kein Retry außer optional einmal bei
-  `429` mit `Retry-After` (Q2-Empfehlung).
+  (`scripts/admin-server.py:2959-2963`, `:4388-4391`); **genau ein** Retry und nur bei `429` mit
+  `Retry-After` (Cap 30 s, Default 1 s, injizierbare `sleep`); `5xx`/Timeouts ohne Retry (K-17, D14).
 - **Python-Kompatibilität:** `from __future__ import annotations` bzw. `Optional[...]`; die
   Prüfungen `consistency/python_compat.py` (`--validate`) müssen grün bleiben (kein
   PEP-604 im Laufzeitpfad, keine Backslashes im f-String-Ausdruck).
@@ -242,11 +304,11 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
 | `scripts/lib/issue_conventions.py` | **neu** | 7-Stufen-Resolver, Achsen-Gate, Projektion, Namensgrenzen, Block-/Doku-Renderer, `LEGACY_ROLE_BLOCKS` (K-1) | T2, T4–T9, T19, T25 |
 | `scripts/lib/issue_adapters.py` | **neu** | Adapter-Loader, `select_adapter`, Transport-Härtung, `build_target_url`, `resolve_id_map`, `parse_remote_url`, `resolve_repository`, Diff/Apply, Manifest, Single-Axis, Create-Policy | T3, T15–T20 |
 | `scripts/lib/consistency/issue_labels.py` | **neu** | Sechs Regeln (4 offline, 2 online) mit eigenen Check-IDs | T23 |
-| `docs/issue-labels.md` | **generiert** | Menschliche Doku aus dem Resolver (AC-22), Marker-Kommentar, Ownership-Regel (IC-7); Datei-Set `project-docs` | T25 |
+| `docs/issue-labels.md` | **generiert** | Menschliche Doku aus dem Resolver (AC-22), Marker-Kommentar, Ownership-Regel (IC-7), Abschnitt „Nicht Teil der Taxonomie" (D15); Datei-Set `project-docs`; drift-geprüft über `generated-file-hashes.json` (D11) | T25 |
 | `.meta-config/issue-labels-state.json` | **persistiert** | Prune-Manifest (Spec IC-8): projizierte Namen + `sha256`, versioniert, nur von `--apply` geschrieben | T17, T21 |
 | `docs/plans/2026-11-09-issue-label-taxonomy-plan.md` | **neu** | dieser Plan | — |
 
-### Produktion — ändern (18)
+### Produktion — ändern (20)
 
 | Datei | neu/ändern | Zweck | Task |
 |---|---|---|---|
@@ -267,9 +329,11 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
 | `agents/1-generic/git.md` | ändern | `{{GIT_ISSUE_NAMING_BLOCK}}` (`:149-151`) → `{{ISSUE_TITLE_FORMAT}}` + `{{ISSUE_CLOSING_KEYWORDS}}` + `{{ISSUE_TAXONOMY_TABLE}}` + `{{ISSUE_LABEL_MAP}}` | T14 |
 | `docs/api/cli-reference.md` | ändern | `--labels`, `--apply`, `--check`, `--explain`, `--force`-Wechselwirkung dokumentieren (`:18`, `:27-28`) | T22 |
 | `docs/api/admin-ui-reference.md` | ändern | `<!-- help-id: project_instance-issue_labels -->` (Muster `:306`) + Help-IDs der Framework-Sichten | T26, T27 |
+| `scripts/lib/generated_file_drift.py` | ändern | Explizite Root-Level-Registrierung von `docs/issue-labels.md` (Muster `PLATFORM_DEFAULTS_RESOLVED_REL`, `:49`, Scan `:383-393`, Capture `:535-537`) — D11 | T25 |
+| `.meta-config/generated-file-hashes.json` | ändern (generiert) | Baseline-Eintrag für `docs/issue-labels.md`; wird vom Sync-Capture geschrieben, **nie** handeditiert (D11) | T25 |
 | `CHANGELOG.md` | ändern | `[Unreleased]`-Eintrag (Konvention; `crossrefs.changelog-*` prüft nur `agents/`/`commands/`, aber DoD) | T29 |
 
-### Tests — neu (17)
+### Tests — neu (18)
 
 | Datei | Zweck | Task |
 |---|---|---|
@@ -286,10 +350,11 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
 | `tests/test_issue_adapters_apply.py` | Teilfehler, 401-Abbruch, Single-Axis, drei Create-Modi, Idempotenz, Gitea-ID-Map | T18–T20 |
 | `tests/test_issue_labels_cli.py` | Dry-Run/Apply/Check/Explain, Exitcodes, Nutzungsfehler, Manifest-Persistenz | T21 |
 | `tests/test_issue_labels_consistency.py` | Sechs Regel-IDs über beide Kontexte, offline/online-Zuschnitt, still bei `enabled:false` | T23, T24 |
-| `tests/test_issue_labels_docs.py` | Generierte Doku, Ownership-Marker, kein Token | T25 |
+| `tests/test_issue_labels_docs.py` | Generierte Doku, Ownership-Marker, Drift-Registrierung (D11), Nicht-Taxonomie-Abschnitt (D15), kein Token | T25 |
 | `tests/test_admin_ui_issue_labels_section.py` | Whitelist, PUT-Roundtrip, Preview-Route, Hilfetext | T26 |
 | `tests/test_admin_ui_issue_labels_framework_views.py` | Read-only Framework-Sichten für Presets/Adapter | T27 |
 | `tests/test_issue_labels_scenario_1188.py` | Voller Szenarientest mit gemocktem Tracker (Labels mit `/`, Prune, Teilfehler) | T28 |
+| `tests/test_issue_labels_templates.py` | `templates.mode` off/scaffold/manage, `force`, Capability-Gating, kein Token (D12) | T30 |
 
 ### Tests — bewusst unverändert (1)
 
@@ -297,13 +362,17 @@ AC-Traceability (Abschnitt „AC→Task-Traceability") ausgewiesen.
 |---|---|---|
 | `tests/test_conventions_migration_invariant.py` | **nicht** ändern (Anker). Der Golden-Test für Issue-Labels liegt in `test_issue_conventions_golden.py`, damit die bestehende Datei konfliktfrei bleibt | — |
 
-### Optionale Tracker-Templates (T30, bedingt)
+### Optionale Tracker-Templates (T30, Pflicht-Task seit D12)
 
 | Datei | Zweck | Task |
 |---|---|---|
 | `.github/ISSUE_TEMPLATE/<type>.yml` | GitHub Issue Form mit Pre-Labels (`issue-forms`) | T30 |
 | `.gitlab/issue_templates/<Type>.md` | GitLab Issue Template (`issue-templates`) | T30 |
 | `.gitea/ISSUE_TEMPLATE/<type>.md` | Gitea Issue Template (`issue-templates`) | T30 |
+
+Erzeugt wird ausschließlich bei `issue-conventions.templates.mode != off` und nur für Dateien, die
+die Adapter-Capability deckt; `scaffold` fasst bestehende Dateien nie an, `manage` nur
+marker-tragende (oder `force: true`).
 
 ## pipeline_stages
 
@@ -335,7 +404,7 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 | **M5** | CLI `--labels` + Doku-Pflicht | T21–T22 | `pytest tests/test_issue_labels_cli.py`; `--validate` rc 0 (inkl. `docs.cli_reference`); `--help` zeigt `--label` **und** `--labels` |
 | **M6** | Consistency-Check | T23–T24 | `pytest tests/test_issue_labels_consistency.py`; `--validate` rc 0 **mit gepatchtem `urlopen`** |
 | **M7** | Generierte Doku + Admin-UI | T25–T27 | `pytest tests/test_issue_labels_docs.py tests/test_admin_ui_issue_labels_section.py tests/test_admin_ui_issue_labels_framework_views.py`; `--validate` rc 0 (inkl. `docs.ui_help_mappings`); Preview-Route liefert Explain ohne Token |
-| **M8** | Integration, Szenario, Doku-Abschluss | T28–T29 (T30 optional) | `tests/test_issue_labels_scenario_1188.py` grün; volle Suite; `--validate` rc 0; `--validate-spec-plan` nur noch mit dem erwarteten `spec_plan_approval_marker` (Spec-Status) |
+| **M8** | Integration, Szenario, Doku-Abschluss, Templates | T28–T30 | `tests/test_issue_labels_scenario_1188.py` und `tests/test_issue_labels_templates.py` grün; volle Suite; `--validate` rc 0; `--validate-spec-plan` nur noch mit dem erwarteten `spec_plan_approval_marker` (Spec-Status) |
 
 ## Tasks
 
@@ -355,10 +424,10 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - Create: `tests/test_issue_conventions_schema.py`
 **Interfaces:** Produces `properties["issue-conventions"]` und die `$defs` `taxonomyAxis`, `adapterApi`, `adapterIds`, `adapterPagination`, `adapterDefaults` (alle geschlossen); Consumes bestehende `$defs`-Konvention (`config/project-config.schema.json:2855`).
 
-- [ ] Step 1: **Test zuerst** in `tests/test_issue_conventions_schema.py`: `test_section_is_closed` (unbekannter Schlüssel ⇒ Validierungsfehler), `test_taxonomy_axis_is_closed`, `test_defaults_match_ic1` (`enabled:false`, `preset:"default"`, `adapter:"inherit"`, `sync.prune:false`, `sync.prune-allow:[]`, `enforcement.single-axis-per-issue:"error"`), `test_platform_overrides_declared` (Adapter-ID offen), `test_platform_override_value_is_closed` (unbekannter Schlüssel **je Adapter** ⇒ Fehler), `test_platform_override_accepts_transport_keys` (`base-url`, `api`, `ids`, `pagination`, `auth.header`, `defaults` valide; `auth.env`/`auth.token` ⇒ Fehler — RVW-1188-03), `test_create_enum`, `test_examples_contain_closed_section` (parametrisiert über `howto/configs/project.yaml.example` **und** `templates/configs/project.yaml.example`: YAML parsebar, `issue-conventions` ist vorhanden und enthält nur IC-1-Schlüssel — RVW2-1188-02). Lauf → **rot** (Sektion fehlt in Schema **und** beiden Beispielen).
-- [ ] Step 2: Sektion wortgleich zu IC-1 nach `conventions` (`:703-707`), also vor `debug-mode` (`:708`) einfügen; `#/$defs` ergänzen: `taxonomyAxis` (`enabled`, `cardinality`, `color`, `label-case`, `max-length`, `allowed-pattern`, `values`), `adapterApi`, `adapterIds`, `adapterPagination`, `adapterDefaults` — alle mit `additionalProperties: false`, ebenso `platform-overrides.<adapter>` (nur der Adapter-ID-Schlüssel bleibt offen).
-- [ ] Step 3: Dieselbe Sektion in **beide** Beispiel-Dateien (`howto/configs/project.yaml.example`, `templates/configs/project.yaml.example`) ergänzen — kommentierte Defaults, gleiche Schlüssel wie IC-1, Einfügeposition nach `conventions-preset`/`conventions`. Die Beispiele sind Doku, kein Prüf-Gate; der parametrisierte Test hält sie trotzdem deckungsgleich (RVW2-1188-02).
-- [ ] Step 4: `taxonomyAxis`-Defaults dokumentieren (`cardinality`, `label-case:"lower"`, `max-length:50`, `allowed-pattern` leer = keine Prüfung); in der Sektionsbeschreibung vermerken, dass `platform-overrides.<adapter>` der **einzige** Ort für Projekt-Overrides inklusive Transport ist (Spec §4.5/IC-1).
+- [ ] Step 1: **Test zuerst** in `tests/test_issue_conventions_schema.py`: `test_section_is_closed` (unbekannter Schlüssel ⇒ Validierungsfehler), `test_taxonomy_axis_is_closed`, `test_defaults_match_ic1` (`enabled:false`, `preset:"default"`, `adapter:"inherit"`, `sync.prune:false`, `sync.prune-allow:[]`, `enforcement.single-axis-per-issue:"error"`, `templates.mode:"off"`, `templates.force:false`), `test_platform_overrides_declared` (Adapter-ID offen), `test_platform_override_value_is_closed` (unbekannter Schlüssel **je Adapter** ⇒ Fehler), `test_platform_override_accepts_transport_keys` (`base-url`, `api`, `ids`, `pagination`, `auth.header`, `defaults` valide; `auth.env`/`auth.token` ⇒ Fehler — RVW-1188-03), `test_create_enum`, `test_repository_subsection_closed_and_documented` (`repository` akzeptiert `owner`/`repo`/`project-id`, kein weiterer Schlüssel — D9), `test_templates_subsection_closed` (nur `mode`/`force`; `mode` ∈ `off|scaffold|manage`; `force` boolean, Default false — D12), `test_examples_contain_closed_section` (parametrisiert über `howto/configs/project.yaml.example` **und** `templates/configs/project.yaml.example`: YAML parsebar, `issue-conventions` ist vorhanden und enthält nur IC-1-Schlüssel inkl. `repository` und `templates` — RVW2-1188-02). Lauf → **rot** (Sektion fehlt in Schema **und** beiden Beispielen).
+- [ ] Step 2: Sektion wortgleich zu IC-1 nach `conventions` (`:703-707`), also vor `debug-mode` (`:708`) einfügen; `#/$defs` ergänzen: `taxonomyAxis` (`enabled`, `cardinality`, `color`, `label-case`, `max-length`, `allowed-pattern`, `values`), `adapterApi`, `adapterIds`, `adapterPagination`, `adapterDefaults` — alle mit `additionalProperties: false`, ebenso `platform-overrides.<adapter>` (nur der Adapter-ID-Schlüssel bleibt offen) und `templates` (D12).
+- [ ] Step 3: Dieselbe Sektion in **beide** Beispiel-Dateien (`howto/configs/project.yaml.example`, `templates/configs/project.yaml.example`) ergänzen — kommentierte Defaults, gleiche Schlüssel wie IC-1 (inklusive `repository: {owner, repo}` als auskommentiertes Beispiel und `templates: {mode: off, force: false}`), Einfügeposition nach `conventions-preset`/`conventions`. Die Beispiele sind Doku, kein Prüf-Gate; der parametrisierte Test hält sie trotzdem deckungsgleich (RVW2-1188-02).
+- [ ] Step 4: `taxonomyAxis`-Defaults dokumentieren (`cardinality`, `label-case:"lower"`, `max-length:50`, `allowed-pattern` leer = keine Prüfung); in der Sektionsbeschreibung vermerken, dass `platform-overrides.<adapter>` der **einzige** Ort für Projekt-Overrides inklusive Transport ist (Spec §4.5/IC-1), dass `repository` die Stufe 0 der Identitäts-Präzedenz ist (D9) und `templates.mode` die drei Stufen aus §4.9 steuert (D12).
 - [ ] Step 5: Lauf: `python3 -m pytest tests/test_issue_conventions_schema.py --basetemp="$PYTEST_BASETEMP" -q` → **grün**; `python3 scripts/sync.py --validate` → **rc 0** (Sektion ist additiv).
 - [ ] Step 6: Commit `feat: add closed issue-conventions schema section`.
 
@@ -387,7 +456,7 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 **Interfaces:** Produces `AdapterConfig` (dataclass mit `auth_env`, `auth_header`, `base_url`, `defaults`, `api`, `ids`, `pagination`, `capabilities`, `aliases`), `load_issue_adapters(agent_meta_root, config) -> dict[str, AdapterConfig]`, `select_adapter(adapters, configured, config) -> AdapterConfig`, `resolved_adapter_dump(adapter) -> dict`; Consumes `_deep_merge` (`scripts/lib/io.py:39`).
 
 - [ ] Step 1: **Test zuerst**: `test_three_adapters_present`, `test_capabilities_sets` (`github` ⊇ `labels`,`issue-labels`,`issue-forms`; `gitlab` ⊇ `scoped-labels`,`issue-templates`; `gitea` ⊇ `issue-templates`), `test_separator_per_cardinality`, `test_codeberg_alias_selects_gitea` (K-3), `test_every_adapter_declares_pagination` (K-7), `test_gitea_declares_ids` (`ids == {op: "list", key: "id"}`; `update`/`delete` pfade enthalten `{id}` — RVW-1188-01), `test_project_override_merges_without_token` (konkret: `issue-conventions.platform-overrides.gitea.base-url` mit gleichem Host, nur Pfad — RVW-1188-03), `test_token_key_rejected` (`auth.token` ⇒ `IssueConfigError`), `test_synthetic_fourth_adapter_from_yaml` (Fixture-Adapter `forgejo-x` nur in YAML, `kind: http`), `test_dump_contains_only_auth_env` (AC-8-Vorstufe), `test_http_base_url_rejected` (H-1), `test_loopback_http_allowed` (H-1-Ausnahme für Tests), `test_host_change_rejected` (H-2: `base-url` mit fremdem Host ⇒ `IssueConfigError`), `test_absolute_path_rejected` (H-3: `path: "https://evil.example/x"`/`"//evil"`/`"../x"`), `test_header_without_token_placeholder_rejected` und `test_header_with_literal_credential_rejected` (H-6).
-- [ ] Step 2: YAML nach IC-3 anlegen; `aliases: {Codeberg: gitea}`; `base-url` mit `{GITEA_URL}`-Platzhalter (Env, kein Secret); `pagination` je Adapter; `ids` nur bei `gitea`.
+- [ ] Step 2: YAML nach IC-3 anlegen; `aliases: {Codeberg: gitea}`; `base-url` mit `{GITEA_URL}`-Platzhalter (Env, kein Secret); `pagination` je Adapter; `ids` nur bei `gitea`. Die `capabilities` (`issue-forms`/`issue-templates`) sind zugleich der **einzige** Steuerinput für die Template-Erzeugung in T30 (D12) — kein Provider-Name, keine separate Schalterliste.
 - [ ] Step 3: Loader + Merge implementieren: Projekt-Overrides ausschließlich aus `issue-conventions.platform-overrides.<adapter>` (`base-url` nur Pfad, `api.*`, `ids`, `pagination`, `auth.header`, `defaults`); `auth.env` ist pflichtig und **nicht** überschreibbar; `auth.token`/`auth.password` sind harte Fehler; H-1/H-2/H-3/H-6 werden beim Laden geprüft, nicht erst beim Request.
 - [ ] Step 4: Lauf → **grün**; `--validate` rc 0.
 - [ ] Step 5: Commit `feat: add yaml-driven tracker adapter registry`.
@@ -468,9 +537,9 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - Modify: `scripts/lib/config.py`
 - Modify: `scripts/lib/consistency/placeholders.py`
 - Create: `tests/test_issue_conventions_role_blocks.py`
-**Interfaces:** Produces `render_taxonomy_table(resolved)`, `render_label_map(resolved)`, `render_title_format(resolved)`, `render_closing_keywords(resolved)`, `render_triage_labels(resolved)`, `LEGACY_ROLE_BLOCKS: dict[str, dict[str, str]]`; Consumes `_build_convention_variables()` (`scripts/lib/config.py:2673-2734`).
+**Interfaces:** Produces `render_taxonomy_table(resolved)`, `render_label_map(resolved)`, `render_title_format(resolved)`, `render_closing_keywords(resolved)`, `render_triage_labels(resolved)`, `TRIAGE_LABELS: tuple[str, str]` (Framework-Konstante `("triage", "needs-info")`, D15/K-18), `LEGACY_ROLE_BLOCKS: dict[str, dict[str, str]]`; Consumes `_build_convention_variables()` (`scripts/lib/config.py:2673-2734`).
 
-- [ ] Step 1: **Test zuerst**: `test_enabled_table_has_all_axes_and_values`, `test_disabled_block_is_role_legacy` (vier Rollen, vier verschiedene Alt-Texte; K-1), `test_new_vars_registered` (`ISSUE_TAXONOMY_TABLE`, `ISSUE_LABEL_MAP`, `ISSUE_TITLE_FORMAT`, `ISSUE_CLOSING_KEYWORDS`, `ISSUE_TRIAGE_LABELS`, `ISSUE_TAXONOMY_ENABLED` in `_BUILTIN_VARS`), `test_build_variables_with_empty_config_does_not_raise` (K-4).
+- [ ] Step 1: **Test zuerst**: `test_enabled_table_has_all_axes_and_values`, `test_disabled_block_is_role_legacy` (vier Rollen, vier verschiedene Alt-Texte; K-1), `test_new_vars_registered` (`ISSUE_TAXONOMY_TABLE`, `ISSUE_LABEL_MAP`, `ISSUE_TITLE_FORMAT`, `ISSUE_CLOSING_KEYWORDS`, `ISSUE_TRIAGE_LABELS`, `ISSUE_TAXONOMY_ENABLED` in `_BUILTIN_VARS`), `test_build_variables_with_empty_config_does_not_raise` (K-4), `test_triage_labels_are_a_framework_constant` (`TRIAGE_LABELS == ("triage", "needs-info")`, nicht aus `taxonomy.*`/Projekt-Config ableitbar — D15), `test_triage_labels_are_not_in_desired_set` (`build_desired_labels` enthält weder `triage` noch `needs-info`).
 - [ ] Step 2: Sechs Variablen in `_build_convention_variables()` setzen — **immer** (auch bei `enabled:false`), damit `check_placeholders` nie eine unbekannte Variable sieht; Werte im Disabled-Fall = `LEGACY_ROLE_BLOCKS["__default__"]` (neutral).
 - [ ] Step 3: `ISSUE_LANGUAGE` auf `resolved.language` umstellen, Fallback `"english"` beibehalten (Semantik aus `:2711-2722` unverändert).
 - [ ] Step 4: Registrierung in `_BUILTIN_VARS` (`:114-123`); **nicht** in `_UNREGISTERED_BUILDER_RATCHET` (shrink-only, `:273-284`).
@@ -523,10 +592,10 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 **Files:**
 - Modify: `agents/1-generic/bug-feature-analyzer.md`
 - Modify: `tests/test_issue_conventions_role_blocks.py`
-**Interfaces:** Consumes `{{ISSUE_TAXONOMY_TABLE}}` und `{{ISSUE_TRIAGE_LABELS}}`.
+**Interfaces:** Consumes `{{ISSUE_TAXONOMY_TABLE}}` und `{{ISSUE_TRIAGE_LABELS}}` (Framework-Konstante `TRIAGE_LABELS`, D15).
 
-- [ ] Step 1: **Test zuerst**: `test_bfa_has_no_taxonomy_label_literal` (`` `bug` ``, `` `feature` ``, `` `P0` ``…`` `P3` `` als **Labels**), `test_bfa_keeps_category_words` (die Kategorien `BUG`/`FEATURE`/`USER-ERROR` in `:78-87` bleiben — sie sind Klassifikation, nicht Label), `test_bfa_uses_triage_labels` (`triage`/`needs-info` kommen aus `{{ISSUE_TRIAGE_LABELS}}`, nicht als Literal; Q7).
-- [ ] Step 2: Label-Schema (`:89`) und Prioritätsmatrix (`:91-97`) ersetzen; Kategorien-Tabelle unangetastet.
+- [ ] Step 1: **Test zuerst**: `test_bfa_has_no_taxonomy_label_literal` (`` `bug` ``, `` `feature` ``, `` `P0` ``…`` `P3` `` als **Labels**), `test_bfa_keeps_category_words` (die Kategorien `BUG`/`FEATURE`/`USER-ERROR` in `:78-87` bleiben — sie sind Klassifikation, nicht Label), `test_bfa_uses_triage_labels` (`triage`/`needs-info` kommen aus `{{ISSUE_TRIAGE_LABELS}}`, nicht als Literal; D15), `test_bfa_has_no_triage_literal` (die beiden Wörter stehen **nirgends** als Backtick-Literal im Template).
+- [ ] Step 2: Label-Schema (`:89`) und Prioritätsmatrix (`:91-97`) ersetzen; Kategorien-Tabelle unangetastet. Die Triage-Zeile referenziert ausschließlich `{{ISSUE_TRIAGE_LABELS}}` und sagt explizit „nicht Teil der Taxonomie" (D15).
 - [ ] Step 3: Lauf → **grün**; Golden grün.
 - [ ] Step 4: Commit `refactor: feed triage labels from the taxonomy`.
 
@@ -543,19 +612,19 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - [ ] Step 3: Lauf → **grün**; `pytest tests/test_conventions_migration_invariant.py tests/test_variable_builder_active_set.py` → grün (der Rolle-Gate-Fall `:81-89` bleibt unberührt, weil der Block weiter berechnet wird).
 - [ ] Step 4: Commit `refactor: render git issue conventions from the taxonomy`.
 
-### Task 15: Repository-Identität aus `git.remote-url` (AC-16)
+### Task 15: Repository-Identität: Präzedenzkette aus Config, Git-Remote und CI-Env (AC-16, D9)
 
 **Agent:** senior-developer · **Depends on:** 3 · **Größe:** M
 **Files:**
 - Modify: `scripts/lib/issue_adapters.py`
 - Create: `tests/test_issue_adapters_url.py`
-**Interfaces:** Produces `RepositoryIdentity(owner, repo, project_id, host)` und `parse_remote_url(url: str) -> RepositoryIdentity` sowie `resolve_repository(config, resolved) -> RepositoryIdentity`; Consumes `git.remote-url`-Fallback (`scripts/lib/config.py:1718`) und `GIT_REMOTE_URL_SET` (`:1747-1763`).
+**Interfaces:** Produces `RepositoryIdentity(owner, repo, project_id, host)`, `parse_remote_url(url: str) -> RepositoryIdentity`, `parse_github_repository_env(value: str) -> Optional[RepositoryIdentity]`, `parse_ci_project_path(value: str) -> Optional[RepositoryIdentity]` und `resolve_repository(config, resolved, *, env=None) -> RepositoryIdentity` (**Präzedenz D9**); Consumes `git.remote-url`-Fallback (`scripts/lib/config.py:1718`), `GIT_REMOTE_URL_SET` (`:1747-1763`), `issue-conventions.repository.*` (IC-1), `os.environ`.
 
-- [ ] Step 1: **Test zuerst**: `test_https_url` (`https://github.com/owner/repo.git`), `test_ssh_url` (`git@github.com:owner/repo.git`), `test_suffixless_url`, `test_gitlab_subgroup` (`https://gitlab.com/group/sub/repo` ⇒ `project_id == "group%2Fsub%2Frepo"`), `test_gitea_path_form`, `test_unparsable_raises_with_url_in_message` (AC-16: Meldung enthält die URL und niemals `owner == ""`), `test_repository_override_wins` (`issue-conventions.repository.*`), `test_missing_remote_uses_env_fallback` (Q1-Empfehlung), `test_missing_everything_raises_naming_the_fix`.
-- [ ] Step 2: Parser implementieren (regex-basiert, vier Formen, `host`-basiert auf `project_id` vs. `owner/repo` entscheiden — **kein** Provider-Name im Code).
-- [ ] Step 3: `resolve_repository` implementieren: Override → `git.remote-url` → Env-Fallback → `IssueConfigError`. Lazy (K-4), nie in `build_variables`.
+- [ ] Step 1: **Test zuerst**: `test_https_url` (`https://github.com/owner/repo.git`), `test_ssh_url` (`git@github.com:owner/repo.git`), `test_suffixless_url`, `test_gitlab_subgroup` (`https://gitlab.com/group/sub/repo` ⇒ `project_id == "group%2Fsub%2Frepo"`), `test_gitea_path_form`, `test_unparsable_raises_with_url_in_message` (AC-16: Meldung enthält die URL und niemals `owner == ""`); **Präzedenzkette (D9):** `test_repository_override_wins_over_remote` (`issue-conventions.repository.owner/repo` gesetzt, `git.remote-url` vorhanden ⇒ Override gewinnt), `test_remote_used_when_no_override`, `test_github_repository_env_fallback` (`git.remote-url` leer, `GITHUB_REPOSITORY=owner/repo` ⇒ Env gewinnt), `test_ci_project_path_fallback_gitlab` (`CI_PROJECT_PATH=group/sub/repo` ⇒ `project_id` URL-encoded), `test_env_without_slash_is_skipped_as_unparsable` (`GITHUB_REPOSITORY=foo` ⇒ wird übersprungen, nicht als `owner=foo`/`repo=""` akzeptiert), `test_all_sources_empty_raises_one_message_naming_three_ways` (Meldung enthält `repository`, `git.remote-url`, `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`), `test_error_never_emits_empty_owner_or_repo` (Assertion auf den kompletten Fehlertext: keine leeren Wertfelder), `test_resolve_repository_never_reads_shell` (`subprocess` wird gepatcht auf `raise`; Repo-Containment).
+- [ ] Step 2: Parser implementieren (regex-basiert, vier Formen, `host`-basiert auf `project_id` vs. `owner/repo` entscheiden — **kein** Provider-Name im Kontrollfluss; Alias-Auflösung bleibt Daten, K-3).
+- [ ] Step 3: `resolve_repository` implementieren: strikte Präzedenz **repository-Override → `git.remote-url` → CI-Env → `IssueConfigError`** (K-12). Jede Quelle wird nur akzeptiert, wenn sie vollständig parsebar ist; unparsbare Quellen werden zugunsten der nächsten Stufe übersprungen. Lazy (K-4), nie in `build_variables`. Die Fehlermeldung ist **eine** Meldung, nennt alle drei Wege und enthält nie einen leeren `owner`/`repo`.
 - [ ] Step 4: Lauf → **grün**.
-- [ ] Step 5: Commit `feat: derive tracker repository identity from the git remote`.
+- [ ] Step 5: Commit `feat: derive tracker repository identity from config, remote and ci env`.
 
 ### Task 16: HTTP-Executor, URL-Kodierung, IDs und Auth-Vertrag (AC-8, IC-3, IC-6, §4.12)
 
@@ -563,10 +632,10 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 **Files:**
 - Modify: `scripts/lib/issue_adapters.py`
 - Create: `tests/test_issue_adapters_http.py`
-**Interfaces:** Produces `HttpTransport` (Protocol), `UrllibTransport(timeout=15)`, `build_headers(adapter, token) -> dict`, `build_target_url(adapter, identity, op, *, fields, id_map=None) -> str`, `resolve_id_map(adapter, identity, transport) -> dict[str, str]`, `iter_pages(adapter, identity, transport) -> list[dict]`, `request(adapter, identity, op, **fields) -> tuple[int, Any]`; Consumes `auth.env`/`auth.header` (T3), `os.environ`, optional `.env` im Projektwurzelverzeichnis.
+**Interfaces:** Produces `HttpTransport` (Protocol), `UrllibTransport(timeout=15, sleep=time.sleep)`, `retry_delay(retry_after: Optional[str]) -> float` (Sekunden oder HTTP-Datum, Cap 30 s, Default 1 s — D14), `build_headers(adapter, token) -> dict`, `build_target_url(adapter, identity, op, *, fields, id_map=None) -> str`, `resolve_id_map(adapter, identity, transport) -> dict[str, str]`, `iter_pages(adapter, identity, transport) -> list[dict]`, `request(adapter, identity, op, **fields) -> tuple[int, Any]`; Consumes `auth.env`/`auth.header` (T3), `os.environ`, optional `.env` im Projektwurzelverzeichnis.
 
-- [ ] Step 1: **Test zuerst**: `test_header_built_from_template` (`Authorization: Bearer <token>`, `PRIVATE-TOKEN: <token>`), `test_token_from_env_only`, `test_dotenv_read_without_echo`, `test_missing_token_raises_before_request` (keinen stillen anonymen Call), `test_no_token_in_error_message`, `test_no_token_in_resolved_dump`, `test_transport_is_injected` (Fake-Transport, kein Netz), `test_timeout_is_set` (15 s) — **Härtung/Kodierung (RVW-1188-01/-05):** `test_slash_label_is_percent_encoded` (`type/bug` ⇒ `.../labels/type%2Fbug`), `test_nested_slash_label_is_encoded` (`area/core` ⇒ `area%2Fcore`), `test_id_placeholder_uses_numeric_id` (Gitea-Mock: `PATCH /labels/42`, `DELETE /labels/42`, nie `.../type%2Fbug`), `test_id_map_resolved_once_per_run` (Callcount `list` == 1, unabhängig von der Label-Zahl), `test_pagination_reads_all_pages` (Mock liefert 100 + 3 Einträge ⇒ 103), `test_redirect_is_not_followed` (302 auf `https://evil.example` ⇒ Fehler, Auth-Header geht **nicht** an den zweiten Host, Callcount am zweiten Host == 0), `test_auth_header_not_sent_to_foreign_host` (Host-Pinning: Request-URL-Host ≠ `base-url`-Host ⇒ Abbruch vor dem Call).
-- [ ] Step 2: Transport implementieren; `base-url` expandieren (`{GITEA_URL}`), Pfad über `build_target_url` bauen: jedes `{…}`-Segment mit `quote(value, safe="")` einsetzen, `{id}` aus `id_map` (sonst `IssueConfigError`); Header-Template mit `{token}` substituieren; Body-Template mit `{name}`, `{color}`, `{description}`, `{owner}`, `{repo}`, `{project_id}` (Bodies werden **nicht** URL-kodiert).
+- [ ] Step 1: **Test zuerst**: `test_header_built_from_template` (`Authorization: Bearer <token>`, `PRIVATE-TOKEN: <token>`), `test_token_from_env_only`, `test_dotenv_read_without_echo`, `test_missing_token_raises_before_request` (keinen stillen anonymen Call), `test_no_token_in_error_message`, `test_no_token_in_resolved_dump`, `test_transport_is_injected` (Fake-Transport, kein Netz), `test_timeout_is_set` (15 s) — **Härtung/Kodierung (RVW-1188-01/-05):** `test_slash_label_is_percent_encoded` (`type/bug` ⇒ `.../labels/type%2Fbug`), `test_nested_slash_label_is_encoded` (`area/core` ⇒ `area%2Fcore`), `test_id_placeholder_uses_numeric_id` (Gitea-Mock: `PATCH /labels/42`, `DELETE /labels/42`, nie `.../type%2Fbug`), `test_id_map_resolved_once_per_run` (Callcount `list` == 1, unabhängig von der Label-Zahl), `test_pagination_reads_all_pages` (Mock liefert 100 + 3 Einträge ⇒ 103), `test_redirect_is_not_followed` (302 auf `https://evil.example` ⇒ Fehler, Auth-Header geht **nicht** an den zweiten Host, Callcount am zweiten Host == 0), `test_auth_header_not_sent_to_foreign_host` (Host-Pinning: Request-URL-Host ≠ `base-url`-Host ⇒ Abbruch vor dem Call) — **Retry-Policy (D14):** `test_429_retried_exactly_once` (zwei `429` hintereinander ⇒ genau 2 Calls, kein dritter), `test_retry_delay_uses_retry_after_seconds`, `test_retry_delay_parses_http_date`, `test_retry_delay_capped_at_30_seconds` (`Retry-After: 3600` ⇒ 30.0), `test_retry_delay_defaults_to_one_second` (Header fehlt/unparsbar), `test_500_is_not_retried`, `test_timeout_is_not_retried`, `test_sleep_is_injected` (`FakeSleep` protokolliert die Wartezeit, Test wartet nie real).
+- [ ] Step 2: Transport implementieren; `base-url` expandieren (`{GITEA_URL}`), Pfad über `build_target_url` bauen: jedes `{…}`-Segment mit `quote(value, safe="")` einsetzen, `{id}` aus `id_map` (sonst `IssueConfigError`); Header-Template mit `{token}` substituieren; Body-Template mit `{name}`, `{color}`, `{description}`, `{owner}`, `{repo}`, `{project_id}` (Bodies werden **nicht** URL-kodiert). Retry-Abbildung: nur `429` ⇒ einmal `sleep(retry_delay(header))` und wiederholen; `5xx`/Timeout ⇒ sofort als Fehler zurück (K-17).
 - [ ] Step 3: Redirects abschalten (eigener `HTTPRedirectHandler`, der `redirect_request` auf `None` setzt; 3xx wird als Fehler gewertet), Host/Scheme gegen den aufgelösten `base-url` prüfen (H-2/H-5), Maskierung wiederverwenden (`scripts/lib/env.py:130` `_mask`) für jede Log-Zeile.
 - [ ] Step 4: Lauf → **grün** (kein `urlopen`-Aufruf im Test).
 - [ ] Step 5: Commit `feat: add hardened http executor with url-encoded paths and numeric ids`.
@@ -580,10 +649,10 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - Create: `tests/test_issue_labels_state.py`
 **Interfaces:** Produces `build_desired_labels(resolved) -> dict[str, DesiredLabel]`, `label_diff(desired, actual, projection, *, prune, manifest, prune_allow) -> list[DiffEntry]`, `prune_candidates(actual, desired, manifest, prune_allow) -> tuple[list[DiffEntry], list[Finding]]`, `load_state(project_root) -> State`, `save_state(project_root, state, *, applied_names, adapter_id, repo_key) -> None`, `owned_prefixes(projection) -> tuple[str, ...]` (**nur** Klassifikation, nie Löschgrund); Consumes T7-Projektion, `sync.prune`/`sync.prune-allow` (IC-1).
 
-- [ ] Step 1: **Test zuerst** (`tests/test_issue_adapters_diff.py`): `test_create_update_noop` (drei Zeilen), `test_prune_default_false` (AC-10: Tracker-Label außerhalb der Soll-Menge ⇒ **kein** `delete`), `test_prune_true_manifest_entry_deletes` (Label steht im Manifest eines früheren Laufs ⇒ `delete`), `test_prune_true_prune_allow_deletes` (`sync.prune-allow: [legacy-label]` ⇒ `delete`, ohne Manifest-Eintrag; die Allowlist wirkt auch ohne Manifest — RVW2-1188-01), `test_prune_never_deletes_foreign_label_inside_prefix` (**RVW-1188-04:** `type/needs-design` liegt im Präfix `type/`, steht nicht im Manifest und nicht in `prune-allow` ⇒ **kein** `delete`, nur `info: prune-candidate-unowned`), `test_prune_without_manifest_and_allow_deletes_nothing` (erster Lauf/neuer Klon **und** leere Allowlist ⇒ null Löschkandidaten + `info: prune-needs-manifest`; RVW2-1188-01), `test_prune_allow_does_not_bypass_prune_false` (Allowlist ohne `prune: true` löscht nichts), `test_disabled_axis_labels_never_deleted` (§4.4/IC-5: `area` deaktiviert, `area/core` steht im Manifest ⇒ **kein** Kandidat; Formel `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)`, RVW2-1188-01), `test_candidate_set_is_manifest_minus_desired_minus_inactive` (Manifest mit `type/bug` (desired), `area/core` (inaktive Achse) und `legacy-label` ⇒ genau **ein** Kandidat `legacy-label`), `test_rename_prints_explicit_line` (IC-5: `rename <alt> -> <neu>` nur bei explizitem Signal; Q3-Empfehlung: ohne Signal `create <neu>` + `info: rename-candidate <alt>`), `test_check_never_emits_delete`.
+- [ ] Step 1: **Test zuerst** (`tests/test_issue_adapters_diff.py`): `test_create_update_noop` (drei Zeilen), `test_prune_default_false` (AC-10: Tracker-Label außerhalb der Soll-Menge ⇒ **kein** `delete`), `test_prune_true_manifest_entry_deletes` (Label steht im Manifest eines früheren Laufs ⇒ `delete`), `test_prune_true_prune_allow_deletes` (`sync.prune-allow: [legacy-label]` ⇒ `delete`, ohne Manifest-Eintrag; die Allowlist wirkt auch ohne Manifest — RVW2-1188-01), `test_prune_never_deletes_foreign_label_inside_prefix` (**RVW-1188-04:** `type/needs-design` liegt im Präfix `type/`, steht nicht im Manifest und nicht in `prune-allow` ⇒ **kein** `delete`, nur `info: prune-candidate-unowned`), `test_prune_without_manifest_and_allow_deletes_nothing` (erster Lauf/neuer Klon **und** leere Allowlist ⇒ null Löschkandidaten + `info: prune-needs-manifest`; RVW2-1188-01), `test_prune_allow_does_not_bypass_prune_false` (Allowlist ohne `prune: true` löscht nichts), `test_disabled_axis_labels_never_deleted` (§4.4/IC-5: `area` deaktiviert, `area/core` steht im Manifest ⇒ **kein** Kandidat; Formel `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)`, RVW2-1188-01), `test_candidate_set_is_manifest_minus_desired_minus_inactive` (Manifest mit `type/bug` (desired), `area/core` (inaktive Achse) und `legacy-label` ⇒ genau **ein** Kandidat `legacy-label`), `test_new_value_creates_and_reports_rename_candidate` (**D10:** neuer Wert ⇒ `create <neu>`, alter Wert im Manifest ⇒ `info: rename-candidate <alt>`), `test_no_rename_call_in_v1` (kein `update`-Aufruf mit `new_name`; `update`-Callcount für den alten Wert == 0), `test_old_value_leaves_desired_set_but_stays_in_tracker` (alter Wert fehlt in `desired`, das Tracker-Label bleibt unangetastet), `test_rename_line_is_never_emitted_in_v1` (Ausgabe enthält kein `rename <alt> -> <neu>`; die Zeile bleibt nur Vertrag), `test_check_never_emits_delete`.
 - [ ] Step 2: **Test zuerst** (`tests/test_issue_labels_state.py`): `test_state_has_version_and_repo_key` (`version: 1`, `adapters.<id>.<owner/repo>.labels`), `test_state_stores_only_name_and_hash` (kein Token, keine Farbe im Klartext — nur `sha256`), `test_save_state_is_sorted_and_line_per_label` (stabile Schlüsselreihenfolge, ein Label je Zeile → merge-freundlich), `test_partial_apply_adds_only_successful_names` (drei ok, zwei 500 ⇒ nur die drei im Manifest), `test_missing_state_file_yields_empty_state`, `test_state_roundtrip_is_idempotent`.
-- [ ] Step 3: Diff implementieren; Soll-Menge aus aktiven Achsen, Ist-Menge aus `list` (T16, paginiert), Manifest aus IC-8. Löschkandidaten über `prune_candidates` (K-9), nicht über den Präfix: `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)`, plus `prune_allow` unabhängig vom Manifest (RVW2-1188-01).
-- [ ] Step 4: `save_state` implementieren: atomar schreiben (`.tmp`-Datei + `os.replace`), nur aus dem Apply-Pfad (T21) aufrufen; `owned_prefixes` ausschließlich für `info`/`warning`-Klassifikation der Consistency-Regeln 2 verwenden.
+- [ ] Step 3: Diff implementieren; Soll-Menge aus aktiven Achsen, Ist-Menge aus `list` (T16, paginiert), Manifest aus IC-8. Löschkandidaten über `prune_candidates` (K-9), nicht über den Präfix: `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)`, plus `prune_allow` unabhängig vom Manifest (RVW2-1188-01). Ein nicht mehr gewünschter Wert, der im Manifest steht, erzeugt **ausschließlich** `info: rename-candidate <alt>` — kein `update.new_name`, kein `rename`-Diff-Eintrag (K-13/D10).
+- [ ] Step 4: `save_state` implementieren: atomar schreiben (`.tmp`-Datei + `os.replace`), nur aus dem Apply-Pfad (T21) aufrufen; `owned_prefixes` ausschließlich für `info`/`warning`-Klassifikation der Consistency-Regeln 2 verwenden. Kein Commit, kein `git`-Aufruf aus diesem Pfad (D13/K-16) — die Datei wird geschrieben und dem `git`-Schritt übergeben.
 - [ ] Step 5: Lauf → **grün**.
 - [ ] Step 6: Commit `feat: diff tracker labels against a persisted prune manifest`.
 
@@ -595,8 +664,8 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - Create: `tests/test_issue_adapters_apply.py`
 **Interfaces:** Produces `apply_labels(adapter, identity, diff, *, transport, log) -> ApplyResult` (`entries`, `failed`, `aborted`, `exit_code`), `enforce_single_axis(adapter, labels) -> SingleAxisOutcome` (`allow`/`replace`/`refuse`); Consumes `capabilities` (T3).
 
-- [ ] Step 1: **Test zuerst**: `test_partial_failure_keeps_other_labels` (fünf Labels, dritter Aufruf 500 ⇒ vier angewendet, Tabelle, `exit_code == 1`, **kein** Delete; AC-18), `test_401_aborts_after_first_call` (Callcount == 1, AC-19), `test_403_aborts_like_401`, `test_single_axis_scoped_replaces_second_type` (Adapter mit `scoped-labels` ⇒ genau ein `type::`-Wert im Soll-Set; AC-7), `test_single_axis_unscoped_refuses` (ohne `scoped-labels`, `enforcement.single-axis-per-issue: error` ⇒ `refuse`; AC-7), `test_single_axis_warn_mode_only_warns`, `test_no_retry_for_500`, `test_retry_once_on_429_with_retry_after` (Q2-Empfehlung), `test_result_table_is_stable`.
-- [ ] Step 2: Apply implementieren: sequenziell, Fehler sammeln, bei `401`/`403` sofort abbrechen; **kein** Rollback, **kein** Delete-Versuch.
+- [ ] Step 1: **Test zuerst**: `test_partial_failure_keeps_other_labels` (fünf Labels, dritter Aufruf 500 ⇒ vier angewendet, Tabelle, `exit_code == 1`, **kein** Delete; AC-18), `test_401_aborts_after_first_call` (Callcount == 1, AC-19), `test_403_aborts_like_401`, `test_single_axis_scoped_replaces_second_type` (Adapter mit `scoped-labels` ⇒ genau ein `type::`-Wert im Soll-Set; AC-7), `test_single_axis_unscoped_refuses` (ohne `scoped-labels`, `enforcement.single-axis-per-issue: error` ⇒ `refuse`; AC-7), `test_single_axis_warn_mode_only_warns`, **Retry-Policy (D14/K-17):** `test_no_retry_for_500` (Callcount == 1), `test_no_retry_for_timeout` (Callcount == 1, `failed`-Eintrag), `test_retry_once_on_429_with_retry_after` (genau 2 Calls, dann Erfolg), `test_429_twice_fails_after_single_retry` (Callcount == 2, `failed`, weiter mit dem nächsten Label), `test_retry_still_aborts_on_401_after_retry` (Retry ändert den Auth-Abbruch nicht), `test_result_table_is_stable`.
+- [ ] Step 2: Apply implementieren: sequenziell, Fehler sammeln, bei `401`/`403` sofort abbrechen; **kein** Rollback, **kein** Delete-Versuch. Retry-Logik lebt ausschließlich im Transport (T16): `apply_labels` wiederholt **nichts** selbst und zählt nur das Ergebnis; ein nach dem Retry weiterhin fehlgeschlagenes Label landet als `failed` in der Tabelle und führt zu Exit 1.
 - [ ] Step 3: Single-Axis-Entscheidung **nur** über `"scoped-labels" in adapter.capabilities`; das Ergebnis fließt in den gerenderten Rollen-Block und in `enforce`.
 - [ ] Step 4: Lauf → **grün**.
 - [ ] Step 5: Commit `feat: apply label diffs with partial-failure and auth-abort semantics`.
@@ -636,9 +705,9 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - Create: `tests/test_issue_labels_cli.py`
 **Interfaces:** Produces `_handle_labels(ctx: _SyncContext) -> None` und das Flag `--labels`; Consumes `--apply` (`scripts/sync.py:482-484`), `--check` (`:334-338`), `_MODE_HANDLERS` (`:757-787`), `resolve_explain` (T8), `label_diff`/`apply_labels` (T17/T18), `load_state`/`save_state` (T17).
 
-- [ ] Step 1: **Test zuerst**: `test_dry_run_writes_nothing` (AC-4; Fake-Transport zählt nur `list`), `test_apply_creates_labels`, `test_second_run_noop`, `test_check_exits_1_on_drift` (AC-5), `test_check_exits_0_when_clean`, `test_explain_exits_0`, `test_apply_and_check_is_usage_error` (Exit 2, kein HTTP), `test_resolve_error_exits_2_without_http` (AC-20-Kopplung), `test_transport_policy_violation_exits_2_without_http` (H-1/H-2/H-6 ⇒ Resolve-Fehler, Callcount 0), `test_apply_writes_manifest_and_check_does_not` (K-9: `--apply` schreibt `.meta-config/issue-labels-state.json`, `--check` lässt die Datei byte-identisch), `test_help_distinguishes_label_and_labels` (F-3: beide Flags mit eindeutiger Beschreibung), `test_output_lines_are_create_update_noop`.
+- [ ] Step 1: **Test zuerst**: `test_dry_run_writes_nothing` (AC-4; Fake-Transport zählt nur `list`), `test_apply_creates_labels`, `test_second_run_noop`, `test_check_exits_1_on_drift` (AC-5), `test_check_exits_0_when_clean`, `test_explain_exits_0`, `test_apply_and_check_is_usage_error` (Exit 2, kein HTTP), `test_resolve_error_exits_2_without_http` (AC-20-Kopplung), `test_transport_policy_violation_exits_2_without_http` (H-1/H-2/H-6 ⇒ Resolve-Fehler, Callcount 0), `test_apply_writes_manifest_and_check_does_not` (K-9: `--apply` schreibt `.meta-config/issue-labels-state.json`, `--check` lässt die Datei byte-identisch), **Commit-Ownership (D13/K-16):** `test_apply_prints_manifest_path_in_result_table` (letzte Zeile `wrote .meta-config/issue-labels-state.json`), `test_cli_never_invokes_git` (`subprocess`/`git`-Aufruf gepatcht auf `raise`; der Handler committet nie und ruft kein `git`), `test_help_distinguishes_label_and_labels` (F-3: beide Flags mit eindeutiger Beschreibung), `test_output_lines_are_create_update_noop`.
 - [ ] Step 2: Flag mit `help=`-Text anlegen, **nicht** `--label` umbenennen; Modus-Eintrag als **erster** Eintrag nach `audit_config` (`:759`), damit `--labels` nicht in den Default-Sync fällt.
-- [ ] Step 3: Handler implementieren: `sys.exit(0|1|2)` explizit; `ctx.read_only = True` für Dry-Run/Check/Explain; keine `env.*`-Scripts, kein `sync.log`-Schreiben im Read-only-Modus (Muster `_handle_audit_config`, `scripts/lib/cli_commands.py:756-788`). Im `--apply`-Pfad nach der Ergebnis-Tabelle `save_state(...)` aufrufen (Q9: Datei schreiben, **nicht** committen).
+- [ ] Step 3: Handler implementieren: `sys.exit(0|1|2)` explizit; `ctx.read_only = True` für Dry-Run/Check/Explain; keine `env.*`-Scripts, kein `sync.log`-Schreiben im Read-only-Modus (Muster `_handle_audit_config`, `scripts/lib/cli_commands.py:756-788`). Im `--apply`-Pfad nach der Ergebnis-Tabelle `save_state(...)` aufrufen und den geschriebenen Pfad als letzte Tabellenzeile ausgeben (D13/K-16: schreiben + drucken, **nicht** committen, kein `git`-Aufruf). Der normale Sync-Pfad aktualisiert im selben Lauf die Drift-Baseline von `docs/issue-labels.md` über den Capture-Stage (D11/K-14) — kein zweiter, konkurrierender Schreibpfad.
 - [ ] Step 4: Import in `scripts/sync.py:68`-Block ergänzen.
 - [ ] Step 5: Lauf → **grün**.
 - [ ] Step 6: Commit `feat: add sync --labels dry-run, apply, check and explain`.
@@ -689,12 +758,14 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 **Files:**
 - Modify: `scripts/lib/issue_conventions.py`
 - Modify: `scripts/lib/cli_commands.py` (Schreibpfad im Common Tail)
+- Modify: `scripts/lib/generated_file_drift.py` (explizite Root-Level-Registrierung, D11)
+- Modify: `.meta-config/generated-file-hashes.json` (Baseline-Eintrag, vom Capture-Stage geschrieben)
 - Create: `tests/test_issue_labels_docs.py`
-**Interfaces:** Produces `render_issue_labels_doc(resolved, project_name) -> str` und `write_issue_labels_doc(project_root, resolved, *, dry_run, force, log) -> bool`; Consumes `GENERATED_MARKER = "<!-- generated by agent-meta: issue-labels; do not edit -->"`.
+**Interfaces:** Produces `render_issue_labels_doc(resolved, project_name) -> str` und `write_issue_labels_doc(project_root, resolved, *, dry_run, force, log) -> bool`; Consumes `GENERATED_MARKER = "<!-- generated by agent-meta: issue-labels; do not edit -->"`, `PLATFORM_DEFAULTS_RESOLVED_REL`-Muster (`scripts/lib/generated_file_drift.py:49`, Scan `:383-393`, Capture `:535-537`).
 
-- [ ] Step 1: **Test zuerst**: `test_doc_contains_every_active_value` (AC-22: je aktiver Achse jeder Wert mit projiziertem Label-Namen), `test_doc_marks_inactive_axes` (`area` als „deaktiviert", nicht als leer), `test_disabled_writes_nothing`, `test_handwritten_file_is_not_overwritten` (Warnung, kein Write; IC-7), `test_force_overwrites`, `test_marker_required_for_update`, `test_no_token_in_doc` (AC-8).
-- [ ] Step 2: Renderer implementieren (Achsen-Tabelle, Mapping-Tabelle, Anwendungsregel, Nicht-Taxonomie-Labels `triage`/`needs-info`, `--explain`-Quellen als Fußnote).
-- [ ] Step 3: Schreibpfad in den Common Tail von `_handle_sync` (`scripts/lib/cli_commands.py:1641`ff), nur bei `enabled:true`; `dry_run` schreibt nichts.
+- [ ] Step 1: **Test zuerst**: `test_doc_contains_every_active_value` (AC-22: je aktiver Achse jeder Wert mit projiziertem Label-Namen), `test_doc_marks_inactive_axes` (`area` als „deaktiviert", nicht als leer), `test_doc_lists_triage_labels_under_non_taxonomy` (Abschnitt „Nicht Teil der Taxonomie" enthält `triage` und `needs-info` mit Begründung — D15), `test_disabled_writes_nothing`, `test_handwritten_file_is_not_overwritten` (Warnung, kein Write; IC-7), `test_force_overwrites`, `test_marker_required_for_update`, `test_no_token_in_doc` (AC-8), **Drift-Registrierung (D11/K-14):** `test_doc_is_registered_in_generated_file_hashes` (nach dem Sync steht `docs/issue-labels.md` in `.meta-config/generated-file-hashes.json`), `test_manual_edit_is_detected_as_drift` (Datei nach dem Sync ändern ⇒ `scan_generated_file_drift` meldet sie), `test_manual_edit_is_overwritten_with_backup` (nächster Sync stellt den generierten Inhalt wieder her und legt `.sync-backup-*` an).
+- [ ] Step 2: Renderer implementieren (Achsen-Tabelle, Mapping-Tabelle, Anwendungsregel, Abschnitt „Nicht Teil der Taxonomie" mit `TRIAGE_LABELS` aus T9/D15, `--explain`-Quellen als Fußnote).
+- [ ] Step 3: Schreibpfad in den Common Tail von `_handle_sync` (`scripts/lib/cli_commands.py:1641`ff), nur bei `enabled:true`; `dry_run` schreibt nichts. Danach den Pfad in `scripts/lib/generated_file_drift.py` als Root-Level-Ausnahme registrieren (D11); der Baseline-Eintrag entsteht beim Capture-Stage, nicht durch Handedit.
 - [ ] Step 4: Lauf → **grün**; `--validate` rc 0.
 - [ ] Step 5: Commit `feat: generate issue label documentation from the resolver`.
 
@@ -741,9 +812,9 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 > **Szenario-IDs:** #1188 belegt **keine** ID im Katalog `tests/scenarios/registry.md`
 > (`94` = #1181, `95`–`98` = #1187). Dieser Task ist ein pytest-Szenario, kein Katalog-Szenario.
 
-- [ ] Step 1: Scratch-Projekt in `.tmp/scenario-labels-1188/` anlegen (idempotent: bei Existenz löschen), mit eigener `.meta-config/project.yaml`, `issue-conventions.enabled: true`, `repository.{owner,repo}` gesetzt (kein `git.remote-url` nötig, Q1-neutral), `taxonomy.area.enabled: true` mit `area.values.core`/`area.values.ui` (erzeugt `area/core`) und `sync.prune: true`, `sync.prune-allow: []`.
+- [ ] Step 1: Scratch-Projekt in `.tmp/scenario-labels-1188/` anlegen (idempotent: bei Existenz löschen), mit eigener `.meta-config/project.yaml`, `issue-conventions.enabled: true`, `repository.{owner,repo}` gesetzt (kein `git.remote-url` nötig — genau der D9-Pfad), `taxonomy.area.enabled: true` mit `area.values.core`/`area.values.ui` (erzeugt `area/core`) und `sync.prune: true`, `sync.prune-allow: []`.
 - [ ] Step 2: Gemockten Tracker als `http.server` auf `127.0.0.1:0` starten (stdlib, In-Process), Adapter-Fixture mit `base-url: "http://127.0.0.1:<port>/api/v1"` (Loopback-Ausnahme H-1) und `auth.env: SCENARIO_TOKEN` (Dummy-Wert); der Mock hält ein Label `type/needs-design` (Fremdlabel **innerhalb** des Präfix) und antwortet auf `list` paginiert (2 Seiten). **Kein** echtes Netzwerk, kein echtes Token.
-- [ ] Step 3: Ablauf erzwingen: `--labels` (Dry-Run ⇒ keine Schreibaufrufe im Mock-Log) → `--labels --apply` (Create **mit** `type/bug` und `area/core`) → `--labels --check` (rc 0) → **Drift** erzeugen (eine Farbe im Mock ändern) → `--check` (rc 1) → **Prune-Fall:** `type/needs-design` steht nicht im Manifest ⇒ bleibt, `info: prune-candidate-unowned`; ein Label aus einem früheren Manifest-Lauf wird gelöscht → **Rename-Fall** gemäß Q3 → `--labels --apply`-Wiederholung (idempotent, alles `no-op`).
+- [ ] Step 3: Ablauf erzwingen: `--labels` (Dry-Run ⇒ keine Schreibaufrufe im Mock-Log) → `--labels --apply` (Create **mit** `type/bug` und `area/core`) → `--labels --check` (rc 0) → **Drift** erzeugen (eine Farbe im Mock ändern) → `--check` (rc 1) → **Prune-Fall:** `type/needs-design` steht nicht im Manifest ⇒ bleibt, `info: prune-candidate-unowned`; ein Label aus einem früheren Manifest-Lauf wird gelöscht → **Rename-Fall (D10):** ein neuer Wert erzeugt `create <neu>`, das alte Manifest-Label bleibt im Mock, `info: rename-candidate <alt>`, **kein** `PATCH`-Aufruf mit `new_name` → `--labels --apply`-Wiederholung (idempotent, alles `no-op`).
 - [ ] Step 4: Zusatzassertions: Mock-Log zeigt `.../labels/type%2Fbug` und `.../labels/area%2Fcore` (**kodiert**), die CLI-Ausgabe zeigt `type/bug` und `area/core` (**unkodiert**, K-7); `list` wurde je Lauf genau einmal aufgerufen und paginiert; kein Token im gesamten Output/Log/`docs/issue-labels.md`/Manifest; `docs/issue-labels.md` enthält alle aktiven Werte; `.meta-config/issue-labels-state.json` existiert nach `--apply` und ist nach `--check` byte-identisch; Teilfehler-Simulation (Mock antwortet beim dritten Create mit 500) ⇒ Exit 1 + Tabelle; 401-Simulation ⇒ Callcount 1.
 - [ ] Step 5: Lauf: `python3 -m pytest tests/test_issue_labels_scenario_1188.py --basetemp="$PYTEST_BASETEMP" -q` → **grün**; danach `.tmp/scenario-labels-1188/` aufräumen.
 - [ ] Step 6: Commit `test: add end-to-end label sync scenario with a mock tracker`.
@@ -761,18 +832,20 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 - [ ] Step 3: Lauf: `python3 scripts/sync.py --validate` → **rc 0**; `git status` zeigt genau die erwarteten Dateien.
 - [ ] Step 4: Commit `docs: changelog and module overview for the issue taxonomy`.
 
-### Task 30 (bedingt): Optionale Issue-Templates für drei Plattformen
+### Task 30: Optionale Issue-Templates für drei Plattformen (D12, AC-3/AC-6)
 
-**Agent:** developer · **Depends on:** 26 · **Größe:** M
-**Blockiert:** IC-1 (`additionalProperties: false`) enthält keinen `templates`-Schalter; ohne Spec-Revision würde dieser Task das Schema erfinden (K-6). **Nicht Teil der Freigabe dieses Plans.**
+**Agent:** developer · **Depends on:** 1, 9, 26 · **Größe:** M
+**Schema:** `issue-conventions.templates: {mode: off|scaffold|manage, force: bool}` ist seit D12
+Spec-Vertrag (IC-1) und wird in **T1** angelegt — dieser Task ist deshalb **nicht** bedingt und
+erfindet kein Schema (K-15). `renames` bleibt weiterhin außerhalb dieses Plans (K-13).
 **Files:**
-- Create: `.github/ISSUE_TEMPLATE/<type>.yml` (nur `capabilities` ⊇ `issue-forms`)
-- Create: `.gitlab/issue_templates/<Type>.md` (nur `issue-templates`)
-- Create: `.gitea/ISSUE_TEMPLATE/<type>.md` (nur `issue-templates`)
-- Create/Modify: `tests/test_issue_labels_templates.py`
+- Create: `tests/test_issue_labels_templates.py`
+- Modify: `scripts/lib/issue_conventions.py` (Generator + Capability-Gating)
+- Modify: `scripts/lib/cli_commands.py` (Aufruf im Common Tail, neben T25)
+- Modify: `scripts/lib/generated_file_drift.py` (Template-Pfade in die Drift-Baseline, D11)
 
-- [ ] Step 1: Nach Freigabe von Q8: `mode: off|on` in IC-1 ergänzen (Spec-Revision), dann Test zuerst: `test_off_writes_nothing`, `test_on_creates_only_capable_families`, `test_handwritten_template_never_overwritten`, `test_no_token_in_templates`.
-- [ ] Step 2: Generator implementieren, Capability-gesteuert.
+- [ ] Step 1: **Test zuerst**: `test_off_writes_nothing` (Default `off`), `test_scaffold_creates_missing_only` (vorhandene handgeschriebene Datei bleibt byte-identisch, kein Backup), `test_manage_updates_marker_file`, `test_manage_skips_unmarked_file` (ohne `force`), `test_force_overwrites_unmarked_file`, `test_creates_only_capable_families` (Adapter ohne `issue-forms` ⇒ keine `.github/ISSUE_TEMPLATE`-Datei), `test_no_token_in_templates`, `test_templates_are_registered_in_generated_file_hashes` (D11).
+- [ ] Step 2: Generator implementieren, ausschließlich capability-gesteuert (`issue-forms`/`issue-templates`); Dateinamen aus der aktiven `type`-Achse, Inhalt mit `GENERATED_MARKER`.
 - [ ] Step 3: Lauf → **grün**; `--validate` rc 0.
 - [ ] Step 4: Commit `feat: generate optional issue templates per platform capability`.
 
@@ -781,11 +854,12 @@ Zwischentest-Gate. Kein Meilenstein aktiviert die Sektion in `.meta-config/proje
 ### Schema (IC-1, verbindlich)
 
 - Sektion `issue-conventions`, `additionalProperties: false` auf **allen** Ebenen.
-- Schlüssel: `enabled`, `preset`, `adapter`, `defaults{separator{single,multi}, language, title-format, closing-keywords}` (K2: **kein** `label-separator`), `taxonomy{type,area,priority}`, `platform-overrides.<adapter>{taxonomy, mapping, base-url, api, ids, pagination, auth.header, defaults}`, `mapping`, `repository{owner,repo,project-id}`, `create{on-missing-label}`, `sync{prune,prune-allow,create-boards}`, `enforcement{unknown-label,missing-type,single-axis-per-issue}`.
+- Schlüssel: `enabled`, `preset`, `adapter`, `defaults{separator{single,multi}, language, title-format, closing-keywords}` (K2: **kein** `label-separator`), `taxonomy{type,area,priority}`, `platform-overrides.<adapter>{taxonomy, mapping, base-url, api, ids, pagination, auth.header, defaults}`, `mapping`, `repository{owner,repo,project-id}`, `templates{mode,force}`, `create{on-missing-label}`, `sync{prune,prune-allow,create-boards}`, `enforcement{unknown-label,missing-type,single-axis-per-issue}`.
+- `repository` ist Stufe 0 der Identitäts-Präzedenz (D9/K-12); `templates.mode` ∈ `off|scaffold|manage`, `templates.force` boolean mit Default `false` (D12/K-15).
 - `#/$defs/taxonomyAxis` = `{enabled, cardinality, color, label-case, max-length, allowed-pattern, values}`; `values.<name>` = `{color, description}`. **Kein** `default`-Feld (K4); die Zwei-Defaults-Prüfung lebt in AC-7, nicht im Schema.
 - Die neuen `$defs` bleiben unter `$defs` (nicht `definitions`), weil das Ist-Schema `draft-07` deklariert und dennoch `$defs` nutzt (`config/project-config.schema.json:2`, `:2855`); `#/$defs/…` löst in beiden Fällen auf (K6).
 - Weitere geschlossene `$defs`: `adapterApi` (`list|create|update|delete`), `adapterIds` (`op`, `key`), `adapterPagination` (`param`, `size-param`, `size`), `adapterDefaults` (dieselbe Form wie `adapters.<id>.defaults`).
-- **Kein** `templates`-Schlüssel (T30 blockiert, Q8).
+- `templates` ist ein geschlossener Unterabschnitt mit `mode`/`force` (D12); ein `renames`-Schlüssel existiert **nicht** — D10 reserviert nur die Ausgabezeile (eigene Spec-Revision).
 
 ### Adapter-Interface (Daten, IC-3)
 
@@ -825,7 +899,9 @@ def resolve_id_map(adapter: AdapterConfig, identity: RepositoryIdentity,
 def iter_pages(adapter: AdapterConfig, identity: RepositoryIdentity,
                transport: HttpTransport) -> list[dict]
 def parse_remote_url(url: str) -> RepositoryIdentity
-def resolve_repository(config: dict, resolved: ResolvedTaxonomy) -> RepositoryIdentity
+def resolve_repository(config: dict, resolved: ResolvedTaxonomy, *,
+                        env: Optional[dict] = None) -> RepositoryIdentity
+def retry_delay(retry_after: Optional[str]) -> float   # Cap 30 s, Default 1 s (D14)
 def build_desired_labels(resolved: ResolvedTaxonomy) -> dict[str, DesiredLabel]
 def label_diff(desired, actual, projection, *, prune: bool,
                manifest: dict[str, str], prune_allow: list[str]) -> list[DiffEntry]
@@ -854,6 +930,7 @@ def render_closing_keywords(resolved) -> str
 def render_triage_labels(resolved) -> str
 def render_creation_policy(resolved) -> str
 def render_issue_labels_doc(resolved, project_name: str) -> str
+TRIAGE_LABELS: tuple[str, str]                    # ("triage", "needs-info") — Framework-Konstante (D15)
 LEGACY_ROLE_BLOCKS: dict[str, dict[str, str]]     # K-1
 ```
 
@@ -870,9 +947,10 @@ LEGACY_ROLE_BLOCKS: dict[str, dict[str, str]]     # K-1
 | Exit `0` | sauber / Dry-Run / Explain / Apply ohne Fehler |
 | Exit `1` | Drift (`--check`) oder Teilfehler (`--apply`) |
 | Exit `2` | Resolve-/Config-/Nutzungsfehler; **kein** API-Call |
-| Ausgabe | `create <label>` / `update <label>` / `no-op <label>` / `rename <alt> -> <neu>`, Summenzeile; `--explain` zeilenweise `<key> ← <source>` |
+| Ausgabe | `create <label>` / `update <label>` / `no-op <label>`, Summenzeile, im `--apply`-Fall zusätzlich `wrote .meta-config/issue-labels-state.json`; `rename <alt> -> <neu>` ist **reserviert** und wird in v1 nie erzeugt (D10); `--explain` zeilenweise `<key> ← <source>` |
 | Idempotenz | zweiter `--apply` ⇒ nur `no-op`, Exit 0 (AC-4); setzt paginiertes `list` + Name→ID-Map voraus (K-7) |
 | Zustand | nur `--apply` schreibt `.meta-config/issue-labels-state.json` (IC-8/K-9); `--labels`, `--check`, `--explain` sind schreibfrei |
+| Commit | **kein** Auto-Commit und kein `git`-Aufruf im CLI (D13/K-16); der `git`-Schritt committet, CI-`--apply` nie |
 | Transport-Härtung | H-1…H-7 (Spec §4.12) sind **nicht** abschaltbar; Verstoß ⇒ Exit 2 vor dem ersten Call |
 | Secret-Freiheit | kein Token in Ausgabe, Logs, Doku, Manifest, Fehlermeldung (AC-8) |
 
@@ -928,6 +1006,21 @@ LEGACY_ROLE_BLOCKS: dict[str, dict[str, str]]     # K-1
 - **Prune-Manifest (RVW-1188-04):** `tests/test_issue_labels_state.py` prüft Format, Sortierung,
   Teilfehler-Verhalten und dass ein Fremdlabel **innerhalb** des Präfix (`type/needs-design`) nie
   gelöscht wird.
+- **Repository-Präzedenz (D9/K-12):** `tests/test_issue_adapters_url.py` prüft die Kette
+  `repository.*` → `git.remote-url` → `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`, das Überspringen
+  unparsbarer Quellen und die eine Fehlermeldung, die alle drei Wege nennt und nie einen leeren
+  `owner`/`repo` ausgibt.
+- **Retry-Policy (D14/K-17):** `tests/test_issue_adapters_http.py` prüft `429`-Retry mit
+  `Retry-After` (Sekunden und HTTP-Datum), den 30-s-Cap, den 1-s-Default, „kein Retry bei `5xx` und
+  Timeout" und die injizierte `sleep`-Funktion — kein Test wartet real.
+- **Kein Rename in v1 (D10/K-13):** `tests/test_issue_adapters_diff.py` prüft, dass ein neuer Wert
+  `create <neu>` erzeugt, der alte Wert nur das Soll-Set verlässt, **kein** `update.new_name`-Call
+  entsteht und `info: rename-candidate <alt>` erscheint.
+- **Template-Schalter (D12/K-15):** `tests/test_issue_labels_templates.py` prüft
+  `off`/`scaffold`/`manage`, `force`, Capability-Gating und Token-Freiheit.
+- **Drift-Baseline (D11/K-14):** `tests/test_issue_labels_docs.py` prüft Registrierung in
+  `.meta-config/generated-file-hashes.json`, Drift-Erkennung nach manuellem Edit und
+  Überschreiben mit `.sync-backup-*` beim nächsten Sync.
 
 ### Zwischentests je Meilenstein
 
@@ -949,7 +1042,8 @@ Genau **ein** End-to-End-Lauf, in `.tmp/scenario-labels-1188/`:
 6. Drift: eine Farbe im Mock ändern → `--check` → rc 1.
 7. Prune: `type/needs-design` bleibt (`info: prune-candidate-unowned`); ein Manifest-Label aus einem
    früheren Lauf wird gelöscht.
-8. Rename-Fall gemäß Q3-Entscheidung (heute Empfehlung: `create` + `info`).
+8. Rename-Fall gemäß **D10**: `create` für den neuen Wert, altes Label bleibt, `info: rename-candidate`,
+   kein `PATCH` mit `new_name`.
 9. `--labels --apply` erneut → ausschließlich `no-op`, rc 0.
 10. Teilfehler- und 401-Simulation (Mock-Modi) → rc 1 bzw. Callcount 1.
 11. Kein Token in irgendeiner Ausgabe, Datei oder im Manifest; `docs/issue-labels.md` vollständig.
@@ -990,15 +1084,18 @@ Kein echtes Netzwerk, kein echtes Token, kein Zugriff außerhalb von `.tmp/`.
 | Risiko | Wirkung | Gegenmaßnahme | Restrisiko |
 |---|---|---|---|
 | **`prune` löscht Fremdlabels im eigenen Präfix** (z. B. `type/needs-design`) | Datenverlust an Menschen-Labels | K-9/IC-5: Löschen nur aus Manifest (IC-8) oder `prune-allow`; Test `test_prune_never_deletes_foreign_label_inside_prefix` | gering |
-| **Manifest fehlt/ist nicht versioniert** ⇒ CI blind, Prune wirkungslos | Gate erkennt Drift nicht | IC-8/2 (versioniert), Q9; T21-Test `test_apply_writes_manifest_and_check_does_not` | gering |
+| **Manifest fehlt/ist nicht versioniert** ⇒ CI blind, Prune wirkungslos | Gate erkennt Drift nicht | IC-8/2 (versioniert), D13 (Commit beim `git`-Schritt, CI committet nie); T21-Test `test_apply_writes_manifest_and_check_does_not` | gering |
 | **Label-Namen mit `/` ungeschützt im URL-Pfad** | 404/422, `--apply` nicht idempotent | K-7: `quote(..., safe="")` im Transport, Test mit `type/bug`+`area/core` (T16/T28) | gering |
 | **Gitea braucht numerische ID** | jeder Lauf legt neu an, `--check` Dauer-Drift | `ids`-Daten + Name→ID-Map einmal pro Lauf (T16), Test `test_id_placeholder_uses_numeric_id` | gering |
 | **Abgeschnittenes `list` (Pagination vergessen)** | Labels gelten als fehlend ⇒ Duplikat-`create` | `pagination` Pflichtdaten (T3), `test_pagination_reads_all_pages` (T16) | gering |
 | **Secret-Exfiltration über Projekt-`base-url`/Redirect/literales `auth.header`** | Token-Abfluss an fremden Host | K-8/H-1…H-7, Tests in T3/T16, `--explain`-only-Preview in T26 | gering; Restfall = Operator mit Env- **und** Repo-Kontrolle |
 | **Netzwerk in `--validate`** (Regel 1–3 versehentlich registriert) | CI ohne Token schlägt fehl oder hängt; Baseline `EXIT=0` (`.tmp/issue-dump/baseline-validate.txt:27`) bricht | K-5: `run_checks` ruft den Check **nur** mit `tracker=None`; Test patcht `urlopen` auf `raise` (T24) | gering |
-| **Rename-Semantik** ohne Tracker-Zustand nicht eindeutig | falsche `rename`-Zeile ⇒ falsches Label angefasst | Manifest (IC-8) liefert die `alt`-Seite; Q3-Entscheidung vor T17; Default ohne Signal: `create` + `info: rename-candidate`; `rename` nur bei explizitem Signal (IC-5) | mittel, bis Q3 entschieden |
+| **Rename-Semantik** ohne Tracker-Zustand nicht eindeutig | falsche `rename`-Zeile ⇒ falsches Label angefasst | **D10 (entschieden, K-13):** kein Rename in v1 — `create <neu>` + `info: rename-candidate <alt>`, altes Label bleibt; `rename` nur bei späterer expliziter `renames`-Map (eigene Spec-Revision); Tests in T17 | gering |
 | **`--label` vs. `--labels`** | Tippfehler schreibt Backup-Label statt Label-Sync (F-3) | unterschiedliche Help-Texte, Modus-Tabelle **vor** `audit_config` einsortiert, Test `test_help_distinguishes_label_and_labels`; F-3 als eigenes Issue | niedrig |
-| **`git.remote-url` fehlt** (dieses Repo: keine `git:`-Sektion, `config/project-config.schema.json:1753-1757` ⇒ `""`) | `--labels` schlägt lokal fehl; CI-Gate blockiert | Q1 vor T15: Env-Fallback + `repository.*`-Override + Fehlermeldung, die alle drei Wege nennt (AC-16) | **hoch, solange Q1 offen** |
+| **`git.remote-url` fehlt** (dieses Repo: keine `git:`-Sektion, `config/project-config.schema.json:1753-1757` ⇒ `""`) | `--labels` schlägt lokal fehl; CI-Gate blockiert | **D9 (entschieden, K-12):** Präzedenz `repository.*` → `git.remote-url` → `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`; eine Fehlermeldung nennt alle drei Wege, nie leerer `owner`; Tests in T15 | gering |
+| **`docs/issue-labels.md` driftet unbemerkt** | Doku widerspricht dem Resolver | **D11 (entschieden, K-14):** Registrierung in `.meta-config/generated-file-hashes.json`; manuelle Edits werden beim Sync überschrieben und gemeldet; Tests in T25 | gering |
+| **Interaktives Warten im Test durch `Retry-After`** | hängende/flaky Tests | **D14 (entschieden, K-17):** `sleep` injiziert, Cap 30 s, Default 1 s; Tests prüfen die Wartezeit, warten aber nie real | gering |
+| **Auto-Commit aus dem CLI** | ungewollter Commit in CI, unklare Autorität | **D13 (entschieden, K-16):** kein `git`-Aufruf im CLI; `--apply` druckt die Datei, der `git`-Schritt committet; Test `test_cli_never_invokes_git` | gering |
 | Golden-Byte-Identität nur über `LEGACY_ROLE_BLOCKS` (K-1) | zwei Quellen für Alt-Text; Drift möglich | Golden-Test (T10) friert die Bytes ein; Löschkriterium dokumentiert (Stufe 2) | niedrig |
 | `multi`-Achse + Scoped-Separator (Selbst-Ersetzung) | auf GitLab ersetzt `area::x` das vorherige `area::y` | Separator **pro Kardinalität** (T7), Test `test_gitlab_area_uses_single_dash` (AC-2b) | niedrig |
 | Adapter-YAML wird Programmiersprache | Wartbarkeit, `kind: plugin` wird Umweg | keine Bedingungssyntax im Executor, nur Methode/Pfad/Body-Template; Review-Kriterium in T16 | mittel (Disziplin) |
@@ -1017,25 +1114,25 @@ Kein echtes Netzwerk, kein echtes Token, kein Zugriff außerhalb von `.tmp/`.
 | AC-2 | T2 | `tests/test_issue_conventions_presets.py` | Zwei Sektionen, kein Preset-Codepfad |
 | AC-2b | T3, T7, T17 | `test_gitlab_area_uses_single_dash`, `test_gitlab_type_uses_double_colon` | Separator je Kardinalität; kein Selbst-Ersetzen im Soll-Set |
 | AC-3 | T3 | `test_synthetic_fourth_adapter_from_yaml` | Nur YAML/Fixture, kein Python |
-| AC-4 | T16, T17, T18, T20, T21, T28 | `test_dry_run_writes_nothing`, `test_second_run_noop`, `test_id_map_resolved_once_per_run` | Dry-Run-Default ist strukturell; Idempotenz setzt Pagination + Name→ID-Map voraus (K-7) |
+| AC-4 | T16, T17, T18, T20, T21, T28 | `test_dry_run_writes_nothing`, `test_second_run_noop`, `test_id_map_resolved_once_per_run`, `test_apply_prints_manifest_path_in_result_table` | Dry-Run-Default ist strukturell; Idempotenz setzt Pagination + Name→ID-Map voraus (K-7); `--apply` schreibt/druckt, committet nie (D13) |
 | AC-5 | T21, T23, T24 | `test_check_exits_1_on_drift`, `test_all_six_rule_ids_reported_with_tracker` | ein Modul, sechs IDs, zwei Kontexte (K-5) |
-| AC-6 | T9, T11, T12, T13, T14 | vier `*_has_no_label_literal`-Tests | `git.md` nutzt vier Variablen (K-1), nicht `GIT_ISSUE_NAMING_BLOCK`; vollständige Erfüllung erst mit F-5 (`enabled: true`) |
+| AC-6 | T9, T11, T12, T13, T14 | vier `*_has_no_label_literal`-Tests, `test_bfa_has_no_triage_literal` | `git.md` nutzt vier Variablen (K-1), nicht `GIT_ISSUE_NAMING_BLOCK`; Triage-Labels kommen aus `TRIAGE_LABELS` (D15); vollständige Erfüllung erst mit F-5 (`enabled: true`) |
 | AC-7 | T18 | `test_single_axis_scoped_replaces_second_type`, `test_single_axis_unscoped_refuses` | beide Capability-Pfade |
 | AC-8 | T3, T16, T17, T25, T26, T28 | `test_dump_contains_only_auth_env`, `test_no_token_in_resolved_dump`, `test_preview_never_includes_token`, `test_state_stores_only_name_and_hash` | vier Ebenen: Adapter-Dump, Fehlermeldung/Preview, generierte Doku, Manifest; zusätzlich H-6 (`auth.header` ohne `{token}` ⇒ `IssueConfigError`) |
 | AC-9 | T6, T9, T10, T14 | `tests/test_issue_conventions_golden.py` | Byte-Golden über vier Rollen |
-| AC-10 | T17, T28 | `test_prune_default_false`, `test_prune_never_deletes_foreign_label_inside_prefix`, `test_prune_without_manifest_and_allow_deletes_nothing`, `test_prune_true_prune_allow_deletes`, `test_candidate_set_is_manifest_minus_desired_minus_inactive`, `test_disabled_axis_labels_never_deleted` | Löschen nur aus Manifest (IC-8) oder `prune-allow`; Präfix ist nur Klassifikation; deaktivierte Achsen löschen nie (K-9); Kandidaten = `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)` |
+| AC-10 | T17, T28 | `test_prune_default_false`, `test_prune_never_deletes_foreign_label_inside_prefix`, `test_prune_without_manifest_and_allow_deletes_nothing`, `test_prune_true_prune_allow_deletes`, `test_candidate_set_is_manifest_minus_desired_minus_inactive`, `test_disabled_axis_labels_never_deleted`, `test_new_value_creates_and_reports_rename_candidate`, `test_no_rename_call_in_v1` | Löschen nur aus Manifest (IC-8) oder `prune-allow`; Präfix ist nur Klassifikation; deaktivierte Achsen löschen nie (K-9); Kandidaten = `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)`; kein Rename in v1 (D10) |
 | AC-11 | T6 | `test_area_disabled_yields_no_labels` | Gate **vor** Projektion |
 | AC-12 | T4 | `test_enabled_axis_with_empty_values_fails`, `test_enabled_with_no_active_axis_fails` | harter Fehler (Exit 2 im CLI-Pfad) |
 | AC-13 | T4 | `test_type_axis_disabled_warns_not_raises` | Warnung mit Best-Practice-Satz |
 | AC-14 | T5, T8 | Präzedenzmatrix + `test_explain_lines`, `test_ac14_order_platform_beats_preset` | `source` je Achse **und** Wert; Stufe 4 = Plattform-Default, Stufe 5 = Preset (K-10) |
 | AC-15 | T5, T8 | `test_project_beats_platform_for_enabled` | beide Quellen in `--explain` |
-| AC-16 | T15 | `tests/test_issue_adapters_url.py` (9 Tests) | vier Formen + unparsbar mit URL |
+| AC-16 | T1, T15 | `tests/test_issue_adapters_url.py` (13 Tests) | vier Formen + unparsbar mit URL; Präzedenz `repository.*` → `git.remote-url` → CI-Env, harter Fehler erst wenn alle drei leer/unparsbar (D9/K-12) |
 | AC-17 | T19, T28 | `tests/test_issue_adapters_apply.py`, Szenario | siehe Abschnitt „Nicht abdeckbare bzw. nur teilweise abdeckbare ACs" |
-| AC-18 | T18, T28 | `test_partial_failure_keeps_other_labels` | Tabelle, Exit 1, kein Delete |
-| AC-19 | T18, T28 | `test_401_aborts_after_first_call` | Callcount, nicht Meldung |
+| AC-18 | T16, T18, T28 | `test_partial_failure_keeps_other_labels`, `test_no_retry_for_500`, `test_no_retry_for_timeout` | Tabelle, Exit 1, kein Delete; `5xx`/Timeout ohne Retry, `429` mit genau einem Retry (D14/K-17) |
+| AC-19 | T18, T28 | `test_401_aborts_after_first_call`, `test_retry_still_aborts_on_401_after_retry` | Callcount, nicht Meldung; der `429`-Retry ändert den Auth-Abbruch nicht (D14) |
 | AC-20 | T7, T21 | `test_max_length_exceeded_fails_before_http` | Callcount 0 |
 | AC-21 | T26 | `tests/test_admin_ui_issue_labels_section.py` | Whitelist + PUT + Preview |
-| AC-22 | T25 | `tests/test_issue_labels_docs.py` | alle aktiven Werte + Label-Namen |
+| AC-22 | T25, T30 | `tests/test_issue_labels_docs.py`, `tests/test_issue_labels_templates.py` | alle aktiven Werte + Label-Namen; Triage-Abschnitt (D15); Drift-Registrierung in `generated-file-hashes.json` (D11) |
 
 ## Backlog-Bugs — Einordnung (gegen die echten Issue-Texte)
 
@@ -1044,7 +1141,7 @@ Kein echtes Netzwerk, kein echtes Token, kein Zugriff außerhalb von `.tmp/`.
 | **#1167** — `improvement: unify REQ-ID format across templates and presets and add a format validator` | **unabhängig, aber Datei-nah** — **nicht** in diesem Plan | — (nur Serialisierung) | Der Issue nennt `config/conventions-presets.yaml:34` (REQ-Prefix im Changelog) und `bug-feature-analyzer.md:42,84,134` (ungated REQ-Wording). #1188 ändert dieselben Dateien an **anderen** Stellen (`:50-64` bzw. `:89-97`). Kein inhaltlicher Widerspruch; **nicht parallel** editieren. |
 | **#1141** — `bug: project config schema silently accepts unknown top-level keys` | **Nachläufer in der Wave-Reihenfolge** | T1 liefert die Property `issue-conventions`; T1 berührt `additionalProperties` auf Top-Level **nicht** | #1141 verlangt Top-Level `additionalProperties: false` bzw. ein Unknown-Key-Finding (heute `true`, `config/project-config.schema.json:2854`). AC-1 fordert Striktheit **nur für die neue Sektion**. **Reihenfolge (verbindlich):** `#1187 → #1186 → #1188 → #1181 → #1141` — #1141 schaltet global strikt, **nachdem** alle neuen Sektionen als Properties existieren. **Markierung:** #1141 ist der Nachläufer, #1188 der Zulieferer. |
 | **#1181** — Commit-Authority je Rolle | **Vorgänger/Nachfolger in derselben Prosa** | T10 (`scripts/lib/agent_sync.py`-Overlay), T14 (`agents/1-generic/git.md`) | #1181 folgt **nach** #1188: beide ändern `agent_sync.py` am selben Injektionspunkt (`:1458-1459`) und dieselbe Region in `git.md`. **Zielmatrix (RVW2-X-01):** `agent_sync.py` → #1187/#1188/#1181 (seriell), `sync_pipeline.py` → #1186/#1181 (hier **kein** #1188-Task), `variables.py`/`standalone.py` → #1187, `tests/scenarios/registry.md` → #1181/#1187/#1186, beide `project.yaml.example` → #1187/#1186/#1188/#1181, `.meta-config/issue-labels-state.json` → #1188 erzeugt / #1186 klassifiziert. Keine inhaltliche Abhängigkeit, nur Datei-Serialisierung (Spec §11). |
-| **#957** — `feat: PR-Templates (generic / platform / project override, mit Variablen)` | **Nachbar, gleiche Ausgabefamilie** | T30 nur `issue-templates`-Familie; T25 `docs/issue-labels.md` | Der Issue nennt „Issue-Templates als Folge-Request" (Phase 3) — #1188 ist dieser Folge-Request. Beide schreiben unter `.github/` und brauchen dieselbe Ownership-Regel (`generated-file-hashes`-Frage, Q4). `generated-file-hashes.json` existiert im Repo **nicht**; T25 implementiert deshalb die Marker-Regel aus IC-7 und serialisiert mit #957 bei jeder `.github/`-Erzeugung. |
+| **#957** — `feat: PR-Templates (generic / platform / project override, mit Variablen)` | **Nachbar, gleiche Ausgabefamilie** | T30 (`issue-templates`-Familie); T25 `docs/issue-labels.md` | Der Issue nennt „Issue-Templates als Folge-Request" (Phase 3) — #1188 ist dieser Folge-Request. Beide schreiben unter `.github/` und brauchen dieselbe Ownership-Regel; **D11 entscheidet sie**: Registrierung in `.meta-config/generated-file-hashes.json` (die Datei existiert im Repo, `scripts/lib/generated_file_drift.py:41/53`), Marker-Regel aus IC-7 zusätzlich. Serialisiert wird bei jeder `.github/`-Erzeugung. |
 | **#1168** — `fix: git agent writes harness Co-Authored-By …` | **unabhängig, gleiche Datei** | T14 | Funktional orthogonal (Commit-Trailer vs. Issue-Label), aber beide editieren `agents/1-generic/git.md` (dort Commit-Authority-Block, hier `:149-151`). Nur Datei-Serialisierung nötig, keine inhaltliche Abhängigkeit. |
 
 ## Neu gemeldete Findings (als separates Issue markiert)
@@ -1059,17 +1156,23 @@ die Issue-Nummer wird im Wave-Overview nachgetragen. Hier stehen **keine** erfun
 | **F-3** | CLI-Namenskollision: `sync.py --label TEXT` (Backup-Label, `scripts/sync.py:456`) und `--labels` unterscheiden sich nur im Plural | `scripts/sync.py:456` vs. neues `--labels` | `chore(cli): disambiguate sync.py --label (backup) and --labels (issue taxonomy)` | `chore`, `config`, `P3` | T21 entschärft nur per Help-Text; die Umbenennung (`--backup-label`) ist F-3. |
 | **F-4** | Die Admin-UI editiert `conventions`-Overrides inklusive `issues.*` und verspricht eine Wirkung, die nur für `issues.language` existiert | `docs/ui/admin-ui.html:4156-4323`, Speichern `:4313-4319`; Renderer `scripts/lib/conventions.py:131-132` | `bug(admin-ui): conventions editor exposes inert issues.* fields without a warning or redirect` | `bug`, `config` | T26 fügt ein **neues** Pane hinzu; der Deprecated-Hinweis im alten Pane ist F-4 und wird nicht mitgemacht. |
 
-## Offene Entscheidungen (Q1, Q3, Q9) — Empfehlung und Blockadewirkung
+## Entscheidungsstand (2026-11-09) — Q1…Q9
 
-| ID | Frage | Empfehlung | Blockadewirkung |
+Alle offenen Punkte sind entschieden; das vollständige Protokoll mit den verbindlichen Texten steht
+im Abschnitt „Entscheidungsprotokoll (2026-11-09)". Diese Tabelle hält nur die **Blockadewirkung**
+fest.
+
+| ID | Frage | Entscheidung | Blockadewirkung |
 |---|---|---|---|
-| **Q1** | Woher kommt die Repository-Identität, wenn `git.remote-url` leer ist? (a) harter Fehler, (b) Laufzeit-`git config`, (c) CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`) | **(c) plus `repository.*`-Override als lokaler Ausweg.** (b) scheidet aus (Shell-Abhängigkeit, Repo-Containment). Fehlermeldung nennt alle drei Wege: `git.remote-url`, `issue-conventions.repository.*`, Env-Variable — und **nie** einen leeren `owner`. | **blockiert T15 und damit M4/M5/M8.** Ohne Q1 kann `--labels --check` im CI genau des Repos fehlschlagen, das den Check einführt (dieses Repo hat keine `git:`-Sektion). T15 darf mit (c) gebaut werden; die Freigabe von M8 setzt die Entscheidung voraus. |
-| **Q3** | Wie wird ein Rename erkannt, wenn der Tracker der einzige Zustand ist? (a) explizite `renames`-Map, (b) Heuristik „ein Kandidat mit alter Farbe", (c) kein Rename in v1 | **(c) für v1: kein stilles Rename.** Ein neuer Wert erzeugt `create <neu>` plus `info: rename-candidate <alt>`; die `rename`-Zeile bleibt im Vertrag reserviert für ein späteres explizites Signal (a), das eine Spec-Revision braucht (IC-1 kennt keinen `renames`-Schlüssel). Das Manifest (IC-8) liefert die `alt`-Seite; offen bleibt nur die Paarung. | **blockiert T17 nicht** (die (c)-Semantik ist implementierbar), aber **blockiert die Freigabe von IC-5**: ohne Entscheidung ist unklar, ob ein `rename`-Test erwartet wird. Empfehlung: (c) jetzt, (a) als Folge-Issue. |
-| **Q6** (entschieden) | Wird `issue-label-taxonomy` Teil von `--validate` oder nur von `--labels --check`? | **Split (K-5, entschieden):** Regeln 4–6 offline in `--validate`; Regeln 1–3 nur mit Tracker in `--labels [--check]`; ein Modul, sechs IDs. `--validate` bleibt netzwerkfrei (Baseline `EXIT=0`, `.tmp/issue-dump/baseline-validate.txt:27`). | blockiert nichts mehr; AC-5-Auslegung ist in der Spec (§4.7, „AC-Interpretationen") festgehalten. |
-| **Q9** | Wer committet `.meta-config/issue-labels-state.json` nach `--apply`? | **`--apply` schreibt, `git` committet.** Kein Auto-Commit aus dem CLI-Pfad (Commit-Authority liegt bei der Rolle). CI-`--apply`-Jobs committen nicht; sie schreiben und der nächste Lauf/Mensch committet. | **blockiert T17/T21 nicht** (Schreibpfad ist implementierbar); muss vor der ersten CI-Nutzung des Manifests beantwortet sein, sonst läuft `--check` gegen ein veraltetes Manifest. |
-| Q2 (Nebenentscheidung) | Retry/Backoff bei `429`/`5xx` | **ein** Retry nur bei `429` mit `Retry-After`, sonst keiner (deterministische Tests). | blockiert T18 nicht; im Test gepinnt. |
-| Q7 (Nebenbefund) | `triage`/`needs-info` sind Status-Labels, keine Achse (D2) — `bug-feature-analyzer.md:89` braucht sie aber | Als **Nicht-Taxonomie-Labels** aus einer Framework-Konstante rendern (`render_triage_labels`) und in `docs/issue-labels.md` unter „nicht Teil der Taxonomie" führen. | blockiert T13 nicht; AC-6-Interpretation dokumentiert. |
-| Q8 (Nebenbefund) | Wo lebt der `mode`-Schalter für optionale Issue-Templates? IC-1 ist geschlossen und enthält ihn nicht | Spec-Revision: `issue-conventions.templates.{mode, force}` ergänzen. | **blockiert T30.** Bis dahin bleibt T30 außerhalb der Freigabe (K-6). |
+| **Q1** | Repository-Identität, wenn `git.remote-url` leer ist | **D9 / K-12:** `repository.*` → `git.remote-url` → `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`; harter Fehler erst wenn alle drei leer/unparsbar (eine Meldung, alle drei Wege, nie leerer `owner`) | **entblockt T15** und damit M4/M5/M8; das eigene Repo (keine `git:`-Sektion) löst über `repository.*` bzw. die CI-Env auf |
+| **Q2** | Retry/Backoff bei `429`/`5xx`/Timeout | **D14 / K-17:** genau ein Retry nur bei `429` mit `Retry-After` (Cap 30 s, Default 1 s, injizierbare `sleep`); `5xx`/Timeout ohne Retry | entblockt T16/T18; deterministisch getestet |
+| **Q3** | Rename-Erkennung | **D10 / K-13:** kein Rename in v1; `create <neu>` + `info: rename-candidate <alt>`; `rename` reserviert für spätere `renames`-Map | entblockt T17 und die IC-5-Freigabe; kein Rename-Test mehr erwartet, stattdessen „kein Rename-Call" |
+| **Q4** | Ownership/Drift von `docs/issue-labels.md` | **D11 / K-14:** Registrierung in `.meta-config/generated-file-hashes.json`; #957 spiegelt die Regel | entblockt T25; eine Antwort für beide Ausgabefamilien |
+| **Q5** (entschieden) | Ort von `platform-overrides` | `issue-conventions.platform-overrides.<adapter>`, geschlossen (IC-1) | keine |
+| **Q6** (entschieden) | `--validate` vs. `--labels --check` | Split: Regeln 4–6 offline, 1–3 online (K-5/§4.7) | keine |
+| **Q7** | Triage-Labels | **D15 / K-18:** Framework-Konstante `TRIAGE_LABELS`, Abschnitt „Nicht Teil der Taxonomie", keine vierte Achse | entblockt T13; AC-6-Interpretation präzisiert |
+| **Q8** | Ort des Template-Schalters | **D12 / K-15:** `issue-conventions.templates.{mode,force}` in IC-1; T30 ist Pflicht-Task | entblockt T1/T30; **kein** bedingter Task mehr |
+| **Q9** | Commit des Zustands-Manifests | **D13 / K-16:** `--apply` schreibt und druckt, `git` committet, CI committet nie | entblockt T21; Test `test_cli_never_invokes_git` |
 
 ## Kritische Tasks (Reihenfolge für die Umsetzung)
 
@@ -1095,7 +1198,7 @@ die Issue-Nummer wird im Wave-Overview nachgetragen. Hier stehen **keine** erfun
 | **AC-5** | Die sechs IDs sind **nie** in einem einzigen Lauf sichtbar: offline (4–6) und online (1–3). „consistency-check reports the six rules" wird als „ein Modul, sechs IDs, zwei Kontexte" gelesen und durch `test_all_six_rule_ids_reported_with_tracker` + `test_validate_does_not_report_online_ids` belegt | Netzwerk in `--validate` wäre eine Verhaltensänderung (Q6/K-5) |
 | **AC-6** (`git.md`) | `git.md` rendert aus vier Variablen statt aus `GIT_ISSUE_NAMING_BLOCK`; `GIT_ISSUE_NAMING_BLOCK` bleibt berechnet (Rückwärtskompatibilität), aber ungenutzt | Der Block ist eine Zeile zu viel für „no literal", und die vier Variablen sind die einzige Form, die den Disabled-Fall byte-identisch hält |
 | **AC-6** (Wirkung) | Die Legacy-Tabelle bleibt in der Default-Ausgabe sichtbar (`enabled: false`); „kein Literal" gilt nur für das Template. Vollständige Erfüllung = Folge-Issue **F-5** (`enabled: true` + `LEGACY_ROLE_BLOCKS` löschen) | AC-6 und AC-9 sind ohne F-5 nicht gleichzeitig erfüllbar (Spec „AC-Interpretationen", RVW-1188-06) |
-| **AC-21** („Show diff") | Offline-Teil (Explain + Soll-Menge) ist immer verfügbar; der **Tracker-Diff** braucht Q1 (Identität) und einen Token und ist im Pane als „nicht verfügbar" ausgewiesen, wenn beides fehlt | Sonst würde das Pane bei jedem Öffnen ein Netzwerk-/Auth-Problem zeigen |
+| **AC-21** („Show diff") | Offline-Teil (Explain + Soll-Menge) ist immer verfügbar; der **Tracker-Diff** braucht einen Token und eine aufgelöste Identität (D9) und ist im Pane als „nicht verfügbar" ausgewiesen, wenn beides fehlt | Sonst würde das Pane bei jedem Öffnen ein Netzwerk-/Auth-Problem zeigen |
 | **AC-22** | „Generated" heißt: geschrieben beim Sync, nicht bei `--check`/`--dry-run`; bei `enabled:false` wird die Datei nicht angefasst | IC-7/Repo-Containment |
 
 ## Self-Review
@@ -1111,23 +1214,27 @@ die Issue-Nummer wird im Wave-Overview nachgetragen. Hier stehen **keine** erfun
   **seriell** (T27 nach T26, gleicher Meilenstein, keine Parallel-Gruppe).
 - Jede Code-Referenz trägt einen am Branch `docs/config-wave-plans-1181-1188` (`aaed14c2`)
   verifizierten `datei:zeile`-Anker.
-- Keine Platzhalter, keine offenen Formulierungen; alle offenen Punkte sind als
-  Q1/Q2/Q3/Q7/Q8/Q9 mit Empfehlung und Blockadewirkung ausgewiesen, Q5/Q6 sind entschieden.
+- Keine Platzhalter, keine offenen Formulierungen; alle Entscheidungen sind als **D9–D15** im
+  Abschnitt „Entscheidungsprotokoll (2026-11-09)" protokolliert und als **K-12 … K-18** in die
+  Plan-Präzisierungen übernommen. Offene Fragen gibt es nicht mehr; Q5/Q6 waren bereits entschieden.
 - Die drei Review-Kernpunkte sind als eigene Präzisierungen geführt und in **beiden**
   Dokumenten verankert: URL-Kodierung/IDs (K-7), Transport-Härtung (K-8), Manifest-Prune (K-9),
   AC-14-Reihenfolge (K-10).
 - Jede Neuinterpretation eines AC steht in der Spec-Tabelle „AC-Interpretationen" und in der
   Plan-Tabelle „Nicht abdeckbare bzw. nur teilweise abdeckbare ACs" — kein AC-Text wurde
   umgeschrieben.
-- 17 Testdateien, keine leere Tabellenzelle, keine `<…>`-Auslassung in `Files:`/`Interfaces:`.
+- 18 Testdateien, keine leere Tabellenzelle, keine `<…>`-Auslassung in `Files:`/`Interfaces:`.
 - `pipeline_stages` ist bewusst **nicht** gebunden (DRAFT, kein Pipeline-Lauf) und wird beim
   Übergang zu `IN PROGRESS` nachgetragen.
 - **Platzhalter-Selbstprüfung:** keine Platzhalter-Marker, keine `<…>`-Auslassungen in
   Pflichtfeldern.
+- **Entscheidungs-Abdeckung:** D9 → T15, D10 → T17, D11 → T25/T30, D12 → T1/T30, D13 → T21,
+  D14 → T16/T18, D15 → T9/T13/T25; jede Entscheidung hat mindestens einen Task und einen Test.
 
 ## Abschlusskriterien dieses Plans
 
-1. Spec `Status: APPROVED` und Q1/Q3/Q9 entschieden.
+1. Spec `Status: APPROVED`; die inhaltlichen Entscheidungen Q1/Q2/Q3/Q4/Q7/Q8/Q9 liegen vor
+   (D9–D15, 2026-11-09).
 2. Alle acht Meilenstein-Gates grün, jedes einzeln.
 3. `python3 scripts/sync.py --validate` → rc 0, **ohne** Netzwerk.
 4. `python3 -m pytest tests --basetemp="$PYTEST_BASETEMP" -q` → grün (volle Suite).
@@ -1139,6 +1246,26 @@ die Issue-Nummer wird im Wave-Overview nachgetragen. Hier stehen **keine** erfun
    `config/dod-presets.yaml:63` `spec-plan-traceability: false`), daher entstehen keine
    weiteren Findings aus den `T<n>`-IDs; der Plan-Graph ist kantenrein
    (`Depends on:` trägt ausschließlich numerische IDs).
+
+---
+
+## Entscheidungsprotokoll (2026-11-09)
+
+Verbindliche Nutzer-Entscheidungen zu den offenen Fragen der Spec. Jede Entscheidung ist in der
+Spec (§13) und in diesem Plan eingearbeitet; Abweichungen brauchen eine Spec-Revision.
+
+| D-Nr | Frage | Entscheidung (`DECIDED 2026-11-09`) | Stelle |
+|---|---|---|---|
+| **D9** | **Q1** — Repository-Identität ohne `git.remote-url` | Präzedenzkette `issue-conventions.repository.{owner,repo}` → `git.remote-url` → CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`); harter Fehler erst, wenn **alle drei** leer/unparsbar sind, mit einer Meldung, die alle drei Wege nennt und **nie** einen leeren `owner` ausgibt. Schema `repository` wird in T1 gepinnt; Parser/Fehlermeldung/Tests in T15 | K-12, T1, T15, Risiken, AC-16-Trace |
+| **D10** | **Q3** — Rename | Kein Rename in v1: neuer Wert ⇒ `create <neu>`; altes Label bleibt im Tracker, Meldung `info: rename-candidate <alt>`; kein `update.new_name`, keine `rename`-Ausgabezeile. `rename` bleibt im Vertrag reserviert für eine spätere explizite `renames`-Map (eigene Spec-Revision). Tests: `test_new_value_creates_and_reports_rename_candidate`, `test_no_rename_call_in_v1`, `test_rename_line_is_never_emitted_in_v1` | K-13, T17, Risiken, AC-10-Trace |
+| **D11** | **Q4** — Drift-Ownership der generierten Doku | `docs/issue-labels.md` kommt in `.meta-config/generated-file-hashes.json` (Root-Level-Registrierung nach dem Muster `PLATFORM_DEFAULTS_RESOLVED_REL`); manuelle Edits werden beim nächsten Sync überschrieben und gemeldet. Dieselbe Regel spiegelt #957 für PR-Templates. Dieselbe Registrierung gilt für die generierten Tracker-Templates aus T30 | K-14, T25, T30, File Structure, AC-22-Trace |
+| **D12** | **Q8** — Ort des Template-Schalters | `issue-conventions.templates: {mode: off\|scaffold\|manage, force: bool}` als geschlossener Unterabschnitt der bestehenden Sektion (Default `off`, `force: false`). `scaffold` = nur fehlende Dateien, `manage` = zusätzlich marker-tragende. **T30 ist Pflicht-Task** (kein bedingter Task, keine Schema-Erfindung) | K-6, K-15, T1, T30, M8 |
+| **D13** | **Q9** — Commit des Manifests | `--apply` schreibt und druckt die geänderte Datei in der Ergebnis-Tabelle (`wrote .meta-config/issue-labels-state.json`); **kein** Auto-Commit, **kein** `git`-Aufruf im CLI. Der `git`-Schritt committet; CI-`--apply`-Jobs committen **nie**. Tests: `test_apply_prints_manifest_path_in_result_table`, `test_cli_never_invokes_git` | K-16, T21, CLI-Vertrag, AC-4-Trace |
+| **D14** | **Q2** — Retry-Policy | Genau **ein** Retry, nur bei `429`, Wartezeit aus `Retry-After` (Sekunden oder HTTP-Datum), Cap 30 s, Default 1 s, `sleep` injiziert. `5xx`/Timeouts ohne Retry (sammeln, Exit 1); `401`/`403` brechen unverändert nach dem ersten Fehlschlag ab. Kein Backoff, keine Konfiguration in `project.yaml` | K-17, T16, T18, Global Constraints, AC-18/AC-19-Trace |
+| **D15** | **Q7** — Triage-Labels | `TRIAGE_LABELS = ("triage", "needs-info")` als Framework-Konstante; `render_triage_labels()` rendert daraus `{{ISSUE_TRIAGE_LABELS}}`. Keine vierte Achse (D2), kein Projekt-Override, kein Soll-Label, kein `prune`-Ziel. `docs/issue-labels.md` führt sie unter „Nicht Teil der Taxonomie"; Regel 4 nimmt sie von der Literal-Prüfung aus | K-18, T9, T13, T25, AC-6-Trace |
+
+**Nicht Teil dieser Entscheidungen:** ein `renames`-Schema-Schlüssel (D10 reserviert nur die
+Ausgabezeile) und jede Änderung an `Status: DRAFT`.
 
 ---
 
@@ -1161,7 +1288,7 @@ Alle Review-Befunde zu #1188, mit Änderung und Fundstelle im Plan. Der Plan ble
 | **Querschnitt: Wave-Reihenfolge** | `#1187 → #1186 → #1188 → #1181`, danach `#1141`, Whitelist-Ableitung zuletzt; als Global Constraint und im #1141/#1181-Einordnungsblock | Global Constraints, „Backlog-Bugs — Einordnung" (#1141, #1181 neu), Risiken („Wave-Reihenfolge verletzt") |
 | **Querschnitt: Konfliktmatrix** | #1181-Flächen ergänzt: `scripts/lib/sync_pipeline.py`/`agent_sync.py`, `scripts/lib/variables.py`, `scripts/lib/standalone.py`, `tests/scenarios/registry.md`, beide `project.yaml.example` | Global Constraints (Wave-Reihenfolge), „Backlog-Bugs" (#1181-Zeile); vollständige Matrix in Spec §11 |
 | **Querschnitt: Szenario-IDs** | `94` = #1181, `95`–`98` = #1187; #1188 belegt **keine** ID (pytest statt Katalog) | Global Constraints, **T28** (Hinweisblock), „Der eine volle Szenarientest" |
-| **Querschnitt: `docs/issue-labels.md`** | Als `project-docs`-Datei-Set für #1186 klassifiziert; Q4 verweist auf #1186 **und** #957 | File Structure (Zeile `docs/issue-labels.md`), „Offene Entscheidungen" Q4/Einordnung |
+| **Querschnitt: `docs/issue-labels.md`** | Als `project-docs`-Datei-Set für #1186 klassifiziert; die Drift-/Ownership-Frage ist **D11** (Registrierung in `generated-file-hashes.json`, #957 spiegelt die Regel) | File Structure (Zeile `docs/issue-labels.md` + `generated_file_drift.py`), Entscheidungsprotokoll D11 |
 | **RVW2-1188-01** (MAJOR, Sicherheit/Prune) | Kandidatenmenge ist `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)` statt `desired ∪ (Manifest ∖ aktive Achsen)`; „kein Manifest ⇒ null Kandidaten" gilt nur bei **leerer** `sync.prune-allow` (Allowlist wirkt unabhängig). T17-Tests geschärft: `test_prune_without_manifest_and_allow_deletes_nothing`, `test_prune_true_prune_allow_deletes` (ohne Manifest), `test_candidate_set_is_manifest_minus_desired_minus_inactive`, `test_disabled_axis_labels_never_deleted` (Kandidat statt nur „kein delete") | **T17** (Step 1), AC-10-Traceability, Spec IC-5 |
 | **RVW2-1188-02** (MINOR) | Beide `project.yaml.example` sind jetzt Teil von **T1** (`Files:` + neuer Step 3) und werden mit `test_examples_contain_closed_section` parametrisiert gepinnt; File-Structure-Zähler 16 → 18 | **T1** (Files, Step 1, Step 3), File Structure (Produktion — ändern) |
 | **RVW2-1188-03** (MINOR, Testgüte) | M3-Gate stützt sich auf den Golden-Test aus T10 statt auf `git diff`; Abschlusskriterium 6 nutzt `git diff --name-only aaed14c2..HEAD -- .meta-config/project.yaml` (fester Basis-Commit, nicht vakuum-grün nach dem Commit) | M3-Gate, „Abschlusskriterien dieses Plans" Nr. 6 |

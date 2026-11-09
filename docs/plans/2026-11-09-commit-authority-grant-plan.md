@@ -2,13 +2,13 @@
 pipeline_stages:
   implement: 1
 status: DRAFT
-revision: "1.3"
-review: "2026-11-09 — RVW-1181-01 … -06 (§15) + RVW2-1181-01 … -05 + RVW2-X-01 (§15) + K1–K8 (§15.1)"
+revision: "1.4"
+review: "2026-11-09 — RVW-1181-01 … -06 (§15) + RVW2-1181-01 … -05 + RVW2-X-01 (§15) + K1–K8 (§15.1) + Nutzerentscheidungen D16–D23 (§15.2)"
 date: 2026-11-09
 issue: "#1181"
 spec: docs/specs/2026-11-09-commit-authority-grant-spec.md
 spec-status: DRAFT
-spec-revision: "1.3"
+spec-revision: "1.4"
 klasse: L
 base-commit: aaed14c2
 branch: feat/1181-commit-authority-grant
@@ -24,20 +24,25 @@ trace:
 
 > **Status: DRAFT** — Dieser Plan implementiert nichts und committet nichts. Er ist die
 > Umsetzungsplanung zur Spec `docs/specs/2026-11-09-commit-authority-grant-spec.md`
-> (`Status: DRAFT`, Rev. 1.3, Klasse L).
+> (`Status: DRAFT`, Rev. 1.4, Klasse L).
+>
+> **Entschieden (2026-11-09):** Alle offenen Fragen der Spec sind durch den Nutzer entschieden
+> (**D16–D23**, §15.2). Der Plan setzt diese Entscheidungen verbindlich um; es gibt keine
+> verbleibende OQ, auf die ein Task wartet. Der `Status` bleibt `DRAFT` (kein `APPROVED` der Spec).
 >
 > **Voraussetzung (Master-Rule `spec-plan-workflow`):** Die Spec trägt noch **kein**
 > `Status: APPROVED`. Task-Ausführung startet erst, wenn `concept-reviewer`/der Nutzer die
 > Spec freigegeben hat; dieser Plan kann parallel zum Review als Umsetzungsvorschlag dienen,
 > ist aber selbst ungeprüft (`Status: DRAFT`).
 >
-> **Quellen:** Spec §1–§12 (Rev. 1.3); `.tmp/issue-dump/issue-1181.json` (maßgeblich),
+> **Quellen:** Spec §1–§13 (Rev. 1.4); `.tmp/issue-dump/issue-1181.json` (maßgeblich),
 > `issue-1142.json`, `issue-1151.json`, `issue-1172.json`; Baseline `baseline-validate.txt`
 > (`EXIT=0`) und `baseline-check.txt` (fünf erwartete Vorab-Warnungen, kein `auto_commit`-Befund);
 > Ist-Code mit `datei:zeile`-Ankern unten; Vorläufer
 > `docs/specs/767-auto-commit-permission-authority.md` und
 > `docs/superpowers/specs/2026-09-07-auto-commit-tiers-design.md`; Review 2026-11-09
-> (RVW-1181-01 … -06 und RVW2-1181-01 … -05 + RVW2-X-01, in §15 aufgelöst).
+> (RVW-1181-01 … -06 und RVW2-1181-01 … -05 + RVW2-X-01, in §15 aufgelöst); Nutzerentscheidungen
+> D16–D23 in §15.2.
 >
 > **Klasse:** L (Bounded, Review-Loop) · **Datum:** 2026-11-09 · **Base:** `aaed14c2`
 > (`v2.0.0-beta.8`) · **Branch:** `feat/1181-commit-authority-grant` (Branch-Guard: keine
@@ -154,7 +159,7 @@ trace:
   den Injection-Pfad: das PreToolUse-Payload trägt nur ein opakes `agent_id`, keinen Rollennamen
   (`orchestrator-guard-impl.sh:262-269`, Sentinel-Parse `:326-350`). Deshalb bleibt der Grant ein
   Voll-Shell-Grant (Ack-Pflicht, K-8) und die Grenze wird nirgends als Security-Boundary
-  dokumentiert. Finding F-5.
+  dokumentiert. **#1210** (vormals Finding F-5).
 - **K-12 (Opencode ist kein positiver Render-Fall, RVW2-1181-01):** `config/ai-providers.yaml:274`
   (`has_hooks: false`) und `config/provider-capabilities.yaml:179` (`hooks: false`) machen die
   Bedingung „verifizierter Hook" für Opencode unerfüllbar. Ein Test, der auf einem echten
@@ -191,6 +196,24 @@ trace:
   `auto_commit_violations()` „unknown key(s)" melden und deaktiviert per Fail-Safe die gesamte
   Authority — #1187 liefe weiter, #1181 wäre still aus. Pflicht-Gate ist der bestehende
   Mengengleichheits-Test `set(_KEYS) == set(ac["properties"])`; T1-Step 4 führt ihn aus.
+- **K-20 (D17 — nur geben, kein Revoke):** Das Schema-Enum bleibt exakt `["direct"]`; ein Wert
+  `notify`/`delegate`/`none` ist ein Konfigurationsfehler und **kein** Revoke. Entzug läuft über
+  `roles:`-Entfernung oder Entfernen des Override-Keys. Für die Schrumpf-Begründung heißt das:
+  Rolle vorher gegrantet **und** jetzt nicht mehr in `roles:` ⇒ `grant withdrawn`; nur der
+  Override-Key entfernt, Rolle bleibt in `roles:` ⇒ `no Bash` (T9/T13).
+- **K-21 (D21 — gemischtes Set):** `resolve_commit_grant` und die Logs arbeiten **per Provider**.
+  Mindestens ein Ziel-Provider mit verifiziertem Hook **und** aktivem Guard ⇒ Render dort, WARN auf
+  den übrigen Providern, **keine** Violation. `authority_override_violations` meldet nur, wenn
+  **kein** Ziel-Provider durchsetzen kann (T2/T6/T8).
+- **K-22 (D20 — kein Grant unter `suggest`):** `mode: suggest` ⇒ `resolve_commit_grant` liefert
+  `(derived, False)`. `eligible_roles` und das Artefakt bleiben mode-unabhängig (K-7), die
+  Render-Wirkung ist es nicht (T6/T8).
+- **K-23 (D16 — Persona bleibt):** `agents/1-generic/documenter.md` wird **nicht** angefasst. Der
+  Grant ist im Block als Commit-Recht formuliert (T5) und wird in der Doku erklärt (T11); der
+  Byte-Golden für Nicht-Grant-Rollen bleibt unverändert (T5/T8).
+- **K-24 (D22 — INFO statt Fehler):** „Rolle nicht in `roles:`" erzeugt ausschließlich eine
+  INFO-Zeile aus `authority_override_notices`; `--validate` bleibt rc 0 (T2). ERROR bleibt für
+  read-only/unbekannte Templates und für nirgends durchsetzbare Grants.
 
 ## 3. Global Constraints
 
@@ -295,7 +318,7 @@ Whitelist-Ableitung (`PROJECT_WRITABLE_SECTIONS` aus #1186 AC-7) zuletzt. Szenar
 |---|---|---|---|
 | **M1** | Contract: Hook-Prädikat, Schema-Key + `_KEYS`, Validierung | T1, T15, T2 | `pytest tests/test_hook_state.py tests/test_auto_commit_schema.py tests/test_auto_commit_violations.py` → **0 failed**; `python3 scripts/sync.py --validate` → rc 0; `git diff --name-only aaed14c2..HEAD -- agents/` → leer (commit-fest, K-16) |
 | **M2** | Authority-Auflösung (rein): effektive Authority, Allowlist-Form, Render-Text | T3, T4, T5 | `pytest tests/test_auto_commit_lib.py tests/test_auto_commit_block_render.py tests/test_auto_commit_authority_grants.py` → **0 failed**; die bestehenden Byte-Golden-Tests (`test_role_none_is_byte_identical`, `test_default_authority_parameter_stays_direct`) unverändert grün |
-| **M3** | Render-Vertrag: Provider- **und** Guard-Gate, Bash-Injektion, Sync-Logs, Variablen | T6, T7, T8 | `pytest tests/test_auto_commit_*.py tests/test_orchestrator_guard_hook.py` → **0 failed**; ein Claude-Sync mit Grant rendert `Bash`; der reale Opencode-Sync rendert `bash: deny` + WARN; positive v1/v2-Permission-Pfade nur gegen den synthetischen Hook-Fixture (K-12); deaktivierter Guard rendert unverändert + WARN bzw. ERROR |
+| **M3** | Render-Vertrag: Provider- **und** Guard-Gate, Bash-Injektion, Sync-Logs, Variablen | T6, T7, T8 | `pytest tests/test_auto_commit_*.py tests/test_orchestrator_guard_hook.py` → **0 failed**; ein Claude-Sync mit Grant rendert `Bash`; der reale Opencode-Sync rendert `bash: deny` + WARN; im gemischten Set beides gleichzeitig (D21); positive v1/v2-Permission-Pfade nur gegen den synthetischen Hook-Fixture (K-12); deaktivierter Guard rendert unverändert + WARN bzw. ERROR; `suggest` rendert nichts (D20) |
 | **M4** | Allowlist-Stage und Hook-Härtung | T9, T16 | `pytest tests/test_auto_commit_allowlist_pipeline.py tests/test_orchestrator_guard_hook.py` → **0 failed**, inkl. exakter WARN-Strings und rc 2 für `curl` mit Grant-Sentinel; `python3 scripts/sync.py --dry-run --check` → rc 0 |
 | **M5** | Admin-UI-Round-Trip + Doku | T10, T11 | `pytest tests/test_admin_ui_auto_commit_section.py tests/test_admin_ui_git_section.py` → **0 failed**; Doku-Greps (T11-Step 1) treffen |
 | **M6** | End-to-End: Szenario 94 + Scratch-Consumer + Gesamtabnahme | T12, T13, T14 | `tests/scenarios/run.sh 94` → PASS; Scratch-Lauf (T13) belegt alle Punkte aus Step 2–5; volle `tests/test_auto_commit_*.py`-Suite → **0 failed** (Bestand 75, siehe §8); `--validate` rc 0, `--check` rc 0 |
@@ -319,7 +342,7 @@ nicht „durchgewunken" — der Task bleibt offen (Plan-Ledger-Konvention).
 
 **Interfaces:** Produces den Schema-Teilblock `auto_commit.properties.authority_overrides`
 (Object; `propertyNames.pattern ^[a-z0-9][a-z0-9-]*$`; `additionalProperties` = Objekt mit
-`required ["authority", "acknowledge_full_shell"]`, `authority.const "direct"`,
+`required ["authority", "acknowledge_full_shell"]`, `authority.enum ["direct"]`,
 `acknowledge_full_shell.const true`, `additionalProperties false`; `default {}`);
 Consumes nichts.
 
@@ -339,12 +362,17 @@ Consumes nichts.
   "acknowledge_full_shell": true, "extra": 1}` ⇒ `ValidationError`),
   `test_authority_overrides_rejects_bad_role_name` (`{"Documenter": {…}}` und `{"_x": {…}}` ⇒
   `ValidationError`), `test_authority_overrides_default_is_empty_object` (Schema-`default` ist `{}`,
-  nicht `null`). In `tests/test_auto_commit_violations.py`:
+  nicht `null`), `test_authority_overrides_enum_is_exactly_direct` (`set(ac["properties"]
+  ["authority_overrides"]["additionalProperties"]["properties"]["authority"]["enum"]) == {"direct"}`
+  — **D17**, kein Revoke-Wert). In `tests/test_auto_commit_violations.py`:
   `test_authority_overrides_key_is_known` (`auto_commit_violations({... "authority_overrides":
   {"documenter": {"authority": "direct", "acknowledge_full_shell": true}}}) == []`).
   Lauf → **rot — 8 + 1 failed** (`ValidationError` bleibt aus, `unknown key(s)` erscheint).
 - [ ] Step 2: Schema-Block einfügen — exakt nach Spec §4.1, `description` wörtlich übernehmen;
   Position im Objekt ist irrelevant (`"custom_script"` `:1532`, `"file_count_threshold"` `:1526`).
+  **D23:** `required` = `["authority", "acknowledge_full_shell"]`, `additionalProperties: false`,
+  `acknowledge_full_shell.const = true`; **D17:** `authority.enum = ["direct"]` (kein weiterer
+  Wert, insbesondere kein Revoke-Wert).
 - [ ] Step 3: `_KEYS` (`:164`) um `"authority_overrides"` ergänzen; `ALLOWLIST_VERSION = 2`
   (`:31`). **Schema und `_KEYS` ändern sich im selben PR** (K8/K-19) — kein Zwischenstand mit
   Schema-Key ohne `_KEYS`-Eintrag, sonst deaktiviert der Fail-Safe die ganze Authority. Der
@@ -408,12 +436,14 @@ Consumes `normalize_authority_overrides` (T1/T4), `role_commit_authority` (`:127
   active`),
   `test_grant_notice_for_gate_dropped_role` (Rolle steht in `roles:`/`raw_roles`, ist aber
   `active_set.has(role) == False` ⇒ ebenfalls genau eine INFO-Zeile; K-15/RVW2-1181-05),
-  plus zwei Subprozess-Tests
+  plus drei Subprozess-Tests
   `test_validate_rc1_on_read_only_grant` (`sync.py --validate` mit `explorer`-Grant ⇒ rc 1,
-  `config-audit [ERROR] auto_commit: auto_commit.authority_overrides.explorer` in der Ausgabe) und
+  `config-audit [ERROR] auto_commit: auto_commit.authority_overrides.explorer` in der Ausgabe),
+  `test_validate_rc0_on_inactive_role_grant` (Grant auf eine Rolle, die nicht in `roles:` steht ⇒
+  rc 0, INFO-Zeile im Log, **kein** `[ERROR]`; D22) und
   `test_validate_rc1_on_grant_without_active_guard` (Claude + `orchestrator-guard.enabled: false`
   ⇒ rc 1, N-1).
-  Lauf → **rot — 14 failed**.
+  Lauf → **rot — 15 failed**.
 - [ ] Step 2: `normalize_authority_overrides(raw)` implementieren (eine Normalisierung, K-8):
   `{role: "direct"}` nur für Objekte mit `authority == "direct"` **und**
   `acknowledge_full_shell is True`; alles andere wird übergangen (die Violation kommt aus Step 3).
@@ -424,12 +454,17 @@ Consumes `normalize_authority_overrides` (T1/T4), `role_commit_authority` (`:127
   Enforcement-Meldung, wenn `guard_hook_enabled(config)[0]` False ist **oder** kein aktiver
   Provider `provider_hooks_supported(...)` erfüllt. Provider-Namen sortiert, bei einem
   Provider `provider 'X'`, bei mehreren `providers 'A', 'B'` (Spec §4.3).
+  **D21:** Bedingung ist „**kein** aktiver Ziel-Provider mit verifiziertem Hook" — nicht „nicht
+  alle"; ein gemischtes Set (Claude + Opencode) ist keine Violation.
+  **D23:** Form-/Ack-Fehler sind die einzigen Ursachen der Objektform-Meldung und erzeugen
+  niemals einen Grant; ein Skalar löst keinen `TypeError` aus.
   `provider_config=None` ⇒ `load_providers_config(agent_meta_root, config)`. **Nur wenn** die
   normalisierte Grant-Map nicht leer ist — im dominanten Fall „kein Grant" wird die
   Provider-Registry gar nicht geladen (Performance, gleiche Semantik).
 - [ ] Step 4: `authority_override_notices(config, active_roles)` implementieren: je Grant, dessen
   Rolle nicht in `active_roles` steht, eine INFO-Zeile (Spec §4.3). Der Parameter `active_roles`
-  lebt damit ausschließlich hier (K-2).
+  lebt damit ausschließlich hier (K-2). **D22:** Das ist ausdrücklich **kein** Fehler und erhöht
+  `consistency_errors` nicht.
 - [ ] Step 5: `auto_commit_violations` **nicht** erweitern (sie bleibt rein strukturell);
   `resolve_auto_commit_config` ruft in T4 **beide** Prüfungen (Spec §4.3).
 - [ ] Step 6: In `_handle_validate` **nach** `_provider_config = _load_pc(agent_meta_root)`
@@ -444,7 +479,7 @@ Consumes `normalize_authority_overrides` (T1/T4), `role_commit_authority` (`:127
   Die effektive Menge ist Pflicht (K-15/RVW2-1181-05), sonst erhält eine gate-dropped Rolle
   keine Notice.
   Kein Exit an dieser Stelle (bestehender Mechanismus).
-- [ ] Step 7: Verifikation: obige Tests **grün — 14 passed**;
+- [ ] Step 7: Verifikation: obige Tests **grün — 15 passed**;
   `python3 -m pytest tests/test_auto_commit_violations.py --basetemp="$PYTEST_BASETEMP" -q`
   → **0 failed**; `python3 scripts/sync.py --validate` → rc 0 (Selbst-Hosting hat keinen Grant).
 - [ ] Step 8: Commit `feat: reject invalid or unenforced commit authority grants in validation`.
@@ -486,6 +521,8 @@ Consumes `role_commit_authority` (`:127-143`), `AUTHORITY_*` (`:34-37`).
   `_role_tools`-Lesen; Reihenfolge exakt Spec §3.2 Nr. 1–5. Der Override-Zugriff lautet
   `authority_overrides.get(role) if isinstance(authority_overrides, Mapping) else None`
   (K-14/RVW2-1181-04), damit `authority_overrides=["x"]` keinen `AttributeError` auslöst.
+  **D17:** Die Funktion eskaliert nur (`delegate|notify → direct`) und stuft **nie** herab —
+  `{"documenter": "notify"}` bleibt ein Nicht-Grant, kein Revoke.
 - [ ] Step 3: `is_role_eligible` delegieren (`return effective_commit_authority(...) == AUTHORITY_DIRECT`),
   Docstring ergänzen: „ein Grant ist die **einzige** Ausnahme vom direct-only-Prinzip und wird
   von `authority_override_violations` auf schreibfähige Rollen begrenzt".
@@ -530,6 +567,9 @@ Schlüsseln `authority_overrides` (normalisierte Map, nur Rollen aus `active_rol
   ac_cfg.get("authority_overrides")).items() if r in set(active_roles)}`
   und `eligible_roles` über `is_role_eligible(..., authority_overrides=overrides)`; Rückgabe um
   `"authority_overrides": overrides` ergänzen. **Keine** Änderung an `mode`/`triggers`-Semantik.
+  **D17:** `overrides` enthält ausschließlich `direct`-Einträge; ein entzogener Grant ist ein
+  fehlender Key, nie ein anderer Wert. **D20:** unter `suggest` bleibt `eligible_roles` unverändert
+  mode-unabhängig (Capability), nur der Render entfällt (T6/T8).
 - [ ] Step 4: Verifikation: **grün — 8 passed**; `tests/test_auto_commit_violations.py` bleibt grün.
 - [ ] Step 5: Commit `feat: record granted roles in the auto-commit allowlist`.
 
@@ -565,8 +605,13 @@ Consumes `resolved["authority_overrides"]` (T4) und die bestehenden Textbaustein
   nach der Sentinel-Zeile einfügen, wenn
   `role and resolved.get("authority_overrides", {}).get(role) == "direct"`.
   `_BOM_LINE`/`_PUSH_BOUNDARY_LINE` bleiben **letzte** zwei Zeilen (Reihenfolge unverändert).
+  **D16:** Die Zeile ist die **einzige** Stelle, an der der Grant als Recht benannt wird
+  („Granted by project config …" = Commit-Recht); `agents/1-generic/documenter.md` bleibt
+  unverändert, die Persona wird nicht umgeschrieben.
 - [ ] Step 3: Rückwärtskompatibilität belegen: `role=None` ⇒ kein zusätzlicher Zweig, gleiche
-  Zeilenzahl; die 20 bestehenden Tests dieser Datei bleiben unverändert.
+  Zeilenzahl; die 20 bestehenden Tests dieser Datei bleiben unverändert. **D16:** Kein Test und
+  keine Änderung berührt `agents/1-generic/documenter.md`; der Byte-Golden gilt für die Rolle
+  **ohne** Grant und bleibt exakt der heutige Text.
 - [ ] Step 4: Verifikation: **grün — 5 passed**, `python3 -m pytest
   tests/test_auto_commit_block_render.py tests/test_auto_commit_coverage.py --basetemp="$PYTEST_BASETEMP" -q`
   → 0 failed.
@@ -602,15 +647,24 @@ agent_meta_root: Path, *, guard_enabled: bool) -> tuple[str, bool]`
   (`guard_enabled=False` + Hook-Provider ⇒ `("notify", False)`, RVW-1181-01),
   `test_derived_direct_role_never_needs_bash_injection` (`developer` ⇒ `("direct", False)`, K-3),
   `test_none_capabilities_fail_closed` (`provider_capabilities=None` ⇒ `(derived, False)`,
-  keine Exception). Lauf → **rot — 8 failed**.
+  keine Exception),
+  `test_grant_under_suggest_is_never_rendered` (`mode: suggest` + Hook-Provider + Grant ⇒
+  `("notify", False)`; D20 — auch mit aktivem Guard),
+  `test_grant_in_mixed_provider_set_renders_on_hook_provider`
+  (zwei Aufrufe: `has_hooks=True`/`claude-code-json` ⇒ `("direct", True)` und `has_hooks=False`
+  ⇒ `("notify", False)`, gleicher `resolved`-Stand; D21 — die Auflösung ist per Provider).
+  Lauf → **rot — 10 failed**.
 - [ ] Step 2: Implementieren:
   `authority = effective_commit_authority(role, agent_meta_root, None, resolved.get("authority_overrides"))`;
   `granted = resolved.get("authority_overrides", {}).get(role) == "direct"`;
   `render_bash = granted and resolved.get("mode") in ("auto", "custom") and guard_enabled and provider_hooks_supported(pc or {}) and "Bash" not in _role_tools(role, agent_meta_root)`.
+  **D20:** `("auto", "custom")` ist eine echte Whitelist — `suggest` und `off` fallen heraus und
+  liefern unbedingt `(derived, False)`. **D21:** Die Funktion bewertet **genau einen** Provider;
+  gemischte Sets werden vom Aufrufer je Provider aufgerufen (T8).
 - [ ] Step 3: Docstring: beide Gate-Begründungen — ohne Hook wäre `direct`-Prosa auf `bash: deny`
   der #767-Widerspruch; ohne aktiven Guard wäre `Bash` eine unbeschränkte Shell (Spec §3.3) —
   plus Verweis `#1181`/`#1151`.
-- [ ] Step 4: Verifikation: **grün — 8 passed**; `python3 -m pytest
+- [ ] Step 4: Verifikation: **grün — 10 passed**; `python3 -m pytest
   tests/test_auto_commit_authority_grants.py --basetemp="$PYTEST_BASETEMP" -q` → 0 failed.
 - [ ] Step 5: Commit `feat: gate the rendered grant on a provider hook and an active guard`.
 
@@ -646,6 +700,9 @@ der Fail-Safe-Zweig prüft **beide** Verstoßklassen (K-13/RVW2-1181-03).
   erweitern (K-13). Im Normalfall (`:1827-1833`)
   `"authority_overrides": normalize_authority_overrides(_auto_commit_cfg.get("authority_overrides"))`.
   **Nicht** gegen `roles:` filtern — das ist Sache von T8/T9; `config.py` kennt hier nur den Block.
+  **D23:** `normalize_authority_overrides` liefert für Skalar-Kurzform und fehlendes/falsches Ack
+  `{}`; da `authority_override_violations` in derselben Bedingung greift, landet dieser Fall im
+  Fail-Safe mit `INVALID_CONFIG_MARKER`. **D17:** Die Map enthält ausschließlich `direct`.
 - [ ] Step 3: Verifikation: **grün — 4 passed**; `python3 scripts/sync.py --dry-run` → rc 0 und
   kein `KeyError` in `sync.log`.
 - [ ] Step 4: Commit `feat: expose the authority overrides to the per-role render`.
@@ -691,6 +748,10 @@ Rolle über alle Provider hinweg) und
   `notify`-Prosa und **keine** Grant-Zeile, `sync.log` enthält
   `auto-commit-grant: documenter=direct not enforced on provider 'Opencode' (has_hooks=false); rendered as notify (issue #1181)`),
   `test_grant_log_line_on_claude` (`auto-commit-grant: documenter=direct (source: auto_commit.authority_overrides; hook-enforced: yes)`),
+  `test_mixed_provider_set_logs_info_and_warn` (Claude + Opencode in **einem** Sync ⇒ genau eine
+  `hook-enforced: yes`-INFO **und** genau eine `not enforced on provider 'Opencode'`-WARN;
+  D21), `test_suggest_renders_no_grant_line_and_no_bash` (`mode: suggest` + Grant ⇒ kein `Bash`,
+  Block ohne `#1181`, Log ohne `hook-enforced: yes`; D20),
   `test_grant_on_inactive_role_is_logged_as_info` (`roles: [developer]` + Grant auf `planner` ⇒
   INFO-Zeile `grant ignored — role is not active`), `test_gemini_grant_maps_to_run_command`
   (K-4: `.gemini/agents/documenter.md` enthält `run_command`, **nicht** `code_execution`),
@@ -705,7 +766,7 @@ Rolle über alle Provider hinweg) und
   `#agent-meta:agent=documenter\ngit add -A && git commit -m 'x'` ⇒ rc 0) und
   `test_v2_allowlist_still_blocks_push_for_granted_role`
   (`... git push origin main` ⇒ rc 2; AC-2-Grenze).
-  Lauf → **rot — 12 failed**.
+  Lauf → **rot — 14 failed**.
 - [ ] Step 2: `_apply_role_auto_commit_overrides`: Signatur additiv erweitern (`config`,
   `guard_off_logged`); nach der bestehenden `off`-Behandlung (`:117-120`)
   `guard_on, _guard_invalid = guard_hook_enabled(config or {})` und
@@ -716,6 +777,9 @@ Rolle über alle Provider hinweg) und
   (Unterscheidung Guard-aus vs. Provider ohne Hook, Formate Spec §4.6 wörtlich). Die
   Guard-aus-WARN wird über `guard_off_logged` je Rolle nur **einmal** emittiert, auch wenn
   mehrere Provider synchronisiert werden. `return render_bash`.
+  **D21:** Der Aufruf erfolgt **je Provider**; die INFO-Zeile entsteht nur dort, wo tatsächlich
+  gerendert wird, die Provider-WARN einmal je hook-losem Provider. **D20:** Bei `suggest` sind
+  beide Log-Zeilen stumm (kein Grant-Render ⇒ keine `auto-commit-grant:`-Zeile).
 - [ ] Step 3: Aufrufstelle `sync_agents_for_provider` (`:1459`): vor der Rollen-Schleife
   `guard_off_logged: set[str] = set()` anlegen und
   `render_bash = _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables,
@@ -729,7 +793,7 @@ Rolle über alle Provider hinweg) und
   **Nicht** die MCP-Injektion (`:1027-1040`) als Ort nutzen — sie läuft bewusst nach dem
   Transform und würde bei Opencode die Permission-Map nicht mehr erreichen
   (`provider_transform.py:1069-1092` liest den Content).
-- [ ] Step 5: Verifikation: **grün — 12 passed**; Regression
+- [ ] Step 5: Verifikation: **grün — 14 passed**; Regression
   `python3 -m pytest tests/test_auto_commit_block_render.py tests/test_auto_commit_coverage.py
   tests/test_auto_commit_developer_reference.py tests/test_mcp_role_overrides.py --basetemp="$PYTEST_BASETEMP" -q`
   → 0 failed; `python3 scripts/sync.py --validate` → rc 0.
@@ -763,9 +827,12 @@ vor dem Schreibpfad; privater Helfer
   `test_shrink_warning_reports_gate_dropped` (Fixture `tests/fixtures/active-set/p20` wie
   `:72-80`; Rolle steht in `roles:` ⇒ `(gate-dropped)`),
   `test_shrink_warning_reports_withdrawn_grant` (vorherige v2-Datei mit
-  `authority_overrides: {documenter: direct}` + `eligible_roles` mit `documenter`, aktueller
-  Lauf ohne Grant **und** `documenter` weiterhin in `roles:` ⇒ `documenter (grant withdrawn)`,
-  nicht `no Bash`),
+  `authority_overrides: {documenter: direct}`; aktueller Lauf: `documenter` steht **nicht mehr in
+  `roles:`** (Override-Key darf weiter gesetzt sein) ⇒ `documenter (grant withdrawn)`, nicht
+  `role removed`; D17),
+  `test_removed_grant_key_while_role_listed_is_no_bash` (vorherige v2-Datei mit Grant;
+  aktueller Lauf: `documenter` steht **weiterhin in `roles:`**, Override-Key entfernt ⇒
+  `documenter (no Bash)`, nicht `grant withdrawn`; D17 — der zweite Entzugsweg),
   `test_mode_change_to_off_is_reported` (vorher `mode: auto`, aktuell `mode: off` ⇒ exakt
   `auto-commit-allowlist: mode changed auto -> off; all <n> eligible role(s) dropped`),
   `test_missing_previous_allowlist_is_info` (Erst-Sync ⇒ INFO-Zeile wörtlich, keine WARN),
@@ -774,26 +841,31 @@ vor dem Schreibpfad; privater Helfer
   vorhanden, Datei-Bytes unverändert),
   `test_allowlist_is_written_with_version_two` (voller Sync ⇒ `version == 2`,
   `authority_overrides`-Key vorhanden, **auch ohne Grant** `{}` — K-10),
-  `test_check_mode_stays_rc_zero_on_shrink` (OQ-4: `--dry-run --check` ⇒ rc 0 trotz WARN).
-  Lauf → **rot — 10 failed**.
+  `test_check_mode_stays_rc_zero_on_shrink` (OQ-4/D19: `--dry-run --check` ⇒ rc 0 trotz WARN).
+  Lauf → **rot — 11 failed**.
 - [ ] Step 2: Vor dem `dry_run`-`return` (`:1922-1924`) den Vergleich einbauen:
   Datei lesen (`json.load`), bei `FileNotFoundError` INFO, bei `json.JSONDecodeError`/`OSError`
   WARN; sonst `dropped = sorted(set(previous.get("eligible_roles", [])) - set(resolved["eligible_roles"]))`
   und bei `dropped` die WARN-Zeile bauen: Rollen sortiert, je `role (reason)`, auf 20 Einträge
   begrenzen, Rest `… (+N more)`.
-- [ ] Step 3: `_shrink_reasons` mit der **disjunkten** Definition aus K-5/Spec §3.5
+- [ ] Step 3: `_shrink_reasons` mit der **disjunkten** Definition aus K-5/K-20/Spec §3.5
   implementieren — Prüfreihenfolge `grant withdrawn` → `role removed` → `gate-dropped` →
   `no Bash`; `no Bash` nur, wenn die Rolle in `roles:` steht (sonst greift bereits
   `role removed`). `no Bash` nutzt
   `effective_commit_authority(role, agent_meta_root, None, resolved.get("authority_overrides"))`.
+  **D17 (verbindlich):** `grant withdrawn` = „vorherige Datei hatte einen Grant **und** die Rolle
+  steht im aktuellen Lauf nicht mehr in `roles:`". Ein nur entfernter Override-Key bei weiterhin
+  gelisteter Rolle ist **`no Bash`**. Kein dritter Grund.
 - [ ] Step 4: Moduswechsel-Zeile separat **vor** der Schrumpf-Zeile emittieren, wenn
   `previous.get("mode") not in (None, "off")` und `resolved["mode"] == "off"`; Rollenzahl = Länge
   der **vorherigen** Liste.
 - [ ] Step 5: Docstring der Stage (`:1894-1907`) ergänzen: der Vergleich ist read-only, läuft
   damit auch im Dry-Run, die Gründe sind disjunkt definiert, und `version: 2` ist additiv
   (Leser tolerieren `version: 1`; der Hook liest `mode`/`eligible_roles`/`authority_overrides`,
-  `hooks/1-generic/orchestrator-guard-impl.sh:448-478`).
-- [ ] Step 6: Verifikation: **grün — 10 passed**; `python3 -m pytest
+  `hooks/1-generic/orchestrator-guard-impl.sh:448-478`). **D17:** der Docstring nennt die
+  Zuordnung der beiden Entzugswege (nur `roles:`-Entfernung ⇒ `grant withdrawn`; nur Key-Entfernung
+  ⇒ `no Bash`). **D19:** der Vergleich bleibt WARN-only, ohne Exit-Code-Wirkung.
+- [ ] Step 6: Verifikation: **grün — 11 passed**; `python3 -m pytest
   tests/test_auto_commit_allowlist_pipeline.py tests/test_active_set.py --basetemp="$PYTEST_BASETEMP" -q`
   → 0 failed; `python3 scripts/sync.py --dry-run --check` → rc 0.
 - [ ] Step 7: Commit `feat: warn when the auto-commit allowlist shrinks`.
@@ -846,7 +918,9 @@ Allowlist-Form (Spec §4.4); Produces ausschließlich Prosa.
   ⇒ je ≥ 1; `grep -n "acknowledge_full_shell" README.md templates/configs/project.yaml.example`
   ⇒ je ≥ 1; `grep -n "permission-mode-overrides" README.md` ⇒ Treffer im Auto-commit-Abschnitt;
   `grep -n "active-set" README.md` ⇒ Treffer; `grep -c "#1181" CHANGELOG.md` ⇒ ≥ 1;
-  `grep -n "orchestrator-guard" README.md` ⇒ Treffer (Guard-Gate).
+  `grep -n "orchestrator-guard" README.md` ⇒ Treffer (Guard-Gate);
+  `grep -c "1210" README.md CHANGELOG.md` ⇒ je ≥ 1 (Attributionslücke, D18);
+  `grep -n "voller Bash\|Voll-Shell\|full Bash" README.md` ⇒ Treffer (D18, ehrliche Doku).
   Diese Befehle sind der Abnahmeschritt (rot vor Step 2–5).
 - [ ] Step 2: `README.md`-Abschnitt „Auto-commit" (`:477-500`): Grant-Beispiel (YAML, Objektform
   mit `acknowledge_full_shell: true`), Eskalationsregel (`delegate`/`notify` → `direct`, keine
@@ -858,18 +932,24 @@ Allowlist-Form (Spec §4.4); Produces ausschließlich Prosa.
   734, 813, 895`), und die **Sicherheitsaussage** wörtlich: „Der Grant ist eine bewusste
   Voll-Shell-Ausweitung, keine `git`-Beschränkung; der Guard-Hook begrenzt Sentinel-tragende
   Kommandos auf `git add` und ein nicht-amendierendes `git commit`. Kommandos ohne Sentinel kann
-  er keiner Rolle zuordnen (F-5)."
+  er keiner Rolle zuordnen (#1210, vormals F-5)."
+  **D16:** zusätzlich ein Satz, dass `documenter` die Referenzrolle bleibt, ihre Persona
+  („implementiert nichts") **nicht** geändert wird und der Grant ausschließlich das Commit-Recht
+  ergänzt. **D20:** ein Satz, dass `suggest` propose-only ist und der Grant dort nicht rendert.
 - [ ] Step 3: `docs/api/admin-ui-reference.md` (`:181-185`): `authority_overrides` als
   YAML-only-Feld dokumentieren (Objektform + Pflicht-Ack), inkl. „Panel erhält unbekannte Keys
   beim Speichern" und dem Hinweis auf F-2.
 - [ ] Step 4: `templates/configs/project.yaml.example` (`:91`): im `# auto_commit:`-Kommentarblock
   ein auskommentiertes `authority_overrides`-Beispiel mit `authority: direct` und
   `acknowledge_full_shell: true` plus einem Satz zur Shell-Ausweitung ergänzen.
+  **D23:** nur die Objektform zeigen; die Skalar-Kurzform (`documenter: direct`) wird als
+  **ungültig** kommentiert. **D17:** kein Revoke-Wert im Beispiel, mit dem Hinweis, dass Entzug
+  über `roles:` oder das Entfernen des Keys läuft.
 - [ ] Step 5: `CHANGELOG.md` unter `Unreleased` (`:3`): **Added** (neuer Key, Grant-Zeile,
   Grant-/Shrink-/Notice-Logs, `hook_state`-Prädikat), **Changed** (`ALLOWLIST_VERSION` 1→2 wird
   bei **jedem** Sync geschrieben — auch ohne Grant, K-10), **Security** (Voll-Shell-Ausweitung,
-  Pflicht-Ack, Guard-/Hook-Gate, Sentinel-Härtung, Attributionslücke F-5, Rollout-Hinweis auf
-  #1151).
+  Pflicht-Ack, Guard-/Hook-Gate, Sentinel-Härtung, Attributionslücke **#1210** (vormals F-5, D18),
+  Rollout-Hinweis auf #1151).
 - [ ] Step 6: F-3: In `docs/specs/767-auto-commit-permission-authority.md` die veralteten
   `datei:zeile`-Anker auf die heute gültigen ziehen (`auto_commit.py:14→:28`,
   `:32-39→:127-143`, `:85-169→:322-459`, `config.py:1302-1315→:1792-1848`,
@@ -903,8 +983,11 @@ PASS-Szenario mit echten Assertions.
   Render-Grant) und `sync.log` die `auto-commit-grant:`-WARN-Zeile,
   (d) `.meta-config/auto-commit-allowlist.json` hat `"version": 2` und
   `authority_overrides.documenter == "direct"`,
-  (e) ein zweiter Sync mit einer Kopie der Config **ohne** `authority_overrides` erzeugt eine
-  `auto-commit-allowlist: eligible_roles shrank`-WARN-Zeile mit `documenter (grant withdrawn)`,
+  (e) ein zweiter Sync mit einer Kopie der Config, in der `authority_overrides` **fehlt** und
+  `documenter` **nicht mehr in `roles:`** steht, erzeugt eine
+  `auto-commit-allowlist: eligible_roles shrank`-WARN-Zeile mit `documenter (grant withdrawn)`
+  (D17: nur diese Kombination trägt das Reason-Literal; „nur Key entfernt" ⇒ `no Bash` ist im
+  Pipeline-Unit-Test T9 gepinnt),
   (f) ein dritter Sync mit `hooks: {orchestrator-guard: {enabled: false}}` rendert in
   `.claude/agents/documenter.md` **kein** `Bash` (N-1).
   Lauf: `tests/scenarios/run.sh 94` → **FAIL** (Szenario fehlt noch).
@@ -953,20 +1036,30 @@ abschließenden Nachweis inkl. erzwungener Schrumpfung.
   Payload starten —
   `printf '{"tool_name":"Bash","tool_input":{"command":"#agent-meta:agent=documenter\\ngit add -A && git commit -m \\"x\\""},"cwd":"<scratch>"}' | bash hooks/1-generic/orchestrator-guard-impl.sh`
   ⇒ **rc 0**; Kontrolllauf mit `git push origin main` im selben Sentinel ⇒ **rc 2**; Kontrolllauf
-  mit `curl https://example.invalid` im selben Sentinel ⇒ **rc 2** (N-3, Grant-Härtung).
-- [ ] Step 4: Schrumpfung erzwingen: `authority_overrides` aus der Scratch-Config entfernen und
-  erneut syncen ⇒ `sync.log` enthält
-  `auto-commit-allowlist: eligible_roles shrank <alt> -> <neu> (-1): documenter (grant withdrawn)`,
-  `eligible_roles` ohne `documenter`, und der regenerierte `.claude/agents/documenter.md` hat
-  **kein** `Bash` mehr (Rollback-Beweis, §9).
-- [ ] Step 5: Guard-Fail-closed real prüfen: `hooks: {orchestrator-guard: {enabled: false}}` in
-  die Scratch-Config setzen, erneut syncen ⇒ kein `Bash` im generierten Agenten, die
+  mit `curl https://example.invalid` im selben Sentinel ⇒ **rc 2** (N-3, Grant-Härtung);
+  vierter Kontrolllauf **ohne** Sentinel (`pytest -q`) ⇒ **rc 0** — das ist die dokumentierte
+  Attributionslücke **#1210** (D18), ausdrücklich **kein** Erfolgsnachweis.
+- [ ] Step 4: Entzug über den Override-Key prüfen (D17, Weg b): nur `authority_overrides` aus der
+  Scratch-Config entfernen, `documenter` bleibt in `roles:`, erneut syncen ⇒ `sync.log` enthält
+  `auto-commit-allowlist: eligible_roles shrank <alt> -> <neu> (-1): documenter (no Bash)`,
+  `eligible_roles` ohne `documenter`, regenerierter `.claude/agents/documenter.md` ohne `Bash`
+  (Rollback-Beweis, §9). **Keine** `grant withdrawn`-Zeile.
+- [ ] Step 5: Entzug über `roles:` prüfen (D17, Weg a + D22): `authority_overrides.documenter` wieder
+  setzen und syncen (Grant wieder da, `Bash` wieder da); dann `documenter` aus `roles:` entfernen
+  (Override-Key **bleibt** gesetzt) und syncen ⇒ `sync.log` enthält
+  `auto-commit-allowlist: eligible_roles shrank <alt> -> <neu> (-1): documenter (grant withdrawn)`
+  **und** die INFO-Zeile
+  ``auto-commit-grant: documenter=direct ignored — role is not active (not listed in `roles:` or dropped by the active set)``;
+  `--validate` bleibt **rc 0** (D22).
+- [ ] Step 6: Guard-Fail-closed real prüfen: `hooks: {orchestrator-guard: {enabled: false}}` in
+  die Scratch-Config setzen (`documenter` wieder in `roles:`, Grant wieder setzen), erneut syncen
+  ⇒ kein `Bash` im generierten Agenten, die
   `guard hook disabled`-WARN im `sync.log`, `python3 scripts/sync.py --validate` in der
   Scratch-Wurzel ⇒ **rc 1** (N-1).
-- [ ] Step 6: Aufräumen: `.tmp/scenario-authority-1181/` bleibt als Beleg liegen (untracked,
+- [ ] Step 7: Aufräumen: `.tmp/scenario-authority-1181/` bleibt als Beleg liegen (untracked,
   `git status --porcelain` darf nur `.tmp/` zeigen); **kein** Commit in diesem Task.
-- [ ] Step 7: Verifikation: alle Punkte aus Step 2–5 sind belegt (fünf Artefakt-Prüfungen,
-  drei Sentinel-Läufe, Schrumpf-Nachweis, Guard-Fail-closed); die Befehlsausgaben in den
+- [ ] Step 8: Verifikation: alle Punkte aus Step 2–6 sind belegt (fünf Artefakt-Prüfungen,
+  vier Sentinel-Läufe, beide Entzugswege, Guard-Fail-closed); die Befehlsausgaben in den
   Task-Report (nicht in den Plan) übernehmen.
 
 ### T14 — Gesamtabnahme, Baseline-Vergleich, `--check` (M6, S)
@@ -989,14 +1082,14 @@ abschließenden Nachweis inkl. erzwungener Schrumpfung.
 - [ ] Step 2: `python3 scripts/sync.py --validate` → **rc 0**, keine neuen `[ERROR]`-Zeilen
   gegenüber `baseline-validate.txt`.
 - [ ] Step 3: `python3 scripts/sync.py --dry-run --check` → **rc 0**; die Warnliste enthält
-  höchstens die fünf erwarteten Einträge aus `baseline-check.txt:1-6` (OQ-4: Schrumpf-Warnung
-  ist WARN, kein CI-Gate).
+  höchstens die fünf erwarteten Einträge aus `baseline-check.txt:1-6` (D19: Schrumpf-Warnung ist
+  WARN, kein CI-Gate).
 - [ ] Step 4: `git diff --name-only aaed14c2..HEAD -- agents/` → **leer** (AC-1: keine Datei
   unter `agents/` editiert; commit-fest, K-16/RVW2-1181-02).
 - [ ] Step 5: `tests/scenarios/run.sh` (alle) → **PASS** (mindestens `94` neu grün, keine
   Regression in `18`–`21`).
-- [ ] Step 6: Abnahme-Report: AC→Task-Traceability aus §11 mit Beleg je AC **und** N-1…N-4 aus
-  Spec §10; offene Punkte (OQ-1…OQ-6, OQ-P3) mit Entscheidungsstatus.
+- [ ] Step 6: Abnahme-Report: AC→Task-Traceability aus §11 mit Beleg je AC **und** N-1…N-9 aus
+  Spec §10; die Entscheidungen D16–D23 mit Beleg-Task nennen (keine offene OQ).
 - [ ] Step 7: **DoD-Nachweis (K8):** Bestätigen, dass `config/project-config.schema.json`
   (`auto_commit.properties.authority_overrides`) und `scripts/lib/auto_commit.py:164` (`_KEYS`)
   im **selben** PR/Commit gelandet sind, und `test_enum_constants_match_schema` grün ist
@@ -1074,7 +1167,7 @@ v2-Artefakt aus T9 (`authority_overrides`-Map) und die bestehende Sentinel-Eleva
   `eligible_roles=["developer"]`; `#agent-meta:agent=developer\npytest -q` ⇒ rc 0 — native
   `direct`-Rollen bleiben unberührt, AC-3),
   `test_granted_role_without_sentinel_is_unchanged` (`pytest -q` ohne Sentinel ⇒ rc 0; belegt
-  die Attributionslücke F-5 als bewusst dokumentierte Grenze),
+  die Attributionslücke **#1210** (vormals F-5) als bewusst dokumentierte Grenze),
   `test_v1_allowlist_without_grant_field_keeps_full_shell` (Datei ohne `authority_overrides` ⇒
   wie heute).
   Lauf → **rot — 8 failed**.
@@ -1092,6 +1185,8 @@ v2-Artefakt aus T9 (`authority_overrides`-Map) und die bestehende Sentinel-Eleva
   Bewusst mit erfasst: `git status`, `git log` und jeder andere Nicht-`add`/`commit`-Aufruf fallen
   hier durch — der Sentinel ist für eine Grant-Rolle ausschließlich der Commit-Pfad (Spec §3.3.1
   Punkt 2). Das steht als Kommentar am Gate, damit es niemand als Fehler „repariert“.
+  **D18:** Der Kommentar hält außerdem fest, dass das Gate **nur Sentinel-tragende** Kommandos
+  erfasst und damit keine Security-Boundary gegen Injection ist (Attributionslücke **#1210**).
 - [ ] Step 5: `# version: 1.11.0` → `1.12.0` (`:2`) plus Changelog-Satz in derselben Zeile
   (Konvention wie `:3`).
 - [ ] Step 6: Verifikation: **grün — 8 passed**; Regression
@@ -1134,7 +1229,9 @@ _KEYS = {"mode", "triggers", "file_count_threshold", "custom_script",
 
 def normalize_authority_overrides(raw: object) -> dict[str, str]:
     """{role: "direct"} aus der Config-Objektform. Nur Einträge mit
-    authority == "direct" AND acknowledge_full_shell is True. Wirft nie."""
+    authority == "direct" AND acknowledge_full_shell is True (D23: Objektform
+    mit Pflicht-Ack; Skalar-Kurzform wird nicht akzeptiert; D17: kein Revoke-Wert).
+    Wirft nie."""
 
 def effective_commit_authority(
     role: str,
@@ -1178,7 +1275,8 @@ def resolve_commit_grant(
 ) -> tuple[str, bool]:
     """(authority für diesen Provider, render_bash).
     render_bash == True nur bei mode in {auto,custom} AND Grant AND guard_enabled
-    AND provider_hooks_supported(pc) AND 'Bash' nicht schon im Template (K-3)."""
+    AND provider_hooks_supported(pc) AND 'Bash' nicht schon im Template (K-3).
+    mode off/suggest => immer (derived, False) (D20); Bewertung je Provider (D21)."""
 
 def render_auto_commit_block(
     resolved: dict,
@@ -1213,7 +1311,9 @@ def render_auto_commit_block(
 
 `auto_commit.additionalProperties` bleibt `false` (`:1546`) — der Key **muss** in `properties`
 stehen; `_KEYS` wird parallel gepflegt, Wächter ist
-`tests/test_auto_commit_violations.py:111-123`.
+`tests/test_auto_commit_violations.py:111-123`. **D23:** `required` = beide Felder,
+`additionalProperties: false` im Grant-Objekt, `acknowledge_full_shell.const = true`; ein Skalar
+ist damit strukturell unmöglich. **D17:** `enum` ist exakt `["direct"]`.
 
 ### 7.3 Allowlist-v2-Struktur (`.meta-config/auto-commit-allowlist.json`)
 
@@ -1253,7 +1353,9 @@ lesbar (T9-Step 2 toleriert fehlende Schlüssel per `.get`). Das Artefakt enthä
 
 `<reason>` ∈ `grant withdrawn` \| `role removed` \| `gate-dropped` \| `no Bash` — **disjunkt**
 definiert (K-5), Prüfreihenfolge wie in der Spalte genannt. Rollenliste max. 20 Einträge, Rest
-`… (+N more)`.
+`… (+N more)`. **D17:** `grant withdrawn` nur, wenn die Rolle die `roles:`-Liste verlässt; ein nur
+entfernter Override-Key bei weiterhin gelisteter Rolle ergibt `no Bash`. **D19:** alle vier Zeilen
+bleiben WARN/INFO ohne Exit-Code-Wirkung.
 
 ## 8. Teststrategie
 
@@ -1276,7 +1378,7 @@ Dazu die Hook-Fälle in `test_orchestrator_guard_hook.py:945-1058` (eigene Datei
 enthalten). **Gates stützen sich nicht auf Sollzahlen**, sondern auf `0 failed` plus die je Task
 namentlich genannten Tests; die Zahlen hier dienen nur der Plausibilität.
 
-**Neu/erweitert je Grant-Fall (Soll ≈ 40 Tests):**
+**Neu/erweitert je Grant-Fall (Soll ≈ 47 Tests):**
 
 | Fall | Test (Datei) | Assertion-Kern |
 |---|---|---|
@@ -1286,6 +1388,10 @@ namentlich genannten Tests; die Zahlen hier dienen nur der Plausibilität.
 | Grant ungültig → Fail-Safe | `test_invalid_grant_triggers_fail_safe`, `…without_ack…` (lib) | `mode == "off"`, `eligible_roles == []`, `authority_overrides == {}` |
 | Grant nicht durchsetzbar | `test_grant_not_enforced_when_guard_disabled`, `…on_hookless_provider` (violations) | Meldung exakt Spec §4.3 |
 | Grant auf inaktive Rolle | `test_authority_override_inactive_role_is_not_a_violation` (violations) | `[]` + eine INFO-Notice |
+| Grant auf inaktive Rolle bleibt rc 0 | `test_validate_rc0_on_inactive_role_grant` (violations) | rc 0 + INFO-Zeile, **kein** `[ERROR]` (D22) |
+| `suggest` rendert nichts | `test_grant_under_suggest_is_never_rendered`, `test_suggest_renders_no_grant_line_and_no_bash` | `(derived, False)`, Block ohne `#1181` (D20) |
+| Gemischtes Provider-Set | `test_grant_in_mixed_provider_set_renders_on_hook_provider`, `test_mixed_provider_set_logs_info_and_warn` | `(direct, True)` / `(notify, False)` + genau 1 INFO + 1 WARN (D21) |
+| Entzugswege | `test_shrink_warning_reports_withdrawn_grant`, `test_removed_grant_key_while_role_listed_is_no_bash` | `grant withdrawn` (nur `roles:`-Entfernung) / `no Bash` (D17) |
 | Edit-only granted | `test_notify_role_escalates_to_direct` (grants) | `"direct"` |
 | Edit-only not granted | `test_no_override_is_identity` (grants) | Identität über alle Templates |
 | Read-only nie | `test_read_only_role_never_escalates` (grants) | `"none"` |
@@ -1315,8 +1421,9 @@ mit `documenter` als Referenzrolle —
 (a) Grant an → generierter Claude-Agent mit `Bash` + Grant-Zeile, Allowlist v2,
 `auto-commit-grant:`-INFO genau einmal;
 (b) Guard-Sentinel akzeptiert `git add` + `git commit`, lehnt `git push` **und** `curl` ab;
-(c) Grant aus + erneuter Sync → `eligible_roles`-Schrumpfung um `documenter` mit
-`(grant withdrawn)` im Log und ohne `Bash` im regenerierten Agenten;
+(c) beide Entzugswege (D17): nur Override-Key entfernt ⇒ `eligible_roles`-Schrumpfung mit
+`(no Bash)`; Rolle aus `roles:` entfernt ⇒ `(grant withdrawn)` plus INFO-Notice aus D22 — jeweils
+ohne `Bash` im regenerierten Agenten;
 (d) Guard aus + erneuter Sync → kein `Bash`, WARN, `--validate` rc 1.
 Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Unit-Tests.
 
@@ -1333,7 +1440,8 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
   Provider und **kein** `Bash` (fail-safe statt Prosa-Grant); ist der Guard deaktiviert, wird
   ebenfalls nichts gerendert und `--validate` endet rc 1.
 - **Formwechsel:** Es gab nie eine ausgelieferte Skalarform (`documenter: direct`) — die Spec war
-  und ist `DRAFT`. Ein Projekt, das die nicht freigegebene Zwischenform gesetzt hat, bekommt
+  und ist `DRAFT`, und **D23** akzeptiert die Objektform als einzige Form. Ein Projekt, das die
+  nicht freigegebene Zwischenform gesetzt hat, bekommt
   `auto_commit.authority_overrides.documenter: expected {authority: direct,
   acknowledge_full_shell: true}` und den Fail-Safe; das ist laut, nicht still.
 - Upgrade-Reihenfolge: erst Framework (dieser Branch), dann Key setzen. Umgekehrt (Key in einem
@@ -1341,9 +1449,10 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
   `mode: off` + WARN — laut, nicht still.
 
 **Rollback (drei Ebenen):**
-1. `authority_overrides` entfernen ⇒ nächster Sync schrumpft `eligible_roles` mit
-   `(grant withdrawn)`, der Agent verliert `Bash` (Claude/Gemini) und bleibt/ist auf Opencode
-   bereits `bash: deny`; keine Code-Änderung nötig.
+1. **Entzug (D17):** (a) Rolle aus `roles:` entfernen ⇒ `eligible_roles` schrumpft mit
+   `(grant withdrawn)`; (b) nur den Override-Key entfernen ⇒ Schrumpfung mit `(no Bash)`. In beiden
+   Fällen verliert der Agent `Bash` (Claude/Gemini) und bleibt/ist auf Opencode bereits
+   `bash: deny`; keine Code-Änderung nötig.
 2. `auto_commit.mode: off` ⇒ kein Sentinel, kein Block (`auto_commit.py:350-352`,
    Hook `:459-464`); die Grant-Zeile verschwindet mit dem Block.
 3. Vollständiger Code-Rollback: `rev-parse` auf `aaed14c2`; die geschriebene Allowlist v2 bleibt
@@ -1359,15 +1468,18 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
 | R2 | Hook-Lücken (#1151: F6-04/F6-05) | Die Zusage „nur add/commit" ist schwächer als dokumentiert | Rollout-/Doku-Reihenfolge in T11; Risiko in Doku nennen; kein Auto-Rollout; #1151 **vor** T16 mergen (§3a) |
 | R3 | Hook-lose Provider | `direct`-Prosa auf `bash: deny` wäre der #767-Widerspruch | `resolve_commit_grant` rendert dort nichts + WARN (T6/T8) |
 | R3b | **Guard im Projekt deaktiviert** | `Bash`-Grant ohne jedes Gate | `guard_hook_enabled` als zweites Render-Gate (T15/T6), WARN + `--validate`-ERROR (T2), Szenario-Assert (f) |
-| R3c | **Attributionslücke** (F-5) | Kommandos ohne Sentinel sind keiner Rolle zuordenbar ⇒ keine Security-Boundary gegen Injection | Nirgends als Boundary dokumentiert (T5/T11); Ack-Pflicht; F-5 als Ticket |
-| R4 | **Persona-Konflikt `documenter`** („You implement NOTHING" + `Bash`) | Rollen-Selbstverständnis kippt; Agent könnte Shell für Nicht-Commit-Zwecke nutzen | Grant-Zeile nennt die Ausweitung **und** die Grenze (T5); Doku-Absatz (T11); Persona selbst **nicht** anfassen (OQ-3) |
+| R3c | **Attributionslücke** (F-5 / **#1210**) | Kommandos ohne Sentinel sind keiner Rolle zuordenbar ⇒ keine Security-Boundary gegen Injection | Nirgends als Boundary dokumentiert (T5/T11, D18); Ack-Pflicht; **#1210** als Ticket |
+| R4 | **Persona-Konflikt `documenter`** („You implement NOTHING" + `Bash`) | Rollen-Selbstverständnis kippt; Agent könnte Shell für Nicht-Commit-Zwecke nutzen | **D16: akzeptiert.** Grant-Zeile nennt den Grant als Commit-Recht **und** die Grenze (T5); Doku-Absatz (T11); `agents/1-generic/documenter.md` bleibt **unverändert** |
 | R5 | **#767-Widerspruch** | Spec #767 sagt „direct-only by design"; #1181 hebt das bedingt auf | Neue Funktion statt Änderung von `role_commit_authority` (K-1/§7.1); Docstring in `is_role_eligible` nennt die Ausnahme; #767 bleibt inhaltlich gültig |
 | R6 | Admin-UI droppt den Key (F-2) | Nutzer speichert im Panel und verliert den Grant | T10 (Round-Trip-Erhalt) + F-2 (Feld) |
 | R7 | Zwei Key-Listen (Schema + `_KEYS`, F-1) | Vergisst man `_KEYS`, deaktiviert der Fail-Safe die ganze Authority | T1-Step 3 + bestehender Mengengleichheits-Test (`test_enum_constants_match_schema`) |
 | R8 | Tippfehler im Rollennamen | Stiller No-op | Semantische Prüfung „abgeleitet `none`" ⇒ `--validate`-ERROR (T2); inaktive Rolle ⇒ INFO (T2) |
-| R9 | Schrumpf-Warnung bricht CI | Upgrades würden rot | OQ-4: WARN, kein Exit-Code (T9-Step 6, T14-Step 3) |
+| R9 | Schrumpf-Warnung bricht CI | Upgrades würden rot | **D19:** WARN, kein Exit-Code (T9-Step 6, T14-Step 3) |
 | R10 | Reihenfolge-Kollision mit #1186/#1187/#1188 | Hunk-Konflikte in Schema/`config.py`/`agent_sync.py`/`sync_pipeline.py`/`admin-ui.html`/Hook | Kanonische Reihenfolge + Matrix in §3a; ein PR nach dem anderen |
 | R11 | `ALLOWLIST_VERSION`-Bump als Churn | Jeder Consumer sieht eine geänderte Allowlist ohne eigenen Grant | Bewusster Default-Diff (K-10), in `CHANGELOG` „Changed“ (T11) und §9 Migration dokumentiert |
+| R12 | Grant unter `suggest` erwartet | Nutzer wundert sich, dass kein `Bash` erscheint | **D20:** `suggest` ist propose-only; Test (T6/T8) und Doku-Satz (T11) |
+| R13 | Gemischtes Provider-Set fälschlich als ERROR | Jedes Zwei-Provider-Projekt wäre dauerhaft rot | **D21:** ERROR nur bei Nirgends-Durchsetzbarkeit; `test_grant_enforced_on_mixed_provider_set_is_no_violation` (T2) |
+| R14 | Revoke über `authority_overrides` erwartet | Nutzer setzt `notify` und erwartet Entzug; tatsächlich Config-Fehler | **D17:** Schema-Enum `["direct"]`, Violation + Fail-Safe; Doku (T11) nennt die zwei Entzugswege |
 
 ## 11. AC → Task-Traceability
 
@@ -1382,13 +1494,18 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
 | N-2 | Grant ohne `acknowledge_full_shell: true` ⇒ Config-Fehler | T1, T2, T4 | Schema-Tests; `test_grant_without_ack_triggers_fail_safe`; `--validate` rc 1 |
 | N-3 | Sentinel-tragendes Nicht-`git`-Kommando ⇒ rc 2 | T16, T13 | `test_granted_role_sentinel_blocks_curl`/`…mixed_command`; Scratch-Lauf Step 3 |
 | N-4 | Grant nirgends durchsetzbar ⇒ `--validate`-ERROR, gemischt ⇒ WARN | T2 | `test_grant_not_enforced_on_hookless_provider`, `test_grant_enforced_on_mixed_provider_set_is_no_violation` |
+| N-5 | Grant unter `suggest` rendert nichts (D20) | T6, T8 | `test_grant_under_suggest_is_never_rendered`, `test_suggest_renders_no_grant_line_and_no_bash` |
+| N-6 | Gemischtes Set: Render auf Hook-Provider, WARN je hook-losem Provider (D21) | T2, T6, T8, T12 | `test_grant_in_mixed_provider_set_renders_on_hook_provider`, `test_mixed_provider_set_logs_info_and_warn`; Szenario 94 |
+| N-7 | Rolle nicht in `roles:` ⇒ INFO, rc 0 (D22) | T2, T13 | `test_validate_rc0_on_inactive_role_grant`; Scratch-Lauf Step 5 |
+| N-8 | Entzugswege: `grant withdrawn` nur bei `roles:`-Entfernung, sonst `no Bash` (D17) | T9, T12, T13 | `test_shrink_warning_reports_withdrawn_grant`, `test_removed_grant_key_while_role_listed_is_no_bash`; Scratch-Lauf Step 4/5 |
+| N-9 | `agents/1-generic/documenter.md` unverändert, Byte-Golden für Nicht-Grant-Rollen (D16) | T5, T14 | `git diff --name-only aaed14c2..HEAD -- agents/` leer; Byte-Golden `role=None` |
 
 **Nicht vollständig abdeckbare AC-Teile (bewusst, mit Begründung):**
 - AC-2 „Sentinel akzeptiert einen echten `git commit` **zur Laufzeit** beim Provider": in CI nur
   als Hook-Unit-Test mit synthetischem Payload plus Allowlist-Artefakt belegbar (T8/T13/T16). Ein
   echter Provider-Runtime-Test existiert im Repo nicht und wird hier nicht erfunden.
 - AC-2-Alternative „constrained commit-only Bash permission": nicht als **Provider**-Permission
-  erreichbar, weil kein Provider eine kommando-genaue Bash-Permission belegt (OQ-2;
+  erreichbar, weil kein Provider eine kommando-genaue Bash-Permission belegt (OQ-2 → D18;
   `provider_transform.py:895-920` mappt Skalare, v2 nutzt `resource: "*"` `:960-972`). Das
   Äquivalent ist die Hook-Härtung aus T16 — sie gilt nur für Sentinel-tragende Kommandos, und
   genau diese Grenze steht so in Block (T5) und Doku (T11).
@@ -1401,10 +1518,11 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
 | **#1151** | `NotebookEdit/MultiEdit/PowerShell bypass containment and strict-mode guards; allowlist drift` | **Sicherheitsabhängigkeit, kein Blocker** | Der Grant stützt seine Zusage auf den Guard-Hook; die Issue belegt F6-04 (fehlende Mutations-Kommandos) und F6-05 (Sentinel ohne `agent_id`). **Korrektur zur Vorversion:** #1181 fasst den Hook jetzt an (T16); beide ändern `hooks/1-generic/orchestrator-guard-impl.sh`, deshalb steht #1151 in der Matrix (§3a) **vor** #1181. T11 nennt die Rollout-/Doku-Reihenfolge (R2). `CHANGELOG.md:12` zeigt, dass ein Teil bereits in `2.0.0-beta.8` geflossen ist. |
 | **#1172** | `merges dispatched via orchestrator to git agent are blocked …` | **Unabhängig, abgegrenzt** | Merge/Push/Tag/Branch bleiben ausschließlich `git`-Rolle (Spec §5 Nr. 7; `_PUSH_BOUNDARY_LINE`, `auto_commit.py:51-54`). Berührungspunkt wäre nur `rules/1-generic/use-orchestrator.md`, das #1181 nicht anfasst. Kein Task, keine Abhängigkeit — nur der Satz in T11, dass der Grant nichts an der `git`-Rolle ändert. |
 
-## 13. Neu gemeldete Findings (separate Issues, Nummern folgen im Wave-Overview)
+## 13. Findings → Issues (#1210 vergeben, übrige Nummern im Wave-Overview)
 
-> Keine erfundenen Nummern: die Items werden als eigenständige Issues angelegt; die ID trägt
-> das Wave-Overview nach. Bis dahin sind sie hier nur mit `F-n` adressiert.
+> F-5 ist seit **D18** als **#1210** vergeben und in Spec §8.1/§8.2 geführt. Für F-1…F-4 gilt
+> weiter: die Items werden als eigenständige Issues angelegt; die ID trägt das Wave-Overview nach.
+> Keine erfundenen Nummern.
 
 | ID | Titelvorschlag | Labels | Kern (verifiziert) | Verhältnis zu #1181 |
 |---|---|---|---|---|
@@ -1412,21 +1530,24 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
 | **F-2** | `bug(admin-ui): saving the auto-commit panel drops keys the form does not know` | `bug`, `config`, `admin-ui`, `P3` | `docs/ui/admin-ui.html:7753-7760` baut `out` neu und sendet nur dieses (`:7761`); jeder unbekannte Key wird still gelöscht. Repro: Key in `project.yaml` setzen, Panel öffnen, „Save" → Key weg. | T10 behebt den **Datenverlust** (Spread); F-2 liefert das **Formularfeld** + Round-Trip-Test |
 | **F-3** | `docs(spec): 767 references stale file:line anchors` | `docs`, `P3` | `docs/specs/767-auto-commit-permission-authority.md` zeigt u. a. `auto_commit.py:14`, `:32-39`, `:85-169`, `config.py:1302-1315`, `sync_pipeline.py:1479-1494`, Hook `:201-232`; gültig sind `:28`, `:127-143`, `:322-459`, `:1792-1848`, `:1893-1924`, Hook `:420-502` | T11-Step 6 zieht die Anker mit (ohne Inhaltsdebatte) |
 | **F-4** (neu aus diesem Plan) | `docs(spec): #1181 spec cites the dead Bash→code_execution mapper for Gemini` | `docs`, `P3` | Spec §3.3 verweist auf `scripts/lib/provider_transform.py:854-870`; diese Funktion wird im Render-Pfad **nie aufgerufen** (einziger Treffer ist die Definition; `config/provider-capabilities.yaml:290` führt sie selbst als offene Inkonsistenz). Der lebende Pfad ist `config/ai-providers.yaml:230-251` (`tools: filter`, `tool-name-map: {Bash: run_command}`); `code_execution` erscheint nur als `bash_tool_name` (`:203`, Enforcement-Seite). | **Spec-Text mit Rev. 1.1 korrigiert** (§3.3 + AC-2); K-4 + `test_gemini_grant_maps_to_run_command` (T8) verhindern einen roten Test; das Ticket bleibt für den toten Code |
-| **F-5** (neu aus dem Review 2026-11-09) | `bug(hooks): PreToolUse payload carries agent_id but no agent name — command-level scoping for granted roles is not enforceable` | `bug`, `hooks`, `security`, `P3` | Der Guard liest die Rolle ausschließlich aus dem modell-geschriebenen Sentinel (`orchestrator-guard-impl.sh:326-350`); das Payload liefert nur `agent_id` (`:262-269`). Jede rollengebundene Kommando-Grenze ist damit für Kommandos **ohne** Sentinel wirkungslos — genau der Injection-Pfad. | T16 härten den wohlgeformten Pfad; die Grenze wird in T5/T11 ausdrücklich benannt (kein Boundary-Versprechen). Kein Blocker für #1181, weil die Ack-Pflicht (T1) den Grant als Voll-Shell-Grant kontraktiert |
+| **F-5 / #1210** (neu aus dem Review 2026-11-09; Issue-Nummer seit **D18**) | `bug(hooks): PreToolUse payload carries agent_id but no agent name — command-level scoping for granted roles is not enforceable` | `bug`, `hooks`, `security`, `P3` | Der Guard liest die Rolle ausschließlich aus dem modell-geschriebenen Sentinel (`orchestrator-guard-impl.sh:326-350`); das Payload liefert nur `agent_id` (`:262-269`). Jede rollengebundene Kommando-Grenze ist damit für Kommandos **ohne** Sentinel wirkungslos — genau der Injection-Pfad. | T16 härten den wohlgeformten Pfad; die Grenze wird in T5/T11/§15.2 ausdrücklich benannt (kein Boundary-Versprechen). Kein Blocker für #1181, weil die Ack-Pflicht (T1) den Grant als Voll-Shell-Grant kontraktiert |
 
-## 14. Offene Entscheidungen (OQ)
+## 14. Entscheidungen (OQ → D, Stand 2026-11-09)
 
-| ID | Frage | Empfehlung des Plans | Blockadewirkung |
+Alle Fragen sind entschieden; die Tabelle ist der Plan-Spiegel von Spec §13. Es gibt keine offene
+OQ und keine Blockadewirkung mehr.
+
+| ID | Frage | Entscheidung (`DECIDED 2026-11-09`) | Task-/Stellenbezug |
 |---|---|---|---|
-| **OQ-1** | Soll `authority_overrides` in v1 auch `delegate`/`notify`/`none` akzeptieren (Entzug)? | **Nein.** Nur `direct` (Schema-Enum); Entzug über `roles:` und über Entfernen des Keys. Ein Entzugs-Enum wäre ein zweiter, ungeprüfter Pfad ohne AC — und würde die K-5-Reason „grant withdrawn" ununterscheidbar machen. | **Blockiert nichts**: v1-Enum ist `["direct"]`; eine spätere Erweiterung ist additiv (Schema + `_KEYS` + Tests). |
-| **OQ-2** | Gibt es eine kommando-genaue Bash-Permission (nur `git add`/`git commit`)? | **Nein, nicht belegt.** `provider_transform.py:895-920` mappt Skalare, v2 nutzt `resource: "*"` (`:960-972`). Doku sagt daher „voller Bash, hook-begrenzt". Ein Spike ist ein eigenes Ticket, kein Task hier. | **Blockiert nichts** in v1; blockiert jede Doku-Aussage „nur `git`" — die entfällt (T11). |
-| **OQ-3** | Ist der Persona-Konflikt (`documenter` „implementiert nichts" + `Bash`) akzeptabel? | **Ja, mit expliziter Grant-Zeile** (T5) und Doku-Absatz (T11); **keine** Persona-Änderung an `agents/1-generic/documenter.md` (Submodul-Schutz + Byte-Golden für Nicht-Grant-Rollen). | **Blockiert T5/T11-Formulierung**, nicht die Implementierung — ohne Entscheid bleibt die Grant-Zeile die konservative Variante. |
-| **OQ-4** | Soll die Schrumpf-Warnung unter `--check`/`--validate` ein ERROR (CI-Gate) sein? | **Nein, WARN.** Sonst bricht jedes Upgrade die CI (und #1142 arbeitet an derselben Exit-Code-Politik). T14-Step 3 pinnt `--check` rc 0. | **Blockiert nichts**; eine spätere Verschärfung wäre ein eigener Task mit #1142. |
-| **OQ-5** (aus Spec) | Gilt der Grant auch für `suggest`? | **Nein** — `suggest` ist authority-agnostisch propose-only (`auto_commit.py:383-391`); `resolve_commit_grant` liefert `(derived, False)` (T6). | Keine. |
-| **OQ-6** (aus Spec) | Ist ein Grant auf einem hook-losen Provider in einem **gemischten** Provider-Set ein Fehler? | **Nein** (K-9/Spec §4.3): ERROR nur, wenn der Grant **nirgends** durchsetzbar ist (Guard aus oder ausschließlich hook-lose Provider); im gemischten Set bleibt es bei der WARN je Provider. | Blockiert T2-Abgrenzung; Empfehlung ist spec-konform. |
-| **OQ-P1** (Plan) | Braucht `resolve_commit_grant` wirklich `agent_meta_root` (K-1)? | **Erledigt:** Signatur steht so in Spec Rev. 1.1 (§4.3); T6 implementiert sie. Keine offene Frage mehr. | Keine. |
-| **OQ-P2** (Plan) | Ist „Rolle nicht in `roles:`" ein `--validate`-ERROR? | **Nein** (K-2): kein Fehler, aber eine INFO-Notice aus `authority_override_notices` (T2). ERROR nur für read-only/unbekannte Templates und für nicht durchsetzbare Grants. | Keine. |
-| **OQ-P3** (Plan) | Skalar (`documenter: direct`) oder Objekt mit Ack (K-8)? | **Objekt mit Pflicht-Ack** (Review-Variante b, vollständig durchgezogen). Ein Skalar-Kurzweg wird bewusst nicht akzeptiert — zwei akzeptierte Formen wären zwei Parser und zwei Fehlermeldungen. | Blockiert nichts; Schema/Tests in T1/T2. |
+| **OQ-1 → D17** | Soll `authority_overrides` in v1 auch `delegate`/`notify`/`none` akzeptieren (Entzug)? | **Nein, nur geben.** Schema-Enum bleibt `["direct"]`; Entzug ausschließlich über `roles:`-Entfernung oder Entfernen des Override-Keys. `grant withdrawn` bleibt an die `roles:`-Entfernung gebunden, sonst `no Bash`. | T1, T3, T7, T9, T13, §2 K-20, §7.4 |
+| **OQ-2 → D18** | Gibt es eine kommando-genaue Bash-Permission (nur `git add`/`git commit`)? | **Nein.** Grant = voller `Bash`; Doku sagt das ausdrücklich (keine „nur `git`"-Aussage). Guard-Härtung für Sentinel-tragende Kommandos, Attributionslücke = **#1210**. Ack bleibt Pflicht. | T8, T13, T16, T11, §2 K-11, §10 R1/R3c |
+| **OQ-3 → D16** | Ist der Persona-Konflikt (`documenter` „implementiert nichts" + `Bash`) akzeptabel? | **Ja.** `documenter` bleibt Referenzrolle; `agents/1-generic/documenter.md` wird **nicht** geändert. Grant wird im Block als Commit-Recht ausgewiesen und in der Doku erklärt; Byte-Golden für Nicht-Grant-Rollen unverändert. | T5, T11, T14, §2 K-23 |
+| **OQ-4 → D19** | Soll die Schrumpf-Warnung unter `--check`/`--validate` ein ERROR (CI-Gate) sein? | **Nein, WARN.** Kein CI-Gate, exaktes Log-Format bleibt gepinnt; #1142-Abstimmung nur als spätere Option. | T9, T14, §2 K-5 |
+| **OQ-5 → D20** | Gilt der Grant auch für `suggest`? | **Nein.** `resolve_commit_grant` liefert für `suggest` `(derived, False)`; kein `Bash`-Render, keine Grant-Zeile, kein Sentinel. | T6, T8, T11, §2 K-22 |
+| **OQ-6 → D21** | Ist ein Grant auf einem hook-losen Provider in einem **gemischten** Provider-Set ein Fehler? | **Nein, WARN je Provider.** Render auf Providern mit aktivem Guard; ERROR nur, wenn der Grant auf **keinem** Ziel-Provider wirken kann. | T2, T6, T8, T12, §2 K-21 |
+| **OQ-P1** | Braucht `resolve_commit_grant` wirklich `agent_meta_root` (K-1)? | **Erledigt** (bereits Rev. 1.1/1.2): Signatur steht in Spec §4.3 und §7.1; T6 implementiert sie. | T6, §7.1 |
+| **OQ-P2 → D22** | Ist „Rolle nicht in `roles:`" ein `--validate`-ERROR? | **Nein, INFO.** `authority_override_notices` liefert eine INFO-Zeile; ERROR nur für read-only/unbekannte Templates und nicht durchsetzbare Grants. | T2, T13, §2 K-24 |
+| **OQ-P3 → D23** | Skalar (`documenter: direct`) oder Objekt mit Ack (K-8)? | **Nur Objektform mit Pflicht-Ack.** Skalar-Kurzform wird nicht akzeptiert; fehlendes/falsches Ack = Violation + kein Grant. | T1, T2, T7, T11, §2 K-8, §7.2 |
 
 ---
 
@@ -1466,7 +1587,24 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 | **K5** (MINOR) | Provider-/Guard-Gate ist **Wirkbedingung** nach dem Grant, keine Präzedenzstufe 7; T6/T8 prüfen es weiterhin nach der Auflösung | **§2 K-17** |
 | **K6** | **Nicht betroffen**: Schema-Sketch ohne `$defs` | geprüft: T1 |
 | **K7** (NIT) | `acknowledge-full-shell` → **`acknowledge_full_shell`** in allen Schema-, Test-, Doku-, Beispiel- und Meldungsstellen; Stilsatz dokumentiert | **§2 K-18**, T1, T2, T5, T10, T11, §7, §11 (N-2) |
-| **K8** | Schema **und** `_KEYS` im selben PR + Mengengleichheits-Test (`schema.properties.auto_commit.properties == _KEYS`) als DoD-Nachweis | **§2 K-19**, **T1-Step 3**, **T14-Step 7** |
+### 15.2 Entscheidungsprotokoll (2026-11-09) — D16–D23
+
+Spiegel von Spec §13. Die Nummern sind in Spec und Plan identisch; jede Zeile nennt die
+Umsetzungsstelle im Plan.
+
+| D-Nr | Frage | Entscheidung | Stelle |
+|---|---|---|---|
+| **D16** | OQ-3 — Persona-Konflikt akzeptabel? | **Ja, Persona unverändert.** `documenter` bleibt Referenzrolle; `agents/1-generic/documenter.md` wird **nicht** geändert. Der Grant wird im `AUTO_COMMIT_BLOCK` als **Commit-Recht** ausgewiesen und in der Doku erklärt. Byte-Golden für Nicht-Grant-Rollen bleibt unverändert. | T5-Step 2/3 (Grant-Zeile, kein Persona-Edit), T11-Step 2 (Doku-Satz), T14-Step 4 (`agents/`-Diff leer), §2 K-23, §10 R4, §11 N-9 |
+| **D17** | OQ-1 — Auch Revoke-Werte akzeptieren? | **Nein, nur geben.** Schema-Enum = `["direct"]`; Entzug ausschließlich über `roles:`-Entfernung oder Entfernen des Override-Keys. `grant withdrawn` bleibt **ausschließlich** an die `roles:`-Entfernung gebunden; nur entfernter Key ⇒ `no Bash`. | T1-Step 1/2 (Enum-Pin), T3-Step 2 (nie herabstufen), T7-Step 2 (nur `direct` in der Map), T9-Step 1/3 (zwei Reasons), T13-Step 4/5 (beide Wege), §2 K-20, §7.4, §9 |
+| **D18** | OQ-2 — Kommando-genaue Bash-Permission? | **Nein.** Grant = vollständige Shell; die Doku sagt das ausdrücklich (keine „nur `git`"-Aussage). Guard blockt Sentinel-tragende Nicht-`git`-Kommandos; Attributionslücke = **#1210**, ausdrücklich als Grenze benannt. Ack bleibt Pflicht. | T8-Step 1/2 (per-Provider-Logs), T11-Step 1/2/5 (Greps, README, CHANGELOG), T13-Step 3 (kein-Sentinel-Kontrolllauf), T16-Step 4 (Gate-Kommentar), §2 K-11 |
+| **D19** | OQ-4 — Schrumpf-Warnung als ERROR/CI-Gate? | **Nein, bleibt WARN.** Kein CI-Gate, exaktes Log-Format bleibt gepinnt; #1142 nur als spätere Option. | T9-Step 1 (`test_check_mode_stays_rc_zero_on_shrink`), T9-Step 5 (Docstring), T14-Step 3 (`--check` rc 0), §2 K-5, §7.4 |
+| **D20** | OQ-5 — Grant unter `suggest`? | **Nein.** `resolve_commit_grant` liefert `(derived, False)`; kein `Bash`-Render, keine Grant-Zeile, kein Sentinel. Artefakt/`eligible_roles` bleiben mode-unabhängig. | T6-Step 1/2 (Whitelist `auto`/`custom`), T8-Step 1/2 (keine Log-Zeile), T11-Step 2 (Doku), §2 K-22, §10 R12, §11 N-5 |
+| **D21** | OQ-6 — Hook-loser Provider im gemischten Set = ERROR? | **Nein, WARN je Provider.** Auf Providern mit aktivem Guard wird gerendert; auf den übrigen bleibt die abgeleitete Authority + WARN. ERROR nur, wenn der Grant auf **keinem** Ziel-Provider wirken kann. | T2-Step 1/3 (`mixed_provider_set_is_no_violation`), T6-Step 1/2 (per Provider), T8-Step 1/2 (INFO+WARN), T12 (Szenario Claude+Opencode), §2 K-21, §10 R13, §11 N-4/N-6 |
+| **D22** | OQ-P2 — Rolle nicht in `roles:` = Fehler? | **Nein, INFO.** `authority_override_notices` liefert die INFO-Zeile ``<role>=direct ignored — role is not active (not listed in `roles:` or dropped by the active set)`` (§7.4); ERROR nur für read-only/unbekannte Templates und nicht durchsetzbare Grants. | T2-Step 1/4/6 (`test_validate_rc0_on_inactive_role_grant`), T13-Step 5 (Scratch-INFO), §2 K-24, §11 N-7 |
+| **D23** | OQ-P3 — Skalar-Kurzform akzeptieren? | **Nein, nur Objektform mit Pflicht-Ack** `{authority: direct, acknowledge_full_shell: true}`. Skalar-Kurzform wird nicht akzeptiert; fehlendes/falsches Ack = Violation + kein Grant. | T1-Step 1/2 (Schema + Negativtests), T2-Step 2/3 (Normalisierung/Violation), T7-Step 2 (Fail-Safe), T11-Step 4 (Beispiel-Config), §2 K-8/K-18, §7.2, §11 N-2 |
+
+**Konsequenz für die Ausführung:** Kein Task wartet mehr auf eine Entscheidung. Die Gates aus §5
+bleiben unverändert; neu sind ausschließlich Tests und Präzisierungen (N-5…N-9, K-20…K-24).
 
 ---
 
@@ -1490,6 +1628,9 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
   `sync_pipeline.py:1893-1924`, `cli_commands.py:1432-1439`/`:1462`.
 - **Kein Platzhalter:** Kein Task enthält TBD/„analog oben"; jede Log-Zeichenkette, jeder Testname
   und jede Signatur ist ausgeschrieben, jede Tabelle ist vollständig gefüllt.
+- **Entscheidungen eingearbeitet:** D16–D23 sind in Spec §13 und Plan §15.2 protokolliert und in
+  §2 (K-20…K-24), den Tasks T1/T2/T3/T5/T6/T7/T8/T9/T11/T13/T14/T16 sowie §10/§11 gespiegelt; es
+  bleibt keine offene OQ.
 - **Rollback:** drei Ebenen (Key entfernen / `mode: off` / Code-Revert), alle ohne Datenverlust,
   Allowlist v1 bleibt lesbar; `hook_state.py` ist additiv und kann mit dem Hook-Revert bleiben.
 - **Grenze:** Die Spec ist `DRAFT`; dieser Plan ist ebenfalls `DRAFT` und darf nicht vor

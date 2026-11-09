@@ -13,6 +13,7 @@
 > **Revision 2 (Review-Einarbeitung 2026-11-09):** RVW-1188-01 (BLOCKER), -02 … -06 (MAJOR) sowie drei WARNs sind eingearbeitet. Auflösungstabelle: §12 „Review-Auflösung (2026-11-09)". Status bleibt `DRAFT`.
 > **Revision 3 (Review-Runde 2, 2026-11-09):** RVW2-1188-01 … -04 (Prune-Kandidatenformel, Beispiel-Dateien, Testgüte/Abschlusskriterium, Stufen-Nummerierung) sowie die Querschnittsbefunde RVW2-X-01 (Ziel-Dateimatrix) und RVW2-X-02 (Klassifikation der State-Datei durch #1186 als `unmanaged`) sind eingearbeitet. Status bleibt `DRAFT`.
 > **Revision 4 (Szenario-Konflikte K1–K8, 2026-11-09):** K1 (`unmanaged` statt `project-state`), K2 (eine kanonische `separator`-Form, `defaults.label-separator` entfernt), K4 (Regel 6 auf zwei realisierbare Bedingungen), K6 (`$defs`-Notiz) sind eingearbeitet; K3/K5/K7/K8 betreffen dieses Dokument nicht. Auflösungstabelle: §12.1. Status bleibt `DRAFT`.
+> **Revision 5 (Nutzer-Entscheidungen D9–D15, 2026-11-09):** Die offenen Fragen Q1, Q2, Q3, Q4, Q7, Q8 und Q9 sind **entschieden und eingearbeitet** (§13 „Entscheidungsprotokoll (2026-11-09)"): Repository-Präzedenzkette (D9/Q1), kein Rename in v1 (D10/Q3), `docs/issue-labels.md` in `generated-file-hashes.json` (D11/Q4), Template-Schalter `templates.{mode,force}` in IC-1 (D12/Q8), `--apply` schreibt / `git` committet (D13/Q9), Retry nur bei `429` mit `Retry-After` (D14/Q2), Triage-Labels als Nicht-Taxonomie (D15/Q7). Status bleibt `DRAFT`; es fehlt nur noch `Status: APPROVED`.
 
 ---
 
@@ -180,7 +181,7 @@ Regeln: `auth` referenziert **nur** eine Env-Variable; die Datei ist für Projek
 | Aufruf | Verhalten | Exit |
 |---|---|---|
 | `--labels` | Dry-Run-Diff (`create` / `update` / `no-op`) gegen den Tracker, **schreibt nichts** (D4) | 0 |
-| `--labels --apply` | führt die Diffs aus; Ergebnis-Tabelle `created`/`updated`/`failed` | 0 = alles ok, 1 = Teilfehler |
+| `--labels --apply` | führt die Diffs aus; Ergebnis-Tabelle `created`/`updated`/`failed` **plus** die geänderte Datei (`wrote .meta-config/issue-labels-state.json`) — D13 | 0 = alles ok, 1 = Teilfehler |
 | `--labels --check` | strikt read-only; Drift ⇒ rc 1 (CI-Gate) | 0 / 1 |
 | `--labels --explain` | zeigt pro Achse/Wert den aufgelösten Wert **und** `source` | 0 |
 
@@ -225,8 +226,23 @@ Neue Sektion „Issue labels": Achsen-Liste mit `enabled`-Schalter, Wert-Tabelle
 
 ### 4.9 Generierte Doku und optionale Tracker-Templates
 
-- `docs/issue-labels.md`: aus **demselben** Resolver erzeugt; enthält alle aktiven Achsenwerte mit Label-Namen, Beispiel und Anwendungsregel (AC-22). Datei-Set: **`project-docs`** (§11.1, für #1186 relevant).
+- `docs/issue-labels.md`: aus **demselben** Resolver erzeugt; enthält alle aktiven Achsenwerte mit Label-Namen, Beispiel und Anwendungsregel (AC-22) sowie einen Abschnitt **„Nicht Teil der Taxonomie"** mit den Triage-Labels (§4.10, D15). Datei-Set: **`project-docs`** (§11.1, für #1186 relevant).
+- **DECIDED 2026-11-09 (D11 / Q4) — die Datei ist drift-geprüft.** `docs/issue-labels.md` wird in
+  `.meta-config/generated-file-hashes.json` registriert (explizite Root-Level-Registrierung analog
+  `PLATFORM_DEFAULTS_RESOLVED_REL`, `scripts/lib/generated_file_drift.py:49`, Scan `:383-393`,
+  Capture `:535-537`). Konsequenz: manuelle Edits werden beim nächsten Sync **überschrieben** (mit
+  `.sync-backup-*`-Sicherung) und als Drift gemeldet; wer den Inhalt ändern will, ändert die
+  Taxonomie, nicht die Datei. Dieselbe Regel wird in #957 für die PR-Templates gespiegelt — **eine**
+  Antwort, nicht zwei. Die `project-docs`-Klassifizierung aus #1186 bleibt davon unberührt (Datei-Set
+  ≠ Drift-Ownership).
 - Optional, `mode: off` per Default: `.github/ISSUE_TEMPLATE/<type>.yml`, `.gitlab/issue_templates/<Type>.md`, `.gitea/ISSUE_TEMPLATE/<type>.md` — nur wenn das Projekt opt-in setzt; handgeschriebene Templates werden nie überschrieben.
+- **DECIDED 2026-11-09 (D12 / Q8) — Template-Schalter als geschlossener Unterabschnitt.**
+  `issue-conventions.templates: {mode: off|scaffold|manage, force: bool}` (IC-1). Semantik:
+  `off` (Default) schreibt nichts; `scaffold` legt **nur fehlende** Dateien an und lässt jede
+  bestehende Datei unangetastet; `manage` legt fehlende Dateien an **und** aktualisiert Dateien, die
+  unseren Marker tragen. Eine Datei ohne Marker wird nur mit `force: true` überschrieben (Default
+  `false`). Erzeugt wird ausschließlich, was die Capability des Adapters deckt (`issue-forms` /
+  `issue-templates`, §4.5).
 
 ### 4.10 Rollen-Templates
 
@@ -237,7 +253,7 @@ aus Titel-/Keyword-Feldern, einer als Aktivierungs-Flag):
 |---|---|
 | `{{ISSUE_TAXONOMY_TABLE}}` | drei Achsen mit Werten, Beschreibungen, projizierten Label-Namen |
 | `{{ISSUE_LABEL_MAP}}` | Commit-Type → Issue-Type (D5) + Single-Value-Regel + Create-Policy (IC-6/§4.11) |
-| `{{ISSUE_TRIAGE_LABELS}}` | **Nicht-Taxonomie-Labels** (`triage`, `needs-info`, …) aus einer Framework-Konstante; bewusst keine vierte Achse (D2, Q7) |
+| `{{ISSUE_TRIAGE_LABELS}}` | **Nicht-Taxonomie-Labels** (`triage`, `needs-info`) aus der Framework-Konstante `TRIAGE_LABELS`; bewusst keine vierte Achse (D2, D15) |
 | `{{ISSUE_TAXONOMY_ENABLED}}` | `"true"`/`"false"` der aufgelösten Sektion — erlaubt Rollen einen bedingten Satz („Labels stammen aus der Taxonomie") ohne Literal; bei `false` rendert der Block den Legacy-Text |
 | `{{ISSUE_TITLE_FORMAT}}`, `{{ISSUE_CLOSING_KEYWORDS}}` | aus derselben Auflösung (`{{ISSUE_LANGUAGE}}` bleibt, `scripts/lib/config.py:2720-2722`) |
 
@@ -248,9 +264,37 @@ aus dem Review).
 
 Konsumenten: `feedback.md` (§3-Matrix, `:41-48`), `meta-feedback.md` (§4, `:46-48`), `bug-feature-analyzer.md` (Label-Schema `:89`), `git.md` (bestehender Block `:149-151`). Eine Rolle, die ein Label außerhalb der Taxonomie anwendet, ist ein **Sync-Zeit-Fehler** (Regel 4/5) — genau der Mechanismus, der die heutige Dreiteilung verhindert hätte.
 
+**DECIDED 2026-11-09 (D15 / Q7) — Triage-Labels sind Nicht-Taxonomie.** `render_triage_labels()`
+liefert `triage` und `needs-info` aus einer **Framework-Konstante** (`TRIAGE_LABELS`, in
+`scripts/lib/issue_conventions.py`), nicht aus der Projekt-Taxonomie und nicht aus einem
+Projekt-Override. Sie sind weder eine vierte Achse (D2 bleibt unverändert) noch Teil des
+Soll-Label-Sets: der Sync legt sie nie an, `prune` löscht sie nie, und Regel 4 des
+Consistency-Checks nimmt sie von der Literal-Prüfung aus, weil sie nicht aus `taxonomy.*` stammen.
+`docs/issue-labels.md` führt sie in einem eigenen Abschnitt **„Nicht Teil der Taxonomie"** mit
+Begründung (Status/Triage statt Klassifikation). Rolle ist `bug-feature-analyzer` (T13); die
+AC-6-Interpretation („kein Taxonomy-Literal im Template") schließt die beiden Triage-Labels
+ausdrücklich **ein**, weil sie über den Platzhalter kommen.
+
 ### 4.11 Betriebskanten
 
-- **Repository-Identität:** `{owner}/{repo}` (GitHub/Gitea) bzw. `{project_id}` (GitLab) werden aus `git.remote-url` **abgeleitet**, nicht zweitkonfiguriert. Vier Formen: `https://…git`, `git@host:owner/repo.git`, GitLab-Subgruppe (`project_id` = URL-encoded `group/sub/repo`), Gitea-Pfadform. Nicht parsebar ⇒ harter Fehler **mit der URL** in der Meldung, nie leerer `owner` (AC-16). Optionaler Override `issue-conventions.repository.{owner,repo,project-id}` für Fork-Workflows.
+**DECIDED 2026-11-09 (D9 / Q1) — Präzedenzkette der Repository-Identität.** Die Identität
+(`{owner}/{repo}` für GitHub/Gitea, `project_id` für GitLab) wird in genau dieser Reihenfolge
+aufgelöst, und die erste **nicht-leere, parsebare** Quelle gewinnt:
+
+1. `issue-conventions.repository.{owner,repo}` (bzw. `project-id`) — Projekt-Override, höchste Priorität,
+   deckt Fork-Workflows ab und ist der einzige Weg ohne Git-/CI-Zugriff.
+2. `git.remote-url` — die vier Formen `https://…git`, `git@host:owner/repo.git`, GitLab-Subgruppe
+   (`project_id` = URL-encoded `group/sub/repo`), Gitea-Pfadform; `owner`/`repo` werden hieraus
+   **abgeleitet**, nicht zweitkonfiguriert (AC-16).
+3. CI-Env — `GITHUB_REPOSITORY` (`owner/repo`) und `CI_PROJECT_PATH` (GitLab, `group/sub/repo` →
+   `project_id`). Eine Env-Quelle, die nicht dem erwarteten `owner/repo`-Muster entspricht, gilt als
+   **unparsbar** und wird übersprungen (nicht als halbe Identität akzeptiert).
+
+Erst wenn **alle drei** Quellen leer **oder** unparsbar sind, bricht der Lauf mit **einem** harten
+Fehler (`IssueConfigError`, Exit 2, kein API-Call) ab. Die Meldung nennt **alle drei Wege** namentlich
+(`issue-conventions.repository.{owner,repo}`, `git.remote-url`, `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`)
+und gibt **nie** einen leeren `owner` oder `repo` aus — weder im Text noch in der Diff-/Explain-Ausgabe.
+Schema, Parser, Fehlermeldung und Tests liegen zusammen in Plan T15; AC-16 bleibt wörtlich unverändert.
 - **`--apply` ist nicht transaktional:** jeder Aufruf ist eigenständig; bei Fehler weiter mit den restlichen Labels, Ergebnis-Tabelle, Exit 1, **kein Rollback**, kein Delete-Versuch. `401/403` bricht nach dem **ersten** Fehlschlag ab (AC-18/AC-19).
 - **Label fehlt beim Anlegen:** `create.on-missing-label: warn-and-omit | create | fail`, Default `warn-and-omit` (AC-17).
 - **Namensgrenzen vor dem ersten API-Call:** Adapter-Defaults `label-case` (`lower`), `max-length` (`50`), `allowed-pattern`; Verstoß schlägt beim **Resolve** fehl, nicht als 422 mitten im Apply (AC-20).
@@ -271,7 +315,13 @@ Konsumenten: `feedback.md` (§3-Matrix, `:41-48`), `meta-feedback.md` (§4, `:46
 - **`prune` braucht ein Manifest (RVW-1188-04):** Löschkandidaten stammen ausschließlich aus dem
   persistierten Soll-/Hash-Manifest früherer Läufe (IC-8) oder aus `sync.prune-allow`. Der eigene
   Präfix ist **kein** Löschkriterium mehr — siehe IC-5.
-- **Rate-Limit/HTTP-Robustheit:** das Issue legt keine Retry-Policy fest — siehe offene Frage Q2.
+- **Rate-Limit/HTTP-Robustheit — DECIDED 2026-11-09 (D14 / Q2):** Genau **ein** Retry, und nur bei
+  `429`. Die Wartezeit kommt aus `Retry-After` (Sekunden oder HTTP-Datum), ist **gedeckelt** (Cap
+  30 s; fehlender/unparsbares Header ⇒ 1 s) und wird über eine injizierbare `sleep`-Funktion
+  abgewartet, damit Tests deterministisch bleiben (kein echtes Warten). `5xx` und Timeouts werden
+  **nicht** wiederholt: Fehler sammeln, restliche Labels weiter, Ergebnis-Tabelle, Exit 1 (AC-18).
+  `401`/`403` brechen unverändert nach dem ersten Fehlschlag ab (AC-19). Kein Backoff, kein Retry
+  über Labels hinweg, keine Retry-Konfiguration in `project.yaml`.
 
 ### 4.12 Transport-Härtung (Secret-Exfiltration)
 
@@ -358,10 +408,19 @@ Alle Verträge sind implementierungsbindend; Abweichungen brauchen eine Spec-Rev
     },
     "mapping": { "type": "object", "additionalProperties": { "type": "string" } },
     "repository": {
-      "type": "object", "additionalProperties": false,
+      "type": "object", "additionalProperties": false,     // D9: Stufe 0 der Identitäts-Präzedenz
+      "description": "Projekt-Override der Repository-Identität; schlägt git.remote-url und CI-Env (D9, §4.11)",
       "properties": {
         "owner": { "type": "string" }, "repo": { "type": "string" },
-        "project-id": { "type": "string" }
+        "project-id": { "type": "string" }                 // GitLab: URL-encoded group/sub/repo
+      }
+    },
+    "templates": {
+      "type": "object", "additionalProperties": false,       // D12: geschlossener Unterabschnitt für §4.9
+      "description": "Optionale Tracker-Templates; off = nichts, scaffold = nur fehlende, manage = auch generierte",
+      "properties": {
+        "mode":  { "enum": ["off", "scaffold", "manage"], "default": "off" },
+        "force": { "type": "boolean", "default": false }     // nur nötig, um Dateien ohne Marker zu überschreiben
       }
     },
     "create": {
@@ -548,6 +607,7 @@ Vertragsregeln:
 | Ausgabe | Diff-Zeilen `create <label>` / `update <label>` / `no-op <label>`, danach Summenzeile; `--explain` zeilenweise `<key> ← <source>` |
 | Idempotenz | zweiter `--apply`-Lauf ohne Änderung ⇒ ausschließlich `no-op`, Exit 0 (AC-4). Setzt vollständiges `list` (Pagination) und — wo nötig — die Name→ID-Map voraus; ohne beides wäre der zweite Lauf ein Duplikat-`create` (RVW-1188-01) |
 | Zustands-Schreiben | nur `--apply` schreibt `.meta-config/issue-labels-state.json` (IC-8); `--labels`, `--check` und `--explain` sind strikt lesend |
+| Commit (D13) | **kein** Auto-Commit aus dem CLI-Pfad. `--apply` schreibt und druckt die geänderte Datei; der Commit bleibt beim `git`-Aufruf (Commit-Authority). CI-`--apply`-Jobs committen **nie** — sie schreiben nur, der nächste Mensch- oder Job-Schritt committet |
 | Secret-Freiheit | Ausgabe, Logs und generierte Dateien enthalten **keinen** Token-Wert (AC-8); Transport-Regeln H-1…H-7 (§4.12) sind nicht abschaltbar |
 
 ### IC-5 `prune`-Semantik
@@ -576,9 +636,13 @@ Vertragsregeln:
   leer, gibt es **null** Löschkandidaten (safe default) und `info: prune-needs-manifest`.
   `sync.prune-allow` wirkt unabhängig vom Manifest (Bedingung 3 oben ist ein ODER): ein dort
   genanntes Label ist auch ohne Manifest löschbar, sofern `sync.prune: true` gilt (RVW2-1188-01).
-- Ein Rename wird als eigene Diff-Zeile `rename <alt> -> <neu>` gedruckt und nur über
-  `update.new_name` übertragen — nie still (Risiko-Tabelle im Issue). Die `alt`-Seite liefert seit
-  IC-8 das Manifest; die *Paarung* Alt↔Neu bleibt offen (Q3).
+- **DECIDED 2026-11-09 (D10 / Q3) — kein Rename in v1.** Ein neuer Wert erzeugt `create <neu>`; das
+  alte Label bleibt im Tracker **unangetastet** und wird als `info: rename-candidate <alt>` gemeldet
+  (die `alt`-Seite liefert das Manifest, IC-8). Es gibt **keinen** `update.new_name`-Aufruf, der aus
+  einem Rename-Verdacht entsteht: der alte Wert verschwindet nur aus dem **Soll-Set**, nie aus dem
+  Tracker, und `--check` löscht ihn auch nicht. Die Vertragszeile `rename <alt> -> <neu>` bleibt im
+  CLI-Vertrag **reserviert** für eine spätere explizite `renames`-Map (eigene Spec-Revision, heute
+  nicht in IC-1). Bis dahin ist `rename` ein Ausgabewort, das in v1 **nie** erzeugt wird.
 - `--check` löscht nie und meldet gelöschte Kandidaten höchstens als `info`.
 
 ### IC-6 Auth-Vertrag
@@ -598,9 +662,9 @@ Vertragsregeln:
 
 ### IC-7 Ausgabe- und Ownership-Vertrag
 
-- Neu erzeugt: `docs/issue-labels.md` (aus dem Resolver; AC-22) — Datei-Set `project-docs` (§11.1) — sowie optional die drei Template-Familien aus 4.9.
-- Vorhandene, handgeschriebene Dateien werden **nie** überschrieben; bei Abweichung Warnung, `--force` nur explizit.
-- Ob die generierten Dateien in `generated-file-hashes.json` gehören, ist mit #957 (PR-Templates, gleiche Ownership-Frage) zu entscheiden — offene Frage Q4.
+- Neu erzeugt: `docs/issue-labels.md` (aus dem Resolver; AC-22) — Datei-Set `project-docs` (§11.1) — sowie optional die drei Template-Familien aus 4.9 (gesteuert über `templates.mode`, IC-1).
+- Vorhandene, handgeschriebene Dateien werden **nie** überschrieben; bei Abweichung Warnung, `--force` bzw. `templates.force: true` nur explizit.
+- **DECIDED 2026-11-09 (D11 / Q4): `docs/issue-labels.md` gehört in `generated-file-hashes.json`.** Die Datei ist generiert und wird drift-geprüft (Registrierung über eine explizite Root-Level-Ausnahme im Stil von `PLATFORM_DEFAULTS_RESOLVED_REL`, `scripts/lib/generated_file_drift.py:49/383-393/535-537`). Manuelle Edits werden beim nächsten Sync überschrieben und als Drift gemeldet. Dieselbe Regel gilt in #957 für PR-Templates — eine Antwort für beide Ausgabefamilien. Die generierten Tracker-Templates aus 4.9 folgen derselben Regel, sobald `templates.mode` sie erzeugt (Registrierung im selben Baseline-Mechanismus).
 
 ### IC-8 Zustands-Manifest (`.meta-config/issue-labels-state.json`)
 
@@ -631,7 +695,9 @@ Vertragsregeln:
    `--explain` schreiben nie.
 2. **Versioniert im Repo.** `--check` in CI braucht dasselbe Manifest wie der Produzent; ohne
    Versionierung wäre der CI-Gate blind. Schreibweise: sortierte Schlüssel, eine Zeile pro Label,
-   damit Merge-Konflikte auf einzelne Zeilen fallen. Der Commit bleibt beim `git`-Agenten (Q9).
+   damit Merge-Konflikte auf einzelne Zeilen fallen. Der Commit bleibt beim `git`-Agenten **außerhalb**
+   des CLI (D13): `--apply` schreibt und druckt die Datei, committet aber nie selbst; CI-`--apply`-Jobs
+   committen ebenfalls nicht.
 3. **Keine Secrets, kein Token.** Nur projizierte Namen und Hashes (AC-8).
 4. **Additiv pflegbar.** Kein Schema-Zwang für Lesen: fehlt die Datei, gilt „kein Manifest" (IC-5).
 5. **Eine Datei pro Projekt**, nicht pro Adapter-Repo — der Repo-Schlüssel (`owner/repo` bzw.
@@ -682,8 +748,9 @@ enthält ausschließlich die projizierten Label-Namen früherer erfolgreicher `-
 deren Hash. Sie ist die *einzige* lokale Erinnerung, ausschließlich für `prune` maßgeblich, und sie
 wird nie zur Diff-Grundlage: der Diff entsteht immer aus `list` gegen die Soll-Menge. Ohne Manifest
 gibt es keine **manifest-basierten** Löschkandidaten (IC-5); `sync.prune-allow` wirkt davon
-unabhängig. Ein Rename ohne Tracker-Zustand bleibt in der *Paarung*
-mehrdeutig — siehe offene Frage Q3.
+unabhängig. Ein Rename wird in v1 **nicht** durchgeführt (D10): das Manifest liefert nur die
+`alt`-Seite für `info: rename-candidate`, die Paarung Alt↔Neu bleibt bis zu einer expliziten
+`renames`-Map offen.
 
 ---
 
@@ -788,6 +855,9 @@ Interpretation ist eine Verschärfung, keine Abschwächung.
 | **AC-5** | Der Check ist **ein** Modul mit sechs IDs. `consistency-check`/`--validate` ruft ihn mit `tracker=None` (Regeln 4–6, offline); `--labels --check` ruft dasselbe Modul mit Tracker (alle sechs). Nachweis: `test_all_six_rule_ids_reported_with_tracker` sieht sechs IDs über den Tracker-Pfad, die Offline-Suite sieht 4–6. | Wörtlich „consistency-check reports the six rules" wäre nur mit Netzwerk in `--validate` erfüllbar — genau die Verhaltensänderung, die Q6 ausschließt (RVW-1188-06). |
 | **AC-6** | Erfüllt ist: **kein Label-Literal mehr im Rollen-Template** — die vier Templates referenzieren ausschließlich Platzhalter, der Alt-Text liegt als `LEGACY_ROLE_BLOCKS` framework-intern (Plan K-1). **Nicht** erfüllt (und bewusst nicht Teil von #1188): die gerenderte Default-Ausgabe enthält weiterhin die Legacy-Tabelle, weil `issue-conventions.enabled` per Default `false` ist. Das ist ein eigenes Folge-Issue **F-5** (§10.2): `enabled`-Default auf `true` + `LEGACY_ROLE_BLOCKS` löschen. Ohne F-5 ist AC-9 (byte-identisch bei `false`) nicht mit AC-6 (kein Literal irgendwo) gleichzeitig erfüllbar. | Wörtlich „no label literal remains in those templates" ist mit K-1 erfüllt, aber die *Wirkung* (niemand sieht je eine hartkodierte Tabelle) erst mit `enabled: true` (RVW-1188-06). |
 | **AC-10** | Löschkriterium ist das Manifest (IC-8) bzw. `sync.prune-allow`, **nicht** der eigene Präfix; ein Fremdlabel innerhalb des Präfix (`type/needs-design`) wird nie gelöscht. | Die Präfix-Heuristik war zu grob: sie hätte Menschen-Labels im eigenen Namespace gelöscht (RVW-1188-04). |
+| **AC-16** | Reihenfolge wörtlich als Präzedenzkette: `issue-conventions.repository.{owner,repo}` → `git.remote-url` (vier Formen) → CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`). Der harte Fehler greift erst, wenn **alle drei** Quellen leer oder unparsbar sind; die Meldung nennt alle drei Wege und enthält nie einen leeren `owner`. | „derive from `git.remote-url`" allein blockierte den ersten CI-Lauf in genau dem Repo, das den Check einführt (keine `git:`-Sektion, `remote-url` = `""`); die Env-Quelle ist der einzige Weg ohne Shell-Zugriff (D9/Q1). |
+| **AC-22** | Die Datei wird nicht nur erzeugt, sondern **drift-geprüft**: Registrierung in `.meta-config/generated-file-hashes.json`; manuelle Edits werden beim nächsten Sync überschrieben und gemeldet. Dieselbe Regel gilt für die PR-Templates aus #957. | „is generated" ohne Baseline hieße: die Datei driftet unbemerkt und die Doku widerspricht dem Resolver (D11/Q4). |
+| **AC-6** (Triage) | `triage`/`needs-info` sind **Nicht-Taxonomie-Labels** aus der Framework-Konstante `TRIAGE_LABELS`, gerendert über `{{ISSUE_TRIAGE_LABELS}}`; im Rollen-Template steht kein Literal, und die beiden Werte sind ausdrücklich **nicht** Teil der Taxonomie (keine vierte Achse, D2). | Ohne diese Abgrenzung wäre `bug-feature-analyzer.md:89` entweder ein Regel-4-Verstoß oder eine stille vierte Achse (D15/Q7). |
 | **AC-14** | Reihenfolge wörtlich: Projekt-Override → Framework-**Plattform**-Default → Framework-**Preset**; `--explain` zeigt den `source` je Achse und Wert. | §4.3 hatte 4/5 vertauscht und widersprach damit dem AC-Text (RVW-1188-02). |
 | **AC-4** | Idempotenz setzt vollständiges `list` (Pagination) und, wo nötig, die Name→ID-Map voraus; ohne beides wäre der zweite Lauf ein Duplikat-`create`. | AC-4 sagt „a second run is a no-op", nicht *warum* es einer ist (RVW-1188-01). |
 
@@ -807,25 +877,28 @@ Interpretation ist eine Verschärfung, keine Abschwächung.
 | GitHub Issue Types bleiben ungenutzt (D1) | dokumentierte Abweichung inkl. Preis; Capability `issue-types` später nachrüstbar, Taxonomie unverändert | akzeptiert |
 | `multi`-Achse mit Scoped-Separator ⇒ Selbst-Ersetzung auf GitLab | Separator **pro Kardinalität** (IC-3/2); Test in AC-2b | niedrig |
 | Framework-Plattform-Default überstimmt still ein Projekt | Stufe 4 schlägt nur vor; Projekt gewinnt (4.3/1), `--explain` zeigt beide; AC-15 pinnt es | niedrig |
-| Repo-Identität aus `git.remote-url` ist im eigenen Repo leer (`.meta-config/project.yaml` hat **keine** `git:`-Sektion → `remote-url` = Schema-Default `""`, `config/project-config.schema.json:1753-1757`) | Fallback-Regel muss vor der Implementierung entschieden werden (Q1); sonst schlägt `--labels --check` im CI genau des Repos fehl, das den Check einführt | **hoch, wenn Q1 offen bleibt** |
+| Repo-Identität aus `git.remote-url` ist im eigenen Repo leer (`.meta-config/project.yaml` hat **keine** `git:`-Sektion → `remote-url` = Schema-Default `""`, `config/project-config.schema.json:1753-1757`) | **D9 (entschieden):** Präzedenz `repository.{owner,repo}` → `git.remote-url` → `GITHUB_REPOSITORY`/`CI_PROJECT_PATH`; harter Fehler erst, wenn **alle drei** leer/unparsbar sind, mit einer Meldung, die alle drei Wege nennt und nie einen leeren `owner` ausgibt | gering — lokal genügt `repository.*`, in CI greift die Env |
 | Token-Leak in Logs/Artefakten | nur `auth.env` (IC-6), Test AC-8, `_mask` (`scripts/lib/env.py:130`) | gering |
 | Adapter-YAML wächst zu einer Programmiersprache | Capability-Flags + `kind: plugin`-Ausweg; keine Bedingungssyntax im Executor | mittel (Design-Disziplin) |
-| Rename ohne lokalen Zustand nicht eindeutig erkennbar | Manifest liefert die `alt`-Seite (IC-8); Paarung offen (Q3) — ohne Signal `create` + `info: rename-candidate` | mittel |
+| Rename ohne lokalen Zustand nicht eindeutig erkennbar | **D10 (entschieden):** kein Rename in v1 — neuer Wert ⇒ `create <neu>`, altes Label bleibt, `info: rename-candidate <alt>`; `rename` bleibt für eine spätere explizite `renames`-Map reserviert | gering (kein stilles Umbenennen, kein Löschen) |
+| Drift-Baseline für `docs/issue-labels.md` fehlt ⇒ manuelle Edits bleiben unbemerkt | **D11 (entschieden):** Registrierung in `.meta-config/generated-file-hashes.json` (Root-Level-Ausnahme); manuelle Edits werden beim Sync überschrieben und gemeldet; #957 spiegelt die Regel für PR-Templates | gering |
 | Kollision `--label`/`--labels` in der CLI | Help-Texte + Finding F-3 | niedrig |
 
 ---
 
-## Offene Fragen
+## Offene Fragen (alle entschieden — Stand 2026-11-09)
 
-| ID | Frage | Warum hier nicht entscheidbar | Vorschlag zur Eskalation |
+| ID | Frage | Status | Entscheidung (D-Nr) / Stelle |
 |---|---|---|---|
-| **Q1** | Woher kommt die Repository-Identität, wenn `git.remote-url` leer ist? Optionen: (a) harter Fehler mit Pflichtfeld, (b) Fallback `git config --get remote.origin.url` zur Laufzeit (Bash nötig), (c) Fallback `GITHUB_REPOSITORY`/CI-Env-Variablen. | Die AC-16 fordert „derive from `git.remote-url`" und „unparsable remote fails" — ein **fehlender** Wert ist damit per Definition ein Fehler; im agent-meta-Repo selbst ist er heute leer, d. h. die wörtliche Umsetzung blockiert den ersten CI-Lauf. | `main_chat` / Daniel: eine der drei Optionen festlegen; (c) ist die einzige, die ohne Shell-Zugriff auskommt. |
-| **Q2** | Retry-/Backoff-Policy bei `429`/`5xx` und Timeout-Wert des Executors. | Das Issue schreibt nur „collect, continue, exit 1" (AC-18) und „401 bricht ab" (AC-19); Rate-Limit-Verhalten ist offen. Bestehende Muster (`scripts/admin-server.py` nutzt `urlopen(..., timeout=30/15)`) definieren keine Retries. | Design-Entscheidung im Umsetzungsplan; Vorschlag: 1 Retry bei `429` mit `Retry-After`, sonst kein Retry (deterministische Testbarkeit). |
-| **Q3** | Wie wird ein Rename erkannt, wenn der Tracker der einzige Zustand ist? Optionen: (a) explizites `renames: {alt: neu}` im Projekt, (b) Heuristik „genau ein Kandidat im eigenen Namespace mit alter Farbe", (c) kein Rename in v1 (alte Labels bleiben, `info`-Finding). | AC-10/IC-5 verlangen „rename printed, never silent". Das Manifest (IC-8) liefert seit Revision 2 die **`alt`-Seite** (welche Labels ein früherer Lauf angelegt hat); offen bleibt nur die **Paarung** Alt↔Neu, wenn ein Wert umbenannt *und* ein anderer gelöscht wurde. | Plan-Entscheidung; (c) ist die kleinste wahrheitsfähige Variante, (a) die expliziteste. |
-| **Q4** | Gehören `docs/issue-labels.md` und die optionalen Issue-Templates in `generated-file-hashes.json` (Ownership/Drift), oder bleiben sie unmanaged? | #957 stellt dieselbe Frage für PR-Templates und ist offen; **zusätzlich** klassifiziert #1186 `docs/issue-labels.md` als `project-docs`-Datei-Set. Eine doppelte, abweichende Antwort wäre schlechter als eine gemeinsame. | Mit #1186 (Datei-Set) **und** #957 (Mechanismus) gemeinsam entscheiden (§11.1). |
-| **Q5** | Wo lebt `platform-overrides` in der Sektion — unter `issue-conventions` (Stufe 1 der Präzedenz) oder als Teil von `adapter`? | Der Issue-Text fordert die Stufe 1, der YAML-Sketch im Issue listet den Schlüssel **nicht**; AC-14 setzt ihn voraus. | **Entschieden (IC-1):** eigener Schlüssel `issue-conventions.platform-overrides.<adapter>`, geschlossen, mit Inhalts- **und** Transport-Schlüsseln (RVW-1188-03). |
-| **Q6** | Wird der Check `issue-label-taxonomy` Teil des Standard-Suite-Laufs (`--validate`) oder nur von `--labels --check` aufgerufen? | Regel 1 (`info` bei fehlendem Tracker-Label) braucht Netzwerk; die Standard-Suite läuft offline (`baseline-validate.txt` zeigt lokale Checks). Netzwerk in `--validate` wäre eine Verhaltensänderung. | **Entschieden (§4.7, K-5):** Regeln 4–6 offline in der Suite, Regeln 1–3 nur mit Tracker (`--labels --check`). Ein Modul, sechs IDs, zwei Kontexte. |
-| **Q9** | Wer committet `.meta-config/issue-labels-state.json` nach einem `--apply`-Lauf? | `--apply` schreibt die Datei, aber der Commit gehört nach ARQ/Commit-Authority dem `git`-Agenten. In CI (`--apply` als Job) entstünde eine uncommittete Arbeitskopie-Änderung. | Empfehlung: `--apply` schreibt nur, druckt die geänderte Datei als Teil der Ergebnis-Tabelle, und der Commit bleibt beim aufrufenden `git`-Schritt (identisch zur Behandlung generierter Dateien in IC-7). CI-`--apply`-Jobs committen nicht — sie schreiben nur und der nächste Mensch/Job committet. |
+| **Q1** | Woher kommt die Repository-Identität, wenn `git.remote-url` leer ist? | **entschieden 2026-11-09** | **D9:** `issue-conventions.repository.{owner,repo}` → `git.remote-url` → CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`); harter Fehler erst, wenn alle drei leer/unparsbar sind (Meldung nennt alle drei Wege, nie leerer `owner`). §4.11, IC-1 `repository`, Plan T15 |
+| **Q2** | Retry-/Backoff-Policy bei `429`/`5xx` und Timeout-Wert des Executors. | **entschieden 2026-11-09** | **D14:** genau ein Retry bei `429` mit `Retry-After` (Cap 30 s, injizierbare `sleep`); `5xx`/Timeouts kein Retry, sammeln, Exit 1; `401`-Abbruch unverändert. §4.11, IC-4, Plan T16/T18 |
+| **Q3** | Wie wird ein Rename erkannt, wenn der Tracker der einzige Zustand ist? | **entschieden 2026-11-09** | **D10:** kein Rename in v1 — `create <neu>` + altes Label bleibt + `info: rename-candidate <alt>`; `rename`-Zeile bleibt für eine spätere explizite `renames`-Map reserviert (eigene Spec-Revision). IC-5, Plan T17 |
+| **Q4** | Gehören `docs/issue-labels.md` und die optionalen Issue-Templates in `generated-file-hashes.json` (Ownership/Drift), oder bleiben sie unmanaged? | **entschieden 2026-11-09** | **D11:** ja — Registrierung in `.meta-config/generated-file-hashes.json`, manuelle Edits werden überschrieben und als Drift gemeldet; dieselbe Regel spiegelt #957 für PR-Templates. IC-7, §4.9, Plan T25 |
+| **Q5** | Wo lebt `platform-overrides` in der Sektion — unter `issue-conventions` (Stufe 1 der Präzedenz) oder als Teil von `adapter`? | **entschieden (IC-1)** | Eigener Schlüssel `issue-conventions.platform-overrides.<adapter>`, geschlossen, mit Inhalts- **und** Transport-Schlüsseln (RVW-1188-03) |
+| **Q6** | Wird der Check `issue-label-taxonomy` Teil des Standard-Suite-Laufs (`--validate`) oder nur von `--labels --check` aufgerufen? | **entschieden (§4.7, K-5)** | Regeln 4–6 offline in der Suite, Regeln 1–3 nur mit Tracker (`--labels --check`); ein Modul, sechs IDs, zwei Kontexte |
+| **Q7** | Sind `triage`/`needs-info` Status-Labels, und wo leben sie? | **entschieden 2026-11-09** | **D15:** Framework-Konstante `TRIAGE_LABELS`, gerendert über `{{ISSUE_TRIAGE_LABELS}}`; in `docs/issue-labels.md` unter „nicht Teil der Taxonomie"; **keine** vierte Achse (D2). §4.10, Plan T13/T25 |
+| **Q8** | Wo lebt der `mode`-Schalter für optionale Issue-Templates? IC-1 ist geschlossen und enthält ihn nicht | **entschieden 2026-11-09** | **D12:** `issue-conventions.templates: {mode: off\|scaffold\|manage, force: bool}` als geschlossener Unterabschnitt in IC-1; T30 ist damit Teil der Freigabe. IC-1, §4.9, Plan T1/T30 |
+| **Q9** | Wer committet `.meta-config/issue-labels-state.json` nach einem `--apply`-Lauf? | **entschieden 2026-11-09** | **D13:** `--apply` schreibt und druckt die Datei in der Ergebnis-Tabelle, committet nie selbst; der `git`-Schritt committet; CI-`--apply`-Jobs committen **nie**. IC-4/IC-8, Plan T21 |
 
 ---
 
@@ -837,7 +910,7 @@ Interpretation ist eine Verschärfung, keine Abschwächung.
 |---|---|---|---|
 | **#1167** | `improvement: unify REQ-ID format across templates and presets and add a format validator` | **unabhängig, aber Datei-nah** | Beide Issues ändern Rollen-Templates (`bug-feature-analyzer.md` ist in #1167 als „ungated REQ wording" gelistet, `:42,84,134`) und `config/conventions-presets.yaml` (`:34`). Kein inhaltlicher Widerspruch; Reihenfolge beliebig, aber nicht parallel editieren. |
 | **#1141** | `bug: project config schema silently accepts unknown top-level keys` | **Nachläufer (Wave-Reihenfolge)** | #1141 will top-level `additionalProperties: false` (heute `true`, `config/project-config.schema.json:2854`) bzw. ein Unknown-Key-Finding. AC-1 fordert dasselbe **nur für die neue Sektion**. Beide sind vereinbar; #1141 läuft **nach** #1181 (Reihenfolge `#1187 → #1186 → #1188 → #1181 → #1141`) und muss `issue-conventions` als Property kennen, sonst wird die neue Sektion beim strikten Top-Level abgelehnt. |
-| **#957** | `feat: PR-Templates (generic / platform / project override, mit Variablen)` | **Nachbar, gleiche Ausgabefamilie** | #957 Phase 3 nennt „Issue-Templates als Folge-Request" — #1188 ist genau dieser Folge-Request. Beide schreiben unter `.github/` und beide brauchen eine Ownership-/Überschreib-Regel (Q4). Serialisieren bei `generated-file-hashes.json` und bei jeder `.github/`-Erzeugung. |
+| **#957** | `feat: PR-Templates (generic / platform / project override, mit Variablen)` | **Nachbar, gleiche Ausgabefamilie** | #957 Phase 3 nennt „Issue-Templates als Folge-Request" — #1188 ist genau dieser Folge-Request. Beide schreiben unter `.github/` und beide brauchen dieselbe Ownership-/Überschreib-Regel; **D11 entscheidet sie für beide**: Registrierung in `generated-file-hashes.json`. Serialisieren bei jeder `.github/`-Erzeugung und beim Marker-Vertrag. |
 | **#1168** | `fix: git agent writes harness Co-Authored-By …` | **unabhängig, gleiche Datei** | Funktional orthogonal (Commit-Trailer vs. Label-Taxonomie), aber beide ändern `agents/1-generic/git.md` (dort Commit-Authority-Block bzw. `:149-151`). Nur Datei-Serialisierung nötig. |
 
 ### 10.2 Neue Findings ohne Issue
@@ -897,8 +970,8 @@ gemockten Tracker und keinen `project.yaml`-Sync-Variantenlauf braucht.
 | `howto/configs/project.yaml.example`, `templates/configs/project.yaml.example` | #1187, #1186, #1188, #1181 | Beide Beispiel-Dateien listen **jede** Config-Option; vier Issues schreiben in dieselbe Doku-Region | seriell in Wave-Reihenfolge; die Beispiele sind Doku, nicht Schema (kein Prüf-Gate). #1188 ergänzt die neue Sektion in **beiden** Dateien und pinnt sie mit einem parametrisierten Test (Plan T1, RVW2-1188-02) |
 | `tests/scenarios/registry.md` | #1181, #1187, #1186 | Alle drei Issues ergänzen Szenarien; Katalogzeilen sind zeilenscharf. #1188 schreibt **keine** Zeile (pytest-Szenario statt Katalog-ID) | seriell; feste IDs: `94` = #1181, `95`–`98` = #1187, #1188 ohne ID (RVW2-X-01) |
 | `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/CODEBASE_OVERVIEW.md` | #1188 (Nr. 11), #1186 (Nr. 10), #1187 | Alle drei Issues listen dieselben vier Doku-Dateien; jede Ergänzung ist ein Merge-Konflikt | **zwingend seriell** (Doku zuletzt, nach den Code-PRs) |
-| `.github/ISSUE_TEMPLATE/**` vs `.github/pull_request_template.md` | #1188 (optional), #957 | Gleiche Verzeichnisfamilie, gleiche Ownership-/Überschreib-Frage (`generated-file-hashes.json`, Q4) | gemeinsam entscheiden, dann seriell erzeugen |
-| `docs/issue-labels.md` | #1188 (Erzeuger), #1186 (`project-docs`-Datei-Set) | #1188 ist der **einzige** Erzeuger; #1186 klassifiziert die Datei als `project-docs` (Artifact-Locations-Matrix) | keine inhaltliche Konfliktfläche, aber eine **Reihenfolge-Abhängigkeit**: Die `project-docs`-Klassifizierung (Querschnittsnotiz, §11.1) muss in #1186 stehen, bevor #1188 die Datei erzeugt |
+| `.github/ISSUE_TEMPLATE/**` vs `.github/pull_request_template.md` | #1188 (optional), #957 | Gleiche Verzeichnisfamilie, gleiche Ownership-/Überschreib-Frage (`generated-file-hashes.json`, Q4) | **Q4 entschieden (D11):** dieselbe Drift-/Überschreib-Regel für beide Familien; Erzeugung bleibt seriell (#1188 nach #957), damit der Marker-Vertrag nur einmal definiert wird |
+| `docs/issue-labels.md` | #1188 (Erzeuger), #1186 (`project-docs`-Datei-Set) | #1188 ist der **einzige** Erzeuger; #1186 klassifiziert die Datei als `project-docs` (Artifact-Locations-Matrix) | keine inhaltliche Konfliktfläche, aber eine **Reihenfolge-Abhängigkeit**: Die `project-docs`-Klassifizierung (Querschnittsnotiz, §11.1) muss in #1186 stehen, bevor #1188 die Datei erzeugt. Zusätzlich drift-geprüft über `.meta-config/generated-file-hashes.json` (D11) |
 | `.meta-config/issue-labels-state.json` | #1188 (erzeugt), #1186 (klassifiziert) | #1188 schreibt das Manifest (`--apply`, IC-8); #1186 führt es als **`unmanaged[]`** (Negativ-Deklaration, keine Klasse) in der Artifact-Locations-Matrix — die frühere Forderung einer dritten Kategorie `project-state` ist **gestrichen** (K1) | seriell: die `unmanaged`-Deklaration aus #1186 muss vor dem ersten `--apply` stehen, sonst landet die Datei in keinem Datei-Set (RVW2-X-02) |
 | `.meta-config/project.yaml` (dieses Repo) | #1188 (Aktivierung), #1186 (`artifact-locations`), #1187 (`project-context-injection`) | Drei neue Sektionen in derselben Projektdatei; jede Aktivierung ändert die Sync-Ausgabe (Golden-Tests anderer Issues!) | seriell; Golden-Test je Issue getrennt halten; #1188 aktiviert **nichts** (Golden-Grundlage) |
 
@@ -906,8 +979,10 @@ gemockten Tracker und keinen `project.yaml`-Sync-Variantenlauf braucht.
 
 - **`docs/issue-labels.md` ist ein `project-docs`-Datei-Set.** Die Datei gehört in #1186 in die
   Artifact-Locations-Matrix als `project-docs` (projekt-eigene, generierte Doku unter `docs/`), **nicht**
-  als `framework-generated`. Konsequenz für #1188: IC-7/Marker-Regel bleibt, aber die Ownership-Frage
-  Q4 wird gegen #1186 entschieden, nicht gegen #957 allein.
+  als `framework-generated`. Konsequenz für #1188: IC-7/Marker-Regel bleibt. **Q4 ist seit 2026-11-09
+  entschieden (D11):** die Datei wird zusätzlich in `.meta-config/generated-file-hashes.json`
+  registriert und drift-geprüft; #957 spiegelt dieselbe Regel für PR-Templates. Datei-Set
+  (#1186) und Drift-Ownership (D11) sind zwei getrennte Antworten auf zwei getrennte Fragen.
 - **`config/issue-adapters.yaml` und `config/issue-conventions-presets.yaml` sind `framework-config`**,
   nicht `project-docs`: sie werden ausschließlich von agent-meta gepflegt und per sync verteilt.
 - **Das Manifest `.meta-config/issue-labels-state.json` ist `unmanaged`** — eine
@@ -935,30 +1010,30 @@ gemockten Tracker und keinen `project.yaml`-Sync-Variantenlauf braucht.
 | AC-3 | §4.5, IC-3 (inkl. `kind: plugin`), D3 |
 | AC-4 | §4.6, IC-3/5+7 (Pagination, Name→ID-Map), IC-4 (Dry-Run-Default, Idempotenz), D4 |
 | AC-5 | §4.6, §4.7 (Kontext-Split: 4–6 offline, 1–3 online), IC-4 (Exitcodes), Q6 |
-| AC-6 | §4.10 (sechs Platzhalter), IC-1 (`enforcement`), §4.7 Regel 4/5, Folge-Issue F-5 (§10.2) |
+| AC-6 | §4.10 (sechs Platzhalter, D15-Triage-Abgrenzung), IC-1 (`enforcement`), §4.7 Regel 4/5, Folge-Issue F-5 (§10.2) |
 | AC-7 | §4.5 (Capability `scoped-labels`), IC-3/1+2, §4.1 |
 | AC-8 | IC-6 (Auth nur `auth.env`; H-6 `{token}`-Pflicht), IC-8/3 (Manifest secret-frei), §4.6 (secret-freie Ausgabe), §4.12 |
 | AC-9 | IC-1/3 (Golden-Test), §4.4, §4.7 (Check still) |
-| AC-10 | IC-5 (Manifest-/Allowlist-Prune), IC-8 (Zustands-Manifest), §4.11 |
+| AC-10 | IC-5 (Manifest-/Allowlist-Prune, **kein** Rename in v1 — D10), IC-8 (Zustands-Manifest), §4.11 |
 | AC-11 | §4.4 (Achsen-Schalter), §4.3 |
 | AC-12 | §4.4 (Fehlerfälle), §4.7 Regel 6 |
 | AC-13 | §4.4, §4.7 Regel 6 |
 | AC-14 | §4.3 (sieben Stufen in AC-14-Reihenfolge + `source`), IC-1 (`platform-overrides`), IC-2 (Stufe 4 vs. 5), Q5 |
 | AC-15 | §4.3 Invariante 1, §4.4, IC-1 |
-| AC-16 | §4.11 (Repository-Identität, vier Formen), Q1 |
+| AC-16 | §4.11 (Präzedenzkette D9: `repository.*` → `git.remote-url` → CI-Env), IC-1 (`repository`), Q1 |
 | AC-17 | §4.11 (`on-missing-label`), IC-1 (`create`) |
 | AC-18 | §4.11 (`--apply` nicht transaktional), IC-4 (Exit 1), IC-5 (kein Delete) |
 | AC-19 | §4.11 (401-Abbruch), Q2 |
 | AC-20 | §4.11 (Namensgrenzen), IC-1 (`taxonomyAxis`), IC-3 (`defaults`) |
 | AC-21 | §4.8 (Admin-UI), IC-4, Konfliktfläche `PROJECT_WRITABLE_SECTIONS` |
-| AC-22 | §4.9 (generierte Doku), IC-7 |
+| AC-22 | §4.9 (generierte Doku, Drift-Baseline D11), IC-7 |
 
-**Rückverfolgbarkeit der Entscheidungen:** D1 → §6/AC-1/AC-6 · D2 → §6/§4.1/Nicht-Ziele · D3 → §4.5/IC-3/AC-3 · D4 → §4.6/IC-4/AC-4 · D5 → §4.2 (`conventional`)/§4.10/AC-2/AC-6.
+**Rückverfolgbarkeit der Entscheidungen:** D1 → §6/AC-1/AC-6 · D2 → §6/§4.1/Nicht-Ziele · D3 → §4.5/IC-3/AC-3 · D4 → §4.6/IC-4/AC-4 · D5 → §4.2 (`conventional`)/§4.10/AC-2/AC-6 · **D9** → §4.11/IC-1 `repository`/AC-16 · **D10** → IC-5/AC-10 · **D11** → §4.9/IC-7/AC-22 · **D12** → §4.9/IC-1 `templates`/AC-22 · **D13** → IC-4/IC-8/AC-4 · **D14** → §4.11/IC-4/AC-18+AC-19 · **D15** → §4.10/AC-6.
 
-**Offene Punkte, die vor dem Freigabe-Marker geschlossen sein müssen:** Q1 (blockiert AC-16 im
-eigenen Repo), Q3 (blockiert die Rename-Paarung in IC-5; die `prune`-Semantik selbst ist seit
-Revision 2 manifest-basiert entschieden), Q9 (Commit-Ownership des Manifests; Empfehlung liegt vor).
-Q5 und Q6 sind entschieden (IC-1 bzw. §4.7/K-5) und brauchen nur noch Review-Bestätigung.
+**Offene Punkte vor dem Freigabe-Marker:** keine inhaltlichen mehr. Q1, Q2, Q3, Q4, Q7, Q8 und Q9
+sind am 2026-11-09 entschieden und in §13 protokolliert (D9, D14, D10, D11, D15, D12, D13); Q5 und
+Q6 waren bereits in Revision 2 entschieden (IC-1 bzw. §4.7/K-5). Es fehlt ausschließlich der
+Statuswechsel `DRAFT → APPROVED` durch den Nutzer.
 
 ---
 
@@ -982,7 +1057,7 @@ Fundstelle. Status der Spec bleibt `DRAFT`.
 | **Querschnitt: Wave-Reihenfolge** | Kanonisch `#1187 → #1186 → #1188 → #1181`, danach `#1141`, Whitelist-Ableitung zuletzt. §10.1 (#1141) und §11 (Schema, `admin-server.py`, `git.md`) sind darauf umgestellt | §11 (Reihenfolge-Block), §11-Tabelle, §10.1 #1141 |
 | **Querschnitt: Konfliktmatrix** | Neue Zeilen für `scripts/lib/variables.py`, `scripts/lib/sync_pipeline.py`/`agent_sync.py`, `scripts/lib/standalone.py`, `tests/scenarios/registry.md` und beide `project.yaml.example` (`howto/configs/`, `templates/configs/`) | §11-Tabelle |
 | **Querschnitt: Szenario-IDs** | `94` = #1181, `95`–`98` = #1187; #1188 belegt **keine** Katalog-ID (pytest statt Katalog) | §11 (Absatz vor der Tabelle) |
-| **Querschnitt: `docs/issue-labels.md`** | Als `project-docs`-Datei-Set für #1186 klassifiziert (Querschnittsnotiz); Q4 verweist auf #1186 **und** #957 | §11-Tabelle (Zeile `docs/issue-labels.md`), **§11.1**, Q4 |
+| **Querschnitt: `docs/issue-labels.md`** | Als `project-docs`-Datei-Set für #1186 klassifiziert (Querschnittsnotiz); die Drift-/Ownership-Frage ist mit **D11** entschieden (Registrierung in `generated-file-hashes.json`, #957 spiegelt die Regel) | §11-Tabelle (Zeile `docs/issue-labels.md`), **§11.1**, §13/D11 |
 | **RVW2-1188-01** (MAJOR, Sicherheit/Prune) | Kandidatenformel korrigiert: nicht `desired ∪ (Manifest ∖ aktive Achsen)`, sondern `(Manifest ∖ desired) ∖ labels(inaktiver Achsen)` — `desired` enthält die inaktive Achse bereits nicht (Achsen-Gate), die Subtraktion ist reine Ausnahme-Regel über den projizierten Achsen-Präfix, kein Löschkriterium. „Fehlt das Manifest ⇒ null Kandidaten" präzisiert: nur wenn **auch** `sync.prune-allow` leer ist; die Allowlist wirkt unabhängig vom Manifest (Bedingung 3 ist ein ODER). Plan-T17-Tests entsprechend geschärft | **IC-5** (beide Prune-Bullets), §11.1 unverändert, Plan T17 |
 | **RVW2-1188-02** (MINOR) | Die neue Sektion steht in **beiden** `project.yaml.example`-Dateien (`howto/configs/`, `templates/configs/`) und wird mit einem parametrisierten Test gepinnt; der Task dafür ist Plan T1 statt nur der Konfliktmatrix | §11-Tabelle (Beispiel-Zeile), Plan T1 (Files + Step 3 + Test) |
 | **RVW2-1188-03** (MINOR, Testgüte) | Kein `git diff` als Gate: M3 stützt sich auf den Golden-Test aus T10; das Abschlusskriterium „keine Aktivierung" nutzt den festen Basis-Commit `git diff --name-only aaed14c2..HEAD -- .meta-config/project.yaml` | Plan M3-Gate, Plan „Abschlusskriterien" Nr. 6 |
@@ -1011,3 +1086,20 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 | **K6** (NIT) | Die Skizzen bleiben bei `$defs`, weil das Ist-Schema `draft-07` deklariert und dennoch `$defs` nutzt; `definitions` wäre nur bei einem Wechsel des Gesamtschemas richtig | **IC-1** (`$defs`-Notiz) |
 | **K7** | **Nicht betroffen**: alle Schlüssel liegen in der neuen Top-Level-Sektion `issue-conventions` und sind durchgehend kebab-case — kein snake_case-Bestandsblock berührt | geprüft: IC-1, IC-3 |
 | **K8** | **Nicht betroffen**: kein bestehender `_KEYS`-Block wird erweitert; #1188 fügt eine eigene, geschlossene Sektion hinzu | geprüft: IC-1 |
+
+---
+
+## 13. Entscheidungsprotokoll (2026-11-09)
+
+Vom Nutzer entschiedene offene Fragen. Jede Zeile ist **bindend** und im Dokument oben eingearbeitet;
+Abweichungen brauchen eine neue Spec-Revision. `Status` bleibt `DRAFT` (nur der Freigabe-Marker fehlt).
+
+| D-Nr | Frage | Entscheidung (`DECIDED 2026-11-09`) | Stelle |
+|---|---|---|---|
+| **D9** | **Q1** — Repository-Identität, wenn `git.remote-url` leer ist | Präzedenzkette `issue-conventions.repository.{owner,repo}` → `git.remote-url` → CI-Env (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`); harter Fehler **erst** wenn alle drei leer/unparsbar sind, mit einer Meldung, die alle drei Wege nennt und **nie** einen leeren `owner` ausgibt. Schema `repository: {owner, repo}` (+ `project-id`) ergänzt; Parser, Fehlermeldung und Tests in T15 | §4.11, IC-1 `repository`, Risiken, AC-16-Trace, Plan T15 |
+| **D10** | **Q3** — Rename-Erkennung | Kein Rename in v1: neuer Wert ⇒ `create <neu>`; das alte Label bleibt im Tracker und wird als `info: rename-candidate <alt>` gemeldet; kein `update.new_name`-Aufruf aus Verdacht. Die `rename`-Zeile bleibt im Vertrag **reserviert** für eine spätere explizite `renames`-Map (eigene Spec-Revision). Test: alter Wert verlässt nur das Soll-Set, kein Rename-Call, Info erscheint | IC-5, AC-10-Trace, Risiken, Plan T17 |
+| **D11** | **Q4** — Ownership/Drift von `docs/issue-labels.md` | Die Datei kommt in `.meta-config/generated-file-hashes.json` (explizite Root-Level-Registrierung analog `PLATFORM_DEFAULTS_RESOLVED_REL`); sie ist generiert und drift-geprüft, manuelle Edits werden beim nächsten Sync überschrieben (mit `.sync-backup-*`). Dieselbe Regel wird in #957 für PR-Templates gespiegelt — eine Antwort, nicht zwei | §4.9, IC-7, §11.1, AC-22-Trace, Plan T25 |
+| **D12** | **Q8** — Ort des Template-Schalters | `issue-conventions.templates: {mode: off\|scaffold\|manage, force: bool}` als **geschlossener** Unterabschnitt der bestehenden Sektion. `off` = nichts, `scaffold` = nur fehlende Dateien, `manage` = zusätzlich marker-tragende Dateien; `force: false` Default. T30 ist damit **innerhalb** der Freigabe | IC-1 `templates`, §4.9, Plan T1/T30 |
+| **D13** | **Q9** — Commit des Zustands-Manifests | `--apply` **schreibt** und druckt die geänderte Datei in der Ergebnis-Tabelle; **kein** Auto-Commit aus dem CLI. Der Commit bleibt beim `git`-Schritt (Commit-Authority). CI-`--apply`-Jobs committen **nie** | IC-4 (Commit-Zeile), IC-8/2, Plan T21 |
+| **D14** | **Q2** — Retry-Policy | Genau **ein** Retry, nur bei `429`, Wartezeit aus `Retry-After` (Cap 30 s, Default 1 s, injizierbare `sleep`). `5xx` und Timeouts: **kein** Retry, Fehler sammeln, Exit 1 (AC-18). `401`/`403` brechen unverändert nach dem ersten Fehlschlag ab (AC-19). Deterministisch testbar | §4.11, IC-4, Plan T16/T18 |
+| **D15** | **Q7** — Triage-Labels | `render_triage_labels()` liefert `triage` und `needs-info` aus der Framework-Konstante `TRIAGE_LABELS`; `docs/issue-labels.md` führt sie unter **„Nicht Teil der Taxonomie"**. **Keine** vierte Achse (D2 bleibt); Regel 4 des Consistency-Checks nimmt sie von der Literal-Prüfung aus | §4.10, AC-6-Interpretation, Plan T13/T25 |

@@ -7,6 +7,9 @@
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 (`unmanaged` statt `project-state`),
 > K3 (vier Wertequellen + Source-Attribution), K6 (`$defs`-Notiz); K2/K4/K5/K7/K8 betreffen
 > dieses Dokument nicht. Details: §11.2.
+> Revision: 4 (Entscheidungsprotokoll D1–D4, 2026-11-09) — OQ-5 (Scratch: **eine** Quelle
+> statt Doppelsenke), OQ-7 (D-9-Ausnahme bleibt), OQ-3 (Naming konfigurierbar, Token-Kanon),
+> OQ-4 (Default `SE`, Regeltext auf `{{ARTIFACT_SE_ROOT}}`). Details: §12.
 > Autor: `concept-specifier` (Subagent, Auftrag des Orchestrators)
 > Issue: [#1186](https://github.com/Popoboxxo/agent-meta/issues/1186) — „feat(config): configurable
 > artifact-locations matrix for all artifact classes (paths, per-class mode, Admin-UI, enforcement)"
@@ -169,7 +172,7 @@ heute eine `{{#if}}`-Zeile ohne Pfadliteral (VERIFIED) — die Zeilenangabe ist 
 | `placeholders.py:76-82` | Allow-List ab `:89`, `SPEC_PLAN_*` auf `:97` | dito |
 | „29 of 63 schema sections" | 30 von 70 fehlen, 7 Whitelist-Einträge ohne Schema | AC-1186-07**b** (Follow-up nach #1141) braucht die Union-Regel (§4.4), sonst Regression |
 | `orchestrator.md:217` als Literalpfad | `{{#if}}`-Zeile ohne Pfad | nicht rewriten |
-| Code-Default `SE_BASE_DIR = "SE"` vs. Regel-Text „Konzept-Default `docs/se`" | Widerspruch im Bestand: `config.py:2273` (`"SE"`) vs. `se-cascade-artifact-taxonomy.md:10` (`docs/se`) | Default muss in der Spec **einmal** festgelegt werden (§3.2) |
+| Code-Default `SE_BASE_DIR = "SE"` vs. Regel-Text „Konzept-Default `docs/se`" | Widerspruch im Bestand: `config.py:2273` (`"SE"`) vs. `se-cascade-artifact-taxonomy.md:10` (`docs/se`) | Default in §3.2 **einmal** festgelegt (`SE`, D4); Regel-Text stellt auf `{{ARTIFACT_SE_ROOT}}` um (Plan T20) |
 
 ## 3. Soll-Verhalten
 
@@ -186,7 +189,8 @@ artifact-locations:
   preset: default            # Auflösungsstufe 3 (framework-weit), gleiche Mechanik wie rules-preset
   defaults:                  # vererbbare Vorgaben je Klasse
     mode: files              # files | inline | off
-    naming: "<YYYY-MM-DD>-<slug>.md"
+    naming: "{date}-{slug}.md"   # Token-Kanon, §3.2.1 (D3); human display form
+                                 # "<YYYY-MM-DD>-<slug>.md" nur in Rollen-Prosa
     archive: "<path>/archive"
     git: tracked             # tracked | ignored
     retention: manual        # manual | keep | prune   (nur Deklaration, siehe §3.5)
@@ -205,7 +209,9 @@ artifact-locations:
 path:      string      # relativ, kein "..", kein absoluter Pfad, nicht leer
 mode:      files|inline|off
 git:       tracked|ignored
-naming:    string      # Platzhalter <YYYY-MM-DD> <slug> <scope> <kind> <NNN> <level> <FolderName>
+naming:    string      # Token-Muster, geschlossene Token-Liste nach §3.2.1
+                       # (D3): {class} {date} {slug} {kind} {n} {topic}
+                       # {scope} {nnn} {level} {folder}
 archive:   string      # optional; Default "<path>/archive"
 retention: manual|keep|prune
 kind:      enum[]      # nur reviews|audits|analysis|reports; geschlossenes Enum (20 Werte, §4.1)
@@ -273,29 +279,53 @@ bleibt **`project-docs`** (`files.issue-labels`, §3.2) und ist **kein** `unmana
 
 | Klasse | `path` Default | `naming` Default | `kind` | `git` | Herkunft/Beleg |
 |---|---|---|---|---|---|
-| `specs` | `docs/specs` | `<YYYY-MM-DD>-<slug>.md` | — | tracked | Schema `:2235` (bestehender Default) |
-| `plans` | `docs/plans` | `<YYYY-MM-DD>-<slug>.md` | — | tracked | Schema `:2239`; `archive: docs/plans/archive` (`rules/1-generic/plan-ledger.md:76`) |
-| `concepts` | `docs/concepts` | `<YYYY-MM-DD>-<slug>.md` | — | tracked | neu (heute Root-Datei, `ideation.md:97`) |
-| `spikes` | `docs/spikes` | `<YYYY-MM-DD>-issue-<n>-<topic>-spike.md` | — | tracked | Schema `:2243` + `explorer.md:71` (bestehendes Naming beibehalten) |
-| `reviews` | `docs/reviews` | `<kind>-<YYYY-MM-DD>-<slug>.md`; `kind: se` → `REVIEW_<YYYY-MM-DD>_<scope>.md` | code, concept, domain, copyedit, proofread, se | tracked | Naming V1 aus `se-critic.md:56` erhalten; `docs/reviews/` existiert bereits |
-| `audits` | `docs/audits` | `<kind>-<YYYY-MM-DD>-<slug>.md` | security, dependency, a11y, lifecycle, prompt, ai-security | tracked | neu; heutige Ablage `docs/plans/audit-*.md` → `legacy[]` |
-| `analysis` | `docs/analysis` | `<kind>-<YYYY-MM-DD>-<slug>.md` | analysis, triage, perf, log, research, estimate, conclusion | tracked | `docs/analysis/` existiert |
-| `reports` | `docs/reports` | `<YYYY-MM-DD>-<slug>.md` (`kind: vv` → `<YYYY-MM-DD>-vv-<slug>.md`); SE-Kontext: `{SE_ROOT}/reports/` (abgeleitet, §3.4) | vv | tracked | AC-1186-04 verlangt `docs/reports`; SE-Projektion **abgeleitet**, nicht konfigurierbar (D-7, RVW-1186-05) |
-| `adr` | `docs/adr` | `ADR-<NNN>_<slug>.md` | — | tracked | `se-cascade-artifact-taxonomy.md:61` (Unterstrich, nicht Bindestrich — §7 OQ-3); SE-Kontext: `{SE_ROOT}/adr/` (§3.4) |
-| `traceability` | `docs/traceability` | `TRACE_<scope>.md` | — | tracked | `se-cascade-artifact-taxonomy.md:58`; SE-Kontext: `{SE_ROOT}/traceability/` (§3.4) |
-| `runbooks` | `docs/runbooks` | `<YYYY-MM-DD>-<slug>.md` | — | tracked | neu, heute undefiniert |
-| `project-docs` | `files:` `docs/ARCHITECTURE.md`, `docs/CODEBASE_OVERVIEW.md`, `docs/REQUIREMENTS.md`, `docs/issue-labels.md` | — | — | tracked | `documenter.md:131-132`; `requirements.md:71`; `docs/issue-labels.md` = generiert von #1188 (OQ-6) |
+| `specs` | `docs/specs` | `{date}-{slug}.md` | — | tracked | Schema `:2235` (bestehender Default) |
+| `plans` | `docs/plans` | `{date}-{slug}.md` | — | tracked | Schema `:2239`; `archive: docs/plans/archive` (`rules/1-generic/plan-ledger.md:76`) |
+| `concepts` | `docs/concepts` | `{date}-{slug}.md` | — | tracked | neu (heute Root-Datei, `ideation.md:97`) |
+| `spikes` | `docs/spikes` | `{date}-issue-{n}-{topic}-spike.md` | — | tracked | Schema `:2243` + `explorer.md:71` (bestehendes Naming beibehalten) |
+| `reviews` | `docs/reviews` | `{kind}-{date}-{slug}.md`; `kind: se` → `REVIEW_{date}_{scope}.md` | code, concept, domain, copyedit, proofread, se | tracked | Naming V1 aus `se-critic.md:56` erhalten; `docs/reviews/` existiert bereits |
+| `audits` | `docs/audits` | `{kind}-{date}-{slug}.md` | security, dependency, a11y, lifecycle, prompt, ai-security | tracked | neu; heutige Ablage `docs/plans/audit-*.md` → `legacy[]` |
+| `analysis` | `docs/analysis` | `{kind}-{date}-{slug}.md` | analysis, triage, perf, log, research, estimate, conclusion | tracked | `docs/analysis/` existiert |
+| `reports` | `docs/reports` | `{date}-{slug}.md` (`kind: vv` → `{date}-vv-{slug}.md`); SE-Kontext: `{SE_ROOT}/reports/` (abgeleitet, §3.4) | vv | tracked | AC-1186-04 verlangt `docs/reports`; SE-Projektion **abgeleitet**, nicht konfigurierbar (D-7, RVW-1186-05) |
+| `adr` | `docs/adr` | `ADR-{nnn}_{slug}.md` (**D3, DECIDED 2026-11-09**) | — | tracked | `se-cascade-artifact-taxonomy.md:61`, `se-cascade-adr-standard.md:10` (Unterstrich, nicht Bindestrich); SE-Kontext: `{SE_ROOT}/adr/` (§3.4) |
+| `traceability` | `docs/traceability` | `TRACE_{scope}.md` | — | tracked | `se-cascade-artifact-taxonomy.md:58`; SE-Kontext: `{SE_ROOT}/traceability/` (§3.4) |
+| `runbooks` | `docs/runbooks` | `{date}-{slug}.md` | — | tracked | neu, heute undefiniert |
+| `project-docs` | `files:` `docs/ARCHITECTURE.md`, `docs/CODEBASE_OVERVIEW.md`, `docs/REQUIREMENTS.md`, `docs/issue-labels.md` | — (Datei-Set, kein `naming`) | — | tracked | `documenter.md:131-132`; `requirements.md:71`; `docs/issue-labels.md` = generiert von #1188 (OQ-6) |
+
+Die `naming`-Spalte zeigt den **Token-Kanon** (`{token}`, §3.2.1). Die in Rollen-Templates
+sichtbare Anzeigeform (`<YYYY-MM-DD>-<slug>.md`) ist nur Prosa und wird von T10 unverändert
+weitergeschrieben.
+
+**ADR-Naming und `legacy[]` (D3, DECIDED 2026-11-09):** Von drei beobachteten Formen ist genau
+**eine** kanonisch (`ADR-{nnn}_{slug}.md`, regelkonform nach
+`rules/1-generic/se-cascade-adr-standard.md:10`). Die beiden anderen Formen
+(`NNNN-{slug}.md`, z. B. `docs/adr/0001-pyyaml-runtime-ausnahme.md`, und
+`ADR-{nnn}-{slug}.md` mit Bindestrich) sind **`legacy[]`-Muster** (§3.6): bestehende Dateien
+werden beim ersten Sync in die Baseline aufgenommen und einmal gemeldet; **neue** ADRs in
+diesen Formen melden `artifact-locations.legacy-write` und werden vom Hook geblockt.
+`legacy-intersect` greift nicht, weil die Prüfung auf **Pfad-Gleichheit** beruht, nicht auf
+Glob-Überlappung — die Muster liegen *innerhalb* von `docs/adr` und sind gewollt.
 
 **2 ephemere Klassen**
 
 | Klasse | `path` Default | `git` | `subdirs` | `retention` | Beleg/Alias |
 |---|---|---|---|---|---|
-| `scratch` | `.tmp` | ignored | `logs`, `test-output`, `drafts` | manual | Alias auf `repo_containment.tmp-sink.path` (`config.py:2044-2046`) |
+| `scratch` | `.tmp` | ignored | `logs`, `test-output`, `drafts` | manual | **einzige Quelle** (D1, §3.6): `classes.scratch.path`; `repo_containment.tmp-sink.path` ist nur Migrations-Alias |
 | `state` | `.meta-viz` | ignored | `progress`, `checkpoints`, `handoffs` | keep | Aliase auf `progress.dir` (Schema `:2812`), `progress.checkpoint-dir` (`:2817`), `viz.event_log` (`:2398`) |
 
-**9 SE-Klassen** — `path` Default einheitlich `SE` (Code-Wahrheit `config.py:2273`; der
-Regel-Text `docs/se` in `se-cascade-artifact-taxonomy.md:10` wird auf `SE` korrigiert,
-§7 OQ-4), `git: tracked`, `naming` = die in §2.4 belegten Leaf-Muster, `subdir` wie dort.
+**9 SE-Klassen** — `path` Default einheitlich `SE` (**D4, DECIDED 2026-11-09**: Code-Wahrheit
+`config.py:2273`, keine Migration; der Regel-Text
+`rules/1-generic/se-cascade-artifact-taxonomy.md` verweist künftig auf
+`{{ARTIFACT_SE_ROOT}}` statt auf ein Literal, und `docs/se` wird als `legacy[]`-Muster
+gelesen — es ist kein Default und kein zweiter „richtiger" Pfad mehr), `git: tracked`,
+`naming` = die in §2.4 belegten Leaf-Muster, `subdir` wie dort.
+
+**Konsequenz (D4):** `docs/se` ist **kein** empfohlener Klassenpfad mehr. Setzt ein Projekt
+`classes.se-*.path: docs/se` trotzdem, ist das kein Config-Fehler (`legacy-intersect` prüft
+Pfad-Gleichheit, das Muster ist ein Glob), aber der erste Schreibvorgang meldet
+`artifact-locations.legacy-write` — das ist das gewollte Migrationssignal, kein stiller
+Durchlauf.
+
 
 **`unmanaged[]` Default (D-8, RVW2-X-02)** — Framework-Liste, read-only, additiv:
 
@@ -305,8 +335,38 @@ Regel-Text `docs/se` in `se-cascade-artifact-taxonomy.md:10` wird auf `SE` korri
 | `docs/api/**`, `docs/howto/**`, `docs/guides/**`, `docs/testing/**`, `docs/providers/**`, `docs/issues/**`, `docs/se-cascade/**` | von Menschen/Rollen gepflegte Doku-Unterbäume ohne Artefakt-Klasse | OQ-6 / F-3 |
 
 `docs/superpowers/**`, `docs/conclusions/`, `docs/estimates/`, `docs/research/`,
-`SE/VV/**` bleiben **`legacy[]`** (gesperrt, nicht unmanaged) — der Unterschied ist
-„darf nie Artefakt-Inhalt bekommen" vs. „ist kein Artefakt-Ziel".
+`SE/VV/**`, `docs/se/**` (D4) sowie `docs/adr/[0-9][0-9][0-9][0-9]-*.md` und
+`docs/adr/ADR-[0-9][0-9][0-9]-*.md` (D3) bleiben **`legacy[]`** (gesperrt, nicht unmanaged) —
+der Unterschied ist „darf nie Artefakt-Inhalt bekommen" vs. „ist kein Artefakt-Ziel".
+
+### 3.2.1 Naming-Token (D3, DECIDED 2026-11-09)
+
+`naming` ist **pro Klasse** konfigurierbar. Wert = String-Pattern aus geschlossenen Tokens
+(`{token}`); ein unbekannter Token, ein nicht klassen-anwendbarer Token, ein Pfadseparator
+oder `..` ist ein harter Fehler `artifact-locations.naming-invalid` (§4.1).
+
+| Token | Bedeutung | erlaubt in (Form) |
+|---|---|---|
+| `{class}` | Klassenname (z. B. `reviews`) | alle Klassen mit `naming` (Form A/B) |
+| `{date}` | Artefakt-Datum `YYYY-MM-DD` | alle persistenten Klassen |
+| `{slug}` | Kurztitel, lowercase, ASCII, keine Leerzeichen | alle persistenten Klassen |
+| `{kind}` | genau **ein** `kind`-Wert der Klasse | nur Klassen mit `kind`-Enum (`reviews`, `audits`, `analysis`, `reports`) |
+| `{n}` | Issue-Nummer, ohne Null-Padding | `specs`, `plans`, `concepts`, `spikes`, `runbooks` |
+| `{topic}` | Topic-Slug (identisch zu `{slug}`, historischer Name) | `specs`, `plans`, `concepts`, `spikes`, `runbooks`, `analysis` |
+| `{scope}` | SE-Scope (`System`/`Component`/`all`) | `reviews` (`kind: se`), `reports`, `traceability` |
+| `{nnn}` | laufende Nummer, **3-stellig nullgepolstert** (`007`) | `adr` |
+| `{level}` | SE-Level (`L0`…`L3`) | 9 SE-Klassen |
+| `{folder}` | FolderName der Zelle (ohne `System`/`Component`-Suffix) | 9 SE-Klassen |
+
+Regeln: (a) die Liste ist **geschlossen** — ein Token außerhalb dieser Tabelle ist
+`naming-invalid`; (b) ein Token, der für die Klasse nicht anwendbar ist (z. B. `{level}` in
+`audits`), ist ebenfalls `naming-invalid`; (c) persistente Datei-Klassen brauchen eine
+Datei-Endung (`.md`); `{kind}`-Klassen dürfen `{kind}` weglassen, dann ist der `kind` nur
+Frontmatter-Pflicht; (d) die Anzeigeform `<TOKEN>` (z. B. `<YYYY-MM-DD>`) ist **kein**
+Konfigurationswert (Schema-Pattern lehnt sie ab, Migrationshinweis im Fehlertext) — sie bleibt
+nur in Rollen-Prosa und in dieser Tabelle als Lesefassung zulässig; (e) Naming erzeugt **keine**
+zusätzliche Variable: die 54 Namen aus §3.4 bleiben unverändert, das aufgelöste `naming`
+erscheint nur in `--status-artifacts --json` (§4.3).
 
 **`vv`:** siehe OQ-1. Empfohlene Auflösung in §3.6 (D-7).
 
@@ -330,10 +390,14 @@ gewählt oder der Framework-Default?" (Szenario B10). Zwei Präzedenzstufen für
 Datenzugriff wären nicht beobachtbar und sind deshalb zusammengeführt. Es bleiben **vier**
 Wertequellen — genau die Zahl, die AC-1186-15 wörtlich verlangt.
 
-**Zwei Zustandswerte, die keine Wertequelle sind:**
+**Drei Zustandswerte/Attributionen, die keine Wertequelle sind:**
 - `source: "disabled"` — bei `enabled: false` liefern alle Klassen die heutigen Pfade; nichts wird
   umgeleitet (Regel 5).
 - `source: "project-preset:<name>"` — Source-Attribution, siehe oben.
+- `field_sources[f] = "project-alias:<alter-key>"` — feldweise Attribution, wenn der Wert aus
+  einem Legacy-Alias stammt (`repo_containment.tmp-sink.path` → `classes.scratch.path`,
+  `se_output.base_dir` → `classes.se-*.path`, `spec-plan-workflow.paths.*` → `classes.*.path`;
+  D1, §3.6). `source` bleibt dabei `"project"`, weil der Wert aus der Projekt-Ebene stammt.
 
 Harte Regeln (sonst wird die Override-Kette zum Ratespiel):
 
@@ -376,6 +440,15 @@ Regeln dazu:
 - `scratch`/`state` haben schema-seitig **kein** `mode`-Feld (`artifactEphemeral`/`artifactState`,
   §4.1); ihre `_MODE`-Variable wird als Konstante `files` exportiert, damit der Vertrag
   „jede Klasse hat einen Modus" lückenlos ist (K-1, im Plan T6).
+- **Eine Quelle für den Scratch-Bereich (D1, DECIDED 2026-11-09):** `{{ARTIFACT_SCRATCH_DIR}}`
+  ist der aufgelöste Wert von `classes.scratch.path`. `{{TMP_SINK_PATH}}` bleibt als
+  Laufzeit-Variable erhalten, wird aber **aus der Matrix gespeist**
+  (`TMP_SINK_PATH == ARTIFACT_SCRATCH_DIR`, `config.py:2046` wird entsprechend umgedreht).
+  Der Name `ARTIFACT_SCRATCH_PATH` aus dem Entscheidungsprotokoll ist damit **kein** 55. Name,
+  sondern die Rollen-Variable `{{ARTIFACT_SCRATCH_DIR}}`; die Menge bleibt bei 54.
+- **Kein `_NAMING`-Variable:** `naming` ist Validierungs- und Doku-Vertrag, kein
+  Rollen-Platzhalter (§3.2.1 e) — sonst würde `check_builder_known_set`
+  (`placeholders.py:314-335`) 23 weitere Namen erzwingen.
 - Die vier SE-Projektions-Variablen sind **keine** zusätzlichen Klassen (AC-1186-12 bleibt bei
   14 + 9): sie halten die im Bestand belegten Pfade `{SE_BASE_DIR}/reviews/`,
   `{SE_BASE_DIR}/reports/` (`se-critic.md:110,114`) und die SE-globalen `adr`/`traceability`
@@ -424,9 +497,33 @@ Regeln dazu:
 |---|---|---|
 | `spec-plan-workflow.paths.{specs,plans,spikes}` | `artifact-locations.classes.*.path` | Bei `enabled: true` gewinnt die Matrix; `paths` wird als **deprecated alias** gelesen und bei Sync-Abweichung einmalig gewarnt. Bei `enabled: false` bleibt `paths` alleinige Quelle. |
 | `se_output.base_dir` | `artifact-locations.classes.se-*.path` | Matrix gewinnt; `se_output` deprecated, Sync-Warnung mit Ziel-Key. `SE_BASE_DIR` bleibt Alias. |
-| `repo_containment.tmp-sink.path` | `classes.scratch.path` | Beide dürfen nicht auseinanderlaufen: Ist `classes.scratch.path` gesetzt, ist es die Senke und `tmp-sink.path` wird als Alias behandelt; sonst gilt `tmp-sink.path` (`TMP_SINK_PATH` bleibt die Laufzeit-Variable). Divergenz → Consistency-**Fehler**, nicht Warnung. |
+| `repo_containment.tmp-sink.path` | `classes.scratch.path` | **Eine Quelle (D1, DECIDED 2026-11-09):** `classes.scratch.path` ist die *einzige* Quelle. `tmp-sink.path` wird nur gelesen, solange `classes.scratch` fehlt (Migrations-Alias, `source: "project"` + Attribution `project-alias:repo_containment.tmp-sink.path`), und löst eine Deprecation-Warnung mit Migrationshinweis aus. Sind **beide** gesetzt, müssen die Werte **gleich** sein — Gleichheit ist zulässig (eine Warnung, Alias entfernen), Divergenz ist ein harter Fehler `artifact-locations.scratch-sink-divergence` (§4.1). `TMP_SINK_PATH` bleibt als Laufzeit-Variable erhalten und wird **aus der Matrix** gespeist (§3.4). |
 | `progress.dir`, `progress.checkpoint-dir`, `viz.event_log` | `classes.state.subdirs.*`, `event-log` | Wie oben; `state` ist eine **Projektion** der drei Keys, kein zweiter Speicher. Divergenz → Consistency-Warnung. |
-| `docs/superpowers/{specs,plans}`, `docs/plans/audit-*.md`, `docs/conclusions/`, `docs/estimates/`, `docs/research/`, `SE/VV/**`, `.meta-viz/handoffs/**` | `legacy[]` | Framework-Liste, read-only, nie mit Artefakt-Inhalt beschrieben (AC-1186-09); Ausnahme: der eine Scaffold-Marker je Verzeichnis (§3.5). |
+| `docs/superpowers/{specs,plans}`, `docs/plans/audit-*.md`, `docs/conclusions/`, `docs/estimates/`, `docs/research/`, `SE/VV/**`, `.meta-viz/handoffs/**`, `docs/se/**`, `docs/adr/[0-9][0-9][0-9][0-9]-*.md`, `docs/adr/ADR-[0-9][0-9][0-9]-*.md` | `legacy[]` | Framework-Liste, read-only, nie mit Artefakt-Inhalt beschrieben (AC-1186-09); Ausnahme: der eine Scaffold-Marker je Verzeichnis (§3.5). Neu in D3/D4: die beiden Nicht-Kanon-Naming-Formen für ADRs und das alte `docs/se`-Verzeichnis. |
+
+**D1 (DECIDED 2026-11-09) — Alias-Semantik und Reichweite.** Alle Zeilen der Tabelle folgen
+demselben Muster: die Matrix ist die Quelle, jeder Alt-Key ist ein **Alias** (nicht eine zweite
+Quelle), und Aliase tragen eine Attribution `project-alias:<alter-key>` im Feld
+`field_sources` — das ist ausdrücklich **keine** fünfte Wertequelle und ändert AC-1186-15
+nicht (§3.3, K3). Drei Ausprägungen:
+
+1. **Ersetzend** (`spec-plan-workflow.paths.*`, `se_output.base_dir`, `state`-Projektion):
+   Matrix-Wert gewinnt, Abweichung → Warnung.
+2. **Migrations-Alias mit Gleichheitszwang** (`scratch`): Alias wird gelesen, solange die
+   Klasse fehlt; beide gesetzt ⇒ Werte müssen gleich sein (sonst harter Fehler); in jedem Fall
+   Deprecation-Warnung mit Ziel-Key.
+3. **Read-only-Liste** (`legacy[]`): additiv, gesperrt, nie Ziel neuer Inhalte.
+
+**Containment-Hook liest den aufgelösten Wert (D1).** `hooks/1-generic/repo-containment*.sh`
+liest den Scratch-Pfad nicht mehr als Roh-Key aus `project.yaml`, sondern die **aufgelöste**
+Matrix: Präzedenz (1) exportierte Variable `ARTIFACT_SCRATCH_DIR` (sofern der Harness sie
+exportiert), (2) `classes.scratch.path` aus
+`.meta-config/artifact-locations.resolved.json` (§4.5, dieselbe Datendatei wie der
+`artifact-path-guard`), (3) Fallback `repo_containment.tmp-sink.path` (heutiges Verhalten,
+fail-closed), (4) Framework-Default `.tmp`. Der Schalter `repo_containment.tmp-sink.enabled`
+bleibt **unverändert** zuständig — `scratch` hat kein `enabled`-Feld (§4.1), und ein fehlender
+Pfad darf das Gefängnis nie öffnen. Die lexikalischen Regeln (`tmp_sink_path_error`-Parität,
+`tests/fixtures/tmp-sink-path-corpus.json`) bleiben unangetastet.
 
 **D-6 (Auflösung der internen AC-Kollision 04↔12):** AC-1186-04 verlangt, dass die Defaults
 `docs/{…,conclusions}` **erzeugen**, AC-1186-12 zählt aber genau 14 Nicht-SE-Klassen, in denen
@@ -468,7 +565,8 @@ Skizze der Sektion — vollständig mit `additionalProperties: false` auf jeder 
       "additionalProperties": false,
       "properties": {
         "mode":      { "enum": ["files", "inline", "off"], "default": "files" },
-        "naming":    { "type": "string", "default": "<YYYY-MM-DD>-<slug>.md" },
+        "naming":    { "allOf": [{ "$ref": "#/$defs/artifactNaming" }],
+                       "default": "{date}-{slug}.md" },
         "archive":   { "type": "string" },
         "git":       { "enum": ["tracked", "ignored"], "default": "tracked" },
         "retention": { "enum": ["manual", "keep", "prune"], "default": "manual" }
@@ -506,13 +604,19 @@ Skizze der Sektion — vollständig mit `additionalProperties: false` auf jeder 
              "se-implementation", "se-testplan", "se-validation", "se-verification",
              "se-decisions"]
   },
+  "artifactNaming": {
+    "type": "string",
+    "minLength": 1,
+    "description": "Closed token pattern (D3). Allowed tokens: {class} {date} {slug} {kind} {n} {topic} {scope} {nnn} {level} {folder}. No path separator, no '..'. Class applicability and the file extension are enforced by the semantic validator (artifact-locations.naming-invalid).",
+    "pattern": "^(?!.*\\.\\.)(?:[^{}/]|\\{(?:class|date|slug|kind|n|topic|scope|nnn|level|folder)\\})+$"
+  },
   "artifactClass": {
     "type": "object", "additionalProperties": false,
     "properties": {
       "path":   { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$" },
       "mode":   { "enum": ["files", "inline", "off"] },
       "git":    { "enum": ["tracked", "ignored"] },
-      "naming": { "type": "string", "minLength": 1 },
+      "naming": { "$ref": "#/$defs/artifactNaming" },
       "archive":{ "type": "string" },
       "retention": { "enum": ["manual", "keep", "prune"] },
       "kind":   { "type": "array", "items": { "$ref": "#/$defs/artifactKind" }, "uniqueItems": true },
@@ -525,7 +629,7 @@ Skizze der Sektion — vollständig mit `additionalProperties: false` auf jeder 
       "path":   { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$" },
       "mode":   { "enum": ["files", "inline", "off"] },
       "git":    { "enum": ["tracked", "ignored"] },
-      "naming": { "type": "string", "minLength": 1 },
+      "naming": { "$ref": "#/$defs/artifactNaming" },
       "archive":{ "type": "string" },
       "retention": { "enum": ["manual", "keep", "prune"] },
       "fallback-parent": { "$ref": "#/$defs/artifactClassName" },
@@ -604,8 +708,13 @@ liegt deshalb im **semantischen** Validator (`config.py`, T5), das Enum selbst i
 | `artifact-locations.unknown-preset` | `preset` nicht in `config/artifact-locations-presets.yaml` | `invalid 'artifact-locations.preset': unknown preset '<name>'` |
 | `artifact-locations.legacy-intersect` | `legacy[]`-Eintrag ist mit einem aktiven Klassen-`path` identisch | `invalid 'artifact-locations.legacy': '<p>' is also an active class path` |
 | `artifact-locations.unmanaged-intersect` | `unmanaged[]`-Eintrag ist mit einem aktiven Klassen-`path` identisch (D-8) | `invalid 'artifact-locations.unmanaged': '<p>' is also an active class path` |
+| `artifact-locations.scratch-sink-divergence` | `classes.scratch.path` **und** `repo_containment.tmp-sink.path` sind gesetzt und **verschieden** (D1) | `invalid 'artifact-locations.classes.scratch.path' vs 'repo_containment.tmp-sink.path': values diverge — keep one source (artifact-locations.classes.scratch.path) and remove the legacy key` |
+| `artifact-locations.naming-invalid` | `naming` enthält einen unbekannten Token, einen für die Klasse nicht anwendbaren Token, einen Pfadseparator, `..`, die Anzeigeform `<TOKEN>` oder eine fehlende Datei-Endung bei persistenter Datei-Klasse (§3.2.1, D3) | `invalid 'artifact-locations.classes.<x>.naming': unknown token '{<t>}' (allowed: {class} {date} {slug} {kind} {n} {topic} {scope} {nnn} {level} {folder})` |
 
-**Neun harte Fehlercodes** (Revision 2: `unmanaged-intersect` ergänzt, RVW2-X-02).
+**Elf harte Fehlercodes** (Revision 2: `unmanaged-intersect` ergänzt, RVW2-X-02;
+Revision 4: `scratch-sink-divergence` und `naming-invalid` ergänzt, D1/D3).
+`scratch-sink-divergence` und `naming-invalid` prüft der semantische Validator (T5), das
+Schema liefert für `naming` bereits einen lexikalischen `pattern`-Fehler (§4.1, D3).
 
 `se-decomposition: off` ist **ausdrücklich zulässig** (AC-1186-11): die Decomposition darf der
 Architekt direkt schreiben; nur `se-requirements` ist startkritisch.
@@ -619,10 +728,12 @@ Pflicht-Presets:
 version: 1
 presets:
   default:    # die Matrix aus §3.2
-    classes: { specs: {path: docs/specs}, plans: {path: docs/plans}, ... }
+    classes: { specs: {path: docs/specs}, plans: {path: docs/plans},
+               adr: {naming: "ADR-{nnn}_{slug}.md"}, ... }
     legacy:  [docs/superpowers/specs, docs/superpowers/plans, docs/plans/audit-*.md,
               docs/specs/*-review.md, docs/conclusions/, docs/estimates/, docs/research/,
-              SE/VV/**, .meta-viz/handoffs/**]
+              SE/VV/**, .meta-viz/handoffs/**, docs/se/**,
+              docs/adr/[0-9][0-9][0-9][0-9]-*.md, docs/adr/ADR-[0-9][0-9][0-9]-*.md]
   minimal:    # nur specs/plans/reviews/audits aktiv (files); alle anderen inline
   flat:       # alles direkt unter docs/, keine Subfolder
   docs-only:  # ephemeral (scratch, state) = off
@@ -630,7 +741,11 @@ presets:
 
 Regeln: (a) Presets dürfen nur Felder setzen, die das Schema kennt (`additionalProperties: false`
 gilt auch hier); (b) ein unbekanntes Preset ist ein harter Fehler (§4.1), kein stiller
-`default`-Fallback; (c) Presets werden **nicht** in `project.yaml` kopiert — nur der Name.
+`default`-Fallback; (c) Presets werden **nicht** in `project.yaml` kopiert — nur der Name;
+(d) `naming`-Werte in Presets folgen dem Token-Kanon (§3.2.1) — ein Preset mit `<TOKEN>`-Form
+ist `artifact-locations.naming-invalid`, kein stiller Durchlauf (D3); (e) die beiden
+ADR-Legacy-Muster und `docs/se/**` stehen in **jedem** Preset, weil sie Framework-Herkunft
+haben (additive `legacy[]`-Regel, §3.3 Regel 4).
 
 ### 4.3 CLI `sync.py --status-artifacts [--json]`
 
@@ -652,10 +767,18 @@ JSON-Vertrag (`schema_version: "1"`, stabil, additiv erweiterbar):
   "classes": {
     "specs": {
       "path": "docs/specs", "mode": "files", "git": "tracked",
+      "naming": "{date}-{slug}.md",
       "source": "schema-default",
       "exists": true, "file_count": 12,
       "newest": "2026-11-09-artifact-locations-matrix-spec.md",
       "kinds": [], "subdir": "",
+      "legacy_hits": [], "violations": []
+    },
+    "scratch": {
+      "path": ".tmp", "mode": "files", "git": "ignored",
+      "source": "project",
+      "field_sources": { "path": "project-alias:repo_containment.tmp-sink.path" },
+      "exists": true, "file_count": 0, "kinds": [], "subdir": "",
       "legacy_hits": [], "violations": []
     },
     "project-docs": {
@@ -671,6 +794,8 @@ JSON-Vertrag (`schema_version: "1"`, stabil, additiv erweiterbar):
 ```
 
 Pflichtfelder pro Klasse laut AC-1186-14: `path`, `mode`, `source`, `exists`.
+Additiv (nicht pflichtig): `naming` (Token-Kanon, D3) und `field_sources` (feldweise Herkunft,
+inkl. `project-alias:<key>` bei Alias-Auflösung, D1).
 `unmanaged` erscheint ausschließlich als **Top-Level-Liste** und **nie** in `classes`
 (D-8): es ist keine Klasse, zählt nicht in AC-1186-12 und hat keinen Modus.
 `violations[]` enthält Objekte `{code, path, expected}` mit den Codes aus §4.6.
@@ -726,11 +851,18 @@ geschriebenen Datendatei `.meta-config/artifact-locations.resolved.json` (Präze
 `scripts/lib/sync_pipeline.py:1893-1921`). Der Hook ruft **keinen** Python-Resolver pro
 Schreibvorgang auf (Latenz) und liest **kein** YAML.
 
+**Zweiter Konsument derselben Datei (D1):** der bestehende
+`hooks/1-generic/repo-containment*.sh` liest den Scratch-Pfad aus derselben Datendatei
+(`classes[].name == "scratch"` → `path`), nicht mehr roh aus `project.yaml`. Präzedenz und
+Fallback-Kette stehen in §3.6; `repo_containment.tmp-sink.enabled` bleibt der Schalter. Beide
+Hooks teilen damit **eine** aufgelöste Wahrheit, ohne einen zweiten Resolver.
+
 **Datenform (IC-H2, stabil):**
 
 ```json
 { "schema_version": "1", "enabled": true, "strict": false, "root": "/abs/project",
   "classes": [ {"name": "reviews", "path": "docs/reviews", "mode": "files",
+                "naming": "{kind}-{date}-{slug}.md",
                 "patterns": ["docs/reviews/**"]} ],
   "legacy": ["docs/superpowers/specs/**", "docs/plans/audit-*.md"],
   "unmanaged": ["docs/api/**", ".meta-config/issue-labels-state.json"],
@@ -746,7 +878,6 @@ Diagnose. `unmanaged` (D-8) wird mitgeschrieben, damit der Hook auch Ziele unter
 `docs/**` durchlässt, die nur als unmanaged deklariert sind.
 
 **Entscheidungstabelle (IC-H3):**
-
 | Fall | `strict: false` (Default) | `strict: true` |
 |---|---|---|
 | Ziel ist ein Verzeichnis-Marker (`.gitkeep`, `.gitignore`, `.keep`) | allow | allow (Scaffold-Ausnahme, §3.5) |
@@ -757,6 +888,12 @@ Diagnose. `unmanaged` (D-8) wird mitgeschrieben, damit der Hook auch Ziele unter
 | Ziel trifft ein `unmanaged[]`-Muster (D-8, auch unter `docs/**`) | allow | allow |
 | Ziel außerhalb des Projekt-Roots | unverändert `repo-containment` (dieser Hook prüft es nicht) | dito |
 | Datei fehlt/unlesbar/kaputtes JSON | allow + eine Warnzeile (fail-open, Convention boundary) | allow + Warnzeile |
+
+**Auswertungsreihenfolge (verbindlich, D3):** Marker → `unmanaged[]` → **`legacy[]`** →
+Klassen-`path` → verwalteter Baum → Root. Der `legacy[]`-Schritt steht **vor** der
+Klassen-Freigabe, weil die ADR-Legacy-Muster (`docs/adr/[0-9][0-9][0-9][0-9]-*.md`) *innerhalb*
+des aktiven Klassenpfads `docs/adr` liegen: nur so bleibt „neue ADRs in Nicht-Kanon-Form werden
+geblockt" (D3) mit „Ziel unter seinem Klassenpfad ist erlaubt" widerspruchsfrei.
 
 **Verhältnis zu AC-1186-09 (RVW-1186-01):** Der Hook ist `enabled_by_default: false` und blockt
 im Auslieferungszustand **nichts** — die Issue-Formulierung „`legacy[]` paths never receive new
@@ -789,7 +926,7 @@ Neues Modul `scripts/lib/consistency/artifact_locations.py`, Registrierung analo
 | `artifact-locations.legacy-write` | warning | Datei in einem `legacy[]`-Baum, die **nicht** in der Baseline steht (`baseline.legacy_files` aus `.meta-config/artifact-locations.resolved.json`, §4.5) und Artefakt-Inhalt trägt. Baseline = beim Sync erfasstes Inventar, **kein** mtime-Vergleich (RVW2-1186-02). Höchstens **ein** Finding pro Datei und Lauf, nichts wird gelöscht. Verzeichnis-Marker (`.gitkeep`/`.gitignore`/`.keep`) sind ausgenommen (§3.5). Fehlt die Baseline, meldet der Check nichts und schreibt **eine** Warnzeile auf stderr (fail-open, kein neuer Check-Code) |
 | `artifact-locations.inline-with-path-promise` | violation | Klasse `inline`/`off`, während das Rollen-Template einen Pfad verspricht (`**Output file:**`, `Persisted to:`, `ARTIFACTS: <path>`) |
 | `artifact-locations.missing-dir` | info | Klasse mit `mode: files`, deren Verzeichnis im Projekt fehlt |
-| `artifact-locations.alias-divergence` | warning | `scratch`↔`tmp-sink.path` oder `state`↔`progress.*`/`viz.event_log` divergieren |
+| `artifact-locations.alias-divergence` | warning | `state`↔`progress.*`/`viz.event_log` divergieren. **Nicht** hier: `scratch`↔`tmp-sink.path` — diese Divergenz ist ein harter Config-Fehler `artifact-locations.scratch-sink-divergence` (§4.1, D1), weil sie zwei Schreibziele für dieselbe Senke erzeugen würde |
 
 **Lese- vs. Schreib-Literal (RVW-1186-06):** `literal-path` prüft **Schreibpositionen**, nicht
 jedes Vorkommen. Ein Literal gilt als Lese-/Scan-Position, wenn die Zeile den Marker
@@ -847,6 +984,13 @@ Template-Zufälle koppeln und den nächsten Rollen-Rewrite blockieren.
 10. **Keine zweite konfigurierbare Pfad-Quelle je Klasse** — kein `reports.se-path`, kein
     `reviews.se-path`: die SE-Projektion der SE-globalen Klassen ist **abgeleitet**
     (`{ARTIFACT_SE_ROOT}/<leaf>`, §3.4), nicht konfigurierbar (D-7).
+11. **Keine Doppelsenke für `scratch`** (D1): `repo_containment.tmp-sink.path` ist ein
+    Migrations-Alias und wird nie als gleichwertige Konfiguration dokumentiert, geschrieben oder
+    in Beispielen beworben; neue Projekte setzen ausschließlich
+    `artifact-locations.classes.scratch.path`.
+12. **Keine automatische Umschreibung der Token-Anzeigeform** (D3): `<TOKEN>`-Strings in
+    Rollen-Prosa werden nicht nach `{token}` konvertiert — Rollen-Prosa bleibt Lesetext, nur
+    Config-Werte folgen dem Token-Kanon.
 
 ## 6. Akzeptanzkriterien
 
@@ -969,7 +1113,7 @@ unbekannter Wert ist `artifact-locations.kind-invalid`.
 | AC-07 | Sektion in #1186 handgepflegt; Ableitung als Follow-up nach #1141 | Ableitung vor #1141 liest eine unvalidierte Wurzel und regressiert 7 Runtime-Sektionen | T17 (hand-add), T22 (Follow-up) |
 | AC-09 | „new writes" = Inhalt; Marker ausgenommen; Baseline = `baseline.legacy_files` aus Stage 14c, kein mtime; Meldung immer, Hook-Block bei Aktivierung | `docs/conclusions/.gitkeep` liegt in `legacy[]`; „nach dem letzten Sync" hatte keine deterministische Basis (RVW2-1186-02) | T8 (Marker-Konstante), T14 (Baseline-Fälle), T15 (Baseline schreiben), T16 |
 | AC-13 | `kind` = geschlossenes Enum (Klasse: Menge, Artefakt: Skalar) | AC-13 validiert ein Dokument, nicht eine Menge | T1 (`artifactKind`-Enum), T5 (`kind-invalid`) |
-| AC-15 | **Vier** Wertequellen (Projekt > Preset > Schema-Default > Code-Fallback) plus Source-Attribution `project-preset:<name>` und Zustand `disabled`; die Projekt-Preset-Wahl ist keine eigene Stufe (K3) | §3.3 listete fünf Stufen, davon zwei identische (dieselbe Datei, dasselbe `source`-Literal); AC-15 verlangt wörtlich vier | T4, §7.5 (4 Quellen + `disabled` + `project-preset`-Attribution) |
+| AC-15 | **Vier** Wertequellen (Projekt > Preset > Schema-Default > Code-Fallback) plus Source-Attributionen `project-preset:<name>`, `project-alias:<key>` (D1) und Zustand `disabled`; weder Preset-Wahl noch Alt-Key-Lesen sind eine eigene Stufe (K3) | §3.3 listete fünf Stufen, davon zwei identische (dieselbe Datei, dasselbe `source`-Literal); AC-15 verlangt wörtlich vier | T4, §7.5 (4 Quellen + `disabled` + 2 Attributionsfamilien) |
 
 ## 7. Risiken & offene Fragen
 
@@ -987,7 +1131,10 @@ unbekannter Wert ist `artifact-locations.kind-invalid`.
 | R8 | **Drei Wellen-Issues editieren dieselben Dateien** (Schema, `admin-server.py`, `admin-ui.html`, `placeholders.py`, Stage 14) | Serialisierungstabelle §9; kanonische Reihenfolge **#1187 → #1186 → #1188 → #1181, danach #1141**; die Whitelist-Ableitung läuft als Follow-up **nach** #1141 |
 | R17 | **`_MODE` als Template-Gate missverstanden.** Ein `{{#if ARTIFACT_<X>_MODE}}` würde nie entfernt (`variables.py:498-508`) und in jeden Agenten lecken | AC-05 präzisiert (§6.3): Modus ist Datenwert; Gate als Follow-up mit zwei Booleschen Variablen je Klasse |
 | R9 | **Eine einzelne große `admin-ui.html`** nimmt drei neue Panes auf | Panes klein halten (Resolver-Vorschau erst serverseitig, `--status-artifacts --json` als Datenquelle); Konfliktfläche in §9 markiert |
-| R10 | **SE-Default-Widerspruch** (`SE` vs. `docs/se`) produziert zwei „richtige" Pfade | ein Default in §3.2 (`SE`), Regel-Text wird korrigiert (OQ-4) |
+| R10 | **SE-Default-Widerspruch** (`SE` vs. `docs/se`) produziert zwei „richtige" Pfade | **D4 (DECIDED 2026-11-09):** ein Default `SE` (§3.2), keine Migration; Regel-Text verweist auf `{{ARTIFACT_SE_ROOT}}`, `docs/se/**` ist `legacy[]` — damit gibt es keinen zweiten „richtigen" Pfad mehr |
+| R21 | **Scratch-Alias-Migration bleibt liegen** — Bestandsprojekte setzen nur `tmp-sink.path`; ohne Migration lebt der Alias dauerhaft und die Deprecation-Warnung wird ignoriert | Ein-Quellen-Modell (D1): Alias wird gelesen (kein Bruch), Gleichheitszwang verhindert stille Doppelsenke, `sync.py --migrate-artifact-aliases [--write]` (Plan T23) schreibt die Matrix und bleibt idempotent; Warnung nennt den Ziel-Key |
+| R22 | **Naming-Token driften** — Rolle schreibt `<YYYY-MM-DD>`, Config erwartet `{date}`; oder ein Preset nutzt `{level}` in `audits` | Geschlossene Token-Liste (§3.2.1) + Schema-`pattern` + semantischer Code `naming-invalid` (D3); Anzeigeform ist ausdrücklich **kein** Config-Wert; Tests in T1/T2/T4/T5 |
+| R23 | **Containment-Hook und Matrix laufen auseinander**, wenn der Hook weiter den Roh-Key liest (zwei Schreibziele, ein davon unsichtbar) | Hook liest die aufgelöste Datendatei mit dokumentierter Fallback-Kette (§3.6); `tmp-sink.enabled` bleibt Schalter; lexikalische Parität unverändert (Plan T24) |
 
 ### 7.2 Offene Fragen
 
@@ -995,11 +1142,11 @@ unbekannter Wert ist `artifact-locations.kind-invalid`.
 |---|---|---|---|
 | **OQ-1** | Ist `vv` (systemweite V&V-Strategie) eine eigene Klasse, eine `kind`-Variante von `reports`, oder eine 24. Zeile? | Issue nennt `vv` im YAML-Beispiel **und** verlangt in AC-1186-12 „genau 14 + 9"; beides zusammen ist arithmetisch unvereinbar | **entschieden (D-7):** `reports.kind: vv`; `reports.path` bleibt `docs/reports`; SE-Pfade über abgeleitete Projektions-Variablen (`ARTIFACT_SE_REPORTS_DIR`), `SE/VV/**` in `legacy[]`; kein `se-path`-Feld (§5 Nr. 10) |
 | **OQ-2** | AC-1186-04 verlangt `docs/conclusions` in den Defaults, AC-1186-12 zählt `conclusions` in `analysis` auf | interner Widerspruch im Issue | **entschieden (D-6):** `docs/conclusions` als Legacy-Zielverzeichnis scaffolden, nicht als Klasse; das `.gitkeep` ist über die Scaffold-Ausnahme (§3.5) von `legacy-write` ausgenommen |
-| **OQ-3** | ADR-Naming: Issue `ADR-<NNN>-<slug>.md` (Bindestrich) vs. Regel `ADR-NNN_kurztitel.md` (Unterstrich, `se-cascade-artifact-taxonomy.md:61`) | beide sind „bestehend", das Repo selbst nutzt `0001-pyyaml-runtime-ausnahme.md` | Default `ADR-<NNN>_<slug>.md` (regelkonform), `legacy[]` akzeptiert `NNNN-<slug>.md` |
-| **OQ-4** | SE-Wurzel-Default: `SE` (Code, `config.py:2273`) oder `docs/se` (Regel-Text, `taxonomy:10`)? | Code gewinnt faktisch, Doku widerspricht | Default `SE` festschreiben, Regel-Text korrigieren (Doku-Fix im selben PR) |
-| **OQ-5** | Wie streng ist `scratch`↔`tmp-sink.path` zu koppeln: Alias, Vorrang-Regel oder Verbot der Doppelkonfiguration? | `repo_containment` ist bereits validiert (`config.py:888-937`), `artifact-locations` wäre zweite Quelle | Vorrang `classes.scratch.path` > `tmp-sink.path`; Divergenz = Consistency-**Fehler** (§3.6) |
+| **OQ-3** | ADR-Naming: Issue `ADR-<NNN>-<slug>.md` (Bindestrich) vs. Regel `ADR-NNN_kurztitel.md` (Unterstrich, `se-cascade-adr-standard.md:10`) | beide sind „bestehend", das Repo selbst nutzt `0001-pyyaml-runtime-ausnahme.md` | **DECIDED 2026-11-09 (D3):** Naming ist pro Klasse konfigurierbar (Token-Kanon §3.2.1). Projekt-Default `ADR-{nnn}_{slug}.md` (regelkonform); `legacy[]` akzeptiert zusätzlich `docs/adr/[0-9][0-9][0-9][0-9]-*.md` und `docs/adr/ADR-[0-9][0-9][0-9]-*.md`; unbekannte Tokens sind `naming-invalid` |
+| **OQ-4** | SE-Wurzel-Default: `SE` (Code, `config.py:2273`) oder `docs/se` (Regel-Text, `taxonomy:10`)? | Code gewinnt faktisch, Doku widerspricht | **DECIDED 2026-11-09 (D4):** Default bleibt `SE`, **keine** Migration; der Regeltext verweist auf `{{ARTIFACT_SE_ROOT}}` statt auf ein Literal; `docs/se/**` wird `legacy[]`-Muster (Plan T20) |
+| **OQ-5** | Wie streng ist `scratch`↔`tmp-sink.path` zu koppeln: Alias, Vorrang-Regel oder Verbot der Doppelkonfiguration? | `repo_containment` ist bereits validiert (`config.py:888-937`), `artifact-locations` wäre zweite Quelle | **DECIDED 2026-11-09 (D1):** **eine** Quelle — `classes.scratch.path`. `tmp-sink.path` ist Migrations-Alias (nur gelesen, solange die Klasse fehlt), beide gesetzt ⇒ Gleichheit Pflicht, sonst harter Fehler `scratch-sink-divergence`; Deprecation-Warnung mit Migrationshinweis; `TMP_SINK_PATH` wird aus der Matrix gespeist; Containment-Hook liest den aufgelösten Wert. Die frühere „Vorrang + ERROR"-Formulierung ist ersetzt (§3.6) |
 | **OQ-6** | Gehören `docs/superpowers/*`, `docs/issues/`, `docs/testing/`, `docs/providers/`, `docs/api/`, `docs/howto/`, `docs/guides/`, `docs/se-cascade/` in `legacy[]` oder bleiben sie „unmanaged"? **Zusatz:** Wo lebt `docs/issue-labels.md` aus #1188? | Issue listet nur 7 `legacy[]`-Einträge; das Repo hat 8 weitere `docs/`-Unterbäume ohne Klasse | **entschieden (D-8):** die 7 übrigen Unterbäume werden **`unmanaged[]`** (§3.2) — deklariert, aber weder gesperrt noch gewarnt; `docs/superpowers/*` + `docs/conclusions` bleiben `legacy[]`. **`docs/issue-labels.md` ist ein generiertes Mensch-Dok und gehört in das `project-docs`-Datei-Set** (`files.issue-labels`, §3.2); damit ist es für den Managed-Tree-Hook erlaubt und #1188 braucht keine zweite Schema-Änderung (Reihenfolge #1186 → #1188). `.meta-config/issue-labels-state.json` (Zustandsdatei aus #1188) ist ebenfalls `unmanaged` (RVW2-X-02) |
-| **OQ-7** | Datei-Ownership `scripts/lib/standalone.py`: Zielmatrix RVW2-X-01 nennt **nur #1187**, #1186-T6 braucht dort aber die 54 Framework-Defaults | Ohne den Block rendert jede Standalone-Persona der 26 umgestellten Templates `[ARTIFACT_* — not available outside a full agent-meta install]` — ein sichtbarer Regress; #1187 läuft zuerst und kann das Modul noch nicht importieren | **D-9 (Entscheidung, Abweichung dokumentiert):** #1186 behält den additiven Fallback-Block in `_standalone_variables`; #1187 bleibt Datei-Federführer, die Reihenfolge #1187 → #1186 verhindert einen Parallel-Edit. **Offener Punkt für den Reviewer:** gilt die Zielmatrix ausnahmslos, muss der Standalone-Fallback als eigenes Follow-up **nach** #1186 wandern — bis dahin bleibt die „not available"-Notiz |
+| **OQ-7** | Datei-Ownership `scripts/lib/standalone.py`: Zielmatrix RVW2-X-01 nennt **nur #1187**, #1186-T6 braucht dort aber die 54 Framework-Defaults | Ohne den Block rendert jede Standalone-Persona der 26 umgestellten Templates `[ARTIFACT_* — not available outside a full agent-meta install]` — ein sichtbarer Regress; #1187 läuft zuerst und kann das Modul noch nicht importieren | **DECIDED 2026-11-09 (D2): die D-9-Ausnahme bleibt.** #1186 behält den additiven Standalone-Fallback in `scripts/lib/standalone.py`; #1187 bleibt Datei-Federführer; die Reihenfolge #1187 → #1186 schließt einen Parallel-Edit aus. Kein Follow-up nötig, kein Reviewer-Vorbehalt mehr |
 
 ## 8. Backlog-Bugs & Findings
 
@@ -1039,7 +1186,7 @@ eindeutig serialisiert.
 | `scripts/lib/config.py` | #1186, #1189, #1187 | #1186 Resolver/Variablen (`:2044`, `:2269`, `:2737-2771`), #1189 Validierungsblock (`:888-937`), #1187 Kontext-Variablen | #1189 zuerst (Blocker für M5), dann #1187 → #1186 |
 | `scripts/lib/sync_pipeline.py` — **Stage 14** (`:1893-1924`) | **#1186, #1181** | **beide bauen dieselbe Stage um**: #1181-T9 fasst `_sync_stage_auto_commit_allowlist` an, #1186 hängt die neue Stage 14c (`artifact-locations.resolved.json`) direkt danach in `cli_commands._handle_sync` (`:1613-1616`) | #1186 vor #1181 (Stage-Reihenfolge 13 → 14 → 14b → **14c** → 15); ein Parallel-Edit ist ausgeschlossen |
 | `scripts/lib/variables.py` | #1187 | **Konfliktfläche ohne Änderung in #1186** (Zielmatrix RVW2-X-01: nur #1187): `strip_inactive_conditional_blocks`-Whitelist (`:570-598`) ist der Ort, an dem ein späteres `ARTIFACT_*_MODE`-Gate und die übrigen Wellen-Conditionals kollidieren | kein Edit in #1186; nur als Hotspot markiert (Follow-up AC-05) |
-| `scripts/lib/standalone.py` | #1187 (Federführung), #1186 (T6, additiver Fallback-Block) | `_standalone_variables` (`:295-336`) muss die 54 `ARTIFACT_*`-Werte mit Framework-Defaults liefern, sonst rendert die Standalone-Persona „not available"-Notizen statt Pfaden | **Abweichung von RVW2-X-01 (D-9):** #1186 braucht den Block, sonst regressieren 26 umgestellte Templates sichtbar; die Änderung ist regionsfremd zu #1187 und läuft nach ihm (§7.2 OQ-7) |
+| `scripts/lib/standalone.py` | #1187 (Federführung), #1186 (T6, additiver Fallback-Block) | `_standalone_variables` (`:295-336`) muss die 54 `ARTIFACT_*`-Werte mit Framework-Defaults liefern, sonst rendert die Standalone-Persona „not available"-Notizen statt Pfaden | **D2 (DECIDED 2026-11-09):** die Abweichung von RVW2-X-01 **bleibt** — #1186 braucht den Block, sonst regressieren 26 umgestellte Templates sichtbar; #1187 bleibt Datei-Federführer, die Reihenfolge #1187 → #1186 schließt den Parallel-Edit aus (§7.2 OQ-7) |
 | `scripts/admin-server.py` | #1186, #1187, #1188, #1189 | alle vier erweitern `PROJECT_WRITABLE_SECTIONS` (`:234-259`) bzw. Guard-Block (`:5295-5308`); #1189 zusätzlich `_start`/`_tmp_sink_env` (`:311`, `:650-671`) | streng sequenziell; #1189 unabhängig zuerst, danach #1187 → #1186 → #1188 |
 | `docs/ui/admin-ui.html` (eine Datei) | #1186, #1187, #1188 | drei neue Panes in derselben Datei; jede Änderung ist ein Konflikt-Hotspot | **streng**: nacheinander, kein Parallel-Edit (Reihenfolge wie oben) |
 | `docs/issue-labels.md` | #1188 (erzeugt), #1186 (klassifiziert) | #1186 muss die Datei **vor** #1188 in `project-docs.files.issue-labels` deklarieren, sonst blockt der Managed-Tree-Hook die Erzeugung | #1186 vor #1188 |
@@ -1049,7 +1196,7 @@ eindeutig serialisiert.
 | `rules/1-generic/use-lazy-rules.md` | #1186 (H-3), #1180 | handgepflegte Pointer-Tabelle driftet; #1186 will Generierung, #1180 will Erreichbarkeit | #1180-Mechanik zuerst, dann generierte Tabelle |
 | `agents/1-generic/*.md` (18+ Rollen) | #1186, #1187, #1188 | #1186 rewritet Pfadstellen, #1187 ändert `{{PROJECT_CONTEXT}}` in 70 Templates, #1188 ändert `feedback.md`/`meta-feedback.md`/`bug-feature-analyzer.md` — **Überschneidung genau bei den Feedback-/Triage-Rollen**, die #1186 ebenfalls auf `analysis` umstellt | #1187 → #1186 → #1188 (Reihenfolge macht die Feedback-Rollen konfliktfrei) |
 | `config/routing/reviewers.yaml` | #1186 | `notes` verweist heute auf tmp-Sink statt Matrix (`:23-29`) | kein Konflikt, gehört zu #1186 |
-| `hooks/1-generic/*` | #1186, #1151 | #1186 legt `artifact-path-guard.sh` an, #1151 hat die gemeinsamen Helfer (`hook_common.sh`) gerade nachgezogen | #1151 verifizieren/schließen, dann #1186-Hook auf `hook_common.sh` v1.9.0 aufsetzen |
+| `hooks/1-generic/*` | #1186, #1151 | #1186 legt `artifact-path-guard.sh` an (**neu**) und stellt `repo-containment*.sh` auf die aufgelöste Scratch-Quelle um (D1, Plan T24); #1151 hat die gemeinsamen Helfer (`hook_common.sh`) gerade nachgezogen | #1151 verifizieren/schließen, dann #1186-Hook auf `hook_common.sh` v1.9.0 aufsetzen; `repo-containment*.sh` hat in #1186 **einen** Owner (T24), die lexikalischen Regeln bleiben unverändert |
 | `scripts/lib/spec_plan_scaffold.py` → `artifact_scaffold.py` | #1186 | Umbenennung/Verallgemeinerung; Importe in `sync_pipeline.py:152` und `knowledge.py:12` | nur #1186 |
 | `tests/scenarios/registry.md` + `tests/scenarios/configs/` | #1186, #1181, #1187 | **Szenario-IDs sind knapp**: `94` = #1181, `95–98` = #1187; #1186 belegt **`99-artifact-locations-matrix`** (+ `asserts/99-…sh`) | ID-Vergabe in dieser Reihenfolge; keine Nachverdichtung |
 | `templates/configs/project.yaml.example`, `howto/configs/project.yaml.example` | #1187, #1186, #1188, #1181 | alle vier Wellen erweitern dieselben vollständigen Beispiele; beide Dateien müssen synchron bleiben (`docs/guides/project.yaml.example` ist ein Orchestrator-Teilbeispiel und **nicht** betroffen) | je PR nur eigene Keys, keine Umsortierung; #1186 hält **beide** Dateien im selben Task (T20) synchron |
@@ -1087,6 +1234,10 @@ Einzige begründete Abweichung: `scripts/lib/standalone.py` (D-9, §7.2 OQ-7).
 | H-2 | Ein Render pro Provider | §3.4 | `build_variables()` einmal pro Provider |
 | H-3 | Lazy-Pointer-Tabelle generieren | §9 (#1180) | generierter Index statt Handpflege |
 | H-4 | Keine neue `PROJECT_CONTEXT`-Duplizierung | §5 Nr. 6, H-4 | keine Änderung an `{{PROJECT_CONTEXT}}` |
+| **D1** (OQ-5) | **Eine** Scratch-Quelle; Alias nur Migrationspfad; Divergenz = harter Fehler; Containment-Hook liest aufgelösten Wert | §3.2, §3.4, §3.6, §4.1 (`scratch-sink-divergence`), §4.5, §4.6 | Plan T4/T5/T9/T23/T24; Tests (a)–(d) in T5/T9 |
+| **D2** (OQ-7) | D-9-Ausnahme bleibt (Standalone-Fallback in #1186, #1187 Datei-Federführer) | §7.2 (OQ-7), §9 | Plan T6, §2.3-Konfliktfläche |
+| **D3** (OQ-3) | Naming pro Klasse konfigurierbar, geschlossene Token-Liste, ADR-Default `ADR-{nnn}_{slug}.md`, zwei Legacy-Formen | §3.1, §3.2, §3.2.1, §4.1 (`artifactNaming`, `naming-invalid`), §4.2, §4.3 | Plan T1/T2/T4/T5/T15 |
+| **D4** (OQ-4) | Default `SE`, Regeltext auf `{{ARTIFACT_SE_ROOT}}`, `docs/se/**` in `legacy[]` | §3.2, §3.6, §4.2 | Plan T2/T20 |
 
 ## 11. Review-Auflösung (2026-11-09)
 
@@ -1144,4 +1295,31 @@ Wave-Specs/-Pläne. Status bleibt `DRAFT`.
 | **K7** | **Nicht betroffen**: alle neuen Schlüssel sind kebab-case in der neuen Top-Level-Sektion `artifact-locations` | geprüft: §3.1 |
 | **K8** | **Nicht betroffen**: kein bestehender `_KEYS`-Block | geprüft: §4.1 |
 | **RVW2-X-01** (MAJOR) | Konfliktmatrix auf die verbindliche Zielmatrix gezogen: `agent_sync.py` (#1187/#1188/#1181), `sync_pipeline.py` (#1186/#1181), `variables.py` (#1187), beide `project.yaml.example` (#1187/#1186/#1188/#1181), `registry.md` (#1186/#1181/#1187), `docs/issue-labels.md` + `.meta-config/issue-labels-state.json` (#1188 erzeugt, #1186 klassifiziert) | §9 |
-| **Deviation D-9** | `standalone.py` bleibt in #1186 (T6) — begründete Abweichung von RVW2-X-01, sonst Regress in 26 Standalone-Personas; als OQ-7 offen ausgewiesen | §7.2 (OQ-7), §9, Plan §2.2/§13 |
+| **Deviation D-9** | `standalone.py` bleibt in #1186 (T6) — begründete Abweichung von RVW2-X-01, sonst Regress in 26 Standalone-Personas; **D2 (DECIDED 2026-11-09)** bestätigt die Ausnahme, #1187 bleibt Datei-Federführer | §7.2 (OQ-7), §9, Plan §2.2/§13 |
+
+## 12. Entscheidungsprotokoll (2026-11-09)
+
+Vom User entschieden; die Markierung `DECIDED 2026-11-09` steht zusätzlich am jeweiligen
+Vertragsabschnitt. Diese vier Entscheidungen sind **Fach-Entscheidungen** und zu
+unterscheiden von den internen Design-Entscheidungen `D-6` (conclusions), `D-7` (`vv`),
+`D-8` (`unmanaged`) und `D-9` (Standalone-Ausnahme, hier als **D2** bestätigt).
+
+| D-Nr | Frage | Entscheidung | betroffene Stellen |
+|---|---|---|---|
+| **D1** | OQ-5 — wie streng ist `scratch` an `repo_containment.tmp-sink.path` gekoppelt? | **Eine** Quelle: `artifact-locations.classes.scratch.path`. `repo_containment.tmp-sink.path` ist **Legacy-Alias**, wird nur gelesen, solange `classes.scratch` fehlt; bei Setzung beider Werte muss der Wert **gleich** sein, Divergenz ist ein **Consistency-ERROR**. Deprecation-Warnung mit Migrationshinweis. `TMP_SINK_PATH` bleibt Laufzeit-Variable, wird aber **aus der Matrix** gespeist. Der Containment-Hook liest den **aufgelösten** Matrix-Wert, nicht den Roh-Key. Die frühere „Vorrang + ERROR"-Formulierung ist ersetzt. Migration: `sync.py --migrate-artifact-aliases [--write]`. | §3.2, §3.4, §3.6, §4.1 (`scratch-sink-divergence`), §4.5, §4.6, §5 Nr. 11, §7.1 R21/R23, §7.2 OQ-5; Plan T4, T5, T9, T23, T24 |
+| **D2** | OQ-7 — gilt die Datei-Zielmatrix (RVW2-X-01) für `scripts/lib/standalone.py` ausnahmslos? | **Nein, die D-9-Ausnahme bleibt.** #1186 behält den additiven Standalone-Fallback (54 Framework-Defaults); #1187 bleibt Datei-Federführer; die Reihenfolge #1187 → #1186 verhindert Parallel-Edits. Kein Follow-up, kein Reviewer-Vorbehalt. | §7.2 (OQ-7), §9 (`standalone.py`-Zeile), §11.2 (`Deviation D-9`); Plan T6, §2.3 |
+| **D3** | OQ-3 — welches ADR-Naming gilt, und ist Naming konfigurierbar? | Naming ist **pro Klasse** konfigurierbar als String-Pattern mit **geschlossener Token-Liste** (`{class}`, `{date}`, `{slug}`, `{kind}`, `{n}`, `{topic}`, `{scope}`, `{nnn}`, `{level}`, `{folder}`). Projekt-Default für ADRs: `ADR-{nnn}_{slug}.md` (regelkonform, `se-cascade-adr-standard.md:10`). `legacy[]` akzeptiert zusätzlich `NNNN-{slug}.md` und `ADR-{nnn}-{slug}.md`. Unbekannte/nicht anwendbare Tokens sind Fehler. | §3.1, §3.2 (ADR-Zeile + Absatz), §3.2.1, §4.1 (`$defs/artifactNaming`, `naming-invalid`), §4.2 (d), §4.3 (`naming` im JSON), §5 Nr. 12, §7.1 R22; Plan T1, T2, T4, T5, T15, T20, T23 |
+| **D4** | OQ-4 — `SE` oder `docs/se` als SE-Wurzel-Default? | Default bleibt **`SE`**, keine Migration. Der Regeltext `rules/1-generic/se-cascade-artifact-taxonomy.md` verweist künftig auf `{{ARTIFACT_SE_ROOT}}` statt auf ein Literal. `docs/se/**` wird als `legacy[]`-Muster gelesen (kein Default, kein zweiter „richtiger" Pfad). | §3.2 (SE-Absatz), §3.6, §4.2, §7.1 R10, §7.2 OQ-4; Plan T2, T20 |
+
+**Verbleibende offene Punkte (nicht entschieden, nicht blockierend):**
+
+1. **`ARTIFACT_SE_ADR_DIR`-Leaf-Schreibweise** — §3.4 leitet die SE-Projektion als
+   `{ARTIFACT_SE_ROOT}/<leaf>` ab; die Taxonomie (`se-cascade-artifact-taxonomy.md:15,61`)
+   führt den Ordner als `ADR/` (Großbuchstaben), die Matrix-Klasse `adr` als `docs/adr`
+   (Kleinbuchstaben). Empfehlung für die Umsetzung: Leaf **wörtlich** `<ADR>`/`<reports>`/
+   `<reviews>`/`<traceability>` aus der Taxonomie übernehmen und in T4 pinnen; keine
+   Entscheidung in diesem Dokument.
+2. **Retention für `scratch`** bleibt Deklaration + Report (Nicht-Ziel 2); ein Cleanup ist
+   weiterhin #1150 vorbehalten.
+3. **Naming-Auflösung zur Laufzeit** (wer erzeugt den Dateinamen: Rolle oder CLI) bleibt
+   Rollen-Verantwortung; die Matrix liefert nur Muster + Validierung (§3.2.1 e).

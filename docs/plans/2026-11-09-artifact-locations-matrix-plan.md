@@ -2,7 +2,7 @@
 pipeline_stages:
   implement: 3
 status: DRAFT
-revision: "2"
+revision: "4"
 date: 2026-11-09
 issue: 1186
 class: XL
@@ -38,6 +38,11 @@ trace:
 > `project-state`) und K3 (vier Wertequellen + Source-Attribution) sind eingearbeitet,
 > K6 ist als `$defs`-Konsistenz notiert. K2/K4/K5/K7/K8 betreffen diesen Plan nicht.
 > Auflösungstabelle: §15.2.
+> **Revision 4 (Entscheidungsprotokoll D1–D4, 2026-11-09):** OQ-5 (eine Scratch-Quelle,
+> Alias-Migration, Containment-Hook liest Matrix), OQ-7 (D-9-Ausnahme bleibt), OQ-3
+> (Naming-Token + ADR-Default + Legacy-Formen), OQ-4 (`SE`, Regeltext auf
+> `{{ARTIFACT_SE_ROOT}}`). Neue Tasks **T23** (Alias-Migration) und **T24**
+> (Containment-Hook auf aufgelösten Pfad). Auflösungstabelle: §16.
 > **Voraussetzungen (kanonische Reihenfolge, verbindlich — Review 2026-11-09):**
 > `#1187 → #1186 → #1188 → #1181`, danach `#1141`. Die **Whitelist-Ableitung aus dem Schema
 > zuletzt** (eigenes Follow-up, T22).
@@ -95,20 +100,24 @@ draft-07, pytest, Markdown/YAML.
 **Spec:** `docs/specs/2026-11-09-artifact-locations-matrix-spec.md`
 **Spec-ID:** `SPEC-1186-artifact-locations-matrix`
 **Issue:** [#1186](https://github.com/Popoboxxo/agent-meta/issues/1186)
-**Aufwand:** 22 Tasks in 6 Meilensteinen (**T22 = Follow-up nach #1141**, nicht Teil
-des #1186-PR), 5 neue Produktionsmodule/Hook, 1 neue Preset-Datei, 1 neue Lazy-Rule,
-15 neue Testdateien + 1 Szenario-Assert, **26 Rollen-Templates** (10 Nicht-SE + 12 SE +
-4 Reviewer), 2 Doku-/Changelog-Änderungen. Eine belastbare Schätzung liefert
-`effort-estimator` (Textverweis; hier bewusst nicht berechnet).
+**Aufwand:** 24 Tasks in 6 Meilensteinen (**T1–T21, T23, T24 = 23 im PR**;
+**T22 = Follow-up nach #1141**, nicht Teil des #1186-PR), 7 neue Produktionsmodule/Hook,
+1 neue Preset-Datei, 1 neue Lazy-Rule, 17 neue Testdateien + 1 Szenario-Assert,
+**26 Rollen-Templates** (10 Nicht-SE + 12 SE + 4 Reviewer), 2 Doku-/Changelog-Änderungen.
+Eine belastbare Schätzung liefert `effort-estimator` (Textverweis; hier bewusst nicht
+berechnet).
 
 ## Größe je Task (Übersicht)
 
 | Größe | Tasks |
 |---|---|
-| S | T3, T7, T9, T12, T17 |
-| M | T1, T2, T6, T13, T18, T20, T22 (Follow-up) |
+| S | T3, T7, T9, T12, T17, T24 |
+| M | T1, T2, T6, T13, T18, T20, T22 (Follow-up), T23 |
 | L | T5, T8, T10, T11, T14, T15, T16, T19, T21 |
-| XL | T4 (Resolver-Kern: 4 Wertequellen + Source-Attribution, 23 Klassen, Alias-Projektion) |
+| XL | T4 (Resolver-Kern: 4 Wertequellen + Source-Attribution, 23 Klassen, Alias-Projektion, Naming-Auflösung) |
+
+**Revision 4 — betroffene Tasks (D1–D4):** D1 → T4, T5, T9, T15, **T23 (neu)**, **T24 (neu)**;
+D2 → T6 (unverändert, Entscheidung bestätigt); D3 → T1, T2, T4, T5, T15, T23; D4 → T2, T20.
 
 ## 1. Zielbild in fünf Sätzen
 
@@ -124,7 +133,10 @@ des #1186-PR), 5 neue Produktionsmodule/Hook, 1 neue Preset-Datei, 1 neue Lazy-R
    Preset-Sieg. Vier **Wertequellen**, zwei Attributionen (K3).
 4. Bestandsprojekte verlieren nichts: `legacy[]` ist additiv und read-only,
    `enabled: false` stellt exakt das heutige Verhalten wieder her, und keine
-   Datei wird verschoben, archiviert oder gelöscht.
+   Datei wird verschoben, archiviert oder gelöscht. Der Scratch-Bereich hat **eine**
+   Quelle (D1): `repo_containment.tmp-sink.path` ist nur noch Migrations-Alias mit
+   Gleichheitszwang und Deprecation-Warnung; `--migrate-artifact-aliases --write`
+   zieht die Matrix nach, ohne Kommentare zu verlieren.
 5. Durchsetzung ist **zweistufig und verhältnismäßig**: der
    Consistency-Check warnt sofort (und immer), der Hook blockt `legacy[]`-Ziele
    und (bei `strict: true`) Fehlrouten — **sobald er aktiviert ist**
@@ -150,7 +162,8 @@ Alle Zeilen sind **Create** (Datei existiert auf `aaed14c2` nicht).
 | `config/artifact-locations-presets.yaml` | Create | Presets `default`, `minimal`, `flat`, `docs-only`; reine Daten, Vorbild `config/rules-presets.yaml:47` | T2 |
 | `scripts/lib/artifact_locations.py` | Create | **Einziger** Matrix-Resolver: `CLASS_REGISTRY`, vier Wertequellen + Source-Attribution (K3), `source`-Reporting, SE-Projektion (D-7), Zell-Pfad, Validierungsfehler | T4 |
 | `scripts/lib/artifact_scaffold.py` | Create | Verallgemeinertes Scaffolding: `files`-Verzeichnisse + `.gitkeep`, `legacy`-Zielverzeichnis `docs/conclusions` (D-6), Marker-Ausnahme | T8 |
-| `scripts/lib/artifact_status.py` | Create | `--status-artifacts`-Report (Mensch + JSON `schema_version: "1"`), Datei-Zählung ohne `*.sync-backup-*` (#1195) | T15 |
+| `scripts/lib/artifact_status.py` | Create | `--status-artifacts`-Report (Mensch + JSON `schema_version: "1"`), Datei-Zählung ohne `*.sync-backup-*` (#1195), `naming`/`field_sources` additiv (D1/D3) | T15 |
+| `scripts/lib/artifact_migration.py` | Create | Alias-Migration (D1): liest `repo_containment.tmp-sink.path`/`se_output.base_dir`/`spec-plan-workflow.paths.*`/`progress.*`/`viz.event_log`, erzeugt den `artifact-locations`-Snippet, `--write` schreibt kommentar-erhaltend (Roundtrip-Guard), idempotent | T23 |
 | `scripts/lib/consistency/artifact_locations.py` | Create | 5 Checks: `literal-path`, `legacy-write` (baseline-basiert), `inline-with-path-promise`, `missing-dir`, `alias-divergence` | T14 |
 | `hooks/1-generic/artifact-path-guard.sh` | Create | PreToolUse-Routing-Guard auf `.meta-config/artifact-locations.resolved.json`, fail-open, `strict` opt-in | T16 |
 | `rules/1-generic/artifact-locations.md` | Create | **Eine** Lazy-Rule (`channel: skill`, H-1) mit Matrix-Tabelle, Modus-Semantik und Rollen-Anleitung | T13 |
@@ -171,6 +184,8 @@ Alle Zeilen sind **Create** (Datei existiert auf `aaed14c2` nicht).
 | `tests/test_artifact_locations_admin_api.py` | Create | `../x` ⇒ 400, Feldname in Meldung, Guard vor Disk-Write | T18 |
 | `tests/test_artifact_locations_admin_ui.py` | Create | statische Pane-/Routing-/Select-Assertions gegen `admin-ui.html` | T19 |
 | `tests/test_artifact_locations_scenario.py` | Create | **Ein** voller Szenarientest in `.tmp/scenario-artifacts-1186/` | T21 |
+| `tests/test_artifact_locations_migration.py` | Create | Alias-Migration: dry-run schreibt nicht, `--write` idempotent + Roundtrip-Guard, Divergenz verweigert, `enabled: false` verweigert | T23 |
+| `tests/test_repo_containment_scratch_resolution.py` | Create | Containment-Hook liest `classes.scratch.path` aus der Datendatei (D1), Fallback-Kette, `tmp-sink.enabled` bleibt Schalter, lexikalische Parität unverändert | T24 |
 
 ### 2.2 Geänderte Dateien
 
@@ -178,9 +193,9 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 
 | Datei | Status | Zweck | Task |
 |---|---|---|---|
-| `config/project-config.schema.json` | Modify | Sektion `artifact-locations` (`:2223`-Umfeld) inkl. `unmanaged[]` + `$defs` (`:2855`); `se_output` deklarieren; `$defs/artifactKind` + `artifactClassName` | T1, T3 |
+| `config/project-config.schema.json` | Modify | Sektion `artifact-locations` (`:2223`-Umfeld) inkl. `unmanaged[]` + `$defs` (`:2855`); `se_output` deklarieren; `$defs/artifactKind` + `artifactClassName` + `artifactNaming` (D3) | T1, T3 |
 | `scripts/lib/config.py` | Modify | `_validate_artifact_locations`, `_build_artifact_variables` (Aufruf bei `:2770-2771`), Alias-Warnungen | T5, T6, T9 |
-| `scripts/lib/standalone.py` | Modify | `_standalone_variables` (`:295-336`) liefert die 54 `ARTIFACT_*`-Framework-Defaults (sonst „not available"-Notizen in exportierten Personas); **D-9: begründete Abweichung von RVW2-X-01**, Datei-Federführung bleibt #1187 (§13 OQ-7) | T6 |
+| `scripts/lib/standalone.py` | Modify | `_standalone_variables` (`:295-336`) liefert die 54 `ARTIFACT_*`-Framework-Defaults (sonst „not available"-Notizen in exportierten Personas); **D2 (DECIDED 2026-11-09): D-9-Ausnahme bleibt**, #1187 ist Datei-Federführer, die Reihenfolge #1187 → #1186 schließt den Parallel-Edit aus (§13 OQ-7) | T6 |
 | `scripts/lib/spec_plan_scaffold.py` | Modify | `scaffold_spec_plan_dirs` wird dünner Wrapper (Import bleibt: `sync_pipeline.py:152`, `knowledge.py:12`) | T8 |
 | `scripts/lib/sync_pipeline.py` | Modify | Scaffold-Aufruf (`:1699`) + neue Stage **14c** „resolved.json" nach `:1615` (Muster `:1893-1924`; **Kollisionsfläche mit #1181-T9**) | T8, T15 |
 | `scripts/lib/consistency/placeholders.py` | Modify | **54** `ARTIFACT_*`-Namen in `_BUILTIN_VARS` (Block ab `:12`); `_UNREGISTERED_BUILDER_RATCHET` bleibt unangetastet (shrink-only) | T7 |
@@ -189,12 +204,13 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 | `scripts/lib/cli_commands.py` | Modify | `_handle_status_artifacts`, Stage-Verdrahtung (`:1613-1616`) | T15 |
 | `scripts/admin-server.py` | Modify | `artifact-locations` in `PROJECT_WRITABLE_SECTIONS` (`:234-259`), `_guard_artifact_locations_write` im Guard-Block (`:5305-5308`) | T17, T18 |
 | `docs/ui/admin-ui.html` | Modify | Pane „Artifacts" (Muster `:7314-7315`, `:7448`, `:11377`) | T19 |
-| `docs/api/cli-reference.md` | Modify | `--status-artifacts` + `--json` dokumentieren (sonst ERROR `docs.cli_reference`, `lib/consistency/docs.py:9-44`) | T15 |
+| `hooks/1-generic/repo-containment{,-impl}.sh` | Modify | Scratch-Pfad kommt aus der **aufgelösten** Matrix (D1): `ARTIFACT_SCRATCH_DIR`-Env → `classes.scratch.path` aus `.meta-config/artifact-locations.resolved.json` → `repo_containment.tmp-sink.path` → `.tmp`; `tmp-sink.enabled` bleibt Schalter; lexikalische Regeln unverändert | T24 |
+| `docs/api/cli-reference.md` | Modify | `--status-artifacts` + `--json` dokumentieren (sonst ERROR `docs.cli_reference`, `lib/consistency/docs.py:9-44`); **`--migrate-artifact-aliases` + `--write` sequenziell nach T15** (dokumentierte Kette auf derselben Datei) | T15, T23 |
 | `docs/api/admin-ui-reference.md` | Modify | `<!-- help-id: project_instance-artifact_locations -->` (sonst ERROR `docs.ui_help_mappings`, `docs.py:47-97`) | T19 |
 | `config/routing/reviewers.yaml` | Modify | `notes:` (`:23-29`) nennt Matrix statt tmp-Sink | T12 |
 | `config/rules-presets.yaml` | Modify | `artifact-locations` im `lazy`-Preset (`channel: skill`, Muster `:110-132`) | T13 |
 | `rules/1-generic/use-lazy-rules.md` | Modify | Pointer-Tabelle (`:5-21`) um Artefakt-Skill ergänzen/regenerieren (H-3) | T13 |
-| `rules/1-generic/se-cascade-artifact-taxonomy.md` | Modify | `:10` `docs/se` → `SE` (OQ-4), Verweis auf `{{ARTIFACT_SE_ROOT}}` | T20 |
+| `rules/1-generic/se-cascade-artifact-taxonomy.md` | Modify | `:10` Literal `docs/se` → `{{ARTIFACT_SE_ROOT}}` (**D4**); `docs/se/**` als Legacy-Ablage benannt, nicht als Default | T20 |
 | `agents/1-generic/agent-meta-manager.md` | Modify | `--status-artifacts` referenzieren (AC-14; Muster `:88`, `:107`, `:112`) | T20 |
 | `agents/1-generic/ideation.md` | Modify | `:97` `concept-<topic>.md` → `{{ARTIFACT_CONCEPTS_DIR}}` | T10 |
 | `agents/1-generic/planner.md` | Modify | `:75` Root-Fallback → `{{ARTIFACT_PLANS_DIR}}` | T10 |
@@ -210,14 +226,15 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 | `templates/configs/project.yaml.example` | Modify | `artifact-locations`-Beispielblock (vollständiges Beispiel) | T20 |
 | `howto/configs/project.yaml.example` | Modify | derselbe Block — beide vollständigen Beispiele müssen synchron bleiben (`docs/guides/project.yaml.example` ist ein Orchestrator-Teilbeispiel und bleibt unverändert) | T20 |
 | `tests/scenarios/registry.md` | Modify | Katalogzeile `99-artifact-locations-matrix` (94–98 sind durch #1181/#1187 belegt) | T21 |
-| `CHANGELOG.md` | Modify | Feature-Eintrag + Migrationshinweis (`legacy[]`, `enabled: false`) | T20 |
+| `CHANGELOG.md` | Modify | Feature-Eintrag + Migrationshinweis (`legacy[]`, `enabled: false`, Scratch-Alias → `--migrate-artifact-aliases`, ADR-Naming D3) | T20 |
 | `tests/test_spec_plan_scaffold.py` | Modify | Wrapper-Verhalten bleibt; neue Delegation prüfen | T8 |
 | `tests/test_admin_server.py` | Modify | `artifact-locations` in der Whitelist (Mengen-Assertion folgt erst in T22) | T17 |
 
-> **Summe:** 24 neue Dateien (7 Produktions-/Daten-/Rule-Dateien + 2 Szenario-Dateien +
-> 15 Tests) und **50 geänderte Dateien in 35 Tabellenzeilen** (drei Zeilen bündeln mehrere
-> Dateien: `copyeditor`/`proofreader` = 2, Reviewer-Rollen = 4, SE-Rollen = 12). Damit ist
-> die Spec-Forderung „alle 25+ Dateien" über 9 Produktionsbereiche erfüllt.
+> **Summe:** 27 neue Dateien (8 Produktions-/Daten-/Rule-Dateien + 2 Szenario-Dateien +
+> 17 Tests) und **51 geänderte Dateien in 36 Tabellenzeilen** (vier Zeilen bündeln mehrere
+> Dateien: `copyeditor`/`proofreader` = 2, Reviewer-Rollen = 4, SE-Rollen = 12,
+> `repo-containment{,-impl}.sh` = 2). Damit ist die Spec-Forderung „alle 25+ Dateien"
+> über 9 Produktionsbereiche erfüllt.
 
 ### 2.3 Konfliktflächen ohne Änderung in #1186
 
@@ -227,6 +244,7 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 | `scripts/lib/agent_sync.py` | Wird von #1187, #1188 und #1181 geändert (Zielmatrix RVW2-X-01) | **kein** Edit in #1186 — nicht als Konfliktfläche beansprucht |
 | `docs/issue-labels.md` | von #1188 erzeugt, von #1186 klassifiziert | #1186 deklariert nur den Pfad (`project-docs.files.issue-labels`, T1), erzeugt die Datei nicht |
 | `.meta-config/issue-labels-state.json` | von #1188 erzeugt, von #1186 klassifiziert | #1186 deklariert den Pfad nur als `unmanaged[]` (D-8, §3.2a); kein Scaffold, kein Block, keine Warnung (K1: `project-state` ist gestrichen) |
+| `hooks/1-generic/repo-containment{,-impl}.sh` | **Hotspot ohne Parallel-Edit:** die Pfad-Quelle wird auf die aufgelöste Matrix umgestellt (D1, T24); die lexikalischen Regeln und `hook_common.sh` bleiben unangetastet | Kein anderes Welle-Issue editiert den Hook; Historie #1136/#1151 ist abgeschlossen (#1151 wird in T16 nur verifiziert). Der `artifact-path-guard` (T16) ist eine **neue** Datei und teilt nur die Datendatei, nicht den Code |
 
 ---
 
@@ -238,18 +256,24 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 
 | # | Klasse | Default `path` | `naming` | `kind` | `git` |
 |---|---|---|---|---|---|
-| 1 | `specs` | `docs/specs` | `<YYYY-MM-DD>-<slug>.md` | — | tracked |
-| 2 | `plans` | `docs/plans` | `<YYYY-MM-DD>-<slug>.md` | — | tracked |
-| 3 | `concepts` | `docs/concepts` | `<YYYY-MM-DD>-<slug>.md` | — | tracked |
-| 4 | `spikes` | `docs/spikes` | `<YYYY-MM-DD>-issue-<n>-<topic>-spike.md` | — | tracked |
-| 5 | `reviews` | `docs/reviews` | `<kind>-<YYYY-MM-DD>-<slug>.md`; `kind: se` → `REVIEW_<YYYY-MM-DD>_<scope>.md` | code, concept, domain, copyedit, proofread, se | tracked |
-| 6 | `audits` | `docs/audits` | `<kind>-<YYYY-MM-DD>-<slug>.md` | security, dependency, a11y, lifecycle, prompt, ai-security | tracked |
-| 7 | `analysis` | `docs/analysis` | `<kind>-<YYYY-MM-DD>-<slug>.md` | analysis, triage, perf, log, research, estimate, conclusion | tracked |
-| 8 | `reports` | `docs/reports` (SE-Kontext: `{SE_ROOT}/reports/`, abgeleitet) | `<YYYY-MM-DD>-<slug>.md`; `kind: vv` → `<YYYY-MM-DD>-vv-<slug>.md` | vv | tracked |
-| 9 | `adr` | `docs/adr` | `ADR-<NNN>_<slug>.md` (OQ-3) | — | tracked |
-| 10 | `traceability` | `docs/traceability` | `TRACE_<scope>.md` | — | tracked |
-| 11 | `runbooks` | `docs/runbooks` | `<YYYY-MM-DD>-<slug>.md` | — | tracked |
-| 12 | `project-docs` | **Datei-Set**: `docs/ARCHITECTURE.md`, `docs/CODEBASE_OVERVIEW.md`, `docs/REQUIREMENTS.md`, `docs/issue-labels.md` | — | — | tracked |
+| 1 | `specs` | `docs/specs` | `{date}-{slug}.md` | — | tracked |
+| 2 | `plans` | `docs/plans` | `{date}-{slug}.md` | — | tracked |
+| 3 | `concepts` | `docs/concepts` | `{date}-{slug}.md` | — | tracked |
+| 4 | `spikes` | `docs/spikes` | `{date}-issue-{n}-{topic}-spike.md` | — | tracked |
+| 5 | `reviews` | `docs/reviews` | `{kind}-{date}-{slug}.md`; `kind: se` → `REVIEW_{date}_{scope}.md` | code, concept, domain, copyedit, proofread, se | tracked |
+| 6 | `audits` | `docs/audits` | `{kind}-{date}-{slug}.md` | security, dependency, a11y, lifecycle, prompt, ai-security | tracked |
+| 7 | `analysis` | `docs/analysis` | `{kind}-{date}-{slug}.md` | analysis, triage, perf, log, research, estimate, conclusion | tracked |
+| 8 | `reports` | `docs/reports` (SE-Kontext: `{SE_ROOT}/reports/`, abgeleitet) | `{date}-{slug}.md`; `kind: vv` → `{date}-vv-{slug}.md` | vv | tracked |
+| 9 | `adr` | `docs/adr` | `ADR-{nnn}_{slug}.md` (D3) | — | tracked |
+| 10 | `traceability` | `docs/traceability` | `TRACE_{scope}.md` | — | tracked |
+| 11 | `runbooks` | `docs/runbooks` | `{date}-{slug}.md` | — | tracked |
+| 12 | `project-docs` | **Datei-Set**: `docs/ARCHITECTURE.md`, `docs/CODEBASE_OVERVIEW.md`, `docs/REQUIREMENTS.md`, `docs/issue-labels.md` | — (kein `naming`) | — | tracked |
+
+`naming`-Werte folgen dem **Token-Kanon** aus Spec §3.2.1 (D3): geschlossene Token-Liste
+`{class} {date} {slug} {kind} {n} {topic} {scope} {nnn} {level} {folder}`; ein unbekannter
+oder klassen-fremder Token ist `artifact-locations.naming-invalid` (T5). Die Anzeigeform
+`<YYYY-MM-DD>` bleibt ausschließlich in Rollen-Prosa (T10) und ist **kein** Konfigurationswert.
+`naming` erzeugt **keine** Variable — die 54 Namen aus §3.3 bleiben unverändert.
 
 **2 ephemer** (`artifactEphemeral`/`artifactState`):
 
@@ -259,6 +283,10 @@ Alle Zeilen sind **Modify** (Datei existiert auf `aaed14c2`).
 | 14 | `state` | `.meta-viz` (`event-log: .meta-viz/events.jsonl`) | ignored | `progress`, `checkpoints`, `handoffs` | keep |
 
 ### 3.2 9 SE-Klassen (alle `path`-Default `SE`, `git: tracked`)
+
+**D4 (DECIDED 2026-11-09):** Default bleibt `SE`, **keine** Migration. Der Regeltext
+`rules/1-generic/se-cascade-artifact-taxonomy.md` verweist künftig auf `{{ARTIFACT_SE_ROOT}}`
+(T20), und `docs/se/**` ist `legacy[]`-Muster — kein Default, kein zweiter Pfad.
 
 | # | Klasse | Leaf-Muster | `subdir` | Producer (Beleg) |
 |---|---|---|---|---|
@@ -318,6 +346,10 @@ Zusatzregeln: `SE_BASE_DIR` bleibt als Alias registriert (`placeholders.py:89`);
 `_UNREGISTERED_BUILDER_RATCHET` (`:275-284`) darf **nicht** wachsen (shrink-only);
 `standalone.py` liefert dieselben 54 Namen mit Framework-Defaults (T6);
 `unmanaged[]` (D-8) erzeugt **keine** Variable und keinen `_MODE`.
+**D1:** `{{TMP_SINK_PATH}}` (`config.py:2046`) wird künftig **aus** `ARTIFACT_SCRATCH_DIR`
+gespeist (`TMP_SINK_PATH == ARTIFACT_SCRATCH_DIR`); der Alias-Name `ARTIFACT_SCRATCH_PATH`
+aus dem Entscheidungsprotokoll ist die Rollen-Variable `{{ARTIFACT_SCRATCH_DIR}}` — **kein**
+55. Name. **D3:** `naming` erzeugt **keine** `_NAMING`-Variable.
 
 ---
 
@@ -331,9 +363,9 @@ hängt von einem späteren ab.
 | **M1** | Vertrag: Schema + Presets + `se_output`-Deklaration | T1–T3 | `pytest tests/test_artifact_locations_schema.py tests/test_artifact_locations_presets.py` grün; `python3 scripts/sync.py --validate` rc 0; `--dry-run` unverändert (keine neue ACTION-Zeile) |
 | **M2** | Auflösung: Resolver, Validierung, Variablen, Scaffold, Alias-Warnungen | T4–T9 | `pytest tests/test_artifact_locations_{resolver,validate,variables,aliases}.py tests/test_artifact_scaffold.py` grün; `sync.py --dry-run` listet `{rel}/.gitkeep` je `files`-Klasse. **Schnitt (RVW2-1186-01):** das Scaffold-Gate enthält **nur** scaffold-lokale Assertions (Verzeichnis, `.gitkeep`, Marker-Konstante); alle `check_artifact_locations`-Fälle laufen in M4/T14 — M2 hängt nicht an einem späteren Modul |
 | **M3** | Rollen-Contract: 26 Templates, Reviewer-Routing, Lazy-Rule | T10–T13 | `pytest tests/test_artifact_locations_templates.py` grün; `python3 scripts/consistency-check.py` ohne `artifact-locations.literal-path`; `grep -rn "/tmp/opencode" agents/ rules/` leer |
-| **M4** | Durchsetzung: Consistency-Check, `--status-artifacts`, Hook | T14–T16 | `pytest tests/test_consistency_artifact_locations.py tests/test_artifact_status_cli.py tests/test_artifact_path_guard_hook.py` grün (inkl. Baseline-, `unmanaged`- und Marker-Fällen); `sync.py --status-artifacts --json` Exit 0; `--validate` rc 0 |
+| **M4** | Durchsetzung: Consistency-Check, `--status-artifacts`, Hook, Containment-Hook auf Matrix | T14–T16, T24 | `pytest tests/test_consistency_artifact_locations.py tests/test_artifact_status_cli.py tests/test_artifact_path_guard_hook.py tests/test_repo_containment_scratch_resolution.py` grün (inkl. Baseline-, `unmanaged`- und Marker-Fällen); `sync.py --status-artifacts --json` Exit 0; `--validate` rc 0 |
 | **M5** | Admin-UI: Whitelist-Eintrag, Write-Guard, Pane | T17–T19 | `pytest tests/test_admin_server.py tests/test_artifact_locations_admin_api.py tests/test_artifact_locations_admin_ui.py` grün; `PUT` mit `path: "../x"` ⇒ HTTP 400 mit Feldnamen; `consistency-check.py` ohne `docs.ui_help_mappings` |
-| **M6** | Doku, Migration, Szenario | T20–T21 | `pytest tests/test_artifact_locations_scenario.py` grün; `tests/scenarios/run.sh 99` PASS; voller Lauf `pytest -q` 0 failed; `sync.py --validate` rc 0; `sync.py --status-artifacts` Exit 0 |
+| **M6** | Doku, Migration, Szenario | T20–T21, T23 | `pytest tests/test_artifact_locations_scenario.py tests/test_artifact_locations_migration.py` grün; `tests/scenarios/run.sh 99` PASS; voller Lauf `pytest -q` 0 failed; `sync.py --validate` rc 0; `sync.py --status-artifacts` Exit 0; `--migrate-artifact-aliases` ohne `--write` verändert keine Datei |
 
 **T22 ist kein Meilenstein dieses PRs.** Die Whitelist-Ableitung (AC-07b) läuft als
 Follow-up **nach #1141** (kanonische Reihenfolge, Spec §9) und wird hier nur spezifiziert,
@@ -343,7 +375,7 @@ damit die Vertragsform feststeht. In #1186 liefert T17 den handgepflegten Eintra
 
 ## 5. Bite-sized TDD-Tasks
 
-**Einheitliche Abarbeitungs-Spine (gilt für T1–T21, Plan-Ledger-kompatibel):**
+**Einheitliche Abarbeitungs-Spine (gilt für T1–T21, T23, T24, Plan-Ledger-kompatibel):**
 
 ```markdown
 - [ ] Step 1: Test zuerst schreiben (rot) — siehe „Test zuerst" des Tasks
@@ -385,20 +417,26 @@ Legende: **Datei** = Ownership; **Test zuerst** = Testname + Assertion;
 - `test_fallback_parent_enum_rejects_unknown_class` — `classes.reviews["fallback-parent"]: "bogus"` ⇒ Fehler; `"se-requirements"` akzeptiert (RVW-1186-04).
 - `test_fallback_parent_rejected_on_ephemeral` — `classes.scratch["fallback-parent"]` ⇒ Fehler (Form `artifactEphemeral` hat kein `mode`).
 - `test_project_docs_accepts_issue_labels` — `files: {"issue-labels": "docs/issue-labels.md"}` validiert; `files.bogus` ⇒ Fehler (OQ-6, #1188).
+- `test_naming_accepts_canonical_tokens` — parametrisiert: `"{date}-{slug}.md"`, `"ADR-{nnn}_{slug}.md"`, `"{kind}-{date}-{slug}.md"`, `"{date}-issue-{n}-{topic}-spike.md"` validieren (D3).
+- `test_naming_rejects_unknown_token` — `"{bogus}-{slug}.md"` ⇒ `ValidationError` (Schema-`pattern`, D3).
+- `test_naming_rejects_path_separator_and_dotdot` — `"sub/{slug}.md"`, `"../{slug}.md"`, `""` ⇒ Fehler.
+- `test_naming_rejects_angle_bracket_form` — `"<YYYY-MM-DD>-<slug>.md"` ⇒ Fehler (Anzeigeform ist **kein** Config-Wert; Migrationshinweis im semantischen Validator, T5).
+- `test_artifact_naming_def_is_shared` — `$defs.artifactNaming.pattern` enthält alle zehn Token; `classes.specs.naming` und `classes["se-validation"].naming` referenzieren denselben `$defs`-Eintrag.
 
 **Impl:** Neue Property `"artifact-locations"` direkt nach dem
 `spec-plan-workflow`-Block (Einfügepunkt `schema.json:2223`-Umfeld, Block endet
 `:2380`), vollständig mit `additionalProperties: false` auf **jeder**
-Objektebene; `legacy` und `unmanaged` als `array of string` (D-8); **sieben** `$defs`
-(`artifactKind`, `artifactClassName`,
-`artifactClass`, `artifactSeClass`, `artifactFileSet`, `artifactEphemeral`,
-`artifactState`) am Block `schema.json:2855`. `kind` ist ein `array` mit
-`items: {"$ref": "#/$defs/artifactKind"}` + `uniqueItems: true` (geschlossenes
-20-Werte-Enum, **kein** `array of string`); `fallback-parent` referenziert
+Objektebene; `legacy` und `unmanaged` als `array of string` (D-8); **acht** `$defs`
+(`artifactKind`, `artifactClassName`, `artifactNaming`, `artifactClass`, `artifactSeClass`,
+`artifactFileSet`, `artifactEphemeral`, `artifactState`) am Block `schema.json:2855`.
+`kind` ist ein `array` mit `items: {"$ref": "#/$defs/artifactKind"}` + `uniqueItems: true`
+(geschlossenes 20-Werte-Enum, **kein** `array of string`); `fallback-parent` referenziert
 `$defs/artifactClassName` (23 Klassen) in den drei Formen mit `mode`;
+`naming` referenziert `$defs/artifactNaming` (Pattern mit geschlossener Token-Alternation,
+D3; `defaults.naming` via `allOf` + `default`, weil draft-07 `$ref`-Geschwister ignoriert).
 `path`-Pattern `^(?!/)(?!.*(^|/)\.\.(/|$)).+$`.
 
-**Verifikation:** `python3 -m pytest tests/test_artifact_locations_schema.py -q` → 16 passed. `python3 scripts/sync.py --validate` → rc 0, keine neue Zeile (Sektion ist optional).
+**Verifikation:** `python3 -m pytest tests/test_artifact_locations_schema.py -q` → 21 passed. `python3 scripts/sync.py --validate` → rc 0, keine neue Zeile (Sektion ist optional).
 
 #### T2 — Preset-Datei (AC-15, §4.2)
 
@@ -411,18 +449,20 @@ Objektebene; `legacy` und `unmanaged` als `array of string` (D-8); **sieben** `$
 - `test_default_preset_covers_all_23_classes` — `default.classes` enthält die 9 SE + 13 Verzeichnis-Klassen (project-docs als Datei-Set); Zähl-Assertion `14 + 9`.
 - `test_every_preset_field_exists_in_schema` — jedes Feld jeder Klasse ist in `$defs` deklariert (F-2-Vorläufer auf Datenebene).
 - `test_preset_does_not_restate_defaults` — `minimal`/`flat`/`docs-only` setzen nur Abweichungen, keine vollständige Kopie (Diff-Größe < `default`).
-- `test_legacy_contains_framework_paths` — `docs/superpowers/specs`, `docs/superpowers/plans`, `docs/plans/audit-*.md`, `docs/specs/*-review.md`, `docs/conclusions/`, `docs/estimates/`, `docs/research/`, `.meta-viz/handoffs/**`.
+- `test_legacy_contains_framework_paths` — `docs/superpowers/specs`, `docs/superpowers/plans`, `docs/plans/audit-*.md`, `docs/specs/*-review.md`, `docs/conclusions/`, `docs/estimates/`, `docs/research/`, `.meta-viz/handoffs/**`, `docs/se/**` (**D4**), `docs/adr/[0-9][0-9][0-9][0-9]-*.md`, `docs/adr/ADR-[0-9][0-9][0-9]-*.md` (**D3**).
+- `test_default_adr_naming_is_canonical` — `default.classes.adr.naming == "ADR-{nnn}_{slug}.md"`; die zwei Legacy-Formen liegen in `legacy[]`, **nicht** als zweiter Default (D3).
+- `test_every_preset_naming_uses_canonical_tokens` — jedes `naming` in jedem Preset besteht ausschließlich aus Tokens der geschlossenen Liste (Spec §3.2.1); die `<TOKEN>`-Form macht den Test rot (D3).
 - `test_default_unmanaged_contains_state_file` — `default.unmanaged` enthält `.meta-config/issue-labels-state.json` und die sieben Doku-Unterbäume aus §3.2a; `docs/issue-labels.md` ist **nicht** darin (D-8, RVW2-X-02).
 - `test_preset_names_are_loadable_yaml` — `load_yaml_file` (Muster `scripts/lib/io.py`) liefert `version: 1`.
 
 **Impl:** YAML mit Top-Level `version: 1`, `presets:` (Vorbild
 `config/rules-presets.yaml:47`). `default` = Matrix aus §3 inkl. `unmanaged[]`
-(§3.2a); `minimal` = nur
+(§3.2a) sowie den beiden ADR-Legacy-Mustern und `docs/se/**` in `legacy[]`; `minimal` = nur
 `specs`/`plans`/`reviews`/`audits` `files`, Rest `inline`; `flat` = alles
 direkt unter `docs/`; `docs-only` = `scratch`/`state` ohne Pfad (ephemer
-deaktiviert). Nur Feldnamen, die das Schema kennt.
+deaktiviert). Nur Feldnamen, die das Schema kennt; `naming` im Token-Kanon (D3).
 
-**Verifikation:** `pytest tests/test_artifact_locations_presets.py -q` → 7 passed. Kein Sync-Effekt (Daten noch ungenutzt).
+**Verifikation:** `pytest tests/test_artifact_locations_presets.py -q` → 9 passed. Kein Sync-Effekt (Daten noch ungenutzt).
 
 #### T3 — `se_output` im Schema deklarieren (Vorbereitung #1141)
 
@@ -440,7 +480,7 @@ Grund (belegt): heute schema-los (`grep` ohne Treffer; Wurzel
 `additionalProperties: true`, `schema.json:2854`); ohne Deklaration bricht
 #1141 Bestandsprojekte.
 
-**Verifikation:** `pytest tests/test_artifact_locations_schema.py -q` → 19 passed; `sync.py --validate` rc 0.
+**Verifikation:** `pytest tests/test_artifact_locations_schema.py -q` → 24 passed; `sync.py --validate` rc 0.
 
 ---
 
@@ -470,10 +510,17 @@ Grund (belegt): heute schema-los (`grep` ohne Treffer; Wurzel
 - `test_kind_enum_is_class_scoped` — `reviews.kinds == 6 Werte`, `audits.kinds == 6`, `analysis.kinds == 7`, `reports.kinds == ("vv",)`, alle übrigen `kinds == ()`; ein `kind`-Wert außerhalb des Enums wirft `artifact-locations.kind-invalid`.
 - `test_fallback_parent_is_exposed` — `classes.reviews.mode = "off"` + `fallback-parent: se-requirements` ⇒ `ResolvedClass.fallback_parent == "se-requirements"`; ohne Feld ⇒ `None` (Validator wirft erst in T5).
 - `test_conclusions_is_legacy_not_class` — `"conclusions" not in classes`; `docs/conclusions/` in `legacy[]` (D-6).
-- `test_scratch_projects_tmp_sink_path` — `classes.scratch.path` gesetzt ⇒ gewinnt; sonst `repo_containment.tmp-sink.path` (OQ-5).
+- `test_scratch_path_is_single_source` — nur `classes.scratch.path` gesetzt ⇒ dieser Wert, `source == "project"`, `field_sources["path"] == "project"`; `repo_containment.tmp-sink.path` wird nicht gelesen (**D1**).
+- `test_scratch_alias_applies_only_when_class_absent` — nur `repo_containment.tmp-sink.path` gesetzt ⇒ `classes.scratch.path` == Alias-Wert, `source == "project"`, `field_sources["path"] == "project-alias:repo_containment.tmp-sink.path"` (Attribution, **keine** fünfte Wertequelle, AC-15).
+- `test_scratch_alias_equal_values_are_resolved` — beide Keys gesetzt, gleicher Wert ⇒ kein Fehler, Pfad aufgelöst, Attribution `project-alias:…` bleibt sichtbar.
+- `test_se_root_default_is_SE` — alle neun `se-*.path` == `SE`; kein Default enthält `docs/se` (**D4**).
 - `test_state_projects_progress_and_event_log` — `subdirs.progress == progress.dir`, `event-log == viz.event_log` (Projektion, kein zweiter Speicher).
 - `test_backup_siblings_excluded_from_counts` — `*.sync-backup-*` zählt nicht in `file_count`/`newest` (#1195).
 - `test_unmanaged_is_not_a_class` — `"unmanaged" not in matrix.classes`; `len(matrix.classes) == 23` bleibt (AC-12); `matrix.unmanaged` enthält `.meta-config/issue-labels-state.json` und ist additiv wie `legacy` (D-8).
+- `test_naming_resolves_per_class` — `resolve_naming(matrix, "specs", date="2026-11-09", slug="x") == "2026-11-09-x.md"`; `adr` mit `n=7` ⇒ `ADR-007_slug.md` (3-stellig, D3); `reviews` mit `kind="code"` ⇒ `code-2026-11-09-x.md`; `se-validation` mit `level=3`, `folder="Steuerung"` ⇒ enthält `L3_Steuerung_Validation.md`.
+- `test_naming_unknown_token_raises` — `naming: "{bogus}"` ⇒ `ArtifactLocationsError` mit Code `artifact-locations.naming-invalid` (D3).
+- `test_naming_is_reported_per_class` — `ResolvedClass.naming` ist für alle 12 persistenten Klassen gesetzt und entspricht dem Default aus §3.1; `project-docs`/`scratch`/`state` haben `naming is None`.
+- `test_legacy_accepts_adr_non_canonical_forms` — `matrix.legacy` enthält beide ADR-Muster (`NNNN-…`, `ADR-NNN-…`) und `docs/se/**` (D3/D4).
 
 **Impl (Signaturen siehe §6):**
 `CLASS_REGISTRY` (23 × `ClassSpec(name, form, default_path, naming, kinds, subdir)`),
@@ -482,13 +529,17 @@ Grund (belegt): heute schema-los (`grep` ohne Treffer; Wurzel
 `ResolvedClass(name, path, mode, git, naming, archive, retention, kinds, subdir, subdirs, event_log, files, source, field_sources, fallback_parent)`,
 `resolve_cell_path(name, level, folder, is_system) -> str`,
 `resolve_se_projection(name) -> str` (4 abgeleitete Pfade, D-7),
+`resolve_naming(matrix, name, *, kind=None, scope=None, **tokens) -> str` (Token-Validierung
++ Padding für `{nnn}`; wirft `artifact-locations.naming-invalid`, D3),
+`resolve_scratch_path(config, classes) -> tuple[str, str]` (Pfad + Attribution
+`project`/`project-alias:<key>`, D1),
 `load_presets(agent_meta_root) -> dict`, `ArtifactLocationsError(code, message)`.
 Resolver liest **nur** Config + Presets + Schema-Defaults (kein Dateisystem
 außerhalb von `exists()`), wirft nie `sys.exit` (Doktrin wie
 `repo_containment.resolve_*`), mutiert keine Eingabe — und ist auf dem **leeren**
 Config-Dict total definiert (`derive_builder_vars`, `placeholders.py:299-306`).
 
-**Verifikation:** `pytest tests/test_artifact_locations_resolver.py -q` → 21 passed. Kein Sync-Effekt.
+**Verifikation:** `pytest tests/test_artifact_locations_resolver.py -q` → 28 passed. Kein Sync-Effekt.
 
 #### T5 — Harte Config-Validierung (AC-11, §4.1)
 
@@ -512,16 +563,25 @@ Config-Dict total definiert (`derive_builder_vars`, `placeholders.py:299-306`).
 - `test_unmanaged_intersect_is_hard_error` — `unmanaged: ["docs/specs"]` bei aktivem `specs.path = docs/specs` ⇒ `artifact-locations.unmanaged-intersect` (D-8, RVW2-X-02).
 - `test_validation_runs_even_when_enabled_false` — Strukturprüfung immer (Muster `_validate_repo_containment:798-803`); nur `se-required-off` ist kaskadenabhängig.
 - `test_validation_is_called_by_validate_config` — `_validate_config` (`config.py:635`) ruft `_validate_artifact_locations` **nach** `_validate_repo_containment` (`:669`) und **vor** `_validate_subagent_permissions` (`:670`); AST-Assertion auf die Aufrufreihenfolge.
+- `test_scratch_sink_divergence_is_hard_error` — `classes.scratch.path: "sink-a"` + `repo_containment.tmp-sink.path: "sink-b"` ⇒ Exit 1, Code `artifact-locations.scratch-sink-divergence`, Meldung nennt **beide** Keys und den Reparaturschritt (D1).
+- `test_scratch_alias_equal_values_pass_validation` — beide Keys gleich ⇒ kein Fehler; `repo_containment`-Strukturprüfung (`config.py:888-937`) bleibt unberührt (D1).
+- `test_scratch_class_only_passes_validation` — nur `classes.scratch.path` ⇒ kein Fehler (die Warnungsfreiheit prüft T9, nicht der Validator) (D1).
+- `test_naming_unknown_token_is_hard_error` — `classes.specs.naming: "{bogus}-{slug}.md"` ⇒ `artifact-locations.naming-invalid`, Meldung listet die erlaubten Tokens (D3).
+- `test_naming_token_not_applicable_is_hard_error` — `classes.audits.naming: "{level}-{slug}.md"` ⇒ `naming-invalid`; `classes.adr.naming: "{nnn}-{slug}.md"` ⇒ akzeptiert (D3).
 
 **Impl:** `_validate_artifact_locations(config, config_path, agent_meta_root) -> None`
 mit lokalem `_fail` (Muster `config.py:808-810`); Aufruf in `_validate_config`
 (`config.py:635`) zwischen `_validate_repo_containment` (`:669`) und
 `_validate_subagent_permissions` (`:670`). Fehlercodes exakt aus Spec §4.1
-(**9** Codes: inkl. `fallback-parent-unknown`, `kind-invalid` und `unmanaged-intersect`).
-Reihenfolge: Struktur → `kind` → Modus + `fallback-parent` → SE-Startkritik →
-Subdir → Preset → Legacy-Schnitt → Unmanaged-Schnitt.
+(**11** Codes: inkl. `fallback-parent-unknown`, `kind-invalid`, `unmanaged-intersect`,
+`scratch-sink-divergence` und `naming-invalid`).
+Reihenfolge: Struktur → `kind` → `naming` (Token + Klassen-Anwendbarkeit) → Modus +
+`fallback-parent` → SE-Startkritik → Subdir → Preset → Scratch-Alias-Gleichheit →
+Legacy-Schnitt → Unmanaged-Schnitt. Die Scratch-Divergenz ist **hart** (D1) — sie
+verhindert zwei Schreibziele für dieselbe Senke und läuft deshalb auch bei
+`enabled: false` (Strukturprüfung, Muster `_validate_repo_containment:798-803`).
 
-**Verifikation:** `pytest tests/test_artifact_locations_validate.py -q` → 15 passed; `sync.py --validate` rc 0; `sync.py --dry-run` rc 0.
+**Verifikation:** `pytest tests/test_artifact_locations_validate.py -q` → 20 passed; `sync.py --validate` rc 0; `sync.py --dry-run` rc 0.
 
 #### T6 — Variablen-Export (AC-02, AC-14, H-2)
 
@@ -613,16 +673,23 @@ Legacy-Erkennung ausgenommen (dieselbe Konstante nutzt T14). Die
 - `test_spec_plan_paths_divergence_warns_once` — `spec-plan-workflow.paths.specs = "docs/specs-old"` vs. Matrix ⇒ genau **eine** WARN, Text nennt Ziel-Key.
 - `test_spec_plan_paths_equal_produces_no_warning` — identische Werte ⇒ still.
 - `test_se_output_divergence_warns` — `se_output.base_dir: "docs/se"` vs. `SE` ⇒ WARN mit Ziel-Key.
-- `test_scratch_divergence_is_consistency_error_not_warn` — `classes.scratch.path != repo_containment.tmp-sink.path` ⇒ Finding Severity ERROR (nicht WARN; §3.6).
+- `test_scratch_alias_is_attribution_not_a_level` — nur `repo_containment.tmp-sink.path` gesetzt ⇒ `field_sources["path"] == "project-alias:repo_containment.tmp-sink.path"`, `source` bleibt `"project"`; die Zahl der **Wertequellen** bleibt vier (D1, AC-15).
+- `test_scratch_deprecation_warning_has_migration_hint` — genau **eine** WARN; Text nennt Ziel-Key `artifact-locations.classes.scratch.path`, das Wort `deprecated` und den Befehl `--migrate-artifact-aliases` (D1).
+- `test_scratch_class_only_produces_no_warning` — nur `classes.scratch.path` ⇒ still (Migrationsziel erreicht).
+- `test_scratch_both_equal_warns_once_about_removal` — beide Keys gleich ⇒ **eine** WARN („entferne `repo_containment.tmp-sink.path`"), kein Fehler (der Fehlerfall liegt in T5).
+- `test_tmp_sink_path_variable_comes_from_matrix` — `variables["TMP_SINK_PATH"] == variables["ARTIFACT_SCRATCH_DIR"]`, beide aus **einem** Resolver-Ergebnis; `config.py:2046` liest keinen zweiten Pfad (D1).
 - `test_state_divergence_warns` — `progress.dir` ≠ `state.subdirs.progress` ⇒ WARN.
 - `test_disabled_matrix_suppresses_deprecation_warnings` — `enabled: false` ⇒ `paths`/`se_output` bleiben alleinige Quelle, keine Warnung.
 
 **Impl:** `_artifact_deprecation_warnings(config, agent_meta_root, project_root) -> list[Finding]`
 in `scripts/lib/config.py` (nutzt `consistency.report.Finding`, `report.py:22-29`);
 einmalige Ausgabe über den bestehenden `warn_sink` (`unmapped`/`pre_warnings`)
-in `build_variables`. Kein `sys.exit` für Warnungen.
+in `build_variables`. Kein `sys.exit` für Warnungen. **D1:** `TMP_SINK_PATH` wird nach der
+Matrix-Auflösung gesetzt (`variables["TMP_SINK_PATH"] = variables["ARTIFACT_SCRATCH_DIR"]`),
+nicht mehr aus `REPO_CONTAINMENT_TMP_PATH` (`config.py:2046`) — der Aliasing-Pfad ist damit
+einseitig (Matrix → Laufzeitvariable).
 
-**Verifikation:** `pytest tests/test_artifact_locations_aliases.py -q` → 6 passed; `sync.py --dry-run` zeigt bei divergenter Test-Fixture genau eine Warnzeile.
+**Verifikation:** `pytest tests/test_artifact_locations_aliases.py -q` → 10 passed; `sync.py --dry-run` zeigt bei divergenter Test-Fixture genau eine Warnzeile.
 
 ---
 
@@ -776,19 +843,23 @@ Sektion mit `File`/`Ziel`/`Output`. Keine Reparatur (Nicht-Ziel 9).
 - `test_violations_array_shape` — `{code, path, expected}`.
 - `test_resolved_json_has_unmanaged_and_baseline` — Datendatei enthält `unmanaged[]` und `baseline: {generated_at, legacy_files}`; `legacy_files` listet nur Artefakt-Dateien (keine Marker, §3.5) — RVW2-1186-02 / RVW2-X-02.
 - `test_status_json_reports_unmanaged_list` — `--status-artifacts --json` zeigt `unmanaged` als **Top-Level**-Liste, **nie** als Eintrag in `classes` (AC-12 bleibt 14 + 9).
+- `test_status_json_reports_naming` — jede Klasse mit `naming` zeigt das Token-Muster (`adr` ⇒ `ADR-{nnn}_{slug}.md`, D3); `project-docs`/`scratch`/`state` haben kein `naming`-Feld.
+- `test_status_json_reports_alias_attribution` — `scratch` mit gesetztem Alias zeigt `source: "project"` und `field_sources.path == "project-alias:repo_containment.tmp-sink.path"` (D1).
 - `test_cli_flag_is_documented` — `docs/api/cli-reference.md` enthält beide Flags in Backticks (`check_sync_cli_docs`, `docs.py:9-44`); sonst `--validate` ERROR `docs.cli_reference`.
 
 **Impl:**
 `sync_pipeline._sync_stage_artifact_locations_resolved(agent_meta_root, project_root, config, args, log) -> None`
-schreibt `{"schema_version":"1","enabled","strict","root","classes":[{"name","path","mode","patterns"}],"legacy":[…],"unmanaged":[…],"baseline":{"generated_at","legacy_files":[…]}}`
+schreibt `{"schema_version":"1","enabled","strict","root","classes":[{"name","path","mode","naming","patterns"}],"legacy":[…],"unmanaged":[…],"baseline":{"generated_at","legacy_files":[…]}}`
 atomar (`io.write_atomic`, Muster `:1921-1924`), Verdrahtung als **Stage 14c**
 in `cli_commands._handle_sync` (nach `:1615`).
 `artifact_status.build_report(...) -> dict` + `render_table(...)`;
 `cli_commands._handle_status_artifacts(ctx)`; `sync.py`: zwei
 `add_argument`-Einträge und ein `_MODE_HANDLERS`-Eintrag (`sync.py:757`)
 sowie `"status_artifacts"` in `_STDOUT_CLEAN_MODES` (`:791`).
+Die Datendatei ist zugleich Quelle des Containment-Hooks für den Scratch-Pfad (D1, T24) —
+`classes[].name == "scratch"` muss deshalb stabil und vollständig sein.
 
-**Verifikation:** `pytest tests/test_artifact_status_cli.py -q` → 15 passed; `python3 scripts/sync.py --status-artifacts --json | jq '.classes.specs'` → enthält `path/mode/source/exists`; `echo ${PIPESTATUS[0]}` → 0.
+**Verifikation:** `pytest tests/test_artifact_status_cli.py -q` → 17 passed; `python3 scripts/sync.py --status-artifacts --json | jq '.classes.specs'` → enthält `path/mode/source/exists`; `echo ${PIPESTATUS[0]}` → 0.
 
 #### T16 — Hook `artifact-path-guard.sh` + `strict` (AC-09, §4.5) — **kritisch**
 
@@ -802,6 +873,7 @@ sowie `"status_artifacts"` in `_STDOUT_CLEAN_MODES` (`:791`).
 - `test_warn_target_in_managed_tree_outside_class` — Ziel `docs/spikes/x.md`, Klasse `spikes.path = docs/spikes-2` ⇒ stderr-Warnung, rc 0 (`strict: false`).
 - `test_block_same_case_with_strict` — `strict: true` ⇒ rc 2, Meldung nennt erwarteten Pfad.
 - `test_block_legacy_target_in_both_modes` — `docs/plans/audit-x.md` (in `legacy[]`) ⇒ rc 2, auch bei `strict: false` (AC-09).
+- `test_legacy_pattern_wins_over_class_path` — `docs/adr/0002-neu.md` liegt **im** aktiven Klassenpfad `docs/adr` **und** trifft ein Legacy-Muster ⇒ rc 2 (Auswertungsreihenfolge Marker → `unmanaged` → `legacy` → Klassenpfad, D3); `docs/adr/ADR-002_neu.md` ⇒ rc 0.
 - `test_marker_files_are_never_blocked` — `docs/conclusions/.gitkeep` ⇒ rc 0 in **beiden** `strict`-Zuständen (Scaffold-Ausnahme, §3.5).
 - `test_allow_src_and_tests_untouched` — `src/app.py`, `tests/test_x.py` ⇒ rc 0, keine Warnung.
 - `test_project_docs_file_is_allowed` — `docs/issue-labels.md` ⇒ rc 0 in beiden `strict`-Zuständen (viertes `project-docs`-File, OQ-6/#1188); eine Datei `docs/labels.md` (nicht deklariert) ⇒ warn/block.
@@ -829,7 +901,41 @@ default-aktiver Hook würde jedes Bestandsprojekt mit `docs/plans/audit-*.md`
 beim ersten Schreibversuch blocken, bevor die Migration überhaupt beschrieben
 ist; die Aktivierung ist ein bewusster Projekt-Schritt (Spec §4.5).
 
-**Verifikation:** `pytest tests/test_artifact_path_guard_hook.py -q` → 15 passed; `pytest tests/test_hook_metadata.py tests/test_hook_enablement_consistency.py -q` → 0 failed; `python3 scripts/sync.py --dry-run` meldet den Hook als „copied (not enabled)".
+**Verifikation:** `pytest tests/test_artifact_path_guard_hook.py -q` → 16 passed; `pytest tests/test_hook_metadata.py tests/test_hook_enablement_consistency.py -q` → 0 failed; `python3 scripts/sync.py --dry-run` meldet den Hook als „copied (not enabled)".
+
+#### T24 — Containment-Hook liest den aufgelösten Scratch-Pfad (D1, §3.6)
+
+**Datei:** Modify `hooks/1-generic/repo-containment.sh`, `hooks/1-generic/repo-containment-impl.sh`; Create `tests/test_repo_containment_scratch_resolution.py`
+**Deps:** T9, T15, T16 · **Größe:** S
+
+**Kontext (VERIFIED):** heute liest `repo-containment-impl.sh:610-622` den Roh-Key
+`repo_containment.tmp-sink.path` (Default `.tmp`) über den Stdlib-YAML-Subset-Reader; die
+lexikalischen Regeln liegen in `path_error` (`:520-578`) und sind durch
+`tests/test_tmp_sink_path_parity.py` + `tests/fixtures/tmp-sink-path-corpus.json` gegen
+`scripts/lib/repo_containment.py::tmp_sink_path_error` gepinnt.
+
+**Test zuerst** (Muster `tests/test_repo_containment_hook.py`: `subprocess.run`, Fixture extern
+via `tempfile.mkdtemp(dir=tempfile.gettempdir())`):
+
+- `test_hook_uses_resolved_scratch_path` — Datendatei sagt `classes.scratch.path = "alt-sink"`, `project.yaml` weiterhin `.tmp` ⇒ Schreiben nach `alt-sink/x` ist erlaubt, `.tmp/x` wird geblockt (genau **eine** Quelle, D1).
+- `test_hook_falls_back_to_legacy_key_without_datafile` — Datendatei fehlt ⇒ Verhalten wie heute (`repo_containment.tmp-sink.path`), fails **closed**, eine Warnzeile auf stderr; das Gefängnis öffnet sich nie.
+- `test_disabled_sink_still_blocks` — `repo_containment.tmp-sink.enabled: false` + `classes.scratch.path: "alt-sink"` ⇒ `alt-sink/x` blockiert (der Schalter bleibt bei `repo_containment`; `scratch` hat kein `enabled`, Spec §4.1).
+- `test_exported_variable_wins` — exportiertes `ARTIFACT_SCRATCH_DIR` überschreibt die Datendatei (Präzedenz §3.6).
+- `test_lexical_rules_are_unchanged` — `../x`, absoluter Pfad und leerer Wert im Scratch-Pfad werden weiterhin abgelehnt; `tests/test_tmp_sink_path_parity.py` bleibt grün (Korpus unangetastet).
+- `test_block_message_names_matrix_key` — die Blockmeldung nennt `artifact-locations.classes.scratch.path` **und** `repo_containment.tmp-sink.enabled` als Reparaturweg.
+
+**Impl:** In `repo-containment-impl.sh` wird die Pfad-Ermittlung (`:610-622`) umgestellt:
+(1) `ARTIFACT_SCRATCH_DIR` aus der Umgebung, (2) `classes[].name == "scratch"` → `path` aus
+`<root>/.meta-config/artifact-locations.resolved.json` (Parser mit
+`hook_json_get`-Äquivalent bzw. `python3 -c` nur als Fallback **innerhalb** des bestehenden
+Helfer-Musters; kein YAML-Parsing der Matrix), (3) `repo_containment.tmp-sink.path`,
+(4) `.tmp`. `path_error` und die Canonical-Form bleiben unverändert; `sink_enabled` kommt
+weiterhin aus `repo_containment`. `repo-containment.sh` (Self-Health-Split-Kopf) wird nur
+angepasst, wenn dort der Key im Hilfetext steht — keine Logik-Duplizierung.
+
+**Verifikation:** `pytest tests/test_repo_containment_scratch_resolution.py -q` → 6 passed;
+`pytest tests/test_tmp_sink_path_parity.py tests/test_repo_containment_hook.py -q` → 0 failed;
+`python3 scripts/sync.py --dry-run` unverändert.
 
 ---
 
@@ -910,10 +1016,13 @@ pro Klasse (Pfad-Text, Modus-Select, git-Select, Naming), `legacy[]` und
 **Test zuerst:**
 
 - `test_manager_references_status_artifacts` — `agent-meta-manager.md` nennt `sync.py --status-artifacts --json` (AC-14; Einfügepunkt nahe `:107`/`:112`).
-- `test_taxonomy_default_is_SE` — `se-cascade-artifact-taxonomy.md:10` sagt `SE` (nicht `docs/se`) und verweist auf `{{ARTIFACT_SE_ROOT}}` (OQ-4).
-- `test_example_config_has_artifact_block` — **parametrisiert über beide** vollständigen Beispiele (`templates/configs/project.yaml.example`, `howto/configs/project.yaml.example`): enthält `artifact-locations:` mit `enabled`, `preset`, `classes`, `legacy`, `unmanaged` (RVW2-1186-04).
+- `test_taxonomy_uses_se_root_variable` — `se-cascade-artifact-taxonomy.md` enthält **kein** Literal `docs/se` mehr, sondern `{{ARTIFACT_SE_ROOT}}` (D4); der frühere Satz „Konzept-Default: `docs/se`" ist ersetzt, und die Datei nennt `docs/se/**` als Legacy-Ablage, nicht als Default.
+- `test_adr_rule_naming_matches_matrix_default` — `rules/1-generic/se-cascade-adr-standard.md:10` (`ADR-NNN_kurztitel.md`) und der Matrix-Default `ADR-{nnn}_{slug}.md` beschreiben dieselbe Form (`NNN` ↔ `{nnn}`, `kurztitel` ↔ `{slug}`); der Test pinnt die Äquivalenz, damit D3 nicht driftet.
+- `test_example_config_has_artifact_block` — **parametrisiert über beide** vollständigen Beispiele (`templates/configs/project.yaml.example`, `howto/configs/project.yaml.example`): enthält `artifact-locations:` mit `enabled`, `preset`, `classes` (`scratch.path` explizit, D1), `legacy`, `unmanaged` (RVW2-1186-04).
 - `test_example_configs_stay_in_sync` — der `artifact-locations`-Block ist in beiden Dateien byte-identisch (keine Divergenz der Beispiele).
-- `test_changelog_entry_mentions_migration` — CHANGELOG-Eintrag nennt `legacy[]` und `enabled: false` (R1).
+- `test_example_config_does_not_promote_tmp_sink_alias` — beide Beispiele setzen **nur** `artifact-locations.classes.scratch.path`; `repo_containment.tmp-sink.path` erscheint dort nicht als empfohlene Zweitkonfiguration (D1, Spec §5 Nr. 11). Ein vorhandener `tmp-sink`-Block bleibt unverändert dokumentiert, ohne Pfad-Empfehlung.
+- `test_example_config_uses_token_naming` — `classes.adr.naming` steht als `ADR-{nnn}_{slug}.md` in beiden Beispielen; die `<TOKEN>`-Form kommt in Config-Beispielen **nicht** vor (D3).
+- `test_changelog_entry_mentions_migration` — CHANGELOG-Eintrag nennt `legacy[]`, `enabled: false` (R1), die Scratch-Alias-Migration (`--migrate-artifact-aliases`, D1) und die ADR-Naming-Umstellung (D3).
 
 **Impl:** Doku-Texte; keine Code-Änderung. **Beide** `project.yaml.example` werden im selben
 Task geändert (Spec §9: #1187/#1186/#1188/#1181, je nur eigene Keys, keine Umsortierung);
@@ -925,14 +1034,14 @@ Task geändert (Spec §9: #1187/#1186/#1188/#1181, je nur eigene Keys, keine Ums
 #### T21 — Ein voller Szenarientest + Szenario `99` (AC-02/04/06/09/10/12/13/14)
 
 **Datei:** Create `tests/test_artifact_locations_scenario.py`; Create `tests/scenarios/configs/99-artifact-locations-matrix.project.yaml`; Create `tests/scenarios/asserts/99-artifact-locations-matrix.sh`; Modify `tests/scenarios/registry.md`
-**Deps:** T1–T20 · **Größe:** L
+**Deps:** T1–T20, T24 · **Größe:** L
 
 **Test zuerst** (ein Test, mehrere Phasen; Fixture-Root `.tmp/scenario-artifacts-1186/`, wird vor dem Lauf geleert):
 
 - **Phase A — Default-Matrix:** Scratch-Konsument (minimales `.meta-config/project.yaml` + `platforms`), `python3 scripts/sync.py --config <fixture>/.meta-config/project.yaml --dry-run` ⇒ listet 12 `.gitkeep`-Aktionen (11 Klassen-Verzeichnisse + `docs/conclusions`); danach echter Lauf ⇒ die 11 Klassenverzeichnisse **plus** `docs/conclusions` existieren; `reviews` und `audits` existieren nach einem frischen Sync in einem Projekt, das sie noch nicht hatte (AC-04 wörtlich; `runbooks` ist die 12. Klasse und in AC-04 nicht aufgezählt, wird aber mitgescaffoldet).
 - **Phase B — Preset/Projekt-Override:** `preset: minimal` + `classes.audits.path: compliance/audits` ⇒ `--status-artifacts --json` zeigt `audits.source == "project"`, `reviews.source == "preset:minimal"` (AC-15); Verzeichnis `compliance/audits` existiert, `docs/reviews` **nicht** (Preset `inline`).
 - **Phase C — 9 SE-Klassen:** `se-validation.path: external-evidence`, `se-requirements.path: SE` ⇒ beide Zellpfade im Report unterschiedlich (AC-10); `se-requirements: off` bei aktiver Kaskade ⇒ Sync Exit 1 (AC-11), `se-decomposition: off` ⇒ Exit 0.
-- **Phase D — Legacy:** Baseline (`baseline.legacy_files`) durch einen Sync setzen; danach Datei in `docs/plans/audit-legacy.md` anlegen, Sync ⇒ `--status-artifacts` zeigt `legacy_hits`; Consistency-Check meldet **einmal** `artifact-locations.legacy-write`; die Datei existiert unverändert (AC-09). Gegenprobe: eine Datei, die **in** der Baseline steht, meldet **nichts** (RVW2-1186-02); das von Phase A erzeugte `docs/conclusions/.gitkeep` erzeugt **keinen** Fund (Scaffold-Ausnahme, RVW-1186-01); `.meta-config/issue-labels-state.json` erzeugt **keinen** Fund (`unmanaged`, D-8).
+- **Phase D — Legacy:** Baseline (`baseline.legacy_files`) durch einen Sync setzen; danach Datei in `docs/plans/audit-legacy.md` anlegen, Sync ⇒ `--status-artifacts` zeigt `legacy_hits`; Consistency-Check meldet **einmal** `artifact-locations.legacy-write`; die Datei existiert unverändert (AC-09). Gegenprobe: eine Datei, die **in** der Baseline steht, meldet **nichts** (RVW2-1186-02); das von Phase A erzeugte `docs/conclusions/.gitkeep` erzeugt **keinen** Fund (Scaffold-Ausnahme, RVW-1186-01); `.meta-config/issue-labels-state.json` erzeugt **keinen** Fund (`unmanaged`, D-8); `docs/adr/0002-neu.md` trifft ein D3-Legacy-Muster ⇒ `legacy_hits`, `docs/adr/ADR-002_neu.md` ⇒ **kein** Fund.
 - **Phase E — `kind`:** `docs/analysis/estimate-2026-11-09-x.md` mit `kind: estimate` ⇒ `--status-artifacts` validiert; `docs/estimates/new.md` ⇒ `legacy_hits` + Violation (AC-13); `kind: bogus` ⇒ `artifact-locations.kind-invalid`.
 - **Phase F — `enabled: false`:** exakt heutiges Verhalten; keine neuen Verzeichnisse außer den drei Spec/Plan/Spike-Pfaden; `source == "disabled"` (AC-02-Escape).
 - **Phase G — Hook:** simulierter PreToolUse-Payload für `docs/estimates/new.md` ⇒ rc 2 (legacy); für `docs/audits/x.md` ⇒ rc 0; für `docs/conclusions/.gitkeep` ⇒ rc 0 (Marker).
@@ -947,6 +1056,34 @@ Repo-Verschmutzung; `.tmp/` ist sanktioniert). Die Registry-Zeile
 unter `asserts/`).
 
 **Verifikation:** `pytest tests/test_artifact_locations_scenario.py -q` → 1 passed (8 Phasen); `tests/scenarios/run.sh 99` → `PASS`; Laufzeit < 120 s.
+
+#### T23 — Alias-Migration `--migrate-artifact-aliases [--write]` (D1)
+
+**Datei:** Create `scripts/lib/artifact_migration.py`; Create `tests/test_artifact_locations_migration.py`; Modify `scripts/sync.py`; Modify `scripts/lib/cli_commands.py`; Modify `docs/api/cli-reference.md` (**sequenziell nach T15**)
+**Deps:** T4, T5, T9, T15, T18 · **Größe:** M
+
+**Test zuerst:**
+
+- `test_dry_run_prints_snippet_without_writing` — `--migrate-artifact-aliases` ohne `--write` gibt den fertigen `artifact-locations.classes.scratch.path`-Block auf stdout aus (Wert = aufgelöster Alias), `project.yaml` bleibt **byte-identisch**.
+- `test_write_migrates_scratch_alias` — mit `--write` steht der Wert anschließend unter `artifact-locations.classes.scratch.path`; Kommentare und Key-Reihenfolge bleiben erhalten (`yaml_roundtrip.assert_roundtrip_preserved`, `scripts/lib/yaml_roundtrip.py:3-19`), `sync.py --validate` ist danach rc 0.
+- `test_write_is_idempotent` — zweiter Lauf meldet „already migrated", schreibt 0 Bytes (Muster `--audit-config --apply`, `sync.py:476-484`).
+- `test_write_refuses_on_divergent_values` — `classes.scratch.path != tmp-sink.path` ⇒ Exit 1 mit `artifact-locations.scratch-sink-divergence`, **kein** Schreibvorgang (T5 ist Autorität, nicht die Migration).
+- `test_write_refuses_when_matrix_disabled` — `enabled: false` ⇒ Exit 1 mit Hinweis, dass `spec-plan-workflow.paths`/`se_output`/`tmp-sink` alleinige Quelle bleiben (Spec §3.3 Regel 5).
+- `test_migration_covers_all_aliases` — Snippets für `spec-plan-workflow.paths.{specs,plans,spikes}`, `se_output.base_dir`, `repo_containment.tmp-sink.path`, `progress.dir`, `progress.checkpoint-dir`, `viz.event_log`; jeder Snippet nennt den Ziel-Key und den Migrationsgrund (D1).
+- `test_cli_flag_is_documented` — `docs/api/cli-reference.md` enthält `--migrate-artifact-aliases` und `--write` in Backticks (sonst `docs.cli_reference`-ERROR).
+
+**Impl:** `artifact_migration.build_migration_plan(config, matrix) -> MigrationPlan`
+(reine Daten: je Alias `{target_key, value, reason}`); `render_snippets(plan) -> str`;
+`apply_migration(project_config_path, plan) -> AppliedReport` schreibt **nur** mit `--write`,
+atomar (`io.write_atomic`), nach `yaml_roundtrip`-Guard und nach
+`artifact_locations.validate_section` (dieselbe Logik wie T18). `sync.py`: ein
+`add_argument`-Paar plus `_MODE_HANDLERS`-Eintrag (`:757`), `"migrate_artifact_aliases"` in
+`_STDOUT_CLEAN_MODES` (`:791`); `cli_commands._handle_migrate_artifact_aliases(ctx)`.
+Keine automatische Migration im Sync — Schreiben nur auf explizites `--write`.
+
+**Verifikation:** `pytest tests/test_artifact_locations_migration.py -q` → 7 passed;
+`python3 scripts/sync.py --migrate-artifact-aliases` (ohne `--write`) verändert
+`git diff --stat` nicht; `--validate` rc 0.
 
 ---
 
@@ -989,6 +1126,7 @@ CLASS_REGISTRY: dict[str, ClassSpec]          # 23 Einträge, Reihenfolge = §3
 SOURCE_PROJECT = "project"
 SOURCE_PRESET = "preset:{name}"
 SOURCE_PROJECT_PRESET = "project-preset:{name}"   # K3: Attribution, keine eigene Stufe
+SOURCE_PROJECT_ALIAS = "project-alias:{key}"      # D1: Alias-Attribution, keine eigene Stufe
 SOURCE_SCHEMA = "schema-default"
 SOURCE_CODE = "code-fallback"
 SOURCE_DISABLED = "disabled"
@@ -1037,7 +1175,12 @@ def resolve_artifact_locations(config: dict, agent_meta_root: Path,
 def resolve_cell_path(matrix: ResolvedMatrix, name: str, level: int,
                       folder: str, is_system: bool) -> str: ...
 def resolve_se_projection(matrix: ResolvedMatrix, name: str) -> str: ...
-def resolve_tmp_sink_alias(matrix: ResolvedMatrix, config: dict) -> str: ...
+def resolve_naming(matrix: ResolvedMatrix, name: str, *, kind: str | None = None,
+                   scope: str | None = None, level: int | None = None,
+                   folder: str | None = None, date: str | None = None,
+                   n: int | None = None, slug: str | None = None) -> str: ...
+def resolve_scratch_path(matrix: ResolvedMatrix, config: dict) -> tuple[str, str]: ...
+def validate_naming(naming: str, name: str) -> None: ...
 def validate_section(section_data: dict, schema: dict, project_root: Path) -> None: ...
 class ArtifactLocationsError(ValueError):
     code: str                       # z. B. "artifact-locations.unknown-preset"
@@ -1049,16 +1192,21 @@ Felder und Pfade = heutige Defaults (`spec-plan-workflow.paths.*`,
 `se_output.base_dir`, `tmp-sink.path`, `progress.*`, `viz.event_log`);
 `resolve_se_projection` liefert für `reviews`/`reports`/`adr`/`traceability`
 **immer** `{ARTIFACT_SE_ROOT}/<leaf>` (unabhängig von `classes.<x>.path`,
-D-7); die Funktionen sind auf dem leeren Config-Dict total definiert.
+D-7); `resolve_scratch_path` liefert `("matrix-wert", "project")` wenn die Klasse gesetzt
+ist, sonst `(alias-wert, "project-alias:repo_containment.tmp-sink.path")` und **niemals**
+einen stillen Vorrang bei divergierenden Werten (Divergenz wirft
+`artifact-locations.scratch-sink-divergence`, D1); `resolve_naming`/`validate_naming`
+erzwingen die geschlossene Token-Liste (D3); die Funktionen sind auf dem leeren
+Config-Dict total definiert.
 
 ### 6.2 Schema-Fragmente
 
 Wurzel-Property (Einfügepunkt `schema.json:2223`-Umfeld) und `$defs`
 (`schema.json:2855`) exakt nach Spec §4.1 — inklusive der dort begründeten
 „ausgeschrieben statt `allOf`"-Regel (draft-07 `additionalProperties` wirkt
-nur im selben Subschema). **Sieben** `$defs`: `artifactKind` (20 Werte),
-`artifactClassName` (23 Klassen, für `fallback-parent`), `artifactClass`,
-`artifactSeClass`, `artifactFileSet`, `artifactEphemeral`, `artifactState`.
+nur im selben Subschema). **Acht** `$defs`: `artifactKind` (20 Werte),
+`artifactClassName` (23 Klassen, für `fallback-parent`), `artifactNaming` (D3),
+`artifactClass`, `artifactSeClass`, `artifactFileSet`, `artifactEphemeral`, `artifactState`.
 
 **`kind` — keine Abweichung mehr (Review 2026-11-09):** `kind` ist ein `array`
 mit `items: {"$ref": "#/$defs/artifactKind"}` und `uniqueItems: true`; die
@@ -1067,6 +1215,14 @@ Die frühere Formulierung „je Klasse ein `enum` statt `array of string`" war
 mehrdeutig (ein Enum kann keine Menge von 6 Kinds ausdrücken); verbindlich ist
 jetzt: **Klassen-Ebene = Menge von Enum-Werten, Artefakt-Ebene = genau ein
 Enum-Wert** (Spec §3.1).
+
+**`naming` (D3, DECIDED 2026-11-09):** `artifactClass.naming` und
+`artifactSeClass.naming` referenzieren `$defs/artifactNaming`
+(`{"type":"string","minLength":1,"pattern":"^(?!.*\\.\\.)(?:[^{}/]|\\{(?:class|date|slug|kind|n|topic|scope|nnn|level|folder)\\})+$"}`).
+Acht `$defs` insgesamt (der neue Eintrag ist `artifactNaming`). `defaults.naming`
+nutzt `allOf` + `default`, weil draft-07 `$ref`-Geschwister ignoriert. Die
+Klassen-Anwendbarkeit der Tokens (z. B. kein `{level}` in `audits`) prüft T5
+(`artifact-locations.naming-invalid`) — das Schema prüft nur die Token-Alphabetik.
 
 ### 6.3 CLI-Exitcodes (`sync.py --status-artifacts`)
 
@@ -1078,6 +1234,7 @@ Enum-Wert** (Spec §3.1).
 
 `--json` ist additiv (`schema_version: "1"`), Pflichtfelder je Klasse:
 `path` (bzw. `files`), `mode`, `source`, `exists`; optional/additiv
+`naming` (D3), `field_sources` (inkl. `project-alias:<key>`, D1),
 `file_count`, `newest`, `kinds`, `subdir`, `legacy_hits`, `violations` sowie die
 Top-Level-Liste `unmanaged` (D-8, nie in `classes`).
 `--status` bleibt unverändert (`sync.py:406`).
@@ -1103,7 +1260,16 @@ Ausgabe: rc 0 (allow/warn), rc 2 (block). Meldung nennt Ziel, erwarteten
 Klassenpfad und Reparatur (`add to artifact-locations.classes.<x>.path or a
 legacy entry`). **fail-open** bei fehlender/kaputter Datei (eine Warnzeile).
 Marker-Dateien (`.gitkeep`, `.gitignore`, `.keep`) werden nie geblockt.
+Auswertungsreihenfolge (D3): Marker → `unmanaged` → `legacy` → Klassenpfad → verwalteter
+Baum → Root; `legacy` steht bewusst **vor** der Klassen-Freigabe, sonst wären die
+ADR-Legacy-Muster innerhalb von `docs/adr` wirkungslos.
 Prüft keine Inhalte, Endungen, Branch-Policies; schreibt nichts um.
+
+**Zweiter Konsument derselben Datei (`repo-containment`).** Der bestehende Hook liest
+`classes[].name == "scratch"` → `path` als Scratch-Bereich (D1); Präzedenz:
+`ARTIFACT_SCRATCH_DIR`-Env → Datendatei → `repo_containment.tmp-sink.path` → `.tmp`.
+`sink_enabled` und die lexikalischen Regeln bleiben bei `repo_containment`, damit
+fehlende Datendatei das Gefängnis nie öffnet (T24).
 
 ### 6.5 UI-API (bestehende Routen, keine neuen)
 
@@ -1128,19 +1294,21 @@ Prüft keine Inhalte, Endungen, Branch-Policies; schreibt nichts um.
 | Consistency | `tests/test_consistency_checks.py`, `tests/test_consistency_temp_literals.py`, `tests/test_consistency_reference_standards.py` | Registrierung, Abgrenzung, Severity |
 | Admin | `tests/test_admin_server.py` (u. a. `:1967`, `:2161-2168`, `:2290`, `:2350`) | Whitelist, 400 ohne Teil-Write, Kommentar-erhaltender Write |
 | Hooks | `tests/test_hook_metadata.py`, `tests/test_hook_enablement_consistency.py`, `tests/test_hook_common_lib.py`, `tests/test_hook_drift.py`, `tests/test_hook_registration_invariant.py` | Header-Parsing, Opt-in, Helfer |
+| Containment-Pfad | `tests/test_tmp_sink_path_parity.py`, `tests/fixtures/tmp-sink-path-corpus.json`, `tests/test_repo_containment_hook.py` | lexikalische Parität Hook ↔ `repo_containment.tmp_sink_path_error`; bleibt bei T24 **unverändert** grün (nur die Pfad-*Quelle* wechselt, nicht die Regeln) |
 | Pipeline-Verdrahtung | `tests/test_generated_file_drift_pipeline_wiring.py:34-46` | Stage-Reihenfolge (Hash-Capture zuletzt) |
 | Platzhalter | `tests/test_placeholder_grace_and_derivation.py` | Allow-List-Mechanik |
 | Templates | `tests/test_template_report_paths.py`, `tests/test_template_slimming_equivalence.py` | kein `/tmp/opencode`, Goldens |
 
 **Baseline:** `baseline-validate.txt` (rc 0, ein `active-set.gate-dropped`-Hinweis) und `baseline-check.txt` (DRY-RUN, `[WARN] 1 warning(s)`, Exit 0). Nach jedem Meilenstein-Gate darf **kein neues** ERROR/WARNING dazukommen (Ausnahme: die in T9 bewusst erzeugten Test-Fixture-Warnungen).
 
-### 7.2 Neue Testdateien (15)
+### 7.2 Neue Testdateien (17)
 
 `schema`, `presets`, `resolver`, `validate`, `variables`, `placeholders`,
 `artifact_scaffold`, `aliases`, `templates`, `consistency`,
-`artifact_status_cli`, `artifact_path_guard_hook`,
-`artifact_locations_admin_api`, `artifact_locations_admin_ui`,
-`artifact_locations_scenario` — siehe §2.1.
+`artifact_status_cli`, `artifact_path_guard_hook`, `artifact_locations_admin_api`,
+`artifact_locations_admin_ui`, `artifact_locations_scenario`,
+`artifact_locations_migration` (T23), `repo_containment_scratch_resolution` (T24) —
+siehe §2.1.
 
 ### 7.3 Testmatrix pro Modus (`files | inline | off`)
 
@@ -1194,6 +1362,12 @@ Code-Fallback). `project-preset:<name>` und `disabled` sind Source-Attributionen
 Stufen; ein Test pinnt genau diese Unterscheidung
 (`test_project_preset_is_attribution_not_a_level`).
 
+**D1-Ergänzung (Rev. 4):** `field_sources[f] == "project-alias:<key>"` ist ebenfalls nur eine
+Attribution: wenn `classes.scratch.path` fehlt und `repo_containment.tmp-sink.path` gelesen
+wird, bleibt `source == "project"`. Der Test `test_scratch_alias_is_attribution_not_a_level`
+pinned das; damit bleibt AC-1186-15 bei vier Quellen, und es gibt keine „fünfte Stufe
+Alias". Divergenz ist kein Auflösungsfall, sondern ein harter Fehler (T5).
+
 ### 7.6 Zwischentests je Meilenstein
 
 Siehe §4 (Gate-Spalte). Zusätzlich nach **jedem** Task:
@@ -1222,6 +1396,9 @@ oder löscht eine Datei (Nicht-Ziel 1). Konkret:
 | `docs/estimates/`, `docs/research/`, `.meta-viz/handoffs/**` | `legacy[]` |
 | `docs/specs/*-review.md` | `legacy[]` |
 | `SE/VV/**`, `SE/reports/**` | `legacy[]`-Alias; `reports.kind: vv` (D-7) |
+| `docs/se/**` | `legacy[]`-Muster (**D4**); kein Default, keine zweite SE-Wurzel; neue Ziele ausschließlich `artifact-locations.classes.se-*.path` (`SE`) |
+| `docs/adr/[0-9][0-9][0-9][0-9]-*.md`, `docs/adr/ADR-[0-9][0-9][0-9]-*.md` | `legacy[]`-Muster (**D3**); bestehende Dateien (z. B. `0001-pyyaml-runtime-ausnahme.md`) kommen beim ersten Sync in die Baseline und werden **einmal** gemeldet; neue ADRs nur in `ADR-{nnn}_{slug}.md` |
+| `repo_containment.tmp-sink.path` | **Migrations-Alias** (**D1**), keine zweite Senke: wird nur gelesen, solange `classes.scratch.path` fehlt; beide gesetzt ⇒ Werte müssen gleich sein; `sync.py --migrate-artifact-aliases [--write]` schreibt die Matrix (T23) |
 | `.tmp/`, `.meta-viz/` | unverändert; `scratch`/`state` projizieren nur die bestehenden Keys |
 
 **`legacy[]` erhält keine neuen Writes** (AC-09): Consistency-Warnung
@@ -1260,8 +1437,8 @@ in `file_count`/`newest` (#1195).
 | R7 | Doppelmeldungen mit `temp_literals`/#1180 | disjunkte Muster, dokumentierte Abgrenzung + Test (T14) |
 | R8 | Drei Wellen-Issues editieren dieselben Dateien | Serialisierung §Voraussetzungen; ein Task je Datei; Owner-Spalte §2 |
 | R9 | Eine große `admin-ui.html` nimmt drei Panes auf | Pane klein, Vorschau serverseitig (T19); kein Parallel-Edit |
-| R10 | SE-Default-Widerspruch (`SE` vs. `docs/se`) | ein Default `SE` (T4/T20); Regeltext korrigiert (OQ-4) |
-| **R11** | **`scratch` vs. `tmp-sink.path` Doppelsenke** — zwei Config-Keys für dasselbe Verzeichnis; eine Rolle schreibt in `.tmp/x`, die andere in `custom-sink/x` | Vorrang `classes.scratch.path > repo_containment.tmp-sink.path` (OQ-5); `TMP_SINK_PATH` bleibt Laufzeit-Variable; Divergenz = Consistency-**ERROR** (T9), nicht Warnung; `--status-artifacts` zeigt beide (T15) |
+| R10 | SE-Default-Widerspruch (`SE` vs. `docs/se`) | **D4 (DECIDED 2026-11-09):** ein Default `SE` (T4); Regeltext auf `{{ARTIFACT_SE_ROOT}}` (T20); `docs/se/**` in `legacy[]` (T2) — kein zweiter Pfad |
+| **R11** | **`scratch` vs. `tmp-sink.path` Doppelsenke** — zwei Config-Keys für dasselbe Verzeichnis; eine Rolle schreibt in `.tmp/x`, die andere in `custom-sink/x` | **D1 (DECIDED 2026-11-09): eine Quelle** (`classes.scratch.path`); `tmp-sink.path` nur Migrations-Alias, Gleichheitszwang, Divergenz = harter Fehler (T5), Deprecation-Warnung + Migration (T9/T23); `TMP_SINK_PATH` wird aus der Matrix gespeist; Containment-Hook liest den aufgelösten Wert (T24) |
 | **R12** | **`vv`-Klasse** — Issue-YAML nennt `vv`, AC-12 zählt 14+9 | D-7: `reports.kind: vv` + `SE/VV/**` in `legacy[]`; keine 24. Klasse (T4); OQ-1 blockiert nur bei Ablehnung |
 | **R13** | **`docs/conclusions`-Kollision** — AC-04 will das Verzeichnis, AC-12 zählt `conclusions` in `analysis` | D-6: Verzeichnis scaffolden (leer, `.gitkeep`, `legacy[]`), **keine** Klasse; Conclusion-Dokumente nach `docs/analysis` mit `kind: conclusion` (T4/T8/T10) |
 | **R14** | **F-1 stille Fehlsubstitution** — 16 `{SE_BASE_DIR}` (einfache Klammer) werden nie ersetzt; neue Variablen könnten denselben Fehler erben | T11 mit Golden-Test „kein `{SE_` in `agents/1-generic`"; separate Issue-Erfassung (F-1) |
@@ -1271,6 +1448,9 @@ in `file_count`/`newest` (#1195).
 | **R18** | Scaffold-Marker (`.gitkeep`) verletzt AC-09 in `docs/conclusions` | `MARKER_FILENAMES`-Ausnahme in T8 **und** T14/T16; Null-Fund-Test (T14; die `check_artifact_locations`-Fälle laufen erst dort, RVW2-1186-01) |
 | **R19** | **`legacy-write` ohne deterministische Basis** — „mtime > letzter Sync" war nirgends definiert; Folge wäre ein Dauerwarn-Teppich auf Bestandsprojekten | Baseline = `baseline.legacy_files` aus Stage 14c (T15), **kein** mtime-Vergleich; fail-open (0 Findings + eine stderr-Zeile) bei fehlender Baseline; Tests in T14 (RVW2-1186-02) |
 | **R20** | **`unmanaged` wird als Klasse missverstanden** — `.meta-config/issue-labels-state.json` (aus #1188) und die Doku-Unterbäume könnten in AC-12 mitgezählt oder vom Hook gewarnt werden | `unmanaged[]` ist Top-Level-Liste ohne `mode`/Variable; Hook wertet sie vor der Baum-Prüfung aus; Zählung bleibt 14 + 9 (T4/T15/T16, D-8) |
+| **R21** | **Scratch-Alias bleibt liegen** — Bestandsprojekte setzen nur `tmp-sink.path`, die Deprecation-Warnung wird ignoriert | Alias bleibt lesbar (kein Bruch), Gleichheitszwang verhindert stille Doppelsenke (T5), `--migrate-artifact-aliases [--write]` schreibt idempotent (T23), Warnung nennt Ziel-Key + Befehl (T9) |
+| **R22** | **Naming-Token driften** — Rolle schreibt `<YYYY-MM-DD>`, Config erwartet `{date}`; oder Preset nutzt `{level}` in `audits` | geschlossene Token-Liste im Schema (`$defs/artifactNaming`) + Klassen-Anwendbarkeit im Validator (`naming-invalid`); Tests in T1/T2/T4/T5; Beispiele nutzen nur Token-Form (T20) |
+| **R23** | **Containment-Hook und Matrix laufen auseinander** (zwei Schreibziele, eines unsichtbar) | T24 stellt den Hook auf die aufgelöste Datendatei um, mit dokumentierter Fallback-Kette; `tmp-sink.enabled` und die lexikalische Parität bleiben unverändert grün |
 
 ---
 
@@ -1292,7 +1472,7 @@ in `file_count`/`newest` (#1195).
 | AC-1186-12 | exakt 14 + 9 Klassen; keine Legacy-Klasse beschrieben; `unmanaged` ist keine Klasse | T4, T8 | `test_class_registry_has_23_entries`, `test_conclusions_is_legacy_not_class`, `test_unmanaged_is_not_a_class` |
 | AC-1186-13 | `kind` (Enum) in zusammengelegten Klassen; Legacy-Write gemeldet | T1, T4, T10, T14, T21/E | `test_kind_is_closed_enum`, `test_kind_enum_is_class_scoped`, Phase E |
 | AC-1186-14 | `--status-artifacts --json` mit `path/mode/source/exists` plus `unmanaged`-Liste; Manager nennt es | T15, T20 | `test_each_class_has_path_mode_source_exists`, `test_status_json_reports_unmanaged_list`, `test_manager_references_status_artifacts` |
-| AC-1186-15 | Präzedenz über **vier Wertequellen** + `source`, plus `disabled` und `project-preset`-Attribution | T4 | §7.5 (4 Quellen + 2 Attributionen) |
+| AC-1186-15 | Präzedenz über **vier Wertequellen** + `source`, plus `disabled`, `project-preset`- und `project-alias`-Attribution (D1) | T4 | §7.5 (4 Quellen + 2 Attributionsfamilien) |
 | AC-1186-16 | `rules-preset: lazy` bleibt `CLAUDE.md ∩ .claude/rules = 0` | T13 | `test_no_always_on_rule_added` |
 
 **Hygiene-Vorgaben:** H-1 → T13; H-2 → T6 (`test_variables_built_once_per_provider`); H-3 → T13 (blockiert durch #1180); H-4 → T13 (`test_provider_context_count_does_not_grow`, relative Assertion — RVW2-1186-03).
@@ -1302,6 +1482,15 @@ Ratchet (T10/T14); AC-05 = Resolver/Consistency statt Template-Gate (T4/T14/T21)
 AC-07 = geteilt in T17 (jetzt) und T22 (Follow-up nach #1141); AC-09 = Inhalt
 statt Marker **plus Baseline `baseline.legacy_files` statt mtime** (T8/T14/T15/T16,
 RVW2-1186-02); AC-13 = geschlossenes Enum (T1/T4/T5).
+
+**Entscheidungen D1–D4 → Tasks (Rev. 4):**
+
+| D-Nr | Entscheidung (kurz) | Tasks | Beleg-Test / Gate |
+|---|---|---|---|
+| **D1** | eine Scratch-Quelle, Alias-Migration, Containment-Hook liest Matrix | T4, T5, T9, T15, T23, T24 | `test_scratch_path_is_single_source`, `test_scratch_alias_applies_only_when_class_absent`, `test_scratch_alias_equal_values_are_resolved` (T4); `test_scratch_sink_divergence_is_hard_error`, `test_scratch_alias_equal_values_pass_validation` (T5); `test_scratch_deprecation_warning_has_migration_hint`, `test_tmp_sink_path_variable_comes_from_matrix` (T9); `test_status_json_reports_alias_attribution` (T15); `test_write_migrates_scratch_alias`, `test_write_refuses_on_divergent_values` (T23); `test_hook_uses_resolved_scratch_path`, `test_hook_falls_back_to_legacy_key_without_datafile` (T24) |
+| **D2** | D-9-Ausnahme bleibt (Standalone-Fallback in #1186) | T6 | `test_standalone_supplies_artifact_variables` |
+| **D3** | Naming-Token, ADR-Default, zwei Legacy-Formen | T1, T2, T4, T5, T15, T20, T23 | `test_naming_accepts_canonical_tokens`, `test_naming_rejects_unknown_token`, `test_naming_rejects_angle_bracket_form` (T1); `test_default_adr_naming_is_canonical` (T2); `test_naming_resolves_per_class` (T4); `test_naming_token_not_applicable_is_hard_error` (T5); `test_status_json_reports_naming` (T15); `test_adr_rule_naming_matches_matrix_default` (T20) |
+| **D4** | `SE` bleibt Default, Regeltext auf `{{ARTIFACT_SE_ROOT}}`, `docs/se/**` legacy | T2, T4, T20 | `test_se_root_default_is_SE`, `test_legacy_accepts_adr_non_canonical_forms` (T4); `test_legacy_contains_framework_paths` (T2); `test_taxonomy_uses_se_root_variable` (T20) |
 
 ---
 
@@ -1360,11 +1549,11 @@ Zustand ist behoben und durch `tests/test_template_report_paths.py:61` geschütz
 |---|---|---|---|
 | **OQ-1** (`vv`) | Eigene Klasse, `reports.kind`, oder 24. Zeile? Issue-YAML nennt `vv`, AC-12 fordert „genau 14 + 9" | **entschieden (D-7):** `reports.kind: vv`; `reports.path` bleibt `docs/reports` (AC-04); SE-Pfade über abgeleitete Projektionen; `SE/VV/**` in `legacy[]`; kein `se-path`-Feld | **keine Blockade mehr** (Review 2026-11-09): die Entscheidung ist im Vertrag, nicht als offene Frage — T4 pinnt `test_reports_path_stays_docs_reports` |
 | **OQ-2** (`docs/conclusions`) | AC-04 verlangt das Verzeichnis, AC-12 zählt `conclusions` in `analysis` | **entschieden (D-6):** Verzeichnis scaffolden (leer, `.gitkeep`, `legacy[]`), keine Klasse; Dokumente nach `docs/analysis` (`kind: conclusion`); das `.gitkeep` ist über die Scaffold-Ausnahme von `legacy-write` ausgenommen | **keine Blockade mehr**: T8/T14 pinnen den Null-Fund |
-| **OQ-5** (`scratch` ↔ `tmp-sink.path`) | Alias, Vorrang-Regel oder Verbot der Doppelkonfiguration? | **Vorrang** `classes.scratch.path > repo_containment.tmp-sink.path`; `TMP_SINK_PATH` bleibt Laufzeit-Variable; Divergenz = Consistency-**ERROR** | **blockiert T9/T14**: die Severity (Error vs. Warn) und die Auflösungsrichtung sind Vertrag; eine andere Wahl ändert Tests und Rollenverhalten. Kein Blocker für M1/M2-Kern |
-| OQ-3 (ADR-Naming) | `ADR-<NNN>-<slug>.md` vs. `ADR-NNN_kurztitel.md` | Default `ADR-<NNN>_<slug>.md` (regelkonform, `se-cascade-adr-standard.md:10`); `legacy[]` akzeptiert `NNNN-<slug>.md` | kein Blocker (Default in T2/T4) |
-| OQ-4 (SE-Wurzel) | `SE` (Code `config.py:2273`) vs. `docs/se` (Regeltext `taxonomy:10`) | **Default `SE`**; Regeltext in T20 korrigieren | kein Blocker (T20) |
+| **OQ-5** (`scratch` ↔ `tmp-sink.path`) | Alias, Vorrang-Regel oder Verbot der Doppelkonfiguration? | **DECIDED 2026-11-09 (D1):** **eine** Quelle (`classes.scratch.path`); `tmp-sink.path` = Migrations-Alias (nur gelesen, solange die Klasse fehlt), Gleichheitszwang bei Doppelsetzung, Divergenz = harter Fehler `scratch-sink-divergence`; `TMP_SINK_PATH` wird aus der Matrix gespeist; Containment-Hook liest den aufgelösten Wert | **keine Blockade mehr**: T4 (Auflösung + Attribution), T5 (Fehler), T9 (Warnung), T23 (Migration), T24 (Hook) sind vertraglich festgelegt |
+| OQ-3 (ADR-Naming) | `ADR-<NNN>-<slug>.md` vs. `ADR-NNN_kurztitel.md`; ist Naming konfigurierbar? | **DECIDED 2026-11-09 (D3):** Naming pro Klasse, geschlossene Token-Liste (Spec §3.2.1); ADR-Default `ADR-{nnn}_{slug}.md` (regelkonform, `se-cascade-adr-standard.md:10`); `legacy[]` akzeptiert `NNNN-…` und `ADR-NNN-…`; unbekannte Tokens = `naming-invalid` | **keine Blockade**: T1/T2/T4/T5/T15/T23 |
+| OQ-4 (SE-Wurzel) | `SE` (Code `config.py:2273`) vs. `docs/se` (Regeltext `taxonomy:10`) | **DECIDED 2026-11-09 (D4):** Default bleibt `SE`, keine Migration; Regeltext verweist auf `{{ARTIFACT_SE_ROOT}}`; `docs/se/**` in `legacy[]` | **keine Blockade**: T2 (Legacy-Muster), T4 (`test_se_root_default_is_SE`), T20 (Regeltext) |
 | OQ-6 (unmanaged `docs/` + `docs/issue-labels.md`) | 8 Unterbäume: `legacy[]` oder „unmanaged"? Und wo lebt die #1188-Datei? | **entschieden (D-8):** `docs/superpowers/*` + `docs/conclusions` in `legacy[]`; die übrigen sieben als **`unmanaged[]`** (kein Block, keine Warnung, keine Klasse, keine Variable). **`docs/issue-labels.md` → `project-docs.files.issue-labels`**; **`.meta-config/issue-labels-state.json` → `unmanaged[]`** (#1188 braucht kein zweites Schema-Update) | kein Blocker (T1/T2-Liste); bei „legacy" entstehen Dauerwarnungen (F-3) |
-| **OQ-7** (`standalone.py`) | Zielmatrix RVW2-X-01 nennt `scripts/lib/standalone.py` **nur bei #1187**; T6 braucht dort die 54 Framework-Defaults | **D-9 (Entscheidung, Abweichung dokumentiert):** #1186 behält den additiven Fallback-Block; #1187 bleibt Datei-Federführer, Revision läuft nach ihm. Alternative: Block als Follow-up nach #1186 verschieben | **Offener Punkt für den Reviewer:** gilt die Zielmatrix ausnahmslos, blockiert der Standalone-Teil T6 (dann bleibt bis zum Follow-up die „not available"-Notiz in 26 Personas). Sonst keine Blockade |
+| **OQ-7** (`standalone.py`) | Zielmatrix RVW2-X-01 nennt `scripts/lib/standalone.py` **nur bei #1187**; T6 braucht dort die 54 Framework-Defaults | **DECIDED 2026-11-09 (D2): die D-9-Ausnahme bleibt.** #1186 behält den additiven Fallback-Block; #1187 bleibt Datei-Federführer; die Reihenfolge #1187 → #1186 verhindert einen Parallel-Edit | **keine Blockade**: T6 bleibt unverändert, kein Reviewer-Vorbehalt, kein Follow-up |
 
 **Zusätzliche Plan-Präzisierung (keine Spec-Änderung):**
 `scratch`/`state` haben schema-seitig **kein** `mode`-Feld
@@ -1377,16 +1566,18 @@ werden für sie als Konstante `files` exportiert (K-1, T6), damit §3.4
 ## 14. Self-Review
 
 - **Jeder Task mappt auf genau eine Rolle:** T1–T3, T5–T12, T14, T15, T17,
-  T18 = `developer`; T4, T16 = `senior-developer`; T19 =
+  T18, T23, T24 = `developer`; T4, T16 = `senior-developer`; T19 =
   `frontend-component-engineer`; T13, T20 = `technical-writer`; T21 =
   `tester`; T22 (Follow-up) = `developer`. (T4 ist `senior-developer`, nicht
   `developer`; in §2.2 bündeln T1/T3 bzw. T17/T18 nur eine Datei, nicht eine
   Rolle.)
 - **Jede Datei hat genau einen schreibenden Task** (Owner-Spalte §2); keine
-  Dateiüberlappung innerhalb eines Meilensteins außer der bewusst
-  sequenziellen Kette `config.py` (T5 → T6 → T9), `admin-server.py`
-  (T17 → T18; T22 liegt in einer späteren Welle) und `sync_pipeline.py`
-  (T8 → T15, Stage 14c nach Stage 13).
+  Dateiüberlappung innerhalb eines Meilensteins außer den bewusst
+  sequenziellen Ketten `config.py` (T5 → T6 → T9), `admin-server.py`
+  (T17 → T18; T22 liegt in einer späteren Welle), `sync_pipeline.py`
+  (T8 → T15, Stage 14c nach Stage 13) und `docs/api/cli-reference.md`
+  (T15 → T23, dokumentierte Kette). `hooks/1-generic/repo-containment*.sh` hat mit **T24**
+  genau einen Owner; T16 legt eine **neue** Datei an und fasst sie nicht an.
 - **AC-Präzisierungen sind ausgewiesen:** AC-03/05/07/09/13 sind in §10 und in
   Spec §6.3 (Revision 2: eigene Unterabschnitte mit Ankern) als Neuinterpretation
   markiert, jede mit benanntem Test und Grund; der Issue-Wortlaut bleibt
@@ -1405,6 +1596,16 @@ werden für sie als Konstante `files` exportiert (K-1, T6), damit §3.4
 - **`pipeline_stages` vorhanden** (`implement: 3` — Schritt 3 = „Test
   (pass)" je Task, wie im Präzedenzplan
   `docs/plans/2026-10-24-tmp-sink-injection-plan.md:96-98`).
+- **D1–D4 sind als Entscheidung eingearbeitet (Rev. 4):** Scratch hat **eine** Quelle mit
+  Migrations-Alias, Gleichheitszwang und **einer** Deprecation-Warnung (T4/T5/T9/T23), der
+  Containment-Hook liest die aufgelöste Datendatei (T24); D2 bestätigt die
+  Standalone-Ausnahme; Naming ist token-validiert (T1/T2/T4/T5); `SE` bleibt Default mit
+  `{{ARTIFACT_SE_ROOT}}`-Regeltext und `docs/se/**` in `legacy[]` (T2/T4/T20).
+- **Keine Doppelquelle bleibt übrig:** `TMP_SINK_PATH == ARTIFACT_SCRATCH_DIR` (T9),
+  `SE_BASE_DIR == ARTIFACT_SE_ROOT` (T6), `state` ist Projektion (T4) — jede Zeile hat
+  einen Test, der den zweiten Pfad ausschließt.
+- **Naming erzeugt keine 55. Variable:** die Menge aus §3.3 bleibt exakt 54 (T6/T7);
+  `naming` erscheint nur im Status-JSON (T15).
 - **Keine Platzhalter/TBD:** jede Code-Referenz hat einen auf `aaed14c2`
   verifizierten `datei:zeile`-Anker; OQs sind entschieden oder mit
   Blockadewirkung markiert.
@@ -1470,3 +1671,29 @@ Wave-Specs/-Pläne. Status bleibt **DRAFT**.
 | **K6** (NIT) | `$defs` bleibt; das Ist-Schema nutzt es bereits (`schema.json:2` + `:2855`); Plan nennt `$defs/artifactKind`/`artifactClassName` unverändert | §2.2, T1, T3 |
 | **K7** | **Nicht betroffen**: alle Schlüssel kebab-case in `artifact-locations` | geprüft: §3.1 |
 | **K8** | **Nicht betroffen**: kein bestehender `_KEYS`-Block | geprüft: §6.1 |
+
+## 16. Entscheidungsprotokoll (2026-11-09)
+
+Vom User entschieden; Markierung `DECIDED 2026-11-09` steht zusätzlich am jeweiligen Task.
+Diese vier sind **Fach-Entscheidungen** und zu unterscheiden von den internen
+Design-Entscheidungen `D-6` (conclusions), `D-7` (`vv`), `D-8` (`unmanaged`) und `D-9`
+(Standalone-Ausnahme, hier als **D2** bestätigt).
+
+| D-Nr | Frage | Entscheidung | betroffene Stellen |
+|---|---|---|---|
+| **D1** | OQ-5 — Kopplung `scratch` ↔ `repo_containment.tmp-sink.path` | **Eine** Quelle: `artifact-locations.classes.scratch.path`. `tmp-sink.path` = Legacy-Alias (nur gelesen, solange die Klasse fehlt); beide gesetzt ⇒ Werte müssen gleich sein, Divergenz = **harter Fehler** `artifact-locations.scratch-sink-divergence`; Deprecation-Warnung mit Migrationshinweis; `TMP_SINK_PATH` bleibt, wird aber **aus der Matrix** gespeist; Containment-Hook liest den **aufgelösten** Wert statt des Roh-Keys. Migration `--migrate-artifact-aliases [--write]`. Die „Vorrang + ERROR"-Formulierung ist ersetzt. | §3.1 (Scratch-Zeile), §3.2, §3.3, §6.1 (`SOURCE_PROJECT_ALIAS`, `resolve_scratch_path`), **T4**, **T5**, T9, T15, **T23 (neu)**, **T24 (neu)**, §8, §9 R11/R21/R23, §10, §13 OQ-5 |
+| **D2** | OQ-7 — gilt die Zielmatrix RVW2-X-01 für `scripts/lib/standalone.py` ausnahmslos? | **Nein — die D-9-Ausnahme bleibt.** #1186 behält den additiven Standalone-Fallback (54 Framework-Defaults), #1187 bleibt Datei-Federführer, Reihenfolge #1187 → #1186 verhindert Parallel-Edits. Kein Follow-up. | §2.2 (`standalone.py`), §2.3, **T6**, §10 (D-Tabelle), §13 OQ-7 |
+| **D3** | OQ-3 — ADR-Naming und Konfigurierbarkeit von `naming` | Naming ist **pro Klasse** konfigurierbar: String-Pattern mit **geschlossener Token-Liste** `{class} {date} {slug} {kind} {n} {topic} {scope} {nnn} {level} {folder}`. Projekt-Default ADR: `ADR-{nnn}_{slug}.md` (regelkonform, `se-cascade-adr-standard.md:10`). `legacy[]` akzeptiert zusätzlich `NNNN-{slug}.md` und `ADR-{nnn}-{slug}.md`. Unbekannter/nicht anwendbarer Token = `artifact-locations.naming-invalid`. | §3.1 (Tabelle + Token-Kanon), §6.1 (`resolve_naming`/`validate_naming`), §6.2 (`$defs/artifactNaming`), **T1**, **T2**, **T4**, **T5**, T15, T20, §8, §9 R22, §10, §13 OQ-3 |
+| **D4** | OQ-4 — `SE` oder `docs/se` als SE-Wurzel-Default | Default bleibt **`SE`**, keine Migration. `rules/1-generic/se-cascade-artifact-taxonomy.md` verweist auf `{{ARTIFACT_SE_ROOT}}` statt auf ein Literal; `docs/se/**` ist `legacy[]`-Muster (kein Default, kein zweiter Pfad). | §3.2 (SE-Absatz), **T2** (Legacy-Muster), **T4** (`test_se_root_default_is_SE`), **T20** (Regeltext), §8, §9 R10, §10, §13 OQ-4 |
+
+**Verbleibende offene Punkte (nicht entschieden, nicht blockierend):**
+
+1. **Leaf-Schreibweise der SE-Projektion** (`ARTIFACT_SE_ADR_DIR` etc.): Spec §3.4 leitet
+   `{ARTIFACT_SE_ROOT}/<leaf>` ab; die Taxonomie führt `ADR/` (Großbuchstaben,
+   `se-cascade-artifact-taxonomy.md:15,61`), die Klasse `adr` heißt `docs/adr`. Empfehlung:
+   Leaf bei der Umsetzung **wörtlich** aus der Taxonomie übernehmen und in T4 pinnen —
+   keine Entscheidung in diesem Plan.
+2. **Retention/Cleanup für `scratch`** bleibt Deklaration + Report (§8) und gehört zu
+   #1150-Problem 2, nicht zu #1186.
+3. **Wer den Dateinamen konkret erzeugt** (Rolle vs. CLI) bleibt Rollen-Verantwortung; die
+   Matrix liefert nur Muster + Validierung (Spec §3.2.1 e).
