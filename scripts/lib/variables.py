@@ -22,10 +22,14 @@ import re
 import sys
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .io import SyncError
 from .log import SyncLog
 from .substitution import substitute_placeholders
+
+if TYPE_CHECKING:  # topology stays a lazy runtime import (see __doc__)
+    from .topology import TopologyResolution
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
 
@@ -353,6 +357,50 @@ def _topology_flags(topology: str, *, explicit: bool, source: str) -> dict:
         "ORCH_TOPOLOGY_SUBAGENT": "true" if normalized == "subagent" else "false",
         "ORCH_TOPOLOGY_HYBRID": "true" if normalized == "hybrid" else "false",
         "ORCH_TOPOLOGY_SOURCE": source,
+    }
+
+
+def _effective_topology_flags(
+    resolution: TopologyResolution, *, mode: str
+) -> dict[str, str]:
+    """Return the flat ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags (G2).
+
+    Reports the *resolved* position instead of the declaration: ``effective``
+    is what the provider can actually do, so it differs from ``ORCH_TOPOLOGY``
+    whenever the value was derived or degraded.
+
+    ``ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT`` is the Rev. 2 K-1 formula
+    ``source != "derived"`` — never ``effective != declared``, which would be
+    true for every unset key and open the ``{{#if}}`` branch in default
+    consumers.
+
+    The two string flags (``_EFFECTIVE``, ``_EFFECTIVE_SOURCE``) and
+    ``_EFFECTIVE_EXPLICIT`` are audit values; only the three position flags
+    and ``ORCH_TOPOLOGY_INERT`` are ``{{#if}}`` conditionals. ``effective`` is
+    never ``"none"`` — the inert case is expressed exclusively through
+    ``ORCH_TOPOLOGY_INERT`` (``mode == "main-chat"``), keeping the resolver
+    invariant untouched.
+    """
+    from .topology import VALID_TOPOLOGIES
+
+    effective = resolution.effective
+    assert effective in VALID_TOPOLOGIES  # never "none", resolver invariant
+    return {
+        "ORCH_TOPOLOGY_EFFECTIVE": effective,
+        "ORCH_TOPOLOGY_EFFECTIVE_SOURCE": resolution.source,
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": (
+            "true" if resolution.source != "derived" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": (
+            "true" if effective == "primary" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": (
+            "true" if effective == "subagent" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": (
+            "true" if effective == "hybrid" else "false"
+        ),
+        "ORCH_TOPOLOGY_INERT": "true" if mode == "main-chat" else "false",
     }
 
 
