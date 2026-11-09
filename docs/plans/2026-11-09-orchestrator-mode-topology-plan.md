@@ -1,7 +1,8 @@
 ---
 pipeline_stages:
   implement: 1
-status: DRAFT
+status: APPROVED
+approved: 2026-11-09
 revision: 4
 date: 2026-11-09
 base-commit: aaed14c2
@@ -14,7 +15,7 @@ trace:
 
 # Orchestrator `mode` × `topology` — Umsetzungsplan (#1190)
 
-> **Status: DRAFT** · **Revision: 4** · Issue **#1190** · Klasse **XL / Architectural** · Datum 2026-11-09
+> **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat) · **Revision: 4** · Issue **#1190** · Klasse **XL / Architectural** · Datum 2026-11-09
 > Review 1 (`docs/reviews/2026-11-09-orchestrator-mode-topology-review.md`, vor Revision 2) ist
 > vollständig eingearbeitet; Nachweis in §16 „Review-Auflösung (2026-11-09)".
 > Re-Review 1 (`docs/reviews/2026-11-09-orchestrator-mode-topology-rereview.md`, vor Revision 3) ist
@@ -24,8 +25,8 @@ trace:
 > Opencode (T19), explizite Deklaration `orchestrator.topology: subagent` als eigener Umsetzungsschritt
 > **nach** dem Code-Fix (T20) und daraus folgend das Abschluss-Gate als T21; Szenarien `100`–`104` auf
 > die neuen Positionen umgestellt.
-> Die Spec steht auf `Status: DRAFT`; der Plan startet erst nach `Status: APPROVED`
-> (Master-Rule `spec-plan-workflow`).
+> Die Spec ist seit **2026-11-09** `Status: APPROVED` (User-Freigabe via `main_chat`); die
+> Ausführung dieses Plans ist damit autorisiert (Master-Rule `spec-plan-workflow`).
 > **spec-id:** `SPEC-orchestrator-mode-topology-2026-11-09`
 > **Normativer Vorgänger:** `SPEC-orchestrator-topology-2026-11-03`
 > (`docs/specs/2026-11-04-orchestrator-topology-spec.md`, D1–D10, AC-1…AC-20 — bleibt gültig,
@@ -62,9 +63,13 @@ Frontmatter, `pytest`, `python3 scripts/sync.py`.
 
 **Voraussetzungen (vor T1 zu erfüllen):**
 
-1. Spec auf `Status: APPROVED` (heute `DRAFT`, `docs/specs/2026-11-09-orchestrator-mode-topology-design.md:3`).
-   Solange sie `DRAFT` ist, meldet `consistency/spec_plan.py` den **beabsichtigten** ERROR
-   `spec_plan_approval_marker` für diesen Plan (er nennt `**Spec:**` wörtlich und hat Tasks).
+1. **Erfüllt (2026-11-09):** Die Spec steht auf `Status: APPROVED`
+   (`docs/specs/2026-11-09-orchestrator-mode-topology-design.md:8`, User-Freigabe via `main_chat`).
+   Der Gate ist damit geschlossen: `consistency/spec_plan.py` findet den Approval-Marker
+   (`> Status: APPROVED`) und meldet **keinen** `spec_plan_approval_marker`-ERROR mehr; die
+   Ausführung dieses Plans ist autorisiert. Die frühere Formulierung („solange sie `DRAFT` ist,
+   blockt der Check") beschrieb den Stand vor der Freigabe und gilt nicht mehr — ein
+   `--validate-spec-plan`-Lauf blockt diesen Plan nicht.
 2. Branch `docs/1190-orchestrator-topology` (HEAD `aaed14c2`) — **nie** `main`/`master`.
 3. **M0 ist noch nicht gelaufen.** Die Baseline wird in M0 erzeugt und im Plan dokumentiert
    (Exit-Code von `--validate`, `--check`, Topologie-Testfamilie). Zitate auf Baseline-Dateien

@@ -1,6 +1,11 @@
+---
+status: APPROVED
+approved: 2026-11-09
+---
+
 # Orchestrator `mode` × `topology` — Entscheidungs- und Design-Spec
 
-> Status: **DRAFT**
+> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat)
 > Revision: 4
 > Datum: 2026-11-09
 > Rev. 4 (2026-11-09): **drei User-Entscheidungen eingearbeitet** — `DECIDED 2026-11-09`:
@@ -8,7 +13,9 @@
 > D-OQ2 (`strict × subagent` bleibt erlaubt und empfohlen, Gate-Tier je Surface), D-OQ3
 > (`advisory × subagent` erst nach #1182). Neu: §3.8 Positionsmodell mit Mapping
 > `mode × topology → Position`, AC-32…AC-37, angepasste D-Q1/D-Q3/D-Q4, Matrix mit
-> Positions-Spalte. Nichts davon hebt D-Q1…D-Q5 auf; die Freigabe steht weiter aus.
+> Positions-Spalte. Nichts davon hebt D-Q1…D-Q5 auf. Die Spec ist seit **2026-11-09** freigegeben
+> (`Status: APPROVED`, User-Freigabe via main_chat); die frühere Formulierung „die Freigabe steht
+> weiter aus" ist damit überholt.
 > Rev. 3.1 (2026-11-09): Pflicht-Überschriften validatorkonform benannt (`## Problem`, `## Ziel`,
 > `## Interface Contracts`, `## Datenfluss`, `## Acceptance Criteria`, `## Offene Fragen`,
 > `## Trace-Anker`); Inhalte nur verdichtet bzw. umbenannt, keine Entscheidung geändert.
@@ -1409,17 +1416,20 @@ Daten, keine eigene Config-Achse — es gibt keinen `position`-Key (§6.1).
      `SPEC-orchestrator-mode-topology-2026-11-09` im Kopf (`**spec-id:**`) und in der
      Frontmatter-`trace`-Liste ⇒ kein Finding.
   3. Der Plan hingegen wird als `plan` erkannt und erreicht `_check_approval_markers` (`:479-507`),
-     **sobald** er `**Spec:**` wörtlich nennt. Solange diese Spec `DRAFT` ist, entsteht dort der
-     beabsichtigte ERROR `spec_plan_approval_marker` — das ist das gewünschte Verhalten, kein
-     Planfehler.
+     **sobald** er `**Spec:**` wörtlich nennt. Solange diese Spec `DRAFT` war, entstand dort der
+     beabsichtigte ERROR `spec_plan_approval_marker` — das war das gewünschte Verhalten, kein
+     Planfehler. Mit der User-Freigabe am 2026-11-09 trägt diese Spec `Status: APPROVED`
+     (sichtbarer Marker `> Status: APPROVED`), sodass `_check_approval_markers` **keinen** Befund
+     mehr erzeugt: der Gate ist erfüllt und die Plan-Ausführung autorisiert.
 
 ---
 
 ## 14. Review-Auflösung (2026-11-09)
 
 Gegenstand: `docs/reviews/2026-11-09-orchestrator-mode-topology-review.md` (Review 1, vor Revision 2).
-Status dieser Tabelle = Stand Rev. 3. Nichts davon ist als „erledigt" zu lesen, solange diese Spec
-`DRAFT` ist — die Tabelle belegt nur, **wo** der Befund eingearbeitet wurde.
+Status dieser Tabelle = Stand Rev. 4. Zum Zeitpunkt der Einarbeitung stand diese Spec auf `DRAFT`;
+seit der User-Freigabe am 2026-11-09 ist sie `Status: APPROVED`. Die Tabelle belegt weiterhin nur,
+**wo** der Befund eingearbeitet wurde — die Freigabe ersetzt kein „erledigt" im Sinne von „umgesetzt".
 
 | Befund-ID | Änderung | Stelle |
 |---|---|---|
@@ -1472,8 +1482,9 @@ Status dieser Tabelle = Stand Rev. 3. Nichts davon ist als „erledigt" zu lesen
 | RVW2-1190-13 (MINOR) | AC-24 (konkrete Prosa-Assertion), AC-23 (Trefferzahlen + Monkeypatch-Zähler), AC-25 (Datei-Scope + Ausnahmen) präzisiert | AC-23, AC-24, AC-25, Plan T10, T14, T16 |
 
 **Nicht aufgelöst (bewusst):** Der Issue-Body #1190 lag auch in dieser Runde nicht vor; H1–H3 sind
-deshalb weiterhin nur gegen diese Spec prüfbar (§13). Diese Spec bleibt `DRAFT`, bis die
-Review-Punkte bestätigt sind.
+deshalb weiterhin nur gegen diese Spec prüfbar (§13). Diese Spec stand bis zur User-Freigabe am
+2026-11-09 auf `DRAFT`; seither ist sie `Status: APPROVED` — die Freigabe betrifft den Entwurf, nicht
+die noch offene H-Map-Frage.
 
 ### User-Entscheidungen (2026-11-09) — D-OQ1…D-OQ3
 
