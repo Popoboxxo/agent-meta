@@ -1,13 +1,13 @@
-"""Provider parity in the rules render seam (G3/G2, AC-14/AC-18/AC-30).
+"""Provider parity in the rules + context render seams (G3/G2, AC-14/18/20/30).
 
-Issue #1190, plan §5 Task 4.
+Issue #1190, plan §5 Tasks 4 and 5.
 
-``rules._merged_rule_vars`` overwrites the provider-less (non-authoritative)
-``ORCH_TOPOLOGY_EFFECTIVE_*`` basis from ``config._build_orch_variables`` with
-the *provider-scoped* resolution — via the one helper
-``variables._provider_topology_flags``. The same per-sync ActiveSet used by the
-emission side reaches the rules seam (AC-30); the helper never resolves an
-ActiveSet and never re-resolves the orchestrator mode.
+``rules._merged_rule_vars`` (T4) and the Stage-4 context seam (T5) overwrite the
+provider-less (non-authoritative) ``ORCH_TOPOLOGY_EFFECTIVE_*`` basis from
+``config._build_orch_variables`` with the *provider-scoped* resolution — via the
+one helper ``variables._provider_topology_flags``. The same per-sync ActiveSet
+used by the emission side reaches both seams (AC-30); the helper never resolves
+an ActiveSet and never re-resolves the orchestrator mode.
 
 Contract under test:
 
@@ -16,20 +16,41 @@ Contract under test:
 * a derived position needs the ActiveSet — without the role the derivation
   fails safe to ``subagent`` even though ``primary-role`` is declared;
 * the ActiveSet object passed by the caller is the object the resolver sees
-  (identity, not an equal copy).
+  (identity, not an equal copy);
+* ``sync_pipeline._sync_stage_contexts`` hands the provider-scoped effective
+  flags to ``sync_context_for_provider`` (Stage 4, not Stage 6) and requires the
+  per-sync ActiveSet as a keyword — no default that would neuter AC-30;
+* one physical ``AGENTS.md`` renders ONE deterministic block with no
+  position-specific statement (G5/AC-20).
 
 Run: python3 -m pytest tests/test_orchestrator_topology_render_parity.py -q
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
+# ``sync_pipeline``/``context`` import their peers as ``lib.*`` (scripts root
+# on sys.path); the ``scripts.lib.*`` aliases below stay resolvable through the
+# repo root entry.
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
+import scripts.lib.sync_pipeline as sync_pipeline  # noqa: E402
 import scripts.lib.topology as topology_module  # noqa: E402
+from scripts.lib.config import load_config  # noqa: E402
+from scripts.lib.context import _build_managed_block  # noqa: E402
+from scripts.lib.log import SyncLog  # noqa: E402
+from scripts.lib.providers import load_providers_config  # noqa: E402
 from scripts.lib.rules import _merged_rule_vars  # noqa: E402
+from scripts.lib.variables import (  # noqa: E402
+    _provider_topology_flags,
+    _resolve_orch_mode,
+)
 
 
 def test_rules_render_effective_flags_per_provider():
@@ -95,3 +116,162 @@ def test_rules_passes_the_shared_active_set(monkeypatch):
     assert any(record is sentinel for record in seen), (
         f"the caller's ActiveSet never reached resolve_topology: {seen!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — Stage-4 context seam + one deterministic block per physical file
+# ---------------------------------------------------------------------------
+
+
+def _stage_context_variables(monkeypatch, tmp_path, config, providers, active_set,
+                             variables=None):
+    """Run Stage 4 with a spy on ``sync_context_for_provider``.
+
+    Returns ``(captured_provider_variables, shared_variables)``: the dict each
+    provider's context render actually received, plus the caller-owned shared
+    ``variables`` dict (to prove no provider-scoped key leaks into it).
+    ``captured["__active_set__"]`` holds the set object the renderer received.
+    """
+    captured: dict = {}
+    variables = {} if variables is None else variables
+
+    def _context_spy(agent_meta_root, project_root, config, variables, log, dry_run,
+                     provider, provider_config, **kwargs):
+        captured[provider] = dict(variables)
+        captured["__active_set__"] = kwargs.get("active_set")
+
+    monkeypatch.setattr(sync_pipeline, "sync_context_for_provider", _context_spy)
+
+    provider_config = {
+        provider: {"context_file": f"{provider}.md", "has_rules": True}
+        for provider in providers
+    }
+    sync_pipeline._sync_stage_contexts(
+        _REPO_ROOT, tmp_path, config, provider_config, list(providers), variables,
+        argparse.Namespace(dry_run=False), SyncLog(),
+        active_set=active_set,
+    )
+    return captured, variables
+
+
+def test_context_render_effective_flags_per_provider(tmp_path, monkeypatch):
+    """Stage 4 hands each provider ITS effective position (G3, AC-18/AC-20)."""
+    config = {
+        "orchestrator": {
+            "topology": "primary",
+            "provider-overrides": {"Opencode": {"topology": "subagent"}},
+        },
+    }
+    shared = {"PROBE": "unchanged"}
+
+    captured, shared_after = _stage_context_variables(
+        monkeypatch, tmp_path, config, ["Opencode", "Claude"], frozenset(), shared,
+    )
+
+    opencode = captured["Opencode"]
+    assert opencode["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "true"
+    assert opencode["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "false"
+
+    claude = captured["Claude"]
+    assert claude["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "true"
+    assert claude["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "false"
+
+    # The provider-scoped re-resolution happens on a copy; the shared dict the
+    # other stages receive must not carry one provider's position (AC-30).
+    assert shared_after == {"PROBE": "unchanged"}
+
+
+def test_shared_context_renders_one_deterministic_block():
+    """One physical AGENTS.md => ONE position-neutral block (G5/AC-20).
+
+    Two sharers with a *different* effective position still render the same
+    text: the shared file must never state a per-provider position (that is the
+    oscillation/false ``--check`` failure mode of #638/#794). This is the
+    ratchet the G5/T10 wording has to keep intact.
+    """
+    config = load_config(_REPO_ROOT / ".meta-config" / "project.yaml")
+    provider_config = load_providers_config(_REPO_ROOT)
+    shared = dict(config.get("variables") or {})
+
+    override_config = {
+        "orchestrator": {
+            "topology": "primary",
+            "provider-overrides": {"Gemini": {"topology": "subagent"}},
+        },
+    }
+    mode = _resolve_orch_mode(override_config["orchestrator"], None)
+    active_set = frozenset({"orchestrator"})
+
+    def _flags(provider: str) -> dict:
+        return _provider_topology_flags(
+            override_config, provider,
+            agent_meta_root=_REPO_ROOT, mode=mode, active_set=active_set,
+        )
+
+    opencode_flags = _flags("Opencode")
+    gemini_flags = _flags("Gemini")
+    assert opencode_flags["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "true"
+    assert gemini_flags["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "true"
+
+    def _render(provider: str, variables: dict) -> str:
+        return _build_managed_block(
+            _REPO_ROOT, config, dict(variables), SyncLog(),
+            provider=provider, provider_config=provider_config,
+            project_root=_REPO_ROOT, target_name="AGENTS.md",
+        )
+
+    shared_vars = dict(shared)
+    shared_vars.update(opencode_flags)
+    primary_a = _render("Opencode", shared_vars)
+    primary_b = _render("Gemini", shared_vars)
+
+    # Byte-identical regardless of which sharer renders the SAME input dict ...
+    assert primary_a == primary_b, (
+        "the two AGENTS.md sharers render different blocks from the same "
+        "variables => each sync overwrites the other forever (#638)"
+    )
+    # ... and regardless of provider order.
+    forward = [_render(p, shared_vars) for p in ("Opencode", "Gemini")]
+    backward = [_render(p, shared_vars) for p in ("Gemini", "Opencode")]
+    assert len(set(forward + backward)) == 1
+
+    # ... and independently of the injected position (no position-specific
+    # statement in the shared file, G5/T10 wording not present yet).
+    subagent_vars = dict(shared)
+    subagent_vars.update(gemini_flags)
+    assert _render("Opencode", subagent_vars) == primary_a
+    assert _render("Gemini", subagent_vars) == primary_a
+
+    assert primary_a.strip()
+    assert "Diese Session startet im" not in primary_a
+    assert "er **ist** der Session-Einstieg" not in primary_a
+
+
+def test_context_uses_the_shared_active_set(tmp_path, monkeypatch):
+    """The per-sync ActiveSet decides the effective position (AC-30)."""
+    empty = frozenset()
+    captured, _ = _stage_context_variables(
+        monkeypatch, tmp_path, {}, ["Opencode"], empty,
+    )
+    assert captured["Opencode"]["ORCH_TOPOLOGY_EFFECTIVE"] == "subagent"
+    assert captured["Opencode"]["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "true"
+    # Same seam, same set: the object reaches the renderer unchanged.
+    assert captured["__active_set__"] is empty
+
+    with_role = frozenset({"orchestrator"})
+    captured, _ = _stage_context_variables(
+        monkeypatch, tmp_path, {}, ["Opencode"], with_role,
+    )
+    assert captured["Opencode"]["ORCH_TOPOLOGY_EFFECTIVE"] == "primary"
+    assert captured["Opencode"]["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "true"
+    assert captured["__active_set__"] is with_role
+
+
+def test_stage4_requires_active_set(tmp_path):
+    """``active_set`` is a required keyword — no default that would neuter AC-30."""
+    provider_config = {"Opencode": {"context_file": "AGENTS.md"}}
+    with pytest.raises(TypeError):
+        sync_pipeline._sync_stage_contexts(
+            _REPO_ROOT, tmp_path, {}, provider_config, ["Opencode"], {},
+            argparse.Namespace(dry_run=False), SyncLog(),
+        )

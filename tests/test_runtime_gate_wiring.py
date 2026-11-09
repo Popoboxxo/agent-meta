@@ -156,7 +156,7 @@ def test_tier_vars_reach_context_render(tmp_path, monkeypatch):
     captured: dict = {}
 
     def _context_spy(agent_meta_root, project_root, config, variables, log, dry_run,
-                     provider, provider_config, platform_vars=None):
+                     provider, provider_config, platform_vars=None, **kwargs):
         captured["variables"] = dict(variables)
         captured["platform_vars"] = platform_vars
 
@@ -167,6 +167,7 @@ def test_tier_vars_reach_context_render(tmp_path, monkeypatch):
         {PROVIDER: {"context_file": "CONTEXT.md"}}, [PROVIDER], {},
         argparse.Namespace(dry_run=False), SyncLog(),
         platform_vars={"platform.probe.flag": "on"},
+        active_set=frozenset(),
     )
 
     variables = captured["variables"]

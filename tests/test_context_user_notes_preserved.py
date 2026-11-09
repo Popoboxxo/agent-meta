@@ -119,6 +119,7 @@ def agents_project(tmp_path):
         sync_context_for_provider(
             REPO_ROOT, tmp_path, config, sync_variables, SyncLog(),
             dry_run=False, provider="Opencode", provider_config=provider_config,
+            active_set=frozenset(),
         )
         return target.read_text(encoding="utf-8")
 

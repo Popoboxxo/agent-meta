@@ -201,6 +201,7 @@ def _sync(project_root, config, provider, pc, caps, provider_config):
     sync_context_for_provider(
         _REPO_ROOT, project_root, config, _variables(config, pc, caps), log,
         dry_run=False, provider=provider, provider_config=provider_config,
+        active_set=frozenset(),
     )
     return log
 
@@ -226,6 +227,7 @@ def _render_synthetic_adapter(tmp_path, config, pc):
     sync_context_adapters_for_provider(
         _REPO_ROOT, tmp_path, config, _variables(config, pc, {}), SyncLog(),
         dry_run=False, provider=provider, provider_config={provider: pc},
+        active_set=frozenset(),
     )
     return (tmp_path / pc["context_adapter_file"]).read_text(encoding="utf-8")
 
@@ -416,6 +418,7 @@ def _render_adapter_to(tmp_path, config, pc):
         _REPO_ROOT, tmp_path, config, _variables(config, pc, {}), SyncLog(),
         dry_run=False, provider=_ROLLBACK_PROVIDER,
         provider_config={_ROLLBACK_PROVIDER: pc},
+        active_set=frozenset(),
     )
     return target
 

@@ -134,6 +134,7 @@ def _sync_with_references(tmp_path: Path, config: dict, *, preset: str) -> tuple
     sync_context_for_provider(
         _REPO_ROOT, project, config, variables, log, dry_run=False,
         provider=_PROVIDER, provider_config=provider_config,
+        active_set=frozenset(),
     )
     return project, log
 

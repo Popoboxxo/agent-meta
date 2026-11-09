@@ -296,7 +296,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                                  log, dry_run, provider, provider_config,
                                  active_set=active_set)
         sync_context_for_provider(agent_meta_root, test_repo_path, config, test_variables,
-                                  log, dry_run, provider, provider_config)
+                                  log, dry_run, provider, provider_config,
+                                  active_set=active_set)
         if pc["has_rules"]:
             sync_rules(agent_meta_root, test_repo_path, config, log, dry_run,
                        variables=test_variables, rules_dir=pc.get("rules_dir"),
@@ -1543,7 +1544,8 @@ def _handle_sync(ctx: _SyncContext) -> None:
     debug_mode, allow_committed_secrets, mcp_gitignore_extras = \
         _sync_stage_contexts(ctx.agent_meta_root, ctx.project_root, config,
                              provider_config, providers, ctx.variables,
-                             ctx.args, ctx.log, platform_vars=platform_vars)
+                             ctx.args, ctx.log, platform_vars=platform_vars,
+                             active_set=ctx.active_set)
     # Stage 5: legacy-provider cleanup.
     _sync_stage_legacy_cleanup(ctx.project_root, config, provider_config,
                                providers, ctx.args, ctx.log)

@@ -150,6 +150,7 @@ from lib.skills import (
 )
 from lib.release_scaffold import scaffold_release_process
 from lib.spec_plan_scaffold import scaffold_spec_plan_dirs
+from lib.variables import _provider_topology_flags
 from lib.viz import (
     get_gitignore_entries as viz_gitignore_entries,
 )
@@ -734,12 +735,23 @@ def _sync_stage_contexts(
     provider_config: dict, providers: list, variables: dict,
     args: argparse.Namespace, log: SyncLog,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> tuple[bool, bool, list]:
     """Stage 4: per-provider context sync loop.
 
     Returns ``(debug_mode, allow_committed_secrets, mcp_gitignore_extras)`` —
     the flags feed stage 6, the accumulator list is appended to by stage 6
     (by reference) and read by stage 11.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required
+    keyword-only (no default: a ``None`` default would let the derive step fall
+    back to the empty set and silently render ``subagent`` everywhere). This
+    stage is the ONE resolution point of the provider-scoped effective
+    topology: ``_provider_topology_flags`` runs exactly once per provider and
+    its result is mixed into that provider's ``provider_variables`` — the
+    provider-less basis from ``config._build_orch_variables`` is never read by a
+    render seam (AC-30 ratchet).
     """
     # Per-provider sync
     debug_mode = config.get("debug-mode", False)
@@ -760,11 +772,12 @@ def _sync_stage_contexts(
         # recomputed ORCH_MODE_* flags — the shared `variables` dict is never mutated.
         _orch_config = config.get("orchestrator", {})
         _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+        # ONE mode resolution for this provider: it feeds the ORCH_MODE_* flags,
+        # the effective-topology helper below and (via variables) the render.
+        _provider_mode = _resolve_orch_mode(_orch_config, _provider_override)
         if _provider_override and _provider_override.get("mode") is not None:
             provider_variables = dict(variables)
-            provider_variables.update(
-                _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
-            )
+            provider_variables.update(_orch_mode_flags(_provider_mode))
         else:
             provider_variables = variables
         if not _context_auto_generate(config):
@@ -778,6 +791,17 @@ def _sync_stage_contexts(
         caps = load_provider_capabilities(agent_meta_root).get(provider, {})
         provider_variables = dict(provider_variables)
         provider_variables.update(runtime_gate_vars(pc, caps, config))
+        # Effective-topology axis (G2/G3, issue #1190): the provider-less basis
+        # from config.py is NOT authoritative. Resolve the position for THIS
+        # provider once (same helper/set as emission and rules) and overwrite the
+        # basis before any context renderer consumes the dict (AC-20/AC-30).
+        provider_variables.update(_provider_topology_flags(
+            config,
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=_provider_mode,
+            active_set=active_set,
+        ))
         # Path migration (Task 11): resolve the discovery surface for every
         # writer/renderer below and move the managed artifacts off the old paths
         # (backup-first, user files untouched). Config-driven no-op unless
@@ -787,7 +811,7 @@ def _sync_stage_contexts(
         provider_config[provider] = pc
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config,
-                                  platform_vars=platform_vars)
+                                  platform_vars=platform_vars, active_set=active_set)
         # Continue run1 fixpoint (AC-4): a scaffolded config-comment context file
         # gets the steady-state managed block immediately, capability-gated —
         # never by provider name.

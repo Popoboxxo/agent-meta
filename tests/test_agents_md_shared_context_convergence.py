@@ -164,6 +164,7 @@ def test_repeated_sync_never_reports_pending_agents_md_change(tmp_path, loaded_c
             REPO_ROOT, project_root, config,
             _gate_variables(config, provider, provider_config), log,
             dry_run=dry_run, provider=provider, provider_config=provider_config,
+            active_set=frozenset(),
         )
         return log
 

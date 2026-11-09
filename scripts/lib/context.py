@@ -808,6 +808,8 @@ def _sync_managed_block_context(
     target_name: str | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for providers with a context file using HTML managed blocks.
 
@@ -815,6 +817,11 @@ def _sync_managed_block_context(
     ``per-provider`` dispatch (IC-09); ``adapter_line`` is the provider-native
     core reference injected into the managed block when the provider reads an
     adapter file. Both default to the legacy single-file behaviour.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword and
+    never resolved here. The provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags
+    are read from the passed ``variables`` dict (Stage 4 owns the resolution);
+    this strategy never re-resolves the position.
     """
 
     pc = provider_config[provider]
@@ -898,12 +905,19 @@ def _sync_opencode_context(
     provider_config: dict,
     target_name: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for Opencode: rules embedded into AGENTS.md managed block.
 
     ``target_name`` overrides the physical filename chosen by the
     ``per-provider`` dispatch (IC-09); it defaults to the provider's
     ``context_file``.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword
+    and never resolved here: the effective-topology position arrives already
+    resolved in ``variables`` (Stage 4), so this strategy only has to accept
+    the set (T10 consumes it in the managed-block path).
     """
 
     pc = provider_config[provider]
@@ -1152,6 +1166,8 @@ def _sync_continue_context(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for Continue: project-context.md + config.yaml comment block."""
     from .extensions import render_managed_block, update_managed_block
@@ -1400,8 +1416,16 @@ def _dispatch_context_strategy(
     target_name: str | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
-    """Capability-driven render dispatch shared by both topology modes."""
+    """Capability-driven render dispatch shared by both topology modes.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword:
+    it is forwarded unchanged to the three strategies so every context seam
+    sees exactly the set the emission/rules seams used (AC-30). It is never
+    resolved here and never defaulted.
+    """
     pc = provider_config.get(provider, {})
     _write_dispatch_depth(
         agent_meta_root, project_root, provider, provider_config, log, dry_run
@@ -1412,18 +1436,20 @@ def _dispatch_context_strategy(
         _sync_opencode_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
-            platform_vars=platform_vars,
+            platform_vars=platform_vars, active_set=active_set,
         )
     elif _has_capability(pc, "context-config-comment"):
         _sync_continue_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, platform_vars=platform_vars,
+            active_set=active_set,
         )
     elif _has_capability(pc, "context-managed-block"):
         _sync_managed_block_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
             adapter_line=adapter_line, platform_vars=platform_vars,
+            active_set=active_set,
         )
 
 
@@ -1526,6 +1552,8 @@ def sync_context_adapters_for_provider(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Write the adapter file of an adapter-capable provider (``per-provider``).
 
@@ -1535,6 +1563,9 @@ def sync_context_adapters_for_provider(
     never routed here. ``resolve_context_filename`` (IC-08) is not consulted —
     it feeds legacy cleanup only. A missing/blank adapter file is a
     ``log.warning`` + return (never silent); ``dry_run`` never writes.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword,
+    forwarded to the dispatch unchanged.
     """
     pc = provider_config.get(provider, {})
     if pc.get("context_adapter") is not True:
@@ -1552,6 +1583,7 @@ def sync_context_adapters_for_provider(
         target_name=adapter_file,
         adapter_line=_adapter_reference_line(config, pc),
         platform_vars=platform_vars,
+        active_set=active_set,
     )
     if safe_path(project_root, adapter_file).exists():
         _record_adapter_managed(project_root, adapter_file, log, dry_run)
@@ -1600,6 +1632,8 @@ def sync_context_for_provider(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ):
     """Create or update the context file for a given provider.
 
@@ -1615,6 +1649,12 @@ def sync_context_for_provider(
     ``context_adapter_file`` via ``sync_context_adapters_for_provider``, every
     other provider renders the canonical core (``context_file.core_file``).
     The default ``unified`` topology keeps the exact legacy path.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword
+    (no default — a ``None`` default would neuter the shared-set contract) and
+    forwarded unchanged to every strategy. The provider-scoped
+    ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags are resolved once by
+    ``sync_pipeline._sync_stage_contexts`` and arrive in ``variables``.
     """
     pc = provider_config.get(provider)
     if not pc:
@@ -1629,6 +1669,7 @@ def sync_context_for_provider(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
                 platform_vars=platform_vars,
+                active_set=active_set,
             )
             return
         _dispatch_context_strategy(
@@ -1636,12 +1677,14 @@ def sync_context_for_provider(
             provider, provider_config,
             target_name=_core_context_filename(config),
             platform_vars=platform_vars,
+            active_set=active_set,
         )
     else:
         _dispatch_context_strategy(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config,
             platform_vars=platform_vars,
+            active_set=active_set,
         )
 
     # IC-07 (Task 2b.4): the compact profile's rule REFERENCE sections reach

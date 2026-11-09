@@ -576,6 +576,7 @@ def test_single_agents_md_managed_block_write_per_sync_run(tmp_path, loaded_conf
         sync_context_for_provider(
             _REPO_ROOT, project_root, config, variables, log,
             dry_run=dry_run, provider=provider, provider_config=provider_config,
+            active_set=frozenset(),
         )
         return log
 

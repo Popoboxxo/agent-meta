@@ -392,6 +392,7 @@ def test_continue_context_dry_run_skips_absent_gitignored(tmp_path):
     _sync_continue_context(
         tmp_path, tmp_path, {}, {"PROJECT_NAME": "p", "PROJECT_CONTEXT": "ctx"},
         log, dry_run=True, provider="Continue", provider_config=_CONTINUE_PC,
+        active_set=frozenset(),
     )
 
     assert log.actions == []
@@ -410,6 +411,7 @@ def test_continue_context_real_run_creates_files(tmp_path):
     _sync_continue_context(
         tmp_path, tmp_path, {}, {"PROJECT_NAME": "p", "PROJECT_CONTEXT": "ctx"},
         log, dry_run=False, provider="Continue", provider_config=_CONTINUE_PC,
+        active_set=frozenset(),
     )
 
     assert (tmp_path / ".continue" / "rules" / "project-context.md").exists()

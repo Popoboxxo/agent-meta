@@ -119,6 +119,7 @@ def test_continue_context_has_no_unresolved_placeholders(tmp_path):
     sync_context_for_provider(
         _REPO_ROOT, tmp_path, config, variables, log,
         dry_run=False, provider="Continue", provider_config=provider_config,
+        active_set=frozenset(),
     )
     converge_managed_block_context(
         tmp_path, context_file, variables, log, agent_meta_root=_REPO_ROOT,
