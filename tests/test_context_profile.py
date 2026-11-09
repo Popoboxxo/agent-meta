@@ -231,7 +231,10 @@ def _build_provider_vars(provider, variables, config):
     from lib.providers import load_providers_config
 
     pcs = load_providers_config(_REPO_ROOT)
-    return _build_provider_vars(pcs[provider], provider, variables, _REPO_ROOT, config)
+    return _build_provider_vars(
+        pcs[provider], provider, variables, _REPO_ROOT, config,
+        active_set=frozenset(),
+    )
 
 
 def test_core_variables_default_to_full_and_false():

@@ -492,6 +492,8 @@ def _build_provider_vars(
     variables: dict,
     agent_meta_root: Path,
     config: dict | None = None,
+    *,
+    active_set,
 ) -> dict:
     """Merge provider-specific variables (extension paths, snippets dir,
     parallel patterns, etc.) over the global variables dict.
@@ -502,6 +504,10 @@ def _build_provider_vars(
     sees the provider-correct policy even when called directly without the
     sync-pipeline pre-merge. Omitting ``config`` keeps the historic behavior
     (the bundle, if any, is inherited from ``variables``).
+
+    ``active_set`` is the per-sync ActiveSet (IC-17), required keyword: the
+    effective-topology seam must see exactly the same set the emission side
+    used (AC-30), so it is never resolved or defaulted here.
     """
     from .delegation_syntax import DelegationSyntaxEngine
 
@@ -551,6 +557,37 @@ def _build_provider_vars(
         from .subagent_permissions import resolve_subagent_permission_provider_vars
 
         provider_vars.update(resolve_subagent_permission_provider_vars(config, provider))
+
+    # G3/AC-18/AC-30: the effective-topology axis is ALWAYS provider-scoped,
+    # with or without ``config``. The provider-less basis from
+    # ``config._build_orch_variables`` is not authoritative — it cannot know the
+    # ActiveSet of this sync run — so reading it here would reopen the AC-30
+    # hole for the agent templates. Same seam as the rules (T4) and context
+    # (T5) renderers; imports stay lazy to avoid a module-level cycle.
+    from .variables import _provider_topology_flags, _resolve_orch_mode
+
+    _config = config if isinstance(config, dict) else {}
+    _orch_config = _config.get("orchestrator", {})
+    _orch_config = _orch_config if isinstance(_orch_config, dict) else {}
+    _provider_overrides = _orch_config.get("provider-overrides", {})
+    _provider_override = (
+        _provider_overrides.get(provider)
+        if isinstance(_provider_overrides, dict)
+        else None
+    )
+    _provider_mode = _resolve_orch_mode(
+        _orch_config,
+        _provider_override if isinstance(_provider_override, dict) else None,
+    )
+    provider_vars.update(
+        _provider_topology_flags(
+            _config,
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=_provider_mode,
+            active_set=active_set,
+        )
+    )
     return {**variables, **provider_vars}
 
 def _should_skip_role(
@@ -1455,7 +1492,8 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
             source_path, provider, project_name, agent_meta_root, project_root, target_path, log, pc=pc)
 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
-        merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root, config=config)
+        merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root, config=config,
+                                           active_set=active_set)
         _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,

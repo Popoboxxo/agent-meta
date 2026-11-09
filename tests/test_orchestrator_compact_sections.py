@@ -142,7 +142,10 @@ def _render_orchestrator(profile, project_root: Path):
         source_path, _PROVIDER, project_name, _REPO_ROOT, project_root,
         target_path, log, pc=pc,
     )
-    merged = _build_provider_vars(pc, _PROVIDER, variables, _REPO_ROOT, config=config)
+    merged = _build_provider_vars(
+        pc, _PROVIDER, variables, _REPO_ROOT, config=config,
+        active_set=frozenset(),
+    )
     merged.setdefault("PIPELINE_DETAILS_DIR", ".claude/pipeline-details")
     content = _apply_content_pipeline(
         content, config, _PROVIDER, merged, rel_source, None, _REPO_ROOT, log

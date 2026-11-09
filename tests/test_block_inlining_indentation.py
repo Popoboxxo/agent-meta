@@ -120,7 +120,8 @@ def _render_platform_override(rel_path: str, platform: str, target_root: Path) -
             )
         )
         merged = _build_provider_vars(
-            pc, _PROVIDER, variables, _REPO_ROOT, config=config
+            pc, _PROVIDER, variables, _REPO_ROOT, config=config,
+            active_set=frozenset(),
         )
         content = _apply_content_pipeline(
             content, config, _PROVIDER, merged, rel_source, None, _REPO_ROOT, log

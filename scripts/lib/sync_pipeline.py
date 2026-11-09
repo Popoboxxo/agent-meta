@@ -1356,6 +1356,38 @@ def emit_topology_summary(
         log.note("topology", line)
 
 
+def _provider_override_vars(
+    config: dict, provider: str, agent_meta_root: Path, *, active_set,
+) -> dict:
+    """Return the per-provider orchestrator flags for the override branch (T6).
+
+    ``orchestrator.provider-overrides.<Provider>.mode`` narrows the mode for
+    THIS provider only, so the branch needs both axes — ``ORCH_MODE_*`` and the
+    provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` — resolved from the same
+    per-sync ``active_set`` the emission side used (G3, AC-18/AC-30). Before
+    T6 the branch wrote only ``ORCH_MODE_*``, so an overridden provider fell
+    back to the provider-less (non-authoritative) topology basis.
+    """
+    orch_config = config.get("orchestrator", {})
+    orch_config = orch_config if isinstance(orch_config, dict) else {}
+    overrides = orch_config.get("provider-overrides", {})
+    override = overrides.get(provider) if isinstance(overrides, dict) else None
+    override = override if isinstance(override, dict) else None
+
+    provider_mode = _resolve_orch_mode(orch_config, override)
+    flags = _orch_mode_flags(provider_mode)
+    flags.update(
+        _provider_topology_flags(
+            config,
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=provider_mode,
+            active_set=active_set,
+        )
+    )
+    return flags
+
+
 def _sync_stage_per_provider(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -1437,7 +1469,9 @@ def _sync_stage_per_provider(
             provider_variables = dict(variables)
             if _orch_override_active:
                 provider_variables.update(
-                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
+                    _provider_override_vars(
+                        config, provider, agent_meta_root, active_set=active_set,
+                    )
                 )
             if _sub_override_active:
                 # Flags AND SUBAGENT_PERMISSIONS_BLOCK from one resolver (M2).

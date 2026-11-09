@@ -1222,7 +1222,10 @@ def render_env(tmp_path_factory: pytest.TempPathFactory) -> RenderEnv:
             source_path, _PROVIDER, project_name, _REPO_ROOT, tmp_root,
             target_path, log, pc=pc,
         )
-        merged = _build_provider_vars(pc, _PROVIDER, variables, _REPO_ROOT, config=config)
+        merged = _build_provider_vars(
+            pc, _PROVIDER, variables, _REPO_ROOT, config=config,
+            active_set=frozenset(),
+        )
         content = _apply_content_pipeline(
             content, config, _PROVIDER, merged, rel_source, None, _REPO_ROOT, log
         )

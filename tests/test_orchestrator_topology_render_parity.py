@@ -42,11 +42,13 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import scripts.lib.sync_pipeline as sync_pipeline  # noqa: E402
 import scripts.lib.topology as topology_module  # noqa: E402
+from scripts.lib.agent_sync import _build_provider_vars  # noqa: E402
 from scripts.lib.config import load_config  # noqa: E402
 from scripts.lib.context import _build_managed_block  # noqa: E402
 from scripts.lib.log import SyncLog  # noqa: E402
 from scripts.lib.providers import load_providers_config  # noqa: E402
 from scripts.lib.rules import _merged_rule_vars  # noqa: E402
+from scripts.lib.topology import VALID_TOPOLOGIES  # noqa: E402
 from scripts.lib.variables import (  # noqa: E402
     _provider_topology_flags,
     _resolve_orch_mode,
@@ -275,3 +277,100 @@ def test_stage4_requires_active_set(tmp_path):
             _REPO_ROOT, tmp_path, {}, provider_config, ["Opencode"], {},
             argparse.Namespace(dry_run=False), SyncLog(),
         )
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — agent-template seam + pipeline override branch (G3, AC-18/AC-30)
+# ---------------------------------------------------------------------------
+
+
+_TOPOLOGY_OVERRIDE_CONFIG = {
+    "orchestrator": {
+        "topology": "primary",
+        "provider-overrides": {"Opencode": {"topology": "subagent"}},
+    },
+}
+
+
+def test_agent_templates_carry_provider_scoped_effective_flags():
+    """``_build_provider_vars`` hands each provider ITS effective position (AC-18).
+
+    The agent-template seam used the provider-less global basis before T6; a
+    provider override must flip ``EFFECTIVE`` for that provider only, exactly as
+    the rules (T4) and context (T5) seams already do.
+    """
+    providers = load_providers_config(_REPO_ROOT)
+    active_set = frozenset({"orchestrator"})
+
+    opencode = _build_provider_vars(
+        providers["Opencode"], "Opencode", {}, _REPO_ROOT,
+        config=_TOPOLOGY_OVERRIDE_CONFIG, active_set=active_set,
+    )
+    assert opencode["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "true"
+    assert opencode["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "false"
+
+    claude = _build_provider_vars(
+        providers["Claude"], "Claude", {}, _REPO_ROOT,
+        config=_TOPOLOGY_OVERRIDE_CONFIG, active_set=active_set,
+    )
+    assert claude["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "true"
+    assert claude["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"] == "false"
+
+
+def test_sync_pipeline_override_branch_carries_topology_flags():
+    """The override branch sets all seven effective flags, not only ``ORCH_MODE_*``.
+
+    Behavioural check through the extracted helper the branch calls: the
+    provider-resolved mode decides ``ORCH_TOPOLOGY_INERT`` and the position
+    flags stay mutually exclusive / in ``VALID_TOPOLOGIES``.
+    """
+    providers = load_providers_config(_REPO_ROOT)
+    for mode, expected_inert in (("strict", "false"), ("main-chat", "true")):
+        config = {
+            "orchestrator": {
+                "provider-overrides": {"Opencode": {"mode": mode}},
+            },
+        }
+        flags = sync_pipeline._provider_override_vars(
+            config, "Opencode", _REPO_ROOT,
+            active_set=frozenset({"orchestrator"}),
+        )
+
+        for key in (
+            "ORCH_TOPOLOGY_EFFECTIVE",
+            "ORCH_TOPOLOGY_EFFECTIVE_SOURCE",
+            "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+            "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+            "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+            "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+            "ORCH_TOPOLOGY_INERT",
+        ):
+            assert key in flags, f"{key} missing from the override branch for {mode}"
+
+        assert flags["ORCH_MODE_%s" % mode.replace("-", "_").upper()] == "true"
+        assert flags["ORCH_TOPOLOGY_EFFECTIVE"] in VALID_TOPOLOGIES
+        positions = [
+            flags["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"],
+            flags["ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT"],
+            flags["ORCH_TOPOLOGY_EFFECTIVE_HYBRID"],
+        ]
+        assert positions.count("true") == 1, positions
+        assert flags["ORCH_TOPOLOGY_INERT"] == expected_inert
+
+
+def test_agents_use_the_shared_active_set():
+    """Derived position needs the per-sync ActiveSet in the agent templates (AC-30)."""
+    providers = load_providers_config(_REPO_ROOT)
+    pc = providers["Opencode"]  # registry: primary-role: orchestrator
+
+    empty = frozenset()
+    derived_subagent = _build_provider_vars(
+        pc, "Opencode", {}, _REPO_ROOT, active_set=empty,
+    )
+    assert derived_subagent["ORCH_TOPOLOGY_EFFECTIVE"] == "subagent"
+
+    with_role = frozenset({"orchestrator"})
+    derived_primary = _build_provider_vars(
+        pc, "Opencode", {}, _REPO_ROOT, active_set=with_role,
+    )
+    assert derived_primary["ORCH_TOPOLOGY_EFFECTIVE"] == "primary"
