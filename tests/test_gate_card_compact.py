@@ -59,7 +59,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib.config import build_variables, load_config
-from lib.context import _build_managed_block, _update_managed_html_block, build_gate_card
+from lib.context import (
+    _build_managed_block,
+    _position_aware_agent_hints,
+    _update_managed_html_block,
+    build_gate_card,
+)
 from lib.io import SyncError
 from lib.log import SyncLog
 from lib.mcp import (
@@ -336,6 +341,18 @@ def _entry_file_block(
         provider, provider_config, capabilities, project_root, config
     )
     pc = provider_config[provider]
+    # Mirror production ``_sync_managed_block_context``: the entry hint is a
+    # position statement, so the shared writer replaces the provider-less global
+    # hints with the position-aware render (G5/AC-20) before the template is
+    # built. Without this the helper would compare the neutral default against
+    # the committed topology-specific text.
+    hints = _position_aware_agent_hints(
+        config, provider, provider_config, _REPO_ROOT, pc.get("context_file"),
+        active_set=frozenset(),
+        position=variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral"),
+    )
+    variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
+    variables["AGENT_HINTS_CLAUDE"] = hints["AGENT_HINTS_CLAUDE"]
     target = project_root / pc["context_file"]
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
