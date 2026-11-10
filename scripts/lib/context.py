@@ -796,6 +796,106 @@ def _insert_managed_block_above_foreign_content(existing: str, new_managed: str)
     return new_managed.rstrip("\n") + "\n\n" + existing
 
 
+def _position_aware_agent_hints(
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+    target_name: str | None,
+    *,
+    active_set,
+    position: str,
+) -> dict[str, str]:
+    """Render ``AGENT_HINTS``/``AGENT_HINTS_CLAUDE`` for the physical target file.
+
+    The entry hint is a position statement, so it must be true for EVERY reader
+    of the file this render writes (SPEC orchestrator topology §5-G5/AC-20):
+
+    * provider-own file -> the provider's own ``position`` (Stage 4 resolved it
+      once and put it into ``variables``; this helper never re-resolves it);
+    * shared file -> the positions of ALL active sharers, resolved with the ONE
+      shared resolver (:func:`lib.topology.resolve_topology`, same ``config``
+      and per-sync ``active_set``). All agree -> that position; they disagree
+      -> ``"neutral"`` (no statement that would be false for one of them).
+
+    Sharers are iterated sorted so the result can never depend on the
+    ``provider_config`` insertion order (no sync-order oscillation).
+    """
+    from .providers import load_provider_capabilities, resolve_providers
+    from .topology import resolve_topology
+
+    orch_config = config.get("orchestrator", {})
+    orch_config = orch_config if isinstance(orch_config, dict) else {}
+    overrides = orch_config.get("provider-overrides", {})
+    overrides = overrides if isinstance(overrides, dict) else {}
+
+    shared_users = _shared_context_users(
+        provider, provider_config, config, target_name=target_name,
+        # Defensive for synthetic provider catalogs (unit tests/adapters): the
+        # real sync validates the catalog at config-load time, so this only
+        # affects callers that pass a provider_config the project never names.
+        tolerate_unknown=True,
+    )
+    # Legacy callers (unit tests, ``_build_managed_block``) pass a plain role
+    # set where the sync pipeline passes the per-sync ActiveSet. ``build_agent_hints``
+    # expects the object form; the historical behaviour for the plain form is
+    # "resolve locally", so normalise instead of crashing.
+    hint_active_set = active_set if hasattr(active_set, "roles") else None
+    active_providers = set(
+        resolve_providers(config, provider_config or {}, tolerate_unknown=True)
+    )
+    capabilities = load_provider_capabilities(agent_meta_root)
+
+    positions: dict[str, str] = {}
+    for sharer in sorted(shared_users):
+        if sharer == provider:
+            # Authoritative for the renderer's own provider: Stage 4 already
+            # resolved it (never a fourth resolution).
+            positions[sharer] = position
+            continue
+        if sharer not in active_providers:
+            # An inactive sharer never writes the file, so its position cannot
+            # be contradicted (IC-15 no. 1: only active sharers count).
+            continue
+        override = overrides.get(sharer)
+        positions[sharer] = resolve_topology(
+            config,
+            sharer,
+            provider_config=provider_config,
+            capabilities=capabilities.get(sharer, {}),
+            mode=_resolve_orch_mode(
+                orch_config, override if isinstance(override, dict) else None
+            ),
+            active_set=active_set,
+        ).effective
+
+    distinct = set(positions.values())
+    chosen = positions.get(provider, position) if len(distinct) <= 1 else "neutral"
+
+    # build_agent_hints owns the main-chat branch; give it the CURRENT
+    # provider's mode (provider override first) instead of the project-global
+    # one, so a provider-scoped main-chat renders the main-chat wording.
+    provider_override = overrides.get(provider)
+    provider_mode = _resolve_orch_mode(
+        orch_config, provider_override if isinstance(provider_override, dict) else None
+    )
+    render_config = dict(config)
+    render_orch = dict(orch_config)
+    render_orch["mode"] = provider_mode
+    render_config["orchestrator"] = render_orch
+
+    return {
+        "AGENT_HINTS": build_agent_hints(
+            render_config, agent_meta_root, include_table=True,
+            active_set=hint_active_set, position=chosen,
+        ),
+        "AGENT_HINTS_CLAUDE": build_agent_hints(
+            render_config, agent_meta_root, include_table=False,
+            active_set=hint_active_set, position=chosen,
+        ),
+    }
+
+
 def _sync_managed_block_context(
     agent_meta_root: Path,
     project_root: Path,
@@ -832,19 +932,9 @@ def _sync_managed_block_context(
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
 
-    # build_agent_hints is imported at module top level — the lazy import was
-    # vestigial (agents does not import context; Issue #478 cleanup, guarded
-    # by tests/test_import_acyclicity.py).
-    orch_config = config.get("orchestrator", {})
-    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
-    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
-    
-    local_config = config.copy()
-    if "orchestrator" in local_config:
-        local_orch = local_config["orchestrator"].copy()
-        local_orch["mode"] = _orch_mode
-        local_config["orchestrator"] = local_orch
-
+    # build_agent_hints is imported at module top level — agents does not import
+    # context, so the helper below can call it directly (Issue #478 cleanup,
+    # guarded by tests/test_import_acyclicity.py).
     # Driven by the `has_dedicated_context_file` capability flag (issue #631)
     # instead of a literal `provider == "Claude"` check -- Claude is the only
     # provider with dedicated context-file handling today (own static-header
@@ -853,10 +943,20 @@ def _sync_managed_block_context(
     has_dedicated = pc.get("has_dedicated_context_file", False)
 
     variables = variables.copy()
+    # G5/AC-20: the entry hint is a position statement. The decision (own file
+    # vs. shared file, mixed sharer positions) lives here, where provider,
+    # target file and sharer set are known; ``build_agent_hints`` only selects
+    # the text block. The provider's own position comes from the Stage-4 flags
+    # already present in ``variables`` (never re-resolved here).
+    position = variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral")
+    hints = _position_aware_agent_hints(
+        config, provider, provider_config, agent_meta_root, context_file,
+        active_set=active_set, position=position,
+    )
     if has_dedicated:
-        variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(local_config, agent_meta_root, include_table=False)
+        variables["AGENT_HINTS_CLAUDE"] = hints["AGENT_HINTS_CLAUDE"]
     else:
-        variables["AGENT_HINTS"] = build_agent_hints(local_config, agent_meta_root, include_table=True)
+        variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
 
     # Claude's CLAUDE.md static part is handled by sync_claude_md_static() in the
     # main sync loop; this strategy only refreshes the managed block for Claude.
@@ -1177,6 +1277,20 @@ def _sync_continue_context(
     pc = provider_config[provider]
     context_file = pc.get("context_file")
     if context_file:
+        # G5/AC-20 + AC-16: the Continue context file is provider-own, so its
+        # entry hint must keep the position text (this repo: the historic
+        # ``subagent`` wording). The provider-less global ``AGENT_HINTS`` from
+        # ``config.build_variables`` is neutral, so overwrite it here for this
+        # provider's dict. The dict is the same per-provider object handed to
+        # ``sync_pipeline.converge_managed_block_context`` right after this
+        # strategy, so the run-1 fixpoint renders the SAME bytes (AC-4) instead
+        # of falling back to the neutral global value.
+        hints = _position_aware_agent_hints(
+            config, provider, provider_config, agent_meta_root, context_file,
+            active_set=active_set,
+            position=variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral"),
+        )
+        variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
         ctx_path = project_root / context_file
         template_path = agent_meta_root / pc["context_template"]
         rel_ctx = str(ctx_path.relative_to(project_root))

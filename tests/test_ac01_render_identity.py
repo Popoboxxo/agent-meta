@@ -1008,6 +1008,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``orchestrator.md``: only the JSON block re-serialized (L214-1887 -> one line, data equal);
   ``compact-golden`` unchanged (line block, no JSON). AC-T4: ac01 ``7c993f7f…`` -> ``a75074b1…``,
   slimming ``6598edb7…`` -> ``59224e04…``. ``AC01_EXCEPTIONS`` is NOT extended.
+- Issue #1190 T9 (orchestrator topology, AC-17): the singleton guard block is topology-aware; in the
+  Opencode matrix project the orchestrator is derived `primary`, so exactly **1 of 1096 hashes moved;
+  0 added/removed**: ``Opencode/.opencode/agents/agent-meta-manager.md`` ``c660ad41…`` -> ``82729745…``
+  (only the first bullet: "der **ist** der Session-Einstieg" instead of "der vom `main_chat` gespawnte").
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

@@ -2010,6 +2010,13 @@ def _build_orch_variables(
     # can reuse the same logic in scripts/sync.py.
     _orch_mode = _resolve_orch_mode(orch_config)
     variables.update(_orch_mode_flags(_orch_mode))
+    # AC-24 (G8): in ``main-chat`` mode the orchestrator agent is deliberately
+    # not emitted (``active_set.role_emitted_for_provider``), so the render-facing
+    # role flag must not claim a spawnable orchestrator. The ActiveSet keeps the
+    # role in ``roles`` (permission scans, routability questions) — this is the
+    # prose flag only, and it is global-mode scoped exactly like ROLE_* itself.
+    if _orch_mode == "main-chat":
+        variables["ROLE_ORCHESTRATOR_ACTIVE"] = "false"
 
     # ORCH_TOPOLOGY_*: provider-LESS (global) block, wired exactly like the
     # ORCH_MODE_* flags above. IC-4 pins its value to the PROJECT declaration:
