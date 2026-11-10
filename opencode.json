@@ -34,19 +34,6 @@
       }
     }
   },
-  "default_agent": "orchestrator",
-  "permissions": [
-    {
-      "action": "edit",
-      "resource": "**",
-      "effect": "deny"
-    },
-    {
-      "action": "shell",
-      "resource": "**",
-      "effect": "deny"
-    }
-  ],
   "experimental": {
     "subagent_depth": 3
   }
