@@ -1,7 +1,17 @@
 """Test suite for opencode-generated agent files.
 
 Validates that agent frontmatter contains correctly mapped permissions,
-especially the `task` permission required for subagent delegation.
+especially the delegation permission required for subagent fan-out.
+
+Both frontmatter surfaces are supported:
+
+* v1 — the ``permission:`` MAP (``task: allow``, ``todowrite: allow``, ...).
+* v2 — the ``permissions:`` LIST of ``{action, resource, effect}`` entries.
+  The v1 ``task`` permission has no 1:1 key here; its equivalent is the entry
+  ``{action: subagent, effect: allow}``.
+
+The repository currently emits v2, so every check must stay green on that
+surface while a v1 consumer project keeps working.
 
 Run: python tests/test_opencode_agents.py
 """
@@ -22,7 +32,7 @@ def _split_frontmatter(content: str) -> tuple[str, str]:
 
 
 def _extract_yaml_permissions(fm: str) -> dict[str, str]:
-    """Extract permission key/value pairs from opencode frontmatter.
+    """Extract v1 ``permission:`` MAP key/value pairs from opencode frontmatter.
 
     Handles block form:
       permission:
@@ -42,6 +52,54 @@ def _extract_yaml_permissions(fm: str) -> dict[str, str]:
                 key, val = stripped.split(":", 1)
                 perms[key.strip()] = val.strip().strip('"').strip("'")
     return perms
+
+
+_PERMISSIONS_LIST_KEY_RE = re.compile(r"^permissions:[ \t]*$", flags=re.MULTILINE)
+
+
+def _extract_permissions_list(fm: str) -> list[dict[str, str]] | None:
+    """Extract the v2 ``permissions:`` LIST; ``None`` when that key is absent.
+
+    Each entry is a YAML map with ``action``/``resource``/``effect`` keys:
+
+      permissions:
+      - action: subagent
+        resource: '*'
+        effect: allow
+
+    Returns ``None`` (not an empty list) when the frontmatter carries no
+    ``permissions:`` key at all, so callers can tell "v1 surface" from
+    "v2 surface with zero entries".
+    """
+    match = _PERMISSIONS_LIST_KEY_RE.search(fm)
+    if match is None:
+        return None
+    entries: list[dict[str, str]] = []
+    for line in fm[match.end():].lstrip("\n").splitlines():
+        if not line.strip():
+            continue
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            entries.append({})
+            stripped = stripped[2:].strip()
+        elif not line[0].isspace():
+            break  # next top-level key ends the list
+        elif not entries:
+            break  # indented scalar/flow value, not a list of maps
+        if not stripped:
+            continue
+        if ":" in stripped:
+            key, value = stripped.split(":", 1)
+            entries[-1][key.strip()] = value.strip().strip('"').strip("'")
+    return entries
+
+
+def _v2_effect(entries: list[dict[str, str]] | None, action: str) -> str | None:
+    """``effect`` of the first v2 entry for *action* (``None`` when absent)."""
+    for entry in entries or []:
+        if entry.get("action") == action:
+            return entry.get("effect")
+    return None
 
 
 AGENTS_DIR = Path(__file__).resolve().parent.parent / ".opencode" / "agents"
@@ -72,7 +130,7 @@ EXPECTED_PERMISSION_MAPPINGS = {
 
 
 def check_all_agents_have_permissions() -> list[str]:
-    """Every generated opencode agent (except ping-test) must have a permission block."""
+    """Every generated opencode agent (except ping-test) must have a permissions block."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
         content = path.read_text(encoding="utf-8")
@@ -83,15 +141,24 @@ def check_all_agents_have_permissions() -> list[str]:
         if name == "ping-test":
             continue  # intentionally minimal
 
+        entries = _extract_permissions_list(fm)
+        if entries is not None:
+            # v2: the block requirement is satisfied by at least one entry.
+            if not entries:
+                errors.append(f"{name}: empty 'permissions:' list in frontmatter")
+            continue
+
         perms = _extract_yaml_permissions(fm)
         if not perms:
-            errors.append(f"{name}: missing 'permission:' frontmatter block")
+            errors.append(
+                f"{name}: missing 'permission:' map or 'permissions:' list frontmatter block"
+            )
 
     return errors
 
 
 def check_delegating_roles_have_task() -> list[str]:
-    """Roles that delegate must have task permission set to allow."""
+    """Roles that delegate must be allowed to spawn subagents (both surfaces)."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
         content = path.read_text(encoding="utf-8")
@@ -100,6 +167,16 @@ def check_delegating_roles_have_task() -> list[str]:
         name = name_match.group(1).strip() if name_match else path.stem
 
         if name not in DELEGATING_ROLES:
+            continue
+
+        entries = _extract_permissions_list(fm)
+        if entries is not None:
+            # v2: `{action: subagent, effect: allow}` is the `task: allow` equivalent.
+            if _v2_effect(entries, "subagent") != "allow":
+                errors.append(
+                    f"{name}: must have permissions entry 'action: subagent, effect: allow' "
+                    f"for subagent delegation, got: {_v2_effect(entries, 'subagent') or 'MISSING'}"
+                )
             continue
 
         perms = _extract_yaml_permissions(fm)
@@ -117,9 +194,17 @@ def check_no_claude_tool_names_in_permissions() -> list[str]:
     for path in sorted(AGENTS_DIR.glob("*.md")):
         content = path.read_text(encoding="utf-8")
         fm, _ = _split_frontmatter(content)
-        perms = _extract_yaml_permissions(fm)
 
-        for key in perms:
+        # v2 entries key on action/resource/effect, never on a tool name.
+        for entry in _extract_permissions_list(fm) or []:
+            for key in entry:
+                if key in EXPECTED_PERMISSION_MAPPINGS:
+                    errors.append(
+                        f"{path.stem}: unmapped Claude tool name '{key}' found in opencode "
+                        "permissions list entry"
+                    )
+
+        for key in _extract_yaml_permissions(fm):
             if key in EXPECTED_PERMISSION_MAPPINGS:
                 errors.append(
                     f"{path.stem}: unmapped Claude tool name '{key}' found in opencode permission block"
@@ -129,7 +214,7 @@ def check_no_claude_tool_names_in_permissions() -> list[str]:
 
 
 def check_orchestrator_can_delegate() -> list[str]:
-    """Orchestrator specifically needs task + todowrite permissions."""
+    """Orchestrator specifically needs the delegation permission."""
     errors = []
     path = AGENTS_DIR / "orchestrator.md"
     if not path.exists():
@@ -138,6 +223,19 @@ def check_orchestrator_can_delegate() -> list[str]:
 
     content = path.read_text(encoding="utf-8")
     fm, _ = _split_frontmatter(content)
+
+    entries = _extract_permissions_list(fm)
+    if entries is not None:
+        # v2: only the subagent gate exists. `todowrite` is a v1-map key with no
+        # v2 counterpart (the list models action/resource/effect only), so that
+        # expectation is deliberately not asserted on this surface.
+        if _v2_effect(entries, "subagent") != "allow":
+            errors.append(
+                "orchestrator: missing permissions entry 'action: subagent, effect: allow' "
+                "— cannot delegate to subagents"
+            )
+        return errors
+
     perms = _extract_yaml_permissions(fm)
 
     if perms.get("task") != "allow":
