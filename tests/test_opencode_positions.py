@@ -39,6 +39,7 @@ Run: python3 -m pytest tests/test_opencode_positions.py -q
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -58,6 +59,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 #: discipline instead of a second renderer.
 import test_ac01_render_identity as render_harness  # noqa: E402
 
+from lib.config import build_variables, load_config  # noqa: E402
 from lib.consistency.topology import check_orchestrator_topology  # noqa: E402
 from lib.providers import (  # noqa: E402
     load_provider_capabilities,
@@ -65,7 +67,12 @@ from lib.providers import (  # noqa: E402
 )
 from lib.roles import load_roles_config  # noqa: E402
 from lib.topology import resolve_topology  # noqa: E402
-from lib.variables import _effective_topology_flags, _topology_flags  # noqa: E402
+from lib.variables import (  # noqa: E402
+    _effective_topology_flags,
+    _topology_flags,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 from tests.timeouts import SYNC_TIMEOUT  # noqa: E402
 
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
@@ -597,3 +604,158 @@ def test_no_position_is_tested_in_a_combined_case():
     )
     assert len(decorators) == 2, decorators
     assert _SURFACES == ("v1", "v2")
+
+
+# ---------------------------------------------------------------------------
+# This repository declares POS-2 (T20; AC-36/AC-31, D-OQ1)
+# ---------------------------------------------------------------------------
+#
+# The repo is no longer in the derived ``subagent`` fallback: it says so in
+# ``.meta-config/project.yaml``, the render picks the explicit branch, and no
+# derived-position warning may fire. The tests read the real repo config, never
+# a scratch project — that is the point of the task.
+
+_REPO_CONFIG = _REPO_ROOT / ".meta-config" / "project.yaml"
+_ORCHESTRATOR_TEMPLATE = _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
+_AGENTS_MD = _REPO_ROOT / "AGENTS.md"
+
+#: The explicit-branch singleton paragraph of the orchestrator template.
+_EXPLICIT_SINGLETON = "**Singleton (subagent):**"
+_EXPLICIT_SPAWN_CLAIM = "Only `main_chat` spawns the orchestrator"
+_DERIVED_SPAWN_CLAIM = "Only `main_chat` may create you"
+
+#: Tracked generated artifacts whose bytes must not move on a repeat sync.
+_TRACKED_GENERATED = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    "opencode.json",
+    ".meta-config/generated-file-hashes.json",
+)
+
+
+def _render_orchestrator_from_repo() -> tuple[str, dict]:
+    """Render ``orchestrator.md`` with this repo's own variables."""
+    config = load_config(_REPO_CONFIG)
+    variables, unmapped = build_variables(config, _REPO_ROOT, _REPO_ROOT)
+    assert unmapped == [], unmapped
+    source = _ORCHESTRATOR_TEMPLATE.read_text(encoding="utf-8")
+    rendered = strip_inactive_conditional_blocks(
+        substitute(source, variables, _ORCHESTRATOR_TEMPLATE.name, None),
+        variables,
+    )
+    return rendered, variables
+
+
+def test_repo_declares_subagent_explicitly():
+    """The declaration is one line in the orchestrator block — nothing else.
+
+    AC-36: the position comes from ``orchestrator.topology`` alone. No
+    ``provider-overrides`` entry may be needed (or present) for it, and the key
+    must not be declared twice.
+    """
+    data = yaml.safe_load(_REPO_CONFIG.read_text(encoding="utf-8"))
+
+    assert data["orchestrator"]["topology"] == "subagent"
+    assert "topology" not in data.get("provider-overrides", {})
+
+    orchestrator_block = _REPO_CONFIG.read_text(encoding="utf-8").split(
+        "\norchestrator:\n", 1
+    )[1].split("\nviz:\n", 1)[0]
+    assert orchestrator_block.count("\n  topology:") == 1, orchestrator_block
+
+
+def test_repo_render_is_the_explicit_branch():
+    """The real config selects ``ORCH_TOPOLOGY_EXPLICIT``, not the ``else``.
+
+    Renders the template through the production order (substitute → strip) with
+    the variables the sync builds from this repo's ``project.yaml``. The
+    committed ``AGENTS.md`` is the second witness: it is a tracked artifact and
+    must carry the *subagent* gate wording, never the ``primary`` entry wording.
+    """
+    rendered, variables = _render_orchestrator_from_repo()
+
+    assert variables["ORCH_TOPOLOGY"] == "subagent"
+    assert variables["ORCH_TOPOLOGY_EXPLICIT"] == "true"
+    assert variables["ORCH_TOPOLOGY_EFFECTIVE_SOURCE"] == "project"
+    assert variables["ORCH_TOPOLOGY_EFFECTIVE_PRIMARY"] == "false"
+
+    assert _EXPLICIT_SINGLETON in rendered
+    assert _EXPLICIT_SPAWN_CLAIM in rendered
+    assert _DERIVED_SPAWN_CLAIM not in rendered
+
+    agents_md = _AGENTS_MD.read_text(encoding="utf-8")
+    # The tracked context file renders the subagent gate branch …
+    assert "MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`." in agents_md
+    # … and never the primary entry-point claim.
+    assert "ist in diesem Projekt der Session-Einstieg" not in agents_md
+
+
+def test_repo_has_no_derived_position_warnings():
+    """``--validate`` stays silent on the derived-position checks (AC-36)."""
+    result = subprocess.run(
+        [sys.executable, str(_SYNC), "--validate"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=SYNC_TIMEOUT,
+    )
+    output = result.stdout + result.stderr
+
+    assert result.returncode == 0, output[-2500:]
+    assert "orchestrator-topology.main-chat-derived-primary" not in output, output[-2500:]
+    assert "orchestrator-topology.strict-primary-entry-mismatch" not in output, (
+        output[-2500:]
+    )
+
+
+def _tracked_hashes() -> dict[str, str]:
+    return {
+        name: hashlib.sha256((_REPO_ROOT / name).read_bytes()).hexdigest()
+        for name in _TRACKED_GENERATED
+        if (_REPO_ROOT / name).is_file()
+    }
+
+
+def _tracked_diff() -> str:
+    result = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout
+
+
+def test_declaration_is_deterministic():
+    """Two consecutive sync runs leave every tracked artifact byte-identical.
+
+    ``--check`` is the second half of AC-31: after a real sync the drift check
+    must be clean, otherwise the declaration is not a fixed point.
+    """
+    before_hashes = _tracked_hashes()
+    before_diff = _tracked_diff()
+
+    sync = subprocess.run(
+        [sys.executable, str(_SYNC)],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=SYNC_TIMEOUT,
+    )
+    assert sync.returncode == 0, (sync.stdout + sync.stderr)[-2500:]
+
+    assert _tracked_hashes() == before_hashes, (
+        "a repeat sync rewrote a tracked generated artifact:\n"
+        + _tracked_diff()
+    )
+    assert _tracked_diff() == before_diff, _tracked_diff()
+
+    check = subprocess.run(
+        [sys.executable, str(_SYNC), "--check"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=SYNC_TIMEOUT,
+    )
+    assert check.returncode == 0, (check.stdout + check.stderr)[-2500:]
