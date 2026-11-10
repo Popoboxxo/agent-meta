@@ -254,3 +254,114 @@ def test_early_return_of_user_owned_check_is_untouched(tmp_path):
         )
         == "orchestrator"
     )
+
+
+# --- D-Q5: direct-dispatch-enabled under mode: main-chat --------------------
+
+_INERT = "orchestrator-strict.direct-dispatch-inert"
+
+
+def _strict_check(config, agent_meta_root=_REPO_ROOT):
+    # Real registry (like tests/test_orchestrator_strict_visibility.py): the
+    # check is provider-agnostic, so the actual capability data is the honest
+    # input.
+    from lib.providers import load_providers_config
+
+    return orchestrator_strict.check_orchestrator_strict_hook_support(
+        _REPO_ROOT,
+        config,
+        load_providers_config(_REPO_ROOT),
+        agent_meta_root,
+    )
+
+
+def test_direct_dispatch_key_present_under_main_chat_is_info():
+    findings = _strict_check(
+        {
+            "ai-providers": ["Claude", "Opencode"],
+            "orchestrator": {"mode": "main-chat", "direct-dispatch-enabled": True},
+        }
+    )
+
+    inert = _by_check(findings, _INERT)
+    assert len(inert) == 1
+    finding = inert[0]
+    assert finding.severity == Severity.INFO
+    assert finding.check == "orchestrator-strict.direct-dispatch-inert"
+
+    message = finding.message
+    # Pinned text (spec §4-D-Q5).
+    assert "direct-dispatch-enabled is set" in message
+    assert "orchestrator.mode is 'main-chat'" in message
+    assert "no consumer" in message
+    assert "mode: strict or mode: advisory" in message
+    # Project-level statement: no provider name in the text.
+    assert "Claude" not in message
+    assert "Opencode" not in message
+    # INFO only, never an escalation.
+    assert all(f.severity != Severity.ERROR for f in findings)
+
+
+def test_info_is_emitted_once_per_run_not_per_provider():
+    config = {
+        "ai-providers": ["Claude", "Opencode"],
+        "orchestrator": {"mode": "main-chat", "direct-dispatch-enabled": True},
+    }
+    findings = _strict_check(config)
+
+    # One project-level statement, not one per active provider.
+    assert len(_by_check(findings, _INERT)) == 1
+
+
+def test_key_under_strict_produces_no_finding():
+    findings = _strict_check(
+        {
+            "ai-providers": ["Claude", "Opencode"],
+            "orchestrator": {"mode": "strict", "direct-dispatch-enabled": True},
+        }
+    )
+
+    # Under strict the key is effective (it renders the delegation section);
+    # other findings (e.g. `no-hook-support`) may exist.
+    assert _by_check(findings, _INERT) == []
+
+
+def test_absent_key_produces_no_finding():
+    findings = _strict_check(
+        {
+            "ai-providers": ["Claude", "Opencode"],
+            "orchestrator": {"mode": "main-chat"},
+        }
+    )
+
+    assert _by_check(findings, _INERT) == []
+
+
+def test_advisory_mode_produces_no_finding():
+    findings = _strict_check(
+        {
+            "ai-providers": ["Claude", "Opencode"],
+            "orchestrator": {"mode": "advisory", "direct-dispatch-enabled": True},
+        }
+    )
+
+    assert _by_check(findings, _INERT) == []
+
+
+def test_presence_not_truthiness():
+    findings = _strict_check(
+        {
+            "ai-providers": ["Claude", "Opencode"],
+            "orchestrator": {"mode": "main-chat", "direct-dispatch-enabled": False},
+        }
+    )
+
+    # Presence semantics: `false` is still an intent signal, so still one INFO.
+    assert len(_by_check(findings, _INERT)) == 1
+
+
+def test_check_lives_in_orchestrator_strict():
+    assert (
+        orchestrator_strict._DISPATCH_INERT_CHECK_ID
+        == "orchestrator-strict.direct-dispatch-inert"
+    )
