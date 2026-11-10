@@ -18,7 +18,9 @@ Run: python3 -m pytest tests/test_orchestrator_topology_docs.py -q
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONCEPT = _REPO_ROOT / "docs" / "concepts" / "active" / "orchestrator-topology.md"
@@ -26,6 +28,13 @@ _SINGLETON = (
     _REPO_ROOT / "docs" / "concepts" / "active" / "singleton-orchestrator-architecture.md"
 )
 _A2A_RULE = _REPO_ROOT / "rules" / "1-generic" / "a2a-delegation-gates.md"
+
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+
+from lib.consistency.report import Severity  # noqa: E402
+from lib.consistency.topology import check_orchestrator_topology  # noqa: E402
+from lib.providers import load_provider_capabilities  # noqa: E402
+from lib.topology import resolve_topology  # noqa: E402
 
 # Markdown inline link target, same shape the docs consistency checks use.
 _LINK_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")
@@ -197,3 +206,338 @@ def test_singleton_architecture_links_the_topology_doc():
         "singleton-orchestrator-architecture.md must carry a status note that "
         "the singleton statement is topology-conditioned in v1."
     )
+
+
+# ---------------------------------------------------------------------------
+# 24-cell position matrix (issue #1190, Task 15; AC-6/7/8/10/11)
+#
+# Binding data source: docs/specs/2026-11-09-orchestrator-mode-topology-design.md
+# §12.2-§12.5 (four surface tables) and §12.6 (evidence index). The concept doc
+# reproduces those tables; the constants below are the same judgments, so a
+# silent verdict drift on either side is a test failure.
+# ---------------------------------------------------------------------------
+
+_MATRIX_SURFACES = ("v1", "v2", "Claude", "Gemini")
+_MATRIX_MODES = ("strict", "advisory", "main-chat")
+_MATRIX_TOPOLOGIES = ("primary", "subagent")
+_VERDICTS = frozenset({"RECOMMENDED", "ALLOWED", "DEGRADED", "FORBIDDEN"})
+
+# `(surface, mode, topology)` -> first token of the Urteil cell.
+EXPECTED_MATRIX: dict[tuple[str, str, str], str] = {
+    ("v1", "strict", "primary"): "ALLOWED",
+    ("v1", "strict", "subagent"): "RECOMMENDED",
+    ("v1", "advisory", "primary"): "ALLOWED",
+    ("v1", "advisory", "subagent"): "ALLOWED",
+    ("v1", "main-chat", "primary"): "FORBIDDEN",
+    ("v1", "main-chat", "subagent"): "ALLOWED",
+    ("v2", "strict", "primary"): "ALLOWED",
+    ("v2", "strict", "subagent"): "RECOMMENDED",
+    ("v2", "advisory", "primary"): "ALLOWED",
+    ("v2", "advisory", "subagent"): "ALLOWED",
+    ("v2", "main-chat", "primary"): "FORBIDDEN",
+    ("v2", "main-chat", "subagent"): "ALLOWED",
+    ("Claude", "strict", "primary"): "ALLOWED",
+    ("Claude", "strict", "subagent"): "RECOMMENDED",
+    ("Claude", "advisory", "primary"): "ALLOWED",
+    ("Claude", "advisory", "subagent"): "ALLOWED",
+    ("Claude", "main-chat", "primary"): "FORBIDDEN",
+    ("Claude", "main-chat", "subagent"): "ALLOWED",
+    ("Gemini", "strict", "primary"): "DEGRADED",
+    ("Gemini", "strict", "subagent"): "RECOMMENDED",
+    ("Gemini", "advisory", "primary"): "DEGRADED",
+    ("Gemini", "advisory", "subagent"): "ALLOWED",
+    ("Gemini", "main-chat", "primary"): "FORBIDDEN",
+    ("Gemini", "main-chat", "subagent"): "ALLOWED",
+}
+
+# spec §3.8.2 (lines 228-246): the ten `mode` x `topology` -> position rows.
+# `None` = same-scope `main-chat` x `primary` is a validator ERROR (no position).
+EXPECTED_POSITION_MAP: dict[tuple[str, str], str | tuple[str, ...] | None] = {
+    ("strict", "unset-with-role"): "POS-3",
+    ("strict", "unset-without-role"): "POS-2",
+    ("strict", "primary"): "POS-3",
+    ("strict", "subagent"): "POS-2",
+    ("advisory", "unset"): ("POS-3", "POS-2"),
+    ("advisory", "primary"): "POS-3",
+    ("advisory", "subagent"): "POS-2",
+    ("main-chat", "unset"): "POS-1",
+    ("main-chat", "primary"): None,
+    ("main-chat", "subagent"): "POS-1",
+}
+
+_SURFACE_HEADING_RE = re.compile(r"^####\s+Surface\s+`([^`]+)`", re.MULTILINE)
+_NEXT_HEADING_RE = re.compile(r"^#{1,4}\s", re.MULTILINE)
+_POSITION_RE = re.compile(r"POS-[123]")
+_FILE_LINE_RE = re.compile(r"[\w./-]+\.(?:py|md|yaml|json|sh):\d+(?:-\d+)?")
+_SEPARATOR_RE = re.compile(r":?-{2,}:?")
+
+
+def _plain(cell: str) -> str:
+    """Drop the Markdown emphasis a verdict/position cell may carry."""
+    return cell.replace("*", "").replace("`", "").strip()
+
+
+def _first_token(cell: str) -> str:
+    plain = _plain(cell)
+    return plain.split()[0] if plain.split() else ""
+
+
+def _topology_key(cell: str) -> str:
+    """Declared topology of a `decl→eff` cell (effective one when unset)."""
+    plain = _plain(cell).replace("->", "→")
+    declared, _, effective = plain.partition("→")
+    declared = declared.strip().lower()
+    effective = effective.strip().lower()
+    if not declared or "ungesetzt" in declared:
+        return effective.split()[0] if effective.split() else ""
+    return declared
+
+
+def _surface_tables() -> dict[str, list[list[str]]]:
+    """The four surface tables (heading ``#### Surface <key>``) as raw cells."""
+    content = _text(_CONCEPT)
+    headings = list(_SURFACE_HEADING_RE.finditer(content))
+    tables: dict[str, list[list[str]]] = {}
+    for heading in headings:
+        next_heading = _NEXT_HEADING_RE.search(content, heading.end())
+        end = next_heading.start() if next_heading else len(content)
+        rows: list[list[str]] = []
+        for line in content[heading.end():end].splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("|"):
+                continue
+            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            if all(_SEPARATOR_RE.fullmatch(cell) for cell in cells):
+                continue
+            if cells[0].lower() == "mode":
+                continue
+            rows.append(cells)
+        tables[heading.group(1)] = rows
+    return tables
+
+
+def _verdict_cells() -> dict[tuple[str, str, str], str]:
+    cells = {}
+    for surface, rows in _surface_tables().items():
+        for row in rows:
+            cells[(surface, _plain(row[0]).lower(), _topology_key(row[1]))] = (
+                _first_token(row[3])
+            )
+    return cells
+
+
+def _resolve_dito(rows: list[list[str]], row_index: int, column: int) -> str | None:
+    """Walk upwards to the first non-`dito` cell of the same column."""
+    for earlier in range(row_index - 1, -1, -1):
+        cell = rows[earlier][column]
+        if "dito" not in cell.lower():
+            return cell
+    return None
+
+
+def test_matrix_has_24_rows():
+    tables = _surface_tables()
+    assert set(tables) == set(_MATRIX_SURFACES), (
+        "orchestrator-topology.md must carry one `#### Surface `<key>`` block per "
+        f"surface {list(_MATRIX_SURFACES)}; found {sorted(tables)}."
+    )
+
+    actual: dict[tuple[str, str, str], str] = {}
+    positions: dict[tuple[str, str, str], str] = {}
+    for surface, rows in tables.items():
+        assert len(rows) == 6, (
+            f"surface {surface!r}: expected exactly 6 data rows "
+            f"(strict/advisory/main-chat x primary/subagent), got {len(rows)}."
+        )
+        for row in rows:
+            assert len(row) == 9, (
+                f"surface {surface!r}: expected 9 columns "
+                "(mode | topology | Position | Urteil | Gate-Tier | "
+                f"Write-Scope-Lock | Recursion | Hop | A2A), got {len(row)}."
+            )
+            mode = _plain(row[0]).lower()
+            topology = _topology_key(row[1])
+            assert mode in _MATRIX_MODES, f"surface {surface!r}: bad mode {mode!r}."
+            assert topology in _MATRIX_TOPOLOGIES, (
+                f"surface {surface!r}: bad topology {topology!r} in {row[1]!r}."
+            )
+            assert _POSITION_RE.search(row[2]), (
+                f"surface {surface!r}, {mode} x {topology}: no POS-1/2/3 in "
+                f"the Position cell {row[2]!r}."
+            )
+            key = (surface, mode, topology)
+            assert key not in actual, f"duplicate matrix row {key}."
+            actual[key] = _first_token(row[3])
+            positions[key] = row[2]
+
+    assert len(actual) == 24, f"expected 24 cells, found {len(actual)}."
+    assert actual == EXPECTED_MATRIX, (
+        "the documented verdicts drifted from spec §12.2-§12.5; "
+        f"diff: { {k: (actual.get(k), v) for k, v in EXPECTED_MATRIX.items() if actual.get(k) != v} }"
+    )
+
+    # §3.8.2 cross-check: every non-degraded cell keeps its documented position.
+    for (surface, mode, topology), verdict in actual.items():
+        if verdict == "DEGRADED":
+            continue
+        expected_position = EXPECTED_POSITION_MAP.get((mode, topology))
+        if isinstance(expected_position, str):
+            assert expected_position in positions[(surface, mode, topology)], (
+                f"{surface}, {mode} x {topology}: expected {expected_position}, "
+                f"found {positions[(surface, mode, topology)]!r}."
+            )
+
+
+def test_verdict_vocabulary_is_closed():
+    tables = _surface_tables()
+    assert tables, "no `#### Surface `<key>`` tables found in the concept doc."
+    for surface, rows in tables.items():
+        for row_index, row in enumerate(rows):
+            assert _first_token(row[3]) in _VERDICTS, (
+                f"{surface} row {row_index}: verdict {row[3]!r} does not start "
+                f"with one of {sorted(_VERDICTS)}."
+            )
+            assert _POSITION_RE.search(row[2]), (
+                f"{surface} row {row_index}: no POS-1/2/3 in {row[2]!r}."
+            )
+            for column, cell in enumerate(row):
+                if "dito" not in cell.lower():
+                    continue
+                resolved = _resolve_dito(rows, row_index, column)
+                assert resolved is not None, (
+                    f"{surface} row {row_index} column {column}: `dito` has no "
+                    "earlier cell to resolve to."
+                )
+                assert _FILE_LINE_RE.search(resolved), (
+                    f"{surface} row {row_index} column {column}: `dito` resolves "
+                    f"to {resolved!r}, which carries no datei:zeile reference."
+                )
+
+
+def test_exactly_one_recommended_per_surface():
+    cells = _verdict_cells()
+    recommended = {key for key, verdict in cells.items() if verdict == "RECOMMENDED"}
+    assert recommended == {(surface, "strict", "subagent") for surface in _MATRIX_SURFACES}, (
+        "exactly one RECOMMENDED cell per surface is allowed (D-OQ1); "
+        f"found {sorted(recommended)}."
+    )
+    for surface in ("v1", "v2"):
+        assert cells[(surface, "strict", "primary")] == "ALLOWED", (
+            f"{surface}: `strict` x `primary` must stay first-class ALLOWED "
+            "(D-OQ2, not downgraded)."
+        )
+    lowered = _normalized(_text(_CONCEPT))
+    assert "nicht empfohlen" not in lowered, (
+        "no position may be marked 'nicht empfohlen' (D-OQ2: both Opencode "
+        "positions are first-class)."
+    )
+
+
+def test_v2_rows_name_tier_facts_and_recommendation_basis():
+    rows = _surface_tables()["v2"]
+    by_key = {
+        (_plain(row[0]).lower(), _topology_key(row[1])): row
+        for row in rows
+    }
+
+    recommended = _normalized(" ".join(by_key[("strict", "subagent")]))
+    assert "session-/context-ownership" in recommended, (
+        "the v2 RECOMMENDED row must name the session/context ownership the "
+        "main chat keeps."
+    )
+    assert "gate-inactive" in recommended and "kein deny" in recommended, (
+        "the v2 RECOMMENDED row must state that the gate is inactive and no "
+        "deny is written."
+    )
+
+    primary = _normalized(" ".join(by_key[("strict", "primary")]))
+    assert "observe" in primary, (
+        "v2 `strict` x `primary` must name the plugin mode `observe`."
+    )
+    assert "permissions" in primary and "deny" in primary, (
+        "v2 `strict` x `primary` must name the `permissions[]`-deny as the "
+        "enforcing instance."
+    )
+    assert "nicht das plugin" in primary, (
+        "v2 `strict` x `primary` must not present the plugin as the enforcing "
+        "instance."
+    )
+
+
+def test_cost_section_has_hop_definition_threshold_and_estimate():
+    content = _text(_CONCEPT)
+    lowered = _normalized(content)
+    for expected in ("pos-3 = 0 hop", "pos-2 = 1 hop", "pos-1 = 0 hop"):
+        assert expected in lowered, (
+            f"the cost section must define `{expected}` (§4, D-Q4)."
+        )
+    assert "s ≤2 dateien → direkter dispatch" in lowered, (
+        "the cost section must carry the S threshold `S ≤2 Dateien → direkter "
+        "Dispatch`."
+    )
+    assert "ESTIMATE" in content, "the cost section must carry an `ESTIMATE`."
+    assert re.search(r"\b\d+\s*[–-]\s*\d+k\b", content), (
+        "the `ESTIMATE` must state a token range (e.g. `4–8k`)."
+    )
+    assert "wc -c" in content and "/ 4" in content, (
+        "the `ESTIMATE` must name its measurement method (`wc -c … / 4`)."
+    )
+    assert "nicht gemessen" in lowered, (
+        "the `ESTIMATE` must carry the explicit 'nicht gemessen' caveat."
+    )
+
+
+def test_single_user_recommendation_is_strict_subagent_with_primary_option():
+    lowered = _normalized(_text(_CONCEPT))
+    assert "strict × subagent" in lowered, (
+        "the single-user default `strict` x `subagent` must be stated."
+    )
+    assert "strict × primary" in lowered, (
+        "`strict` x `primary` must be documented as an option."
+    )
+    assert "gleiche governance, kein hop, dafür session-start-bindung" in lowered, (
+        "the `strict` x `primary` option must be framed as equal governance "
+        "without a hop, at the price of the session-start binding."
+    )
+
+
+def test_gemini_primary_degrades_with_one_warning():
+    capabilities = load_provider_capabilities(_REPO_ROOT)
+    assert "Gemini" in capabilities, (
+        "config/provider-capabilities.yaml must carry the Gemini capability cell."
+    )
+    active_set = SimpleNamespace(
+        roles=frozenset({"orchestrator"}),
+        known_roles=frozenset({"orchestrator"}),
+    )
+    provider_config = {"Gemini": {"primary-role": "orchestrator"}}
+    config = {"orchestrator": {"mode": "strict", "topology": "primary"}}
+
+    resolution = resolve_topology(
+        config,
+        "Gemini",
+        provider_config=provider_config,
+        capabilities=capabilities["Gemini"],
+        mode="strict",
+        active_set=active_set,
+    )
+    assert resolution.effective == "subagent", (
+        "Gemini must degrade a declared `primary` to `subagent` "
+        f"(effective={resolution.effective!r})."
+    )
+    assert resolution.degraded_from == "primary"
+
+    findings = check_orchestrator_topology(
+        _REPO_ROOT,
+        config,
+        provider_config=provider_config,
+        capabilities=capabilities,
+        providers=["Gemini"],
+        active_set=active_set,
+    )
+    degraded = [f for f in findings if f.check == "orchestrator-topology.degraded"]
+    assert len(degraded) == 1, (
+        "exactly one `orchestrator-topology.degraded` WARNING is expected, "
+        f"got {len(degraded)}."
+    )
+    assert degraded[0].severity == Severity.WARNING
