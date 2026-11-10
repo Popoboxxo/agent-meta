@@ -722,6 +722,77 @@ def _merge_default_agent(
     return {}
 
 
+def _warn_user_owned_default_agent(
+    config: dict | None,
+    provider: str,
+    provider_config: dict,
+    active_set,
+    topology,
+    entry: str | None,
+    *,
+    current,
+    state_value,
+    log: SyncLog,
+) -> None:
+    """Warn about a user-owned ``default_agent`` the resolved position cannot back.
+
+    Two independent, warning-only conditions (the user value always wins, D1c):
+
+    ``orchestrator-topology.default-agent-conflict``
+        The value names the provider's orchestrator role while the effective
+        topology is not ``primary`` (IC-7 migration).
+
+    ``opencode.default-agent.dangling`` (#1090/D16)
+        The value names a *known* role of this run that the sync does not emit
+        for this provider (``orchestrator.mode: main-chat`` or an active-set
+        mismatch). Known roles only, so a foreign agent name (another tool's) is
+        never flagged.
+
+    A still-managed value (``current == state_value``) is rolled back by the
+    same run, so it is never reported. The stable ID of the conflict lives in
+    the consistency checker (IC-5); this is the emitter-side counterpart.
+
+    Shared by both ``default_agent`` owners — the Spec-A merge
+    (``_sync_opencode_runtime_gate``) and the v2 reconcile
+    (``_reconcile_v2_default_agent``) — so a position cannot be reported with
+    two different verdicts depending on the surface. Pure: log only.
+    """
+    gate_role = providers.explicit_primary_role(provider_config, provider)
+    managed_current = (
+        isinstance(state_value, str) and bool(state_value) and current == state_value
+    )
+    if (
+        topology is not None
+        and topology.effective != "primary"
+        and isinstance(gate_role, str)
+        and current == gate_role
+        and not managed_current
+    ):
+        log.warning(
+            "orchestrator-topology.default-agent-conflict: default_agent "
+            f"'{current}' names the orchestrator role, but the effective "
+            f"orchestrator topology for provider '{provider}' is "
+            f"'{topology.effective}'. Leaving the user value untouched (no "
+            "auto-delete); remove the key or set orchestrator.topology: primary."
+        )
+
+    if entry is None and active_set is not None:
+        from .active_set import role_emitted_for_provider
+
+        if (
+            isinstance(current, str)
+            and current != state_value
+            and current in getattr(active_set, "known_roles", ())
+            and not role_emitted_for_provider(current, active_set, config, provider)
+        ):
+            log.warning(
+                f"opencode.default-agent.dangling: default_agent '{current}' "
+                f"names role '{current}' which this sync does not generate "
+                "(orchestrator.mode main-chat?) — remove the key or set "
+                "orchestrator.mode: strict"
+            )
+
+
 def _sync_opencode_runtime_gate(
     project_root: Path,
     config: dict,
@@ -883,45 +954,22 @@ def _sync_opencode_runtime_gate(
     state_value = da_state.get("value") if isinstance(da_state, dict) else None
     current = existing.get(_DEFAULT_AGENT_JSON_KEY)
 
-    # IC-7 migration: a USER value on the orchestrator role (no matching state
-    # record) is preserved when the resolved position is no longer `primary`.
-    # No auto-delete — the user decides. The stable ID lives in the consistency
-    # checker (IC-5); this is its emitter-side counterpart for the same run.
-    gate_role = providers.explicit_primary_role(provider_config, provider)
-    managed_current = (
-        isinstance(state_value, str) and bool(state_value) and current == state_value
-    )
-    if (
-        not rollback_only
-        and topology is not None
-        and topology.effective != "primary"
-        and isinstance(gate_role, str)
-        and current == gate_role
-        and not managed_current
-    ):
-        log.warning(
-            "orchestrator-topology.default-agent-conflict: default_agent "
-            f"'{current}' names the orchestrator role, but the effective "
-            f"orchestrator topology for provider '{provider}' is "
-            f"'{topology.effective}'. Leaving the user value untouched (no "
-            "auto-delete); remove the key or set orchestrator.topology: primary."
+    if not rollback_only:
+        _warn_user_owned_default_agent(
+            config,
+            provider,
+            provider_config,
+            active_set,
+            topology,
+            entry,
+            current=current,
+            state_value=state_value,
+            log=log,
         )
 
-    if not rollback_only and entry is None and active_set is not None:
-        from .active_set import role_emitted_for_provider
-
-        if (
-            isinstance(current, str)
-            and current != state_value
-            and current in getattr(active_set, "known_roles", ())
-            and not role_emitted_for_provider(current, active_set, config, provider)
-        ):
-            log.warning(
-                f"opencode.default-agent.dangling: default_agent '{current}' "
-                f"names role '{current}' which this sync does not generate "
-                "(orchestrator.mode main-chat?) — remove the key or set "
-                "orchestrator.mode: strict"
-            )
+    # Still used by the coupling warning below: the role the provider declares
+    # as its orchestrator (``None`` when it declares none).
+    gate_role = providers.explicit_primary_role(provider_config, provider)
 
     # Gate-deny coupled to the entry point (#1006/IC-6 step 2): without an
     # explicit and generated primary role the deny would lock EVERY agent —
@@ -1775,6 +1823,95 @@ def _rollback_opencode_v1_gate_map(
         )
 
 
+def _reconcile_v2_default_agent(
+    project_root: Path,
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    active_set,
+    topology,
+    entry: str | None,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Own the entry point on a v2 surface whose tier skips the Spec-A merge.
+
+    POS-1/POS-2 promise (SPEC-orchestrator-mode-topology-2026-11-09 §3.8.3,
+    AC-34): a position that withholds the entry point must not leave a
+    sync-written ``default_agent`` behind, and a user-owned one must be reported
+    exactly once. The ``default_agent`` merge lives in the Spec-A writer
+    (``_sync_opencode_runtime_gate``), whose dispatch condition is the
+    ``permission`` tier — a v2 project resolves to ``plugin`` and would never
+    reach it. This is the v2 counterpart, called with the SAME resolved
+    ``entry`` and active set.
+
+    Rollback/warn only: ``desired`` is always ``None`` here, so
+    ``_merge_default_agent`` can only take a *still-managed* value back (and
+    restore its prior) — a value that is absent or user-owned is never written.
+    That keeps OQ-B12's remaining accepted limit intact: a deleted entry point is
+    not re-added, and a *divergent* user value stays unmentioned.
+
+    A dry run reports without persisting, exactly like Spec A.
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    committed = _v2_committed_file(provider_config)
+    if committed is None:
+        return
+    root = Path(project_root)
+    file_path = safe_path(root, committed)
+    try:
+        state_rel = opencode_v2_config.opencode_state_path(
+            root, provider_config
+        ).relative_to(root)
+    except ValueError:
+        return
+    state_path = safe_path(root, state_rel)
+
+    document = _v2_committed_document(root, provider_config)
+    if document is None:
+        return  # unparseable — the warning was already emitted by the reader
+
+    da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
+    state_value = da_state.get("value") if isinstance(da_state, dict) else None
+    before = document.get(_DEFAULT_AGENT_JSON_KEY)
+
+    _warn_user_owned_default_agent(
+        config,
+        provider,
+        provider_config,
+        active_set,
+        topology,
+        entry,
+        current=before,
+        state_value=state_value,
+        log=log,
+    )
+
+    # ``gate_effective=False``: no value is written here, so the deny
+    # consequence of ``_merge_default_agent``'s divergent-value text cannot apply.
+    new_da_state = _merge_default_agent(document, None, da_state, False, log)
+    if document.get(_DEFAULT_AGENT_JSON_KEY) == before and new_da_state == da_state:
+        return
+
+    content = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    if not dry_run:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(
+        file_path,
+        content,
+        log,
+        committed,
+        allow_secrets=False,
+        config=None,
+        dry_run=dry_run,
+        verify_gitignored=False,
+    ):
+        log.action("WRITE", committed, "default_agent")
+    if new_da_state != da_state:
+        _write_state(state_path, new_da_state, dry_run, _STATE_DEFAULT_AGENT_KEY)
+
+
 def reconcile_opencode_surface_gate(
     project_root: Path,
     config: dict,
@@ -1826,6 +1963,9 @@ def reconcile_opencode_surface_gate(
        ``primary-role`` warning itself, otherwise Spec A's warning stays the only
        one.
     7. v2, nothing in state, strict off: no-op.
+    8. v2, entry point withheld and Spec A did not run (not the ``permission``
+       tier): a still-managed ``default_agent`` is rolled back and a user-owned
+       one is reported once (``_reconcile_v2_default_agent``, AC-34/POS-1).
 
     D1a is enforced here for the list form too (M1): the triples are written
     ONLY when the committed document carries a usable ``default_agent``.
@@ -1941,6 +2081,18 @@ def reconcile_opencode_surface_gate(
                     "primary-role in config/ai-providers.yaml and keep that "
                     "role in the active set"
                 )
+
+    # POS-1/POS-2 (AC-34, §3.8.3): the entry point of a v2 document is owned by
+    # the SAME merge as on v1, but Spec A only runs on the ``permission`` tier,
+    # while a v2 project resolves to ``plugin``. Same guard as the row-6 warning
+    # above: when Spec A did not run and the position withholds the entry point,
+    # take back a still-managed value and report a user-owned one — exactly once
+    # per channel.
+    if is_v2_surface and entry is None and tier != "permission":
+        _reconcile_v2_default_agent(
+            project_root, config, provider, provider_config, active_set,
+            topology, entry, log, dry_run,
+        )
 
     _sync_opencode_v2_gate_permissions(
         project_root, provider_config, entries, log, dry_run
