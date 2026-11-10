@@ -32,6 +32,8 @@ import inspect
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
@@ -319,3 +321,257 @@ def test_no_render_seam_reads_the_global_basis():
             f"{_GLOBAL_BASIS_HELPER} — use _provider_topology_flags (AC-30)"
         )
 
+
+
+# --- Task 21: end-state byte identity (AC-16/AC-27) ------------------------
+
+_TOPOLOGY_GOLDEN = _REPO_ROOT / "tests" / "fixtures" / "topology-golden"
+_ORCHESTRATOR_TEMPLATE = _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
+
+#: Sentinel for "the project does not write the key" (the derived state).
+_UNSET = object()
+
+#: The baseline commit of the plan (§2 M0): the template BEFORE the topology
+#: gate was introduced. ``orchestrator.unset-derived-subagent.<provider>.md``
+#: freezes that source rendered with the CURRENT renderer.
+_BASELINE_TEMPLATE_COMMIT = "aaed14c2"
+
+#: Frontmatter lines that legitimately move with a template release. The body
+#: (everything after the closing ``---``) must stay byte-identical.
+_VOLATILE_FRONTMATTER_KEYS = ("version", "generated-from")
+
+
+def orchestrator_template_at(commit: str) -> str:
+    """Return the orchestrator template committed at *commit* (baseline source)."""
+    import subprocess
+
+    return subprocess.check_output(
+        ["git", "show", f"{commit}:agents/1-generic/orchestrator.md"],
+        cwd=_REPO_ROOT,
+        text=True,
+    )
+
+
+def _provider_config(provider: str, config: dict):
+    from scripts.lib.providers import load_providers_config
+
+    provider_config = load_providers_config(_REPO_ROOT, config)
+    if provider not in provider_config:  # pragma: no cover - guard for config edits
+        raise AssertionError(f"provider {provider!r} not in ai-providers registry")
+    return provider_config
+
+
+def render_orchestrator(
+    provider: str,
+    project_root: Path,
+    *,
+    template_text: str | None = None,
+    topology=_UNSET,
+    active_set=frozenset(),
+) -> str:
+    """Render ``agents/1-generic/orchestrator.md`` through the real sync path.
+
+    Mirrors ``sync_agents_for_provider`` for ONE role without writing into the
+    repository (everything lands in *project_root*). *topology* overrides the
+    project declaration: the ``_UNSET`` sentinel REMOVES the key, which is the
+    derived state (all ``ORCH_TOPOLOGY_*`` declaration flags fail closed).
+
+    *template_text* renders arbitrary template bytes through the SAME pipeline
+    (used to replay the ``aaed14c2`` baseline with the current renderer);
+    ``None`` reads the working-tree template.
+    """
+    import copy
+
+    from scripts.lib.agent_sync import (
+        _apply_content_pipeline,
+        _build_provider_vars,
+        _finalize_agent_content,
+        _parse_frontmatter_yaml,
+        _resolve_sync_targets,
+        _tools_can_spawn,
+    )
+    from scripts.lib.config import build_variables, load_config
+    from scripts.lib.frontmatter import extract_frontmatter_field
+    from scripts.lib.log import SyncLog
+
+    project_root = Path(project_root)
+    project_root.mkdir(parents=True, exist_ok=True)
+
+    config = copy.deepcopy(load_config(_REPO_ROOT / ".meta-config" / "project.yaml"))
+    orchestrator_cfg = dict(config.get("orchestrator") or {})
+    if topology is _UNSET:
+        orchestrator_cfg.pop("topology", None)
+    else:
+        orchestrator_cfg["topology"] = topology
+    config["orchestrator"] = orchestrator_cfg
+
+    text = (
+        template_text
+        if template_text is not None
+        else _ORCHESTRATOR_TEMPLATE.read_text(encoding="utf-8")
+    )
+    lead, _sep, _body = text.partition("\n---")
+    assert lead.startswith("---"), "orchestrator template lost its frontmatter"
+
+    variables, _warnings = build_variables(config, _REPO_ROOT, project_root)
+    provider_config = _provider_config(provider, config)
+    log = SyncLog()
+    pc, _role_map, _overrides, target_dir = _resolve_sync_targets(
+        provider, provider_config, _REPO_ROOT, project_root, config, True, log
+    )
+    assert pc is not None, f"{provider} provider config missing"
+
+    source_path = _ORCHESTRATOR_TEMPLATE
+    target_path = target_dir / "orchestrator.md"
+    can_spawn = _tools_can_spawn(_parse_frontmatter_yaml(text).get("tools"))
+    source_version = extract_frontmatter_field(text, "version")
+    description = (
+        extract_frontmatter_field(text, "description") or "Orchestrator fixture."
+    )
+
+    details_dir = f".{provider.lower()}/pipeline-details"
+    variables.setdefault("PIPELINE_DETAILS_DIR", details_dir)
+    merged = _build_provider_vars(
+        pc, provider, variables, _REPO_ROOT, config=config, active_set=active_set
+    )
+    merged.setdefault("PIPELINE_DETAILS_DIR", details_dir)
+
+    content = _apply_content_pipeline(
+        text, config, provider, merged,
+        "agents/1-generic/orchestrator.md", None, _REPO_ROOT, log,
+    )
+    return _finalize_agent_content(
+        content, "orchestrator", "orchestrator.md", source_path, provider,
+        provider_config, source_version, description, can_spawn, config,
+        _REPO_ROOT, project_root, target_path, variables, False, log,
+        active_set=active_set,
+    )
+
+
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    assert text.startswith("---\n")
+    end = text.index("\n---\n", 3)
+    return text[4:end], text[end + 5:]
+
+
+def _frontmatter_delta(expected: str, actual: str) -> list[tuple[str, str]]:
+    """Return the ``(expected_line, actual_line)`` pairs of the frontmatter diff."""
+    import difflib
+
+    expected_fm, _ = _split_frontmatter(expected)
+    actual_fm, _ = _split_frontmatter(actual)
+    pairs: list[tuple[str, str]] = []
+    for line in difflib.ndiff(expected_fm.splitlines(), actual_fm.splitlines()):
+        if line.startswith("- "):
+            pairs.append((line[2:], ""))
+        elif line.startswith("+ "):
+            if pairs and pairs[-1][1] == "":
+                pairs[-1] = (pairs[-1][0], line[2:])
+            else:
+                pairs.append(("", line[2:]))
+    return pairs
+
+
+def _assert_body_identity(baseline: str, current: str) -> None:
+    """AC-16/AC-27: only the two version pins may differ, the body never does."""
+    _, baseline_body = _split_frontmatter(baseline)
+    _, current_body = _split_frontmatter(current)
+    assert baseline_body == current_body, (
+        "an unset `orchestrator.topology` (derived subagent) changed the "
+        "rendered body of the orchestrator — the topology gate must be a "
+        "no-op in that state (AC-16/AC-27)"
+    )
+
+    delta = _frontmatter_delta(baseline, current)
+    assert delta, "expected the two release pins to differ in the frontmatter"
+    keys = [line.split(":", 1)[0] for line, _ in delta]
+    assert keys == list(_VOLATILE_FRONTMATTER_KEYS), (
+        "an unset topology may only move `version` and `generated-from` in the "
+        f"frontmatter; unexpected delta: {delta!r}"
+    )
+
+
+_ACTIVE_PROVIDERS = ("Claude", "Opencode", "Gemini")
+
+
+@pytest.mark.parametrize("provider", _ACTIVE_PROVIDERS)
+def test_unset_topology_subagent_render_is_byte_identical(provider, tmp_path):
+    """AC-16/AC-27: declaring nothing renders the pre-topology bytes.
+
+    The fixture is the ``aaed14c2`` template replayed through the CURRENT
+    renderer (never hand-written). The working-tree template must produce the
+    same body for every active provider when the key is missing and the
+    provider's ``primary-role`` is absent from the ActiveSet (derived
+    ``subagent``).
+    """
+    golden_path = _TOPOLOGY_GOLDEN / f"orchestrator.unset-derived-subagent.{provider.lower()}.md"
+    assert golden_path.is_file(), (
+        f"missing frozen baseline {golden_path.name} — regenerate it from "
+        f"`git show {_BASELINE_TEMPLATE_COMMIT}:agents/1-generic/orchestrator.md` "
+        "through render_orchestrator(provider, ...)"
+    )
+    baseline = golden_path.read_text(encoding="utf-8")
+
+    current = render_orchestrator(provider, tmp_path / "current")
+    _assert_body_identity(baseline, current)
+
+    # The state under test really is "derived subagent": the else branch of
+    # both conditionals (neither primary nor explicit) must have rendered.
+    _, body = _split_frontmatter(current)
+    assert "**Singleton:** Self-spawn" in body, (
+        f"{provider}: the unset-key/derived state did not render the legacy "
+        "singleton branch — the byte-identity claim would be vacuous"
+    )
+    assert "**Singleton (session entry):**" not in body
+    assert "**Singleton (subagent):**" not in body
+
+
+def test_frozen_baseline_fixture_replays_the_baseline_template(tmp_path):
+    """The fixture really is ``aaed14c2`` + current renderer (no hand edits)."""
+    baseline_source = orchestrator_template_at(_BASELINE_TEMPLATE_COMMIT)
+    replayed = render_orchestrator("Claude", tmp_path / "replay", template_text=baseline_source)
+    frozen = (
+        _TOPOLOGY_GOLDEN / "orchestrator.unset-derived-subagent.claude.md"
+    ).read_text(encoding="utf-8")
+    assert replayed == frozen, (
+        "the frozen baseline fixture drifted from `git show "
+        f"{_BASELINE_TEMPLATE_COMMIT}:agents/1-generic/orchestrator.md` rendered "
+        "with the current renderer"
+    )
+
+
+def test_default_effective_is_primary_or_subagent():
+    """AC-16: the effective position is always a real position, never empty.
+
+    Covers the provider-less default basis (the repo's own declared config) and
+    the provider-scoped resolution for every active provider, with the key
+    unset (both derived outcomes) and declared.
+    """
+    import copy
+
+    from scripts.lib.config import load_config
+    from scripts.lib.variables import _provider_topology_flags
+
+    variables, _ = config_module.build_variables(
+        load_config(_REPO_ROOT / ".meta-config" / "project.yaml"),
+        _REPO_ROOT,
+        _REPO_ROOT,
+    )
+    assert variables["ORCH_TOPOLOGY_EFFECTIVE"] in {"primary", "subagent"}
+    assert variables["ORCH_TOPOLOGY_EFFECTIVE"] not in {"", "none", "hybrid"}
+
+    unset = copy.deepcopy(load_config(_REPO_ROOT / ".meta-config" / "project.yaml"))
+    orchestrator_cfg = dict(unset.get("orchestrator") or {})
+    orchestrator_cfg.pop("topology", None)
+    unset["orchestrator"] = orchestrator_cfg
+
+    for provider in _ACTIVE_PROVIDERS:
+        for active_set in (frozenset({"orchestrator"}), frozenset()):
+            flags = _provider_topology_flags(
+                unset, provider, agent_meta_root=_REPO_ROOT,
+                mode="strict", active_set=active_set,
+            )
+            assert flags["ORCH_TOPOLOGY_EFFECTIVE"] in {"primary", "subagent"}, (
+                provider, active_set, flags["ORCH_TOPOLOGY_EFFECTIVE"]
+            )
+            assert flags["ORCH_TOPOLOGY_EFFECTIVE"] not in {"", "none", "hybrid"}

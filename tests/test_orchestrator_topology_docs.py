@@ -1087,3 +1087,160 @@ def test_advisory_subagent_carries_1182_condition_everywhere():
             "the README recommendation of `advisory` x `subagent` must name "
             "#1182 in the same paragraph (D-OQ3)."
         )
+
+
+# --- Task 21: intentional topology goldens (AC-17/AC-26/AC-27/AC-36) ------
+
+_TOPOLOGY_GOLDEN = _REPO_ROOT / "tests" / "fixtures" / "topology-golden"
+_PROJECT_SCHEMA = _REPO_ROOT / "config" / "project-config.schema.json"
+_SCHEMA_BASELINE_COMMIT = "a41745e"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_orchestrator_topology_effective_flags import (  # noqa: E402
+    _UNSET,
+    _split_frontmatter,
+    render_orchestrator,
+)
+
+_PRIMARY_MARKER = "**Singleton (session entry):**"
+_DECLARED_SUBAGENT_MARKER = "**Singleton (subagent):**"
+_LEGACY_MARKER = "**Singleton:** Self-spawn (`subagent_type: orchestrator`)"
+
+
+def _golden(name: str) -> str:
+    path = _TOPOLOGY_GOLDEN / name
+    assert path.is_file(), f"missing intentional golden fixture: {path.name}"
+    return path.read_text(encoding="utf-8")
+
+
+def _body_diff(expected: str, actual: str) -> list[str]:
+    """Body lines that differ (frontmatter excluded)."""
+    import difflib
+
+    _, expected_body = _split_frontmatter(expected)
+    _, actual_body = _split_frontmatter(actual)
+    return [
+        line
+        for line in difflib.unified_diff(
+            expected_body.splitlines(), actual_body.splitlines(),
+            "golden", "render", lineterm="",
+        )
+        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    ]
+
+
+def test_derived_primary_render_matches_intentional_golden(tmp_path):
+    """AC-17/Rev.3: an unset key + primary role is INTENTIONALLY different.
+
+    Undeclared, the ``primary`` position renders the session-entry singleton
+    (never the legacy text); the frozen golden is the AC-17 target state. The
+    derived-subagent baseline shares everything except that one line.
+    """
+    rendered = render_orchestrator(
+        "Opencode", tmp_path / "derived-primary",
+        topology=_UNSET, active_set=frozenset({"orchestrator"}),
+    )
+    golden = _golden("orchestrator.derived-primary.opencode.md")
+    assert rendered == golden, "\n".join(_body_diff(golden, rendered))
+
+    _, body = _split_frontmatter(rendered)
+    assert _PRIMARY_MARKER in body
+    assert _LEGACY_MARKER not in body
+
+    # The intentional deviation is exactly the singleton wording, nothing else.
+    baseline = _golden("orchestrator.unset-derived-subagent.opencode.md")
+    _, baseline_body = _split_frontmatter(baseline)
+    assert _LEGACY_MARKER in baseline_body, "baseline lost the legacy branch"
+
+    diff = _body_diff(baseline, rendered)
+    assert len(diff) == 2, (
+        "derived primary vs baseline must differ by exactly one changed line; "
+        f"got: {diff!r}"
+    )
+    assert _LEGACY_MARKER in diff[0] and diff[0].startswith("-"), diff
+    assert _PRIMARY_MARKER in diff[1] and diff[1].startswith("+"), diff
+
+
+def test_declared_primary_render_matches_new_golden(tmp_path):
+    """AC-27: a declared ``primary`` renders the session-entry singleton."""
+    rendered = render_orchestrator(
+        "Claude", tmp_path / "declared-primary", topology="primary",
+    )
+    golden = _golden("orchestrator.declared-primary.md")
+    assert rendered == golden, "\n".join(_body_diff(golden, rendered))
+
+    _, body = _split_frontmatter(rendered)
+    assert _PRIMARY_MARKER in body
+    assert _LEGACY_MARKER not in body
+
+
+def test_declared_subagent_render_matches_new_golden(tmp_path):
+    """AC-36: declared ``subagent`` differs from the derived (else) branch.
+
+    Both renders resolve ``effective == subagent``; only the explicit branch
+    wording separates them, so the difference is deterministic and exactly one
+    line wide.
+    """
+    declared = render_orchestrator(
+        "Claude", tmp_path / "declared-subagent", topology="subagent",
+    )
+    golden = _golden("orchestrator.declared-subagent.md")
+    assert declared == golden, "\n".join(_body_diff(golden, declared))
+
+    derived = render_orchestrator(
+        "Claude", tmp_path / "derived-subagent",
+        topology=_UNSET, active_set=frozenset(),
+    )
+    _, declared_body = _split_frontmatter(declared)
+    _, derived_body = _split_frontmatter(derived)
+    assert declared_body != derived_body, (
+        "declared and derived `subagent` render identically — the "
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT conditional is not wired (AC-36)"
+    )
+    assert _DECLARED_SUBAGENT_MARKER in declared_body
+    assert _LEGACY_MARKER in derived_body
+
+    diff = _body_diff(derived, declared)
+    assert len(diff) == 2, (
+        "declared vs derived `subagent` must differ by exactly one changed "
+        f"line (removed + added); got: {diff!r}"
+    )
+
+
+def test_schema_has_no_new_properties():
+    """AC-26: the topology gate adds no schema property.
+
+    Property PATHS are frozen from the pre-implementation commit; titles,
+    descriptions and enum values may change, the property tree may not.
+    """
+    import json
+
+    fixture_path = _TOPOLOGY_GOLDEN / "schema-property-paths.json"
+    assert fixture_path.is_file(), f"missing schema fixture: {fixture_path.name}"
+    baseline = json.loads(fixture_path.read_text(encoding="utf-8"))
+    assert baseline["commit"] == _SCHEMA_BASELINE_COMMIT
+
+    def property_paths(node: dict, prefix: str = "") -> set[str]:
+        found: set[str] = set()
+        if not isinstance(node, dict):
+            return found
+        for name, child in (node.get("properties") or {}).items():
+            path = f"{prefix}.{name}" if prefix else name
+            found.add(path)
+            found |= property_paths(child, path)
+        if isinstance(node.get("items"), dict):
+            found |= property_paths(node["items"], f"{prefix}[]")
+        return found
+
+    current = json.loads(_PROJECT_SCHEMA.read_text(encoding="utf-8"))
+    current_paths = property_paths(current)
+    frozen_paths = set(baseline["paths"])
+
+    assert current_paths - frozen_paths == set(), (
+        "the implementation added schema properties (AC-26): "
+        f"{sorted(current_paths - frozen_paths)}"
+    )
+    assert frozen_paths - current_paths == set(), (
+        "the implementation removed schema properties (AC-26): "
+        f"{sorted(frozen_paths - current_paths)}"
+    )

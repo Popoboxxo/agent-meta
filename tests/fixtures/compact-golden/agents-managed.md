@@ -3,10 +3,8 @@
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
 `agent-meta v2.0.0-beta.8` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
-# CRITICAL GATE (runtime-partially enforced)
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
-Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
-NICHT erzwungen (Prompt + Permission-Layer).
+# CRITICAL GATE
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
 
 **Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen. Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 
@@ -43,7 +41,16 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 ## Enforced Gates (aktiv prüfen — HARD REJECT)
 
 1. **No Self-Handoff / No Re-Delegation:** Ein `payload`, der mit "Du bist..." beginnt, ist ein Re-Delegations-/Spec-Dump-Versuch → HARD REJECT.
-2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker → `orchestrator` → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
+2. **Orchestrator-Topologie (subagent):**
+   G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.
+   G2 Unter `subagent`/`hybrid` spawnt NUR `main_chat` den Orchestrator; unter
+      `primary` ist der Orchestrator der Session-Einstieg. Höchstens
+      1 gleichzeitig (bei 1 gilt der heutige Singleton),
+      jede mit eindeutiger `orchestrator_id` und disjunktem Scope. Fehlende
+      oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
+   G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
+   Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
+   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 
 # MCP Hard Prohibitions

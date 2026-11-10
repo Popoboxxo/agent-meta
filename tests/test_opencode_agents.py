@@ -16,6 +16,8 @@ surface while a v1 consumer project keeps working.
 Run: python tests/test_opencode_agents.py
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path

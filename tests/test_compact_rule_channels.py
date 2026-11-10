@@ -243,8 +243,13 @@ def test_no_opt_in_render_is_byte_identical_to_the_committed_block(tmp_path):
     match = _MANAGED_BLOCK_RE.search(committed)
     assert match, "committed AGENTS.md has no managed block"
 
-    provider_config = load_providers_config(_REPO_ROOT)
     repo_config = load_config(_REPO_ROOT / ".meta-config" / "project.yaml")
+    # Mirror the production loader contract: the project config carries the
+    # surface/provider-options that resolve a provider's gate tier (e.g. the
+    # verified plugin runtime). Loading without it downgrades Opencode to
+    # ``permission`` and renders a SHARED AGENTS.md gate variant the real sync
+    # never writes.
+    provider_config = load_providers_config(_REPO_ROOT, repo_config)
     no_key = _render(tmp_path / "no-key", repo_config, provider_config)
     full = _render(
         tmp_path / "full", {**repo_config, "context-profile": "full"}, provider_config

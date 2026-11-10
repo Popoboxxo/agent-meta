@@ -45,6 +45,13 @@ documented reason):
   both goldens = main's goldens plus exactly G4's deltas (classify-gate sentence,
   planner gate, slimming only: feature-lifecycle approve stage + neutral commit task)
   and the 8.11.1 version pins.
+* Issue #1190 (mode-topology gate, template 8.11.1 -> 8.12.0): both goldens move
+  by exactly the two release pins (``version``/``generated-from``) and the
+  intended singleton topology wording (the repo declares ``topology: subagent``,
+  so the explicit branch renders). An unset key still renders the legacy line
+  byte-for-byte (AC-16/AC-27), pinned by
+  ``tests/fixtures/topology-golden/orchestrator.unset-derived-subagent.*``.
+  No other line changed.
 """
 from __future__ import annotations
 

@@ -89,3 +89,36 @@ is the guard. Do not regenerate without a documented AC-6 reason.
   ohne Abschluss-Report = `failed`" and the platform depth-limit row). The diff is
   exactly those two lines in both fixtures; the topology wording and the
   role-active/role-inactive fragment difference are unchanged.
+
+## Orchestrator end-state goldens (issue #1190, AC-16/AC-17/AC-26/AC-27/AC-36)
+
+The five `orchestrator.*` fixtures plus `schema-property-paths.json` freeze the
+Task 21 end state of the mode-topology gate. Every `.md` fixture is a FULL
+`agents/1-generic/orchestrator.md` render through the real per-role sync path
+(`tests/test_orchestrator_topology_effective_flags.py::render_orchestrator`) —
+never hand-written.
+
+| Fixture | Provider | Project state | Purpose |
+|---|---|---|---|
+| `orchestrator.unset-derived-subagent.claude.md` | Claude | `topology` unset, `orchestrator` NOT in the ActiveSet | frozen `aaed14c2` template replayed with the CURRENT renderer (AC-16/AC-27 baseline) |
+| `orchestrator.unset-derived-subagent.opencode.md` | Opencode | same | same baseline for Opencode |
+| `orchestrator.unset-derived-subagent.gemini.md` | Gemini | same | same baseline for Gemini |
+| `orchestrator.derived-primary.opencode.md` | Opencode | `topology` unset, `orchestrator` in the ActiveSet (Opencode declares `primary-role: orchestrator`) | intentional AC-17 primary branch |
+| `orchestrator.declared-primary.md` | Claude | `orchestrator.topology: primary` | AC-27 declared primary branch |
+| `orchestrator.declared-subagent.md` | Claude | `orchestrator.topology: subagent` | AC-36 explicit branch |
+
+The three `unset-derived-subagent.*` files are generated from
+`git show aaed14c2:agents/1-generic/orchestrator.md` through
+`render_orchestrator(provider, ..., template_text=baseline)`. The test
+`test_unset_topology_subagent_render_is_byte_identical` asserts that the
+working-tree template renders the same BODY in that state and that only
+`version:` and `generated-from:` move (the two release pins).
+
+`schema-property-paths.json` freezes the recursive `properties` path set of
+`config/project-config.schema.json` at `a41745e` (pre-implementation, 331
+paths). `test_schema_has_no_new_properties` fails on any added or removed
+property; `description`/`title`/`enum` values are explicitly out of scope
+(AC-26).
+
+Regenerate the `.md` goldens only with the helper above (a documented reason
+belongs in the test module's docstring). Do not hand-edit them.

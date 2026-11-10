@@ -44,6 +44,15 @@ Rebaseline log:
 - Issue #1151 (audit G1): the ``use-orchestrator`` Git-Delegation block gained the
   strict-mode sentence and one sentence that worker subagents without the ``git``
   sentinel cannot run ``git init``/config writes/``git stash`` (lines 14-15). Nothing else.
+- Issue #1190 (mode-topology gate, Task 21): the compact golden takes the
+  intended ``a2a-delegation-gates`` G1/G2/G3 topology wording. It also moves
+  from ``# CRITICAL GATE (runtime-partially enforced)`` to the plain
+  ``# CRITICAL GATE``: the fixture had frozen a ``GATE_PARTIAL`` block because
+  this module's ``provider_config`` fixture loaded the registry WITHOUT the
+  project config (Opencode resolved to ``permission`` instead of the verified
+  plugin tier). The fixture now loads like production
+  (``load_providers_config(root, config)``); the committed ``AGENTS.md`` is the
+  reference and the render is byte-identical to it.
 """
 from __future__ import annotations
 
@@ -118,8 +127,13 @@ def loaded_config():
 
 
 @pytest.fixture(scope="module")
-def provider_config():
-    return load_providers_config(_REPO_ROOT)
+def provider_config(loaded_config):
+    # Production loader contract: the project config resolves the provider
+    # surface/provider-options that decide the runtime gate tier. A bare
+    # registry load downgrades Opencode to ``permission`` and renders a
+    # ``GATE_PARTIAL`` block for the shared AGENTS.md that the real sync
+    # (and the committed file) never produces.
+    return load_providers_config(_REPO_ROOT, loaded_config)
 
 
 @pytest.fixture(scope="module")

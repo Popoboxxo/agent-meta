@@ -431,7 +431,11 @@ def _render_context(mode: str | None, workdir: Path) -> str:
         context_block["mode"] = mode
         config["context_file"] = context_block
     variables, _ = build_variables(config, REPO_ROOT)
-    provider_config = load_providers_config(REPO_ROOT)
+    # Production loads the registry WITH the project config (surface /
+    # provider-options) so the per-provider gate tier reflects the verified
+    # plugin runtime. Loading it bare resolves Opencode to ``permission`` and
+    # renders a gate variant the shared AGENTS.md never carries.
+    provider_config = load_providers_config(REPO_ROOT, config)
     capabilities = load_provider_capabilities(REPO_ROOT)
     log = SyncLog()
 
