@@ -74,7 +74,11 @@ anchors:
       - "Verwende Conventional Commits (feat, fix, chore)."
       - "# Sprachregeln"
       - "## Enforced Gates (aktiv prüfen — HARD REJECT)"
-      - "Orchestrator-Singleton:"
+      # #1190 T8: gate 2 now branches three ways (entry-point / explicit /
+      # else), so the history-only "Orchestrator-Singleton:" label is not
+      # position-stable. The numbering + topic prefix is present in every
+      # branch and still proves the gate survived the compact extraction.
+      - "2. **Orchestrator-"
       - "# MCP Hard Prohibitions"
       - "`delete_conclusion`, `set_config`"
       - "`browser_run_code_unsafe`"

@@ -3,7 +3,20 @@
 ## Enforced Gates (aktiv prüfen — HARD REJECT)
 
 1. **No Self-Handoff / No Re-Delegation:** Ein `payload`, der mit "Du bist..." beginnt, ist ein Re-Delegations-/Spec-Dump-Versuch → HARD REJECT.
-{{#if ORCH_TOPOLOGY_EXPLICIT}}
+{{#if ORCH_TOPOLOGY_EFFECTIVE_PRIMARY}}
+2. **Orchestrator-Topologie (Session-Einstieg):**
+   G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.
+   G2 Der Orchestrator ist der Session-Einstieg; ein Start im Main Chat erfüllt
+      dieses Gate nur, wenn er jede Entwicklungsaufgabe an den `orchestrator`
+      delegiert (oder `orchestrator.mode: main-chat` setzt). Höchstens
+      {{ORCH_MAX_INSTANCES}} gleichzeitig (bei 1 gilt der heutige Singleton),
+      jede mit eindeutiger `orchestrator_id` und disjunktem Scope. Fehlende
+      oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
+   G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
+   Fehlende Provider-Unterstützung degradiert laut auf `subagent`
+   (siehe `docs/concepts/active/orchestrator-topology.md`).
+{{else}}
+{{#if ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT}}
 2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**
    G1 Ein Worker dispatcht NIE einen `orchestrator` — HARD REJECT, bei jedem N.
    G2 Unter `subagent`/`hybrid` spawnt NUR `main_chat` den Orchestrator; unter
@@ -16,6 +29,7 @@
    degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
 {{else}}
 2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker{{#if ROLE_ORCHESTRATOR_ACTIVE}} → `orchestrator`{{/if}} → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
+{{/if}}
 {{/if}}
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 

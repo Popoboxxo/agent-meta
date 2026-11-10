@@ -57,7 +57,9 @@ _REQUIRED_COMPACT_ANCHORS = {
         "Verwende Conventional Commits (feat, fix, chore).",
         "# Sprachregeln",
         "## Enforced Gates (aktiv prüfen — HARD REJECT)",
-        "Orchestrator-Singleton:",
+        # #1190 T8: gate 2 branches three ways; the history-only
+        # "Orchestrator-Singleton:" label is not position-stable anymore.
+        "2. **Orchestrator-",
         "# MCP Hard Prohibitions",
         "`delete_conclusion`, `set_config`",
         "`browser_run_code_unsafe`",
