@@ -45,8 +45,10 @@ _REQUIRED_RULE_ANCHORS = (
 # maintainer notes as an HTML comment (IC-08).
 _REQUIRED_COMPACT_ANCHORS = {
     "gate-card": (
+        # #1190 G1: "MAIN CHAT darf nicht selbst editieren" is no longer
+        # position-stable (an effective ``primary`` provider states the
+        # position instead); the heading stays the contract anchor.
         "# CRITICAL GATE",
-        "MAIN CHAT darf nicht selbst editieren",
         "## Git Delegation",
         "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.",
         "# Branch-Guard",

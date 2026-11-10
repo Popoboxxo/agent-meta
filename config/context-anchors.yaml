@@ -48,8 +48,10 @@ anchors:
       - "<pipeline>.md"
   rules-native:
     all-profiles:
+      # #1190 G1: the gate sentence is topology-dependent (effective ``primary``
+      # states the position, ``subagent`` keeps "MAIN CHAT darf nicht selbst
+      # editieren …"). Only the heading is a position-stable contract anchor.
       - "# CRITICAL GATE"
-      - "MAIN CHAT darf nicht selbst editieren"
       - "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren."
       - "# MCP Hard Prohibitions"
       - "# Branch-Guard"
@@ -61,8 +63,9 @@ anchors:
   gate-card:
     all-profiles: []
     compact-only:
+      # #1190 G1: see rules-native above — the heading carries the contract,
+      # the gate sentence is position-dependent.
       - "# CRITICAL GATE"
-      - "MAIN CHAT darf nicht selbst editieren"
       - "## Git Delegation"
       - "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren."
       - "# Branch-Guard"

@@ -5037,7 +5037,14 @@ def test_lab_diff_v1_v2(tmp_path):
     assert f"{tier_marker} `permission`" in agents_v1
     assert f"{tier_marker} `plugin`" in agents_v2
     assert "# CRITICAL GATE (runtime-partially enforced)" in agents_v1
-    assert "# CRITICAL GATE\nMAIN CHAT darf nicht selbst editieren." in agents_v2
+    # #1190 G1: the scenario's provider derives the effective ``primary``
+    # position, so the gate states the position instead of the historic
+    # "MAIN CHAT darf nicht selbst editieren …" sentence. The heading is the
+    # stable contract; the first sentence is the position statement.
+    assert (
+        "# CRITICAL GATE\n"
+        "Der `orchestrator` ist in diesem Projekt der Session-Einstieg"
+    ) in agents_v2
 
 
 def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):

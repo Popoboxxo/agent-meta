@@ -1,23 +1,42 @@
 {{#if ORCH_MODE_STRICT}}
 {{#if GATE_ENFORCED}}
 # CRITICAL GATE
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+{{#if ORCH_TOPOLOGY_EFFECTIVE_PRIMARY}}Der `orchestrator` ist in diesem Projekt der Session-Einstieg (`strict` verlangt das).
+Eine Session im Main Chat erfüllt dieses Gate nur, wenn sie jede Entwicklungsaufgabe an
+den `orchestrator` delegiert — vorausgesetzt, der Provider lässt diesen Start aus dem
+Main Chat zu — oder wenn der Nutzer `orchestrator.mode: main-chat` setzt (dann ist der
+Main Chat Router + Worker).{{else}}MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.{{/if}}
 {{/if}}
 {{#if GATE_PARTIAL}}
 # CRITICAL GATE (runtime-partially enforced)
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
-Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+{{#if ORCH_TOPOLOGY_EFFECTIVE_PRIMARY}}Der `orchestrator` ist in diesem Projekt der Session-Einstieg (`strict` verlangt das).
+Eine Session im Main Chat erfüllt dieses Gate nur, wenn sie jede Entwicklungsaufgabe an
+den `orchestrator` delegiert — vorausgesetzt, der Provider lässt diesen Start aus dem
+Main Chat zu — oder wenn der Nutzer `orchestrator.mode: main-chat` setzt (dann ist der
+Main Chat Router + Worker).
+{{else}}MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+{{/if}}Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
 NICHT erzwungen (Prompt + Permission-Layer).
 {{/if}}
 {{#if GATE_ADVISORY}}
 # CRITICAL GATE (advisory)
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
-ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate.
+{{#if ORCH_TOPOLOGY_EFFECTIVE_PRIMARY}}Der `orchestrator` ist in diesem Projekt der Session-Einstieg (`strict` verlangt das).
+Eine Session im Main Chat erfüllt dieses Gate nur, wenn sie jede Entwicklungsaufgabe an
+den `orchestrator` delegiert — vorausgesetzt, der Provider lässt diesen Start aus dem
+Main Chat zu — oder wenn der Nutzer `orchestrator.mode: main-chat` setzt (dann ist der
+Main Chat Router + Worker).
+{{else}}MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+{{/if}}ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate.
 {{/if}}
 {{#if GATE_NEUTRAL}}
 # CRITICAL GATE (neutral)
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
-Dieser geteilte Kontext wird von mehreren Providern gelesen; die Runtime-Erzwingung
+{{#if ORCH_TOPOLOGY_EFFECTIVE_PRIMARY}}Der `orchestrator` ist in diesem Projekt der Session-Einstieg (`strict` verlangt das).
+Eine Session im Main Chat erfüllt dieses Gate nur, wenn sie jede Entwicklungsaufgabe an
+den `orchestrator` delegiert — vorausgesetzt, der Provider lässt diesen Start aus dem
+Main Chat zu — oder wenn der Nutzer `orchestrator.mode: main-chat` setzt (dann ist der
+Main Chat Router + Worker).
+{{else}}MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+{{/if}}Dieser geteilte Kontext wird von mehreren Providern gelesen; die Runtime-Erzwingung
 ist provider-spezifisch und steht im jeweiligen dedizierten Tier-Kanal (Adapter-
 bzw. Rules-Datei) — siehe `a2a-delegation-gates`.
 {{/if}}
