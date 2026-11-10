@@ -82,6 +82,14 @@ entfernt die Rolle, damit ist jede Topologie gegenstandslos.
 v1-Verhalten: weil `topology_verified_state.hybrid == UNVERIFIED` ist,
 degradiert jede `hybrid`-Zelle in v1 auf `subagent` (Fail-safe).
 
+**Abgeleitete Topologie (B-11, D-Q1).** Die Matrix beschreibt nur die
+**deklarierte** Topologie. Ist `orchestrator.topology` ungesetzt, leitet der
+Resolver `primary` **nur dann** ab, wenn `providers.<P>.primary-role` die Rolle
+nennt **und** sie im ActiveSet liegt; andernfalls leitet er `subagent` ab. Unter
+`mode: main-chat` ist diese Ableitung **inert** — sie erzeugt genau eine WARNING
+`orchestrator-topology.main-chat-derived-primary` (die Rolle wird dort nicht
+emittiert, die abgeleitete Position ist gegenstandslos).
+
 `mode: main-chat` im selben Scope wie eine Topologie (auch im selben Objekt)
 ist ein **harter Validator-ERROR** (rc ≠ 0). Cross-Scope (Provider-Override
 `mode: main-chat` bei global gesetzter Topologie) ist eine WARNING
@@ -223,6 +231,13 @@ Team `strict × subagent`.
 > des ausgelieferten Vertrags — nicht mehr nur entworfen. Der Default bleibt
 > N=1: **N=1 ist byte-identisch** zu vorher (keine Rollen-, Dateinamen-,
 > Session-ID- oder Render-Änderung ohne gesetzten Key).
+
+> **Statuskorrektur (2026-11-09, #1190, B-7).** Die Vorgänger-Spec
+> [`2026-11-04-orchestrator-topology-spec.md`](../../specs/2026-11-04-orchestrator-topology-spec.md)
+> führt die Multi-Instanz-Passage in `:791-792` noch als reinen Entwurf
+> („designed, not shipped"). Diese Zeile ist **überholt** und wird bewusst
+> **nicht** editiert (D1–D10 bleiben unangetastet); verbindlich ist
+> „P3, shipped".
 
 - `orchestrator.max-instances` (integer **1..8**, Default **1**) ist der
   kanonische Multiplizitäts-Key; `orchestrator.singleton` ist ein

@@ -1723,7 +1723,11 @@ Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für o
 
 ### 13.2 Singleton-Regel
 
-> **NUR der `main_chat` darf den `orchestrator` spawnen.**
+> **Wer den `orchestrator` spawnen darf, hängt von `orchestrator.topology` ab.**
+> Unter `subagent`/`hybrid` spawnt ihn der `main_chat` (POS-2); unter `primary` **ist** der
+> Orchestrator der Session-Einstieg (POS-3). Beide Opencode-Positionen sind first-class:
+> POS-2 (`strict × subagent`) ist die Empfehlung, POS-3 (`strict × primary`) die optionale
+> Session-Einstiegs-Variante.
 > Worker-Agents (`delegation_depth >= 2`) dürfen `task(subagent_type="orchestrator", ...)` NIEMALS aufrufen.
 
 ### 13.3 HITL-Gate-Deadlock-Fix (Session 2026-07-01)

@@ -541,3 +541,266 @@ def test_gemini_primary_degrades_with_one_warning():
         f"got {len(degraded)}."
     )
     assert degraded[0].severity == Severity.WARNING
+
+
+# ---------------------------------------------------------------------------
+# Issue #1190, Task 16 (AC-25/AC-28): the eleven documentation findings B-1…B-11
+#
+# B-1 … B-11 (spec §9.1) are absolute singleton claims that must be
+# topology-qualified, a contradictory P3 status, one rendered gate variant and
+# two README gaps. B-9 is a render defect (checked against the generated rule,
+# not against text); B-5/B-6 were already fixed in T8 and are pinned here so
+# the template branches cannot regress.
+#
+# Spec/review/plan files are intentionally excluded: they quote the defect.
+# ---------------------------------------------------------------------------
+
+_README = _REPO_ROOT / "README.md"
+_CLAUDE_MD = _REPO_ROOT / "CLAUDE.md"
+_CODEBASE_OVERVIEW = _REPO_ROOT / "docs" / "CODEBASE_OVERVIEW.md"
+_MAIN_CHAT_CONCEPT = (
+    _REPO_ROOT / "docs" / "concepts" / "active" / "main-chat-orchestrator-mode.md"
+)
+_ORCHESTRATOR_TEMPLATE = _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
+_GENERATED_GATE_RULE = _REPO_ROOT / ".claude" / "rules" / "use-orchestrator.md"
+_ADR_0002 = _REPO_ROOT / "docs" / "adr" / "0002-orchestrator-mode-topology.md"
+
+# Normalized (see ``_normalized``) forbidden literals: an absolute singleton
+# claim. It is only allowed when a topology qualifier sits in the same block.
+_SINGLETON_CLAIM_LITERALS = (
+    "nur der main_chat spawnt",
+    "nur main_chat darf",
+    # B-4 variant: "NUR der `main_chat` darf …" (same absolute claim).
+    "nur der main_chat darf",
+    "only main_chat may create you",
+    "der vom main_chat gespawnte",
+    "one per session, spawned by the main chat",
+)
+# Word boundary on both sides: `subagent_type` is not a topology qualifier.
+_SINGLETON_QUALIFIER_RE = re.compile(r"(?<![a-z_])(?:topology|subagent|primary)(?![a-z_])")
+
+# ``(finding, path, anchor, extra required tokens)``. Eleven site entries for
+# ten text-carrying findings: B-9 is the generated-render check below and B-10
+# pins both the consequence line and the status row that contradicted it.
+_B_SITES: tuple[tuple[str, Path, str, tuple[str, ...]], ...] = (
+    ("B-1", _CLAUDE_MD, "Singleton-Regel", ("topology",)),
+    ("B-2", _README, "flowchart TD", ("orchestrator (primary)", "orchestrator (subagent)")),
+    ("B-3", _README, "| `orchestrator.mode` |", ("orchestrator.topology",)),
+    ("B-4", _CODEBASE_OVERVIEW, "13.2 Singleton-Regel", ("pos-2", "pos-3")),
+    ("B-5", _ORCHESTRATOR_TEMPLATE, "**Singleton", ()),
+    ("B-6", _A2A_RULE, "G2 Unter", ()),
+    ("B-7", _CONCEPT, "Der Vertrag ist implementiert und validiert", ()),
+    ("B-8", _SINGLETON, "Status-Hinweis (2026-11-04)", ("p3, shipped",)),
+    ("B-10", _MAIN_CHAT_CONCEPT, "Singleton-Guard-Hook", ("offenes follow-up", "pos-1")),
+    (
+        "B-10",
+        _MAIN_CHAT_CONCEPT,
+        "Hook-Deaktivierung bleibt offenes Follow-up",
+        ("offenes follow-up",),
+    ),
+    ("B-11", _CONCEPT, "Main Chat spawnt, strikte Gates", ("topology",)),
+)
+
+
+def _block_at(path: Path, anchor: str) -> str:
+    """The blank-line-delimited Markdown block containing *anchor*.
+
+    A heading-only block is expanded to the following block, so an anchor on a
+    heading also covers the paragraph/table/blockquote it introduces.
+    """
+    lines = _text(path).splitlines()
+    for index, line in enumerate(lines):
+        if anchor not in line:
+            continue
+        start = index
+        while start > 0 and lines[start - 1].strip():
+            start -= 1
+        end = index
+        while end + 1 < len(lines) and lines[end + 1].strip():
+            end += 1
+        if lines[start].lstrip().startswith("#") and start == end:
+            cursor = end + 1
+            while cursor < len(lines) and not lines[cursor].strip():
+                cursor += 1
+            end = cursor
+            while end + 1 < len(lines) and lines[end + 1].strip():
+                end += 1
+            start = cursor
+        return "\n".join(lines[start:end + 1])
+    raise AssertionError(f"anchor {anchor!r} not found in {path}")
+
+
+def _fenced_blocks(content: str, language: str) -> list[str]:
+    return re.findall(
+        rf"^```{language}\s*$(.*?)^```\s*$", content, re.MULTILINE | re.DOTALL
+    )
+
+
+def test_no_absolute_singleton_claim_without_topology_qualifier():
+    """AC-25 / RVW2-1190-13: no absolute singleton claim survives.
+
+    The eleven B sites of spec §9.1 are pinned; a forbidden literal may only
+    appear when ``topology``/``subagent``/``primary`` is in the same block.
+    """
+    assert len(_B_SITES) == 11, "expected exactly the eleven B sites."
+    violations = []
+    for finding, path, anchor, _extra in _B_SITES:
+        block = _normalized(_block_at(path, anchor))
+        for literal in _SINGLETON_CLAIM_LITERALS:
+            if literal in block and not _SINGLETON_QUALIFIER_RE.search(block):
+                violations.append(f"{finding} {path.relative_to(_REPO_ROOT)}: {literal!r}")
+    assert violations == [], (
+        "absolute singleton claim without a topology qualifier in the same "
+        "block (B-1…B-11): " + "; ".join(violations)
+    )
+
+    for finding, path, anchor, extra in _B_SITES:
+        block = _normalized(_block_at(path, anchor))
+        for token in extra:
+            assert token in block, (
+                f"{finding}: {path.relative_to(_REPO_ROOT)} block at {anchor!r} "
+                f"must state {token!r}."
+            )
+
+    # B-11: the declared-only interaction matrix carries the derived case.
+    concept = _normalized(_text(_CONCEPT))
+    assert "orchestrator-topology.main-chat-derived-primary" in concept, (
+        "B-11: the mode x topology matrix must name the derived-topology WARN "
+        "`orchestrator-topology.main-chat-derived-primary`."
+    )
+    assert "primary-role" in concept, (
+        "B-11: the derived row must name `providers.<P>.primary-role` as the "
+        "derivation source."
+    )
+
+
+def test_p3_status_is_single_valued():
+    """B-7/B-8: P3 has exactly one status — shipped."""
+    for path in (_CONCEPT, _SINGLETON):
+        content = _text(path)
+        assert "P3, shipped" in content, (
+            f"{path.relative_to(_REPO_ROOT)} must say `P3, shipped`."
+        )
+        assert "P3, designed, not shipped" not in content, (
+            f"{path.relative_to(_REPO_ROOT)} still carries the superseded "
+            "`P3, designed, not shipped` marker."
+        )
+    concept = _text(_CONCEPT)
+    assert "überholt" in _normalized(concept), (
+        "orchestrator-topology.md must mark the predecessor spec line as "
+        "superseded (`überholt`) instead of editing it."
+    )
+    assert "2026-11-04-orchestrator-topology-spec.md" in concept and ":791-792" in concept, (
+        "orchestrator-topology.md must cite the superseded predecessor spec "
+        "line `docs/specs/2026-11-04-orchestrator-topology-spec.md:791-792`."
+    )
+
+
+_GATE_HEADER_RE = re.compile(r"^# CRITICAL GATE(?: \(([^)]+)\))?\s*$", re.MULTILINE)
+_GATE_VARIANT_MARKERS = (
+    "runtime-partially enforced",
+    "ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert",
+    "Dieser geteilte Kontext wird von mehreren Providern gelesen",
+)
+
+
+def test_gate_render_is_single_variant_per_file():
+    """B-9: a rendered rule carries exactly one gate variant."""
+    content = _text(_GENERATED_GATE_RULE)
+    headers = _GATE_HEADER_RE.findall(content)
+    assert len(headers) == 1, (
+        "the rendered `.claude/rules/use-orchestrator.md` must carry exactly "
+        f"one `# CRITICAL GATE` header, found {len(headers)}: {headers!r}."
+    )
+    if headers[0] == "":
+        for marker in _GATE_VARIANT_MARKERS:
+            assert marker not in content, (
+                "a suffixless `# CRITICAL GATE` must not be combined with a "
+                f"tier-suffixed gate paragraph ({marker!r}) in the same file."
+            )
+
+
+def test_readme_lists_the_topology_key():
+    """B-2/B-3: the key table and the Mermaid graph name the topology."""
+    content = _text(_README)
+    key_rows = [line for line in content.splitlines() if line.startswith("| `orchestrator.")]
+    assert any("`orchestrator.mode`" in row for row in key_rows), (
+        "README key table lost the `orchestrator.mode` row."
+    )
+    assert any("`orchestrator.topology`" in row for row in key_rows), (
+        "README key table must name `orchestrator.topology` (B-3)."
+    )
+
+    mermaid = _normalized(
+        "\n".join(
+            block
+            for block in _fenced_blocks(content, "mermaid")
+            if "orchestrator.mode" in block
+        )
+    )
+    assert "orchestrator (primary)" in mermaid and "entry" in mermaid, (
+        "B-2: the Mermaid block needs an `orchestrator (primary)` node marked "
+        "as the session entry point."
+    )
+    assert "orchestrator (subagent)" in mermaid and "spawned" in mermaid, (
+        "B-2: the Mermaid block needs an `orchestrator (subagent)` node marked "
+        "as spawned by the main chat."
+    )
+    assert "one per session, spawned by the main chat" not in mermaid, (
+        "B-2: the absolute `one per session, spawned by the main chat` node "
+        "must be gone."
+    )
+
+
+def _adr_decision_chunk(content: str, decision_id: str) -> str:
+    """Text of one `### <decision_id>` section, up to the next heading."""
+    heading = re.search(rf"^###\s+{re.escape(decision_id)}\b.*?$", content, re.MULTILINE)
+    assert heading, f"ADR must carry a `### {decision_id}` decision section."
+    rest = content[heading.end():]
+    following = re.search(r"^#{2,3}\s", rest, re.MULTILINE)
+    return rest[: following.start()] if following else rest
+
+
+def test_adr_records_dq1_to_dq5():
+    """AC-28: the five design decisions live in ADR 0002 with consequences."""
+    assert _ADR_0002.is_file(), (
+        "docs/adr/0002-orchestrator-mode-topology.md must exist (AC-28)."
+    )
+    content = _text(_ADR_0002)
+    for expected in (
+        "Status: Accepted",
+        "2026-11-09",
+        "#1190",
+        "2026-11-09-orchestrator-mode-topology-design.md",
+    ):
+        assert expected in content, f"ADR 0002 must carry {expected!r}."
+    for index in range(1, 6):
+        chunk = _normalized(_adr_decision_chunk(content, f"D-Q{index}"))
+        assert "konsequenz" in chunk, (
+            f"ADR 0002: D-Q{index} needs an explicit consequence."
+        )
+
+
+def test_adr_records_doq1_to_doq3():
+    """AC-28: the three user decisions carry the 2026-11-09 date + consequence."""
+    content = _text(_ADR_0002)
+    chunks = {}
+    for index in (1, 2, 3):
+        decision = f"D-OQ{index}"
+        chunks[index] = _normalized(_adr_decision_chunk(content, decision))
+        assert "2026-11-09" in chunks[index], (
+            f"ADR 0002: {decision} must carry the decision date 2026-11-09."
+        )
+        assert "konsequenz" in chunks[index], (
+            f"ADR 0002: {decision} needs an explicit consequence."
+        )
+    assert "strict × subagent" in chunks[1] and "first-class" in chunks[1], (
+        "D-OQ1 must record the default `strict × subagent` and the first-class "
+        "status of both Opencode positions."
+    )
+    assert "gate-tier" in chunks[2], (
+        "D-OQ2 must record the gate tier per surface."
+    )
+    assert "#1182" in chunks[3], (
+        "D-OQ3 must record the #1182 precondition for `advisory × subagent`."
+    )

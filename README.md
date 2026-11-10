@@ -208,6 +208,7 @@ Common top-level keys (all verified in `scripts/lib/`):
 | `rules-preset` | `default`, `minimal`, `silent` | Which rules are active |
 | `speech-mode` | mode name | Agent response style; see [Speech modes](#speech-modes) |
 | `orchestrator.mode` | `strict`, `advisory`, `main-chat` | Task routing; see [Orchestrator modes](#orchestrator-modes) |
+| `orchestrator.topology` | `primary`, `subagent`, `hybrid` | Where the orchestrator lives (entry point vs. spawned); see [Orchestrator topology](docs/concepts/active/orchestrator-topology.md) |
 | `orchestrator.native-extensions.whitelist` | list | Native skills/plugins/hooks exempt from the strict gate |
 | `auto_commit` | block | Opt-in commit authority; see [Auto-commit](#auto-commit) |
 | `knowledge-engine` | block | Opt-in wiki bundle; see [Knowledge Engine](#knowledge-engine) |
@@ -412,14 +413,19 @@ flowchart TD
     U["User request in the main chat"]
     M{"orchestrator.mode"}
     MC["main-chat: main chat routes and works itself"]
-    O["orchestrator: one per session, spawned by the main chat"]
+    T{"orchestrator.topology"}
+    OP["orchestrator (primary): session entry point"]
+    OS["orchestrator (subagent): spawned by the main chat"]
     W["Worker sub-agents, e.g. developer, tester, validator"]
     R["Result returned to the caller"]
     X["Worker never calls the orchestrator again"]
     U --> M
     M -->|"main-chat"| MC
-    M -->|"strict or advisory"| O
-    O -->|"delegates"| W
+    M -->|"strict or advisory"| T
+    T -->|"primary"| OP
+    T -->|"subagent / hybrid / unset"| OS
+    OP -->|"delegates"| W
+    OS -->|"delegates"| W
     U -.->|"advisory only: direct dispatch"| W
     W --> R
     W -.->|"forbidden: no back-delegation"| X
@@ -427,6 +433,10 @@ flowchart TD
 
 `strict` routes every task through the orchestrator. `advisory` recommends it but allows direct dispatch.
 `main-chat` has no orchestrator sub-agent.
+
+`orchestrator.topology` decides where that orchestrator lives: `primary` makes it the session entry
+point (one per session, started by the user), `subagent` is spawned by the main chat, and an unset
+topology is derived per provider (see [Orchestrator topology](docs/concepts/active/orchestrator-topology.md)).
 
 Set `orchestrator.mode` in `.meta-config/project.yaml`. Override per provider with
 `orchestrator.provider-overrides.<Provider>.mode`.
