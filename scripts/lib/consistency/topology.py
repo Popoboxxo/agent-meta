@@ -35,6 +35,13 @@ render cannot express as a diff:
     inert. Only the derivation is reported — a *declared* topology next to
     ``main-chat`` stays the hard validator's error (D-Q1, AC-1/AC-2).
 
+``orchestrator-topology.strict-primary-entry-mismatch`` (WARNING)
+    ``mode: strict`` with an effective topology of ``primary`` while the
+    committed ``default_agent`` is absent or names another role: the session
+    does not start in the role the strict gate requires. Only this static part
+    is checkable at sync time — the session form is a user decision (D-Q2,
+    AC-4). Read-only: no state record, no rollback.
+
 ``orchestrator-topology.singleton-redundant`` (INFO, P3)
     ``orchestrator.singleton`` is present while ``max-instances`` is 1. Valid
     but redundant — the count is already the default (AC-8).
@@ -73,6 +80,9 @@ CHECK_DEGRADED = "orchestrator-topology.degraded"
 CHECK_HYBRID_UNVERIFIED = "orchestrator-topology.hybrid-unverified"
 CHECK_MAIN_CHAT_SUPERSEDES = "orchestrator-topology.main-chat-supersedes"
 CHECK_MAIN_CHAT_DERIVED_PRIMARY = "orchestrator-topology.main-chat-derived-primary"
+CHECK_STRICT_PRIMARY_ENTRY_MISMATCH = (
+    "orchestrator-topology.strict-primary-entry-mismatch"
+)
 CHECK_GATE_INACTIVE = "orchestrator-topology.gate-inactive"
 CHECK_DEFAULT_AGENT_CONFLICT = "orchestrator-topology.default-agent-conflict"
 CHECK_SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
@@ -167,6 +177,54 @@ def _user_owned_default_agent(
     state = _read_state(agent_meta_root / _OPENCODE_STATE_FILE, _STATE_DEFAULT_AGENT_KEY)
     managed = isinstance(state, dict) and state.get("value") == current
     return None if managed else current
+
+
+def _strict_primary_entry_mismatch(
+    agent_meta_root: Path,
+    provider_config: dict,
+    provider: str,
+    pc: dict,
+    *,
+    mode: str,
+    effective: str,
+) -> Optional[str]:
+    """The committed ``default_agent`` that misses the strict gate's entry point.
+
+    Returns ``"<absent>"`` when the gate document is missing or carries no
+    ``default_agent``, the foreign value when it names a role other than the
+    provider's ``primary-role`` (fallback ``orchestrator``), and ``None`` when
+    the position, the surface or a matching value makes the check inapplicable.
+
+    Read-only and stateless on purpose: unlike :func:`_user_owned_default_agent`
+    this never consults the ``default-agent`` state record and never reasons
+    about rollback — it only judges the committed document (D-Q2, G6).
+    """
+    if mode != "strict" or effective != "primary":
+        return None
+
+    from ..io import read_json_lenient
+    from ..isolation import owns_gate_surface
+    from ..providers import explicit_primary_role
+
+    if not owns_gate_surface(provider_config, provider):
+        return None
+    rel = _settings_path(agent_meta_root, pc)
+    if rel is None:
+        return None
+    path = agent_meta_root / rel
+    if not path.is_file():
+        return "<absent>"
+    try:
+        document = read_json_lenient(path)
+    except OSError:
+        return None
+    if not isinstance(document, dict):
+        return None
+    current = document.get("default_agent")
+    expected = explicit_primary_role(provider_config, provider) or "orchestrator"
+    if isinstance(current, str) and current:
+        return None if current == expected else current
+    return "<absent>"
 
 
 def _append_once(
@@ -436,6 +494,39 @@ def check_orchestrator_topology(
                     f"'{provider}' is '{resolution.effective}'.",
                     "The user value is left untouched (no auto-delete); remove "
                     "the key or set orchestrator.topology: primary.",
+                )
+
+            # D-Q2 (AC-4): ``strict`` + effective ``primary`` only enforces
+            # anything when the session actually starts in the orchestrator.
+            # The sync cannot see the session form, but it can see whether the
+            # committed entry point exists and points at that role.
+            entry_mismatch = _strict_primary_entry_mismatch(
+                agent_meta_root,
+                provider_config,
+                provider,
+                pc,
+                mode=mode,
+                effective=resolution.effective,
+            )
+            if entry_mismatch is not None:
+                expected_role = (
+                    explicit_primary_role(provider_config, provider) or "orchestrator"
+                )
+                _append_once(
+                    findings,
+                    seen,
+                    CHECK_STRICT_PRIMARY_ENTRY_MISMATCH,
+                    _settings_path(agent_meta_root, pc) or _PROJECT_CONFIG,
+                    "orchestrator.mode is 'strict' and the effective "
+                    f"orchestrator topology for provider '{provider}' is "
+                    f"'primary', but default_agent is '{entry_mismatch}' — the "
+                    "session does not start in the role that the strict gate "
+                    f"requires. Set default_agent to '{expected_role}', or run "
+                    "with orchestrator.mode: main-chat, or set "
+                    "orchestrator.topology: subagent for this provider.",
+                    f"Set default_agent to '{expected_role}', or run with "
+                    "orchestrator.mode: main-chat, or set orchestrator.topology: "
+                    "subagent for this provider.",
                 )
     except Exception:  # noqa: BLE001 — a checker must never fail the suite
         return findings
