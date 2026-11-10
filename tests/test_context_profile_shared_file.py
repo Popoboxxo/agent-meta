@@ -62,6 +62,7 @@ def _render(config, provider_config, provider, captured, log):
     _build_managed_block(
         REPO_ROOT, config, dict(config.get("variables", {})), log,
         provider=provider, provider_config=provider_config, project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     return captured["agents-managed"]
 

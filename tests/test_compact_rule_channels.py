@@ -120,6 +120,7 @@ def _render(project_root: Path, config: dict, provider_config: dict) -> str:
     return _build_managed_block(
         _REPO_ROOT, config, variables, SyncLog(), provider=_PROVIDER,
         provider_config=provider_config, project_root=project_root,
+        active_set=frozenset(),
     )
 
 

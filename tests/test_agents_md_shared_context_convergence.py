@@ -95,6 +95,7 @@ def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
         provider: _build_managed_block(
             REPO_ROOT, config, dict(variables), SyncLog(),
             provider=provider, provider_config=provider_config, project_root=REPO_ROOT,
+            active_set=frozenset(),
         )
         for provider in _AGENTS_MD_SHARERS
     }
@@ -126,6 +127,7 @@ def test_shared_managed_block_identical_with_gate_vars(loaded_config):
             REPO_ROOT, config, _gate_variables(config, provider, provider_config),
             SyncLog(), provider=provider, provider_config=provider_config,
             project_root=REPO_ROOT,
+            active_set=frozenset(),
         )
         for provider in sharers
     }

@@ -916,8 +916,9 @@ def _sync_opencode_context(
 
     ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword
     and never resolved here: the effective-topology position arrives already
-    resolved in ``variables`` (Stage 4), so this strategy only has to accept
-    the set (T10 consumes it in the managed-block path).
+    resolved in ``variables`` (Stage 4). The set is forwarded to the
+    managed-block render, which uses it to keep the position axis of a
+    *shared* physical file deterministic (G5/AC-20).
     """
 
     pc = provider_config[provider]
@@ -977,6 +978,7 @@ def _sync_opencode_context(
             provider=provider, provider_config=provider_config, project_root=project_root,
             target_name=target_name,
             platform_vars=platform_vars,
+            active_set=active_set,
         )
         # The "agents-managed" template ends with a trailing newline after its
         # own closing marker, but managed_pattern's match never consumes any
@@ -2407,6 +2409,83 @@ def sync_compact_reference_skills(
         )
 
 
+def _shared_topology_flags(
+    active_shared_users: list[str],
+    config: dict,
+    provider_config: dict,
+    agent_meta_root: Path,
+    active_set,
+) -> dict[str, str]:
+    """Return the ONE deterministic effective-position flags for a shared file.
+
+    A physical context file that more than one active provider renders is
+    written by each sharer in turn, so it must render identically every time
+    (issue #638/#794 oscillation guard). A position-specific statement violates
+    that as soon as the sharers resolve to different positions — the file would
+    flip on every sync and ``--check`` never converges (spec §5-G5/AC-20).
+
+    Rule: resolve every active sharer's effective state with the ONE resolver
+    (:func:`lib.topology.resolve_topology`, same inputs, same per-sync
+    ``active_set``) and
+
+    * all sharers agree -> write exactly that state (byte-identical to the
+      single-sharer render, so the pure ``subagent`` case stays untouched);
+    * the sharers disagree -> neutralise all position flags and the explicit
+      flag, so the consumers fall back to their historic else branch (a
+      directive, not a position claim).
+
+    The state is the pair ``(effective, source != "derived")`` — two sharers
+    that resolve the same position but differ in explicitness would also render
+    different text (``_EFFECTIVE_EXPLICIT`` gates a second wording).
+
+    Provider differences come from the capability data and the provider
+    registry only — never from a provider-name branch. The audit strings
+    ``ORCH_TOPOLOGY_EFFECTIVE``/``_EFFECTIVE_SOURCE`` are deliberately not
+    touched: they are not consumed by this render.
+    """
+    from .providers import load_provider_capabilities
+    from .topology import resolve_topology
+
+    orch_config = config.get("orchestrator", {}) or {}
+    provider_overrides = orch_config.get("provider-overrides", {}) or {}
+    capabilities = load_provider_capabilities(agent_meta_root)
+
+    states: set[tuple[str, bool]] = set()
+    for sharer in active_shared_users:
+        resolution = resolve_topology(
+            config,
+            sharer,
+            provider_config=provider_config,
+            capabilities=capabilities.get(sharer, {}),
+            mode=_resolve_orch_mode(orch_config, provider_overrides.get(sharer)),
+            active_set=active_set,
+        )
+        states.add((resolution.effective, resolution.source != "derived"))
+
+    if len(states) != 1:
+        # Mixed positions (or mixed explicitness): no position-specific claim.
+        return {
+            "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "false",
+        }
+
+    effective, explicit = next(iter(states))
+    return {
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "true" if explicit else "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": (
+            "true" if effective == "primary" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": (
+            "true" if effective == "subagent" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": (
+            "true" if effective == "hybrid" else "false"
+        ),
+    }
+
+
 def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
@@ -2417,6 +2496,8 @@ def _build_managed_block(
     project_root: Path | None = None,
     target_name: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> str:
     from .delegation_table import exclude_name_only, get_active_agents_data
     from .rules import (
@@ -2497,6 +2578,9 @@ def _build_managed_block(
     # stay per-provider by design (determinism scope AC-25 / R7).
     from .providers import load_provider_capabilities
 
+    # Active sharers of this physical file, hoisted: the gate tier (below) and
+    # the orchestrator topology axis (G5) both need the same set.
+    active_shared_users: list[str] = [provider]
     if provider_config:
         from .providers import (
             resolve_providers,
@@ -2512,6 +2596,20 @@ def _build_managed_block(
                     provider_config,
                     load_provider_capabilities(agent_meta_root),
                     config,
+                )
+            )
+            # G5/AC-20 (same determinism contract, independent of the gate
+            # tier above): the position axis must not carry a provider-specific
+            # claim either. A single active sharer keeps the provider-scoped
+            # Stage-4 flags already present in ``variables`` -- re-resolving
+            # there would be the fourth resolution of the run.
+            local_vars.update(
+                _shared_topology_flags(
+                    active_shared_users,
+                    config,
+                    provider_config,
+                    agent_meta_root,
+                    active_set,
                 )
             )
 

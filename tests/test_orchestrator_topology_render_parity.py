@@ -220,6 +220,7 @@ def test_shared_context_renders_one_deterministic_block():
             _REPO_ROOT, config, dict(variables), SyncLog(),
             provider=provider, provider_config=provider_config,
             project_root=_REPO_ROOT, target_name="AGENTS.md",
+            active_set=active_set,
         )
 
     shared_vars = dict(shared)

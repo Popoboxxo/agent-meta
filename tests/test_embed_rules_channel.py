@@ -59,6 +59,7 @@ def test_embed_false_rule_leaves_block_when_group_has_file_channel(env):
         REPO_ROOT, config, env["variables"], env["log"],
         provider="Opencode", provider_config=env["provider_config"],
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" not in block  # body left the embed
     assert "## Übrige Regeln (Lazy-Load)" in block  # pointer took its place
@@ -75,6 +76,7 @@ def test_embed_false_rule_embeds_without_file_channel(env):
         REPO_ROOT, config, env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" in block  # fallback: embedded, not lost
     assert "## Übrige Regeln (Lazy-Load)" not in block
@@ -89,6 +91,7 @@ def test_inactive_weak_sharer_does_not_veto_file_channel(env):
         REPO_ROOT, _no_worktree_override(env), env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" not in block
     assert "## Übrige Regeln (Lazy-Load)" in block
@@ -162,6 +165,7 @@ def test_shared_block_identical_with_and_without_embed_false(env):
             REPO_ROOT, config, env["variables"], env["log"],
             provider=provider, provider_config=env["provider_config"],
             project_root=REPO_ROOT,
+            active_set=frozenset(),
         )
         for provider in ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
     }
@@ -182,6 +186,7 @@ def test_mcp_and_tool_sections_leave_block_on_file_channel(env):
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=env["provider_config"],
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     for gone in ("# MCP: honcho", "# MCP: playwright", "# MCP: reqogniloom",
                  "## Erlaubte Tools", "# External Tool: graphify",
@@ -201,6 +206,7 @@ def test_mcp_and_tool_sections_embed_without_file_channel(env):
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# MCP: honcho" in block
     assert "## Erlaubte Tools" in block

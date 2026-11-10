@@ -140,6 +140,7 @@ def _render(profile, project_root, config, provider_config, capabilities):
     return _build_managed_block(
         _REPO_ROOT, cfg, variables, SyncLog(), provider=_PROVIDER,
         provider_config=provider_config, project_root=project_root,
+        active_set=frozenset(),
     )
 
 
@@ -310,6 +311,7 @@ def test_compact_entry_over_hard_cap_raises(
         _build_managed_block(
             _REPO_ROOT, config, variables, SyncLog(), provider=_PROVIDER,
             provider_config=provider_config, project_root=tmp_path,
+            active_set=frozenset(),
         )
 
 
