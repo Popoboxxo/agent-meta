@@ -969,6 +969,67 @@ def _agent_name_from_filename(filename: str, provider_config: dict | None,
     return Path(filename).stem
 
 
+def _singleton_constraint_block(effective: str, *, inert: bool) -> str:
+    """Render the auto-generated singleton guard block for the effective position.
+
+    Topology-aware (issue #1190, G4/AC-19): the historic wording assumed the
+    orchestrator is always a spawn of ``main_chat``. That is only true for the
+    ``subagent`` (and, unchanged, ``hybrid``) position:
+
+    * ``inert=True`` (``ORCH_TOPOLOGY_INERT``, i.e. ``mode: main-chat``) takes
+      precedence — there is no orchestrator sub-agent instance at all, so the
+      first bullet becomes a neutral statement without any spawner/entry claim.
+    * ``effective == "primary"`` — the orchestrator *is* the session entry; a
+      self-spawn is always a hard reject.
+    * otherwise the historic bullet, byte-identical (AC-16).
+
+    The remaining bullets and the footer are shared by all three variants; the
+    "Gate #5" reference is *consciously conserved* even though the rule no
+    longer carries that gate (spec §5-G4 — not a new defect, do not "fix" it
+    here).
+    """
+    if inert:
+        first_bullet = (
+            "- In diesem Modus ist der Main Chat Router + Worker; es existiert "
+            "keine aktive Orchestrator-Subagent-Instanz.\n"
+        )
+    elif effective == "primary":
+        first_bullet = (
+            "- Es existiert genau **EIN Orchestrator** pro Session — er **ist** der "
+            "Session-Einstieg. Ein `task(subagent_type=\"orchestrator\")`-Aufruf ist "
+            "immer ein HARD REJECT (G1/G3).\n"
+        )
+    else:
+        first_bullet = (
+            "- Es existiert genau **EIN Orchestrator** pro Session — "
+            "der vom `main_chat` gespawnte.\n"
+        )
+    return (
+        "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+        "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+        "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+        + first_bullet
+        + "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte "
+        "und Session-State-Korruption.\n"
+        "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, "
+        "nicht weiter delegieren.\n\n"
+        "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+    )
+
+
+def _singleton_applies(role: str, can_spawn: bool) -> bool:
+    """Whether *role* gets the singleton guard block.
+
+    Only agents that can actually spawn sub-agents (Agent/Task tool) need it —
+    injecting it into non-spawning agents is wasted context. The orchestrator
+    itself never receives it (it carries its own singleton section), and
+    ``*-iteration`` variants are excluded.
+    """
+    return bool(
+        role != "orchestrator" and not role.endswith("-iteration") and can_spawn
+    )
+
+
 def _finalize_agent_content(
     content: str,
     role: str,
@@ -1008,19 +1069,31 @@ def _finalize_agent_content(
     # order) appended it outside the Codex TOML ``developer_instructions``
     # string and produced the two invalid `.codex/agents/*.toml` files
     # (plan Task 3 / finding D1/N1).
-    SINGLETON_CONSTRAINT_BLOCK = (
-        "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
-        "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
-        "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
-        "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
-        "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
-        "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
-        "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
-    )
     # Only agents that can actually spawn sub-agents (Agent/Task tool) need
     # the singleton guard — injecting it into non-spawning agents is wasted context.
-    if role != "orchestrator" and not role.endswith("-iteration") and can_spawn:
-        content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+    if _singleton_applies(role, can_spawn):
+        # G4/AC-19: the block follows the provider-scoped effective topology.
+        # The global basis from ``variables`` is not authoritative (it cannot
+        # know this sync run's ActiveSet), so it is never read here; imports
+        # stay lazy to avoid a module-level cycle. No provider-name branch.
+        from .variables import _provider_topology_flags, _resolve_orch_mode
+
+        _orch_config = (config or {}).get("orchestrator", {}) or {}
+        _provider_override = (
+            (_orch_config.get("provider-overrides", {}) or {}).get(provider) or {}
+        )
+        _provider_mode = _resolve_orch_mode(_orch_config, _provider_override)
+        _topology = _provider_topology_flags(
+            config or {},
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=_provider_mode,
+            active_set=active_set if active_set is not None else frozenset(),
+        )
+        content = content.rstrip() + _singleton_constraint_block(
+            _topology["ORCH_TOPOLOGY_EFFECTIVE"],
+            inert=_topology["ORCH_TOPOLOGY_INERT"] == "true",
+        )
 
     # Serialization mechanism (keyed on the provider spec, never on the
     # provider name): providers that emit the Markdown body as one trailing
