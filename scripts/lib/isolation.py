@@ -1376,7 +1376,11 @@ def _v2_entry_point_will_be_valid(
 
 
 def _v2_gate_invariant_warning(
-    provider: str, desired: str | None, *, merge_rewrites: bool
+    provider: str,
+    desired: str | None,
+    *,
+    merge_rewrites: bool,
+    topology=None,
 ) -> str:
     """Loud state-error text for the v2 surface (D1a, M1).
 
@@ -1385,8 +1389,22 @@ def _v2_gate_invariant_warning(
     v2 deny is a ``permissions[]`` triple, and on a tier where no ``default_agent``
     merge runs the user has to set the key themselves (a deleted value is not
     re-added, OQ-B12/Amendment B4).
+
+    ``topology`` (IC-7/G7) is the already resolved position. When it is not
+    ``primary`` the role never becomes a session default, so recommending
+    ``default_agent`` would send the user against the resolved configuration:
+    the remedy then names the position instead. ``topology=None`` keeps the
+    historic remedy for callers without topology information.
     """
-    if merge_rewrites:
+    if topology is not None and topology.effective != "primary":
+        remedy = (
+            f"Write no entry point: the effective orchestrator topology is "
+            f"'{topology.effective}', so '{desired}' is never a session default "
+            "(see orchestrator-topology.gate-inactive). Set "
+            "orchestrator.topology: primary to activate the deny, or disable "
+            "strict for this provider via orchestrator.provider-overrides."
+        )
+    elif merge_rewrites:
         remedy = (
             f"Restore default_agent to '{desired}' (or remove the "
             f"'{_STATE_DEFAULT_AGENT_KEY}' record from {_OPENCODE_STATE_FILE} "
@@ -1414,6 +1432,7 @@ def _opencode_v2_gate_permissions(
     plugin_mode: str,
     *,
     active_set,
+    topology=None,
 ) -> list[dict]:
     """The effective v2 deny triples for *provider*; empty when inactive.
 
@@ -1430,6 +1449,12 @@ def _opencode_v2_gate_permissions(
     declared but not part of the active set never yields triples (QA-C-01). It
     is deliberately not defaulted to ``None`` — that fail-open made this builder
     contradict Spec A and write v2 denies for a role that was never generated.
+
+    ``topology`` (IC-7/G7) is the ``TopologyResolution`` the caller already
+    resolved for this provider; it is handed to the same entry-point predicate
+    the Spec-A writer uses, so both actors agree on the position instead of this
+    one silently assuming ``primary``. It is never resolved here — that would be
+    a third resolution point per provider and run.
 
     The calculation is independent of ``_opencode_runtime_gate_entries`` (Spec-A
     freeze): it produces the LIST form, never the v1 mapping, and never calls
@@ -1454,7 +1479,9 @@ def _opencode_v2_gate_permissions(
     if not _resolve_effective_strict(orch, provider, agent_meta_root):
         return []
 
-    if _opencode_entry_point(provider, provider_config, active_set, config) is None:
+    if _opencode_entry_point(
+        provider, provider_config, active_set, config, topology=topology
+    ) is None:
         return []
 
     return [
@@ -1758,6 +1785,7 @@ def reconcile_opencode_surface_gate(
     dry_run: bool,
     *,
     active_set,
+    topology=None,
 ) -> None:
     """Reconcile the gate form with the active opencode surface (spec §3.4).
 
@@ -1773,6 +1801,13 @@ def reconcile_opencode_surface_gate(
     writers. A fail-open default (``None``) is not acceptable here — it made
     this function write deny triples for a declared-but-not-generated role while
     Spec A refused its deny and warned "the gate would lock every agent".
+
+    ``topology`` (IC-7/G7) is the ``TopologyResolution`` the CALLER resolved for
+    this provider — the same object the render seams use. It is passed through
+    to both actors below (the direct entry-point lookup and the triples builder)
+    and never resolved here: one resolution per provider per run, no third
+    resolution point. Without it the two actors would assume ``primary`` and
+    write a v2 deny the resolved position cannot back with an entry point.
 
     Binding rollback matrix, in order:
 
@@ -1824,7 +1859,9 @@ def reconcile_opencode_surface_gate(
     # Spec-A writer (QA-C-01). The tier is pure data (IC-03 resolver), never a
     # provider literal.
     entry = (
-        _opencode_entry_point(provider, provider_config, active_set, config)
+        _opencode_entry_point(
+            provider, provider_config, active_set, config, topology=topology
+        )
         if is_v2_surface
         else None
     )
@@ -1839,7 +1876,7 @@ def reconcile_opencode_surface_gate(
 
     entries = _opencode_v2_gate_permissions(
         config, provider, agent_meta_root, provider_config, capabilities, plugin_mode,
-        active_set=active_set,
+        active_set=active_set, topology=topology,
     )
 
     # D1a on the v2 surface (M1): deny and entry point are ONE invariant — no
@@ -1869,7 +1906,8 @@ def reconcile_opencode_surface_gate(
             ):
                 log.warning(
                     _v2_gate_invariant_warning(
-                        provider, entry, merge_rewrites=merge_writes
+                        provider, entry, merge_rewrites=merge_writes,
+                        topology=topology,
                     )
                 )
                 entries = []
@@ -1878,15 +1916,31 @@ def reconcile_opencode_surface_gate(
     # the single one; on every other tier Spec A never runs, so the consequence
     # of a missing entry point would otherwise go untold. The predicate uses the
     # same active set as the builder and the Spec-A writer (QA-C-01).
+    #
+    # G7/AC-22: the warning is cause-aware. When a topology was passed and it is
+    # not ``primary``, the entry point is withheld BY POSITION — the
+    # ``primary-role`` diagnosis would be wrong and its remedy ("declare
+    # primary-role") would contradict the resolved configuration. No topology
+    # information (``topology is None``) keeps the historic text: there the
+    # missing role really is the cause.
     if is_v2_surface and not entries:
         if entry is None and tier != "permission":
-            log.warning(
-                "opencode-v2 gate (permissions deny) NOT written for "
-                f"provider '{provider}': no explicit and generated "
-                "primary-role — the gate would lock every agent; declare "
-                "primary-role in config/ai-providers.yaml and keep that "
-                "role in the active set"
-            )
+            if topology is not None and topology.effective != "primary":
+                log.warning(
+                    "opencode-v2 gate (permissions deny) NOT written for "
+                    f"provider '{provider}': the effective orchestrator "
+                    f"topology is '{topology.effective}' — no entry point is "
+                    "written and the deny would lock every agent; see "
+                    "orchestrator-topology.gate-inactive."
+                )
+            else:
+                log.warning(
+                    "opencode-v2 gate (permissions deny) NOT written for "
+                    f"provider '{provider}': no explicit and generated "
+                    "primary-role — the gate would lock every agent; declare "
+                    "primary-role in config/ai-providers.yaml and keep that "
+                    "role in the active set"
+                )
 
     _sync_opencode_v2_gate_permissions(
         project_root, provider_config, entries, log, dry_run

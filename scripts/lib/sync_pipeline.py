@@ -1412,6 +1412,10 @@ def _sync_stage_per_provider(
     """
     from lib.mcp import load_mcp_registry
     from lib.external_tools import load_external_tools_registry
+    # G7/AC-22: the surface reconcile consumes the topology resolved once per
+    # provider below — imported here, not at module level, keeping the import
+    # surface of this stage small.
+    from lib.topology import resolve_topology, topology_explicit
 
     mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
     external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
@@ -1654,10 +1658,28 @@ def _sync_stage_per_provider(
         # the surface-switch rollback. Deliberately outside the ``== "permission"``
         # block above (Spec-A freeze) and BEFORE the managed-key merge (spec
         # §3.4 data flow); a no-op for non-owners.
+        #
+        # G7/AC-22: the reconcile does NOT resolve the topology itself (that
+        # would be a third resolution point per provider and run) — it receives
+        # the one resolved here, from the same inputs the render seams use.
+        topology = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=caps,
+            mode=_resolve_orch_mode(_orch_config, _provider_override),
+            active_set=active_set,
+        )
+        if not topology_explicit(config, provider) and active_set is None:
+            # Same guard as the Spec-A writer (``_sync_opencode_runtime_gate``):
+            # without active-set information the derivation can only fall back
+            # to ``subagent``, which would silently withhold an entry point the
+            # caller had no information about (AC-6 byte identity).
+            topology = None
         reconcile_opencode_surface_gate(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
-            active_set=active_set,
+            active_set=active_set, topology=topology,
         )
         # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
         # Deliberately outside the ``== "permission"`` block above (Spec-A

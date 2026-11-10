@@ -3528,8 +3528,12 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
     entry_point_calls = []
     real_entry_point = isolation._opencode_entry_point
 
-    def _spy(provider, provider_config, active_set, config=None):
-        role = real_entry_point(provider, provider_config, active_set, config)
+    def _spy(provider, provider_config, active_set, config=None, *, topology=None):
+        # The entry-point source now receives the resolved topology (G7); the
+        # spy mirrors the call signature and forwards it unchanged.
+        role = real_entry_point(
+            provider, provider_config, active_set, config, topology=topology
+        )
         entry_point_calls.append(role)
         return role
 

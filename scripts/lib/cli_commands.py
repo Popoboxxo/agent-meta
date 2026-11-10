@@ -96,6 +96,7 @@ from lib.sync_pipeline import (
     _sync_stage_tmp_sink,
     _track_writer_targets,
 )
+from lib.variables import _resolve_orch_mode
 from lib.viz import cleanup_old_sessions, generate_viz
 
 # ---------------------------------------------------------------------------
@@ -343,10 +344,35 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: same tier-independent surface
         # reconcile as the production per-provider stage (mirrored so a
         # --test-generated repo matches), before the managed-key merge.
+        # G7/AC-22: the topology is resolved once here and passed through — the
+        # reconcile never resolves it itself.
+        from lib.topology import resolve_topology, topology_explicit
+
+        _orch_config = config.get("orchestrator", {})
+        _orch_config = _orch_config if isinstance(_orch_config, dict) else {}
+        _overrides = _orch_config.get("provider-overrides")
+        _provider_override = (
+            _overrides.get(provider) if isinstance(_overrides, dict) else None
+        )
+        topology = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=caps,
+            mode=_resolve_orch_mode(
+                _orch_config,
+                _provider_override if isinstance(_provider_override, dict) else None,
+            ),
+            active_set=active_set,
+        )
+        if not topology_explicit(config, provider) and active_set is None:
+            # Mirrors the production stage and the Spec-A writer: no active-set
+            # information ⇒ keep the historic emission (AC-6 byte identity).
+            topology = None
         reconcile_opencode_surface_gate(
             test_repo_path, config, provider, provider_config,
             agent_meta_root, log, dry_run,
-            active_set=active_set,
+            active_set=active_set, topology=topology,
         )
         # B.7 / AC-B13/B18/B20: same tier-independent call as the production
         # per-provider stage (mirrored so a --test-generated repo matches).
