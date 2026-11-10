@@ -502,7 +502,7 @@ def test_forbidden_cells_are_rejected_by_the_validator(tmp_path: Path) -> None:
 
     # Only the declared `primary` cell is FORBIDDEN; `subagent` is the
     # cross-scope-only ALLOWED cell. `main-chat` x `primary` has no position.
-    assert EXPECTED_POSITION_MAP[("main-chat", "primary")] is None
+    assert EXPECTED_POSITION_MAP[("main-chat", "primary")] == "keine Position"
 
     config_path = tmp_path / ".meta-config" / "project.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)

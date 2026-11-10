@@ -251,17 +251,22 @@ EXPECTED_MATRIX: dict[tuple[str, str, str], str] = {
 }
 
 # spec §3.8.2 (lines 228-246): the ten `mode` x `topology` -> position rows.
-# `None` = same-scope `main-chat` x `primary` is a validator ERROR (no position).
-EXPECTED_POSITION_MAP: dict[tuple[str, str], str | tuple[str, ...] | None] = {
-    ("strict", "unset-with-role"): "POS-3",
-    ("strict", "unset-without-role"): "POS-2",
+# The second key component is the documented `topology` cell: `primary`/
+# `subagent`/`unset` keep their literal spelling, the two derived `strict` rows
+# carry their derivation condition. `"keine Position"` = same-scope
+# `main-chat` x `primary` is a validator ERROR; `"POS-3 bzw. POS-2"` = the
+# `advisory` x unset cell resolves to either position depending on the
+# derivation. Every value is a plain string (one documented position).
+EXPECTED_POSITION_MAP: dict[tuple[str, str], str] = {
+    ("strict", "ungesetzt (primary-role im ActiveSet)"): "POS-3",
+    ("strict", "ungesetzt (keine primary-role)"): "POS-2",
     ("strict", "primary"): "POS-3",
     ("strict", "subagent"): "POS-2",
-    ("advisory", "unset"): ("POS-3", "POS-2"),
+    ("advisory", "ungesetzt"): "POS-3 bzw. POS-2",
     ("advisory", "primary"): "POS-3",
     ("advisory", "subagent"): "POS-2",
-    ("main-chat", "unset"): "POS-1",
-    ("main-chat", "primary"): None,
+    ("main-chat", "ungesetzt"): "POS-1",
+    ("main-chat", "primary"): "keine Position",
     ("main-chat", "subagent"): "POS-1",
 }
 
@@ -381,11 +386,14 @@ def test_matrix_has_24_rows():
         if verdict == "DEGRADED":
             continue
         expected_position = EXPECTED_POSITION_MAP.get((mode, topology))
-        if isinstance(expected_position, str):
-            assert expected_position in positions[(surface, mode, topology)], (
-                f"{surface}, {mode} x {topology}: expected {expected_position}, "
-                f"found {positions[(surface, mode, topology)]!r}."
-            )
+        if expected_position is None or not _POSITION_RE.search(expected_position):
+            # `keine Position`: same-scope `main-chat` x `primary` is a validator
+            # ERROR, so the cell has no position to compare against.
+            continue
+        assert expected_position in positions[(surface, mode, topology)], (
+            f"{surface}, {mode} x {topology}: expected {expected_position}, "
+            f"found {positions[(surface, mode, topology)]!r}."
+        )
 
 
 def test_verdict_vocabulary_is_closed():
@@ -804,3 +812,278 @@ def test_adr_records_doq1_to_doq3():
     assert "#1182" in chunks[3], (
         "D-OQ3 must record the #1182 precondition for `advisory × subagent`."
     )
+
+
+# ---------------------------------------------------------------------------
+# Issue #1190, Task 18 (AC-32/AC-37): the three-position model and the
+# `mode` x `topology` -> position mapping (spec §3.8.1/§3.8.2).
+#
+# The positions must be defined ONCE, before any matrix uses them: a surface
+# table may only cite an ID whose definition the reader has already passed.
+# ---------------------------------------------------------------------------
+
+_POSITIONS_HEADING = "## Positionen"
+_MAPPING_HEADING = "### Mapping `mode` × `topology` → Position"
+_INTERACTION_MATRIX_HEADING = "## `mode` × `topology` — Interaktionsmatrix"
+_SURFACE_MATRIX_HEADING = "## Positions-Matrix je Surface"
+
+# The seven attribute fields of spec §3.8.1, in documented order.
+_POSITION_ATTR_FIELDS = (
+    "wer startet",
+    "wer spawnt",
+    "rolle emittiert?",
+    "default_agent",
+    "gate-tier / wirkung",
+    "a2a / checkpointing",
+    "hops",
+)
+_ALLOWED_POSITION_VALUES = frozenset(
+    {"POS-1", "POS-2", "POS-3", "POS-3 bzw. POS-2", "keine Position"}
+)
+
+
+def _section_text(content: str, heading: str, *, stop_at: str | None = None) -> str:
+    """Body of the `heading` section, up to `stop_at` or the next `##` heading."""
+    start = content.find(heading)
+    assert start >= 0, (
+        f"orchestrator-topology.md must carry a `{heading}` section (AC-32)."
+    )
+    body_start = start + len(heading)
+    if stop_at is not None:
+        marker = content.find(stop_at, body_start)
+        assert marker >= 0, (
+            f"`{heading}` must be followed by `{stop_at}` (document order)."
+        )
+        return content[body_start:marker]
+    following = re.search(r"^##\s", content[body_start:], re.MULTILINE)
+    end = body_start + following.start() if following else len(content)
+    return content[body_start:end]
+
+
+def _table_rows(region: str) -> list[list[str]]:
+    """Markdown table rows of *region* (separator rows dropped, header kept)."""
+    rows: list[list[str]] = []
+    for line in region.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if all(_SEPARATOR_RE.fullmatch(cell) for cell in cells):
+            continue
+        rows.append(cells)
+    return rows
+
+
+def test_position_model_has_three_positions():
+    """AC-32: exactly POS-1/POS-2/POS-3 with the seven §3.8.1 attributes."""
+    content = _text(_CONCEPT)
+    rows = _table_rows(_section_text(content, _POSITIONS_HEADING, stop_at=_MAPPING_HEADING))
+    assert rows, f"`{_POSITIONS_HEADING}` must carry the position definition table."
+    header = [_normalized(cell) for cell in rows[0]]
+    data = rows[1:]
+    assert len(data) == 3, (
+        "the position table must define exactly three positions "
+        f"(POS-1/POS-2/POS-3), got {len(data)}."
+    )
+    assert len(header) == len(_POSITION_ATTR_FIELDS) + 2, (
+        "the position table needs the seven §3.8.1 attribute fields plus the "
+        f"`ID` and `Position` columns, got {len(header)}: {header}."
+    )
+    for field in _POSITION_ATTR_FIELDS:
+        assert field in header, (
+            f"the position table lost the attribute field {field!r} (§3.8.1)."
+        )
+    assert header[0] == "id" and header[1] == "position", (
+        "the position table's first two columns must be `ID` and `Position`, "
+        f"got {header[:2]}."
+    )
+    ids = [_plain(row[0]) for row in data]
+    assert ids == ["POS-1", "POS-2", "POS-3"], (
+        f"the position table must list POS-1, POS-2, POS-3 in order, got {ids}."
+    )
+    for row in data:
+        assert len(row) == len(header), (
+            f"position row {row[0]!r}: expected {len(header)} cells, got {len(row)}."
+        )
+        assert all(cell.strip() for cell in row), (
+            f"position row {row[0]!r} has an empty cell."
+        )
+    assert "POS-4" not in content and "POS-0" not in content, (
+        "there is no fourth position: only POS-1/POS-2/POS-3 exist (AC-32)."
+    )
+
+
+def test_position_mapping_has_ten_rows_without_empty_cells():
+    """AC-32: ten `mode` x `topology` rows, every cell non-empty."""
+    content = _text(_CONCEPT)
+    rows = _table_rows(
+        _section_text(content, _MAPPING_HEADING, stop_at=_INTERACTION_MATRIX_HEADING)
+    )
+    assert rows, f"`{_MAPPING_HEADING}` must carry the mapping table."
+    header = rows[0]
+    data = rows[1:]
+    assert len(data) == 10, (
+        "the mapping table must carry exactly ten `mode` x `topology` rows "
+        f"(spec §3.8.2), got {len(data)}."
+    )
+    actual: dict[tuple[str, str], str] = {}
+    for row in data:
+        assert len(row) == len(header), (
+            f"mapping row {row[:2]!r}: expected {len(header)} cells, got {len(row)}."
+        )
+        assert all(cell.strip() for cell in row), (
+            f"mapping row {row[:2]!r} has an empty cell (AC-32)."
+        )
+        key = (_plain(row[0]).lower(), _plain(row[1]))
+        assert key not in actual, f"duplicate mapping row {key}."
+        position = _plain(row[3])
+        assert position in _ALLOWED_POSITION_VALUES, (
+            f"mapping row {key}: position cell {row[3]!r} must be one of "
+            f"{sorted(_ALLOWED_POSITION_VALUES)}."
+        )
+        actual[key] = position
+    assert actual == EXPECTED_POSITION_MAP, (
+        "the documented mapping drifted from spec §3.8.2; diff: "
+        f"{ {k: (actual.get(k), v) for k, v in EXPECTED_POSITION_MAP.items() if actual.get(k) != v} } "
+        f"| missing={sorted(set(EXPECTED_POSITION_MAP) - set(actual))} "
+        f"| extra={sorted(set(actual) - set(EXPECTED_POSITION_MAP))}"
+    )
+
+
+def test_positions_are_defined_before_they_are_used():
+    """AC-32: no matrix cites a POS-ID before `## Positionen` defines it."""
+    content = _text(_CONCEPT)
+    positions_start = content.find(_POSITIONS_HEADING)
+    assert positions_start >= 0, f"`{_POSITIONS_HEADING}` is missing (AC-32)."
+    mapping_start = content.find(_MAPPING_HEADING, positions_start)
+    assert mapping_start > positions_start, (
+        f"`{_MAPPING_HEADING}` must follow `{_POSITIONS_HEADING}`."
+    )
+    surface_start = content.find(_SURFACE_MATRIX_HEADING, mapping_start)
+    assert surface_start > mapping_start, (
+        f"`{_SURFACE_MATRIX_HEADING}` must follow `{_MAPPING_HEADING}`."
+    )
+
+    early = _POSITION_RE.search(content[:positions_start])
+    assert early is None, (
+        "a POS-ID is used before `## Positionen` defines it: "
+        f"{early.group(0)!r} at offset {early.start()}."
+    )
+
+    used: set[str] = set()
+    for surface, rows in _surface_tables().items():
+        for row in rows:
+            used.update(_POSITION_RE.findall(row[2]))
+    assert used, "the surface matrices must cite positions (T15)."
+    for position in sorted(used):
+        first = content.find(position)
+        assert positions_start <= first < mapping_start, (
+            f"{position} is used in the surface matrix but its first occurrence "
+            f"is at offset {first}, outside the `{_POSITIONS_HEADING}` definition "
+            f"block ({positions_start}..{mapping_start})."
+        )
+
+
+def test_readme_explains_both_opencode_positions():
+    """AC-32: both OpenCode positions are equal, POS-3 is the optional third."""
+    content = _text(_README)
+    blocks = [_normalized(block) for block in re.split(r"\n\s*\n", content)]
+
+    pos1 = [block for block in blocks if "mode: main-chat" in block and "pos-1" in block]
+    assert pos1, (
+        "README.md must name `mode: main-chat` as POS-1 (equal OpenCode "
+        "position, not the only one)."
+    )
+    pos2 = [
+        block for block in blocks if "topology: subagent" in block and "pos-2" in block
+    ]
+    assert pos2, (
+        "README.md must name `topology: subagent` as POS-2 (equal OpenCode "
+        "position, default/recommended)."
+    )
+    assert any("equal" in block for block in pos1), (
+        "README.md must present POS-1 and POS-2 as equal choices, not ranked "
+        "against each other (D-OQ2)."
+    )
+    pos3 = [block for block in blocks if "pos-3" in block and "optional" in block]
+    assert pos3, (
+        "README.md must present `topology: primary` as POS-3, the optional "
+        "third position (0 hops, only when the session starts in the role)."
+    )
+
+    mermaid = "\n".join(_fenced_blocks(content, "mermaid"))
+    assert "orchestrator (primary)" in mermaid, (
+        "B-2: the Mermaid block needs the `orchestrator (primary)` node (POS-3)."
+    )
+    assert "orchestrator (subagent)" in mermaid, (
+        "B-2: the Mermaid block needs the `orchestrator (subagent)` node (POS-2)."
+    )
+
+
+def test_codebase_overview_names_both_positions():
+    """AC-32: §13.2 names POS-1 and POS-2 instead of one absolute claim."""
+    block = _normalized(_block_at(_CODEBASE_OVERVIEW, "13.2 Singleton-Regel"))
+    assert "pos-1" in block, (
+        "CODEBASE_OVERVIEW.md §13.2 must name POS-1 (main-chat as orchestrator): "
+        "that position emits no orchestrator role at all."
+    )
+    assert "pos-2" in block, (
+        "CODEBASE_OVERVIEW.md §13.2 must name POS-2 (delegated orchestrator)."
+    )
+    assert "pos-3" in block and "optional" in block, (
+        "CODEBASE_OVERVIEW.md §13.2 must name POS-3 as the optional "
+        "session-entry position."
+    )
+
+
+def test_advisory_subagent_carries_1182_condition_everywhere():
+    """AC-37: every `advisory` x `subagent` recommendation cites #1182."""
+    concept = _text(_CONCEPT)
+    rows_checked = 0
+    for surface, rows in _surface_tables().items():
+        for row in rows:
+            if (
+                _plain(row[0]).lower() != "advisory"
+                or _topology_key(row[1]) != "subagent"
+            ):
+                continue
+            rows_checked += 1
+            assert "#1182" in " ".join(row), (
+                f"{surface}: the `advisory` x `subagent` row recommends a "
+                "position that is blocked until #1182 is fixed (D-OQ3)."
+            )
+    assert rows_checked == len(_MATRIX_SURFACES), (
+        "expected one `advisory` x `subagent` recommendation per surface, "
+        f"checked {rows_checked}."
+    )
+
+    team_blocks = [
+        block
+        for block in re.split(r"\n\s*\n", concept)
+        if "empfehlung (team)" in _normalized(block)
+    ]
+    assert team_blocks, (
+        "the concept doc must carry a team recommendation paragraph."
+    )
+    for block in team_blocks:
+        assert "#1182" in block, (
+            "the team recommendation (`advisory` x `subagent`) must name #1182 "
+            "in the same paragraph (D-OQ3)."
+        )
+
+    readme_sites = [
+        block
+        for block in re.split(r"\n\s*\n", _text(_README))
+        if "advisory" in _normalized(block)
+        and "subagent" in _normalized(block)
+        and "recommend" in _normalized(block)
+    ]
+    assert readme_sites, (
+        "README.md must state the `advisory` x `subagent` recommendation "
+        "(POS-2, team) so its #1182 precondition can be pinned."
+    )
+    for block in readme_sites:
+        assert "#1182" in block, (
+            "the README recommendation of `advisory` x `subagent` must name "
+            "#1182 in the same paragraph (D-OQ3)."
+        )

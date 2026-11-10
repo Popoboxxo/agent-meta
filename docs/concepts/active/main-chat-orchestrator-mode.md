@@ -107,7 +107,7 @@ Im `main-chat`-Modus soll `agents/1-generic/orchestrator.md` **gar nicht** in `.
 - `INTENT_ROUTING_TABLE` (bisher nur für `orchestrator.md` verwendet) wird für den `main_chat` (in `use-orchestrator.md`) aufbereitet statt der vollen `AGENT_DELEGATION_TABLE` — vermeidet Duplikation der Agent-Beschreibungen, die Claude Code bereits nativ über Subagent-Descriptions injiziert
 - Routing-Tabellen wandern in die Main-Chat-Rule
 - Der Singleton-Guard-Hook (`orchestrator-guard.sh`) **bleibt vorerst aktiv**; seine Deaktivierung ist ein **offenes Follow-up** (siehe Statuszeile in §6) — es gibt in diesem Modus zwar keinen Orchestrator, der Hook wird aber noch nicht abgeschaltet.
-- `orchestrator.mode: main-chat` ist **POS-1** (Main-Chat-als-Orchestrator): **0 Hop**, kein Orchestrator-State — die Orchestrator-Rolle wird nicht emittiert.
+- `orchestrator.mode: main-chat` ist **POS-1** (Main-Chat-als-Orchestrator): **0 Hop**, kein Orchestrator-State — die Orchestrator-Rolle wird nicht emittiert. POS-1 ist eine von drei gleichrangig definierten Positionen; Definition und Mapping stehen in [Positionen](orchestrator-topology.md#positionen).
 
 ---
 

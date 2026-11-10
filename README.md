@@ -434,6 +434,15 @@ flowchart TD
 `strict` routes every task through the orchestrator. `advisory` recommends it but allows direct dispatch.
 `main-chat` has no orchestrator sub-agent.
 
+OpenCode has **three positions**, and the first two are **equal** choices: `mode: main-chat` is
+**POS-1** (the main chat *is* the orchestrator — 0 hops, no orchestrator artifact at all) and
+`topology: subagent` is **POS-2** (the main chat spawns the orchestrator — 1 hop, the default and
+recommended position). `topology: primary` is **POS-3**, the **optional** third position: 0 hops,
+but only when the session really starts inside the orchestrator, which the sync cannot enforce.
+The full position model and the `mode` x `topology` -> position mapping live in
+[Orchestrator topology](docs/concepts/active/orchestrator-topology.md). The team recommendation
+`advisory` x `subagent` (POS-2) requires the #1182 fix first.
+
 `orchestrator.topology` decides where that orchestrator lives: `primary` makes it the session entry
 point (one per session, started by the user), `subagent` is spawned by the main chat, and an unset
 topology is derived per provider (see [Orchestrator topology](docs/concepts/active/orchestrator-topology.md)).
