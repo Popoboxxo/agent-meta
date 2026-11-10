@@ -1,0 +1,43 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Opencode
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+# Position POS-2 (issue #1190, §3.8.1/§3.8.2): `strict` + declared
+# `orchestrator.topology: subagent` is the new DEFAULT (D-OQ1). The role is
+# emitted as a subagent, so no `default_agent` entry point is written and the
+# v2 gate deny is withheld — reported honestly, exactly once (§6.4).
+orchestrator:
+  mode: strict
+  topology: subagent
+plugins:
+  playwright:
+    enabled: true
+# v2 project channel (same allow-listed key as 69-opencode-v2-surface): the
+# consumer opts into the v2 surface via `provider-options.<Provider>`, never by
+# editing the framework registry.
+provider-options:
+  Opencode:
+    surface-version: v2
+project:
+  name: scenario-strict-subagent-opencode-v2
+  prefix: s100
+  short: strict-subagent-v2
+variables:
+  PROJECT_NAME: scenario-strict-subagent-opencode-v2
+  PROJECT_DESCRIPTION: Opencode v2 with strict mode and declared topology subagent (position POS-2, the default).
+  PROJECT_GOAL: Verify POS-2 writes no default_agent, emits mode subagent and reports the withheld v2 gate deny once.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-strict-subagent-opencode-v2
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

@@ -1,0 +1,38 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Opencode
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+# Position POS-1 (issue #1190, §3.8.1/§3.8.2): `mode: main-chat` makes the main
+# chat the orchestrator — the role is NOT emitted, so no agent file and no
+# `default_agent` may appear. The `topology` key is deliberately ABSENT: the
+# registry's `providers.Opencode.primary-role: orchestrator` derives `primary`,
+# which is inert here and must be reported as exactly one
+# `orchestrator-topology.main-chat-derived-primary` WARNING (D-Q1, AC-34).
+orchestrator:
+  mode: main-chat
+plugins:
+  playwright:
+    enabled: true
+project:
+  name: scenario-main-chat-derived-primary
+  prefix: s102
+  short: main-chat-derived
+variables:
+  PROJECT_NAME: scenario-main-chat-derived-primary
+  PROJECT_DESCRIPTION: Opencode main-chat mode with an unset topology that derives primary (position POS-1).
+  PROJECT_GOAL: Verify POS-1 emits no orchestrator role, no default_agent and exactly one derived-primary warning.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-main-chat-derived-primary
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
