@@ -5499,10 +5499,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `compact-golden` (the `agent-meta vX` stamp; c5c43c00 -> 7bf087ac) re-pinned;
 # `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 #1190 M3 (2026-11-10): ac01-baseline re-pinned after the intentional AC-17 topology wording (orchestrator 8.12.0, Opencode primary branch) — slimming/compact-golden unchanged.
+# #1190 T21 (2026-11-10): re-frozen after the intentional topology wording/version rebaseline (orchestrator 8.12.0, G1/G4); no other fixture tree changed.
 _FIXTURE_TREES = {
     "ac01-baseline": "fc718eac217c12277b22387d721e0ee133d555a8357305e317b18a665bc93710",
-    "slimming-golden": "2ba04df64ee0a361f205b771b353aab0ec8197a74ea12af3570539aaaca9ed06",
-    "compact-golden": "7bf087ac57b4a89f8c2209cabb730c3892b5f3d62ddf307efa14ca1fb785a7b3",
+    "slimming-golden": "0028e50a6f3267cf59fde73f74e431290d9a3644b6562a020546aa5bdf231764",
+    "compact-golden": "8e5308d718179a0f4c48cc44d7c6c8436a7bda03b87773dd453887fdfd12785b",
 }
 
 
