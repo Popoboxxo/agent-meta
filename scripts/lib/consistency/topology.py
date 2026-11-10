@@ -29,6 +29,12 @@ render cannot express as a diff:
     effective topology is not ``primary``. The value is never auto-deleted;
     the finding names the action (AC-14).
 
+``orchestrator-topology.main-chat-derived-primary`` (WARNING)
+    ``mode: main-chat`` with an undeclared topology that the resolver derives
+    to ``primary``: the role is never emitted, so the derived position is
+    inert. Only the derivation is reported — a *declared* topology next to
+    ``main-chat`` stays the hard validator's error (D-Q1, AC-1/AC-2).
+
 ``orchestrator-topology.singleton-redundant`` (INFO, P3)
     ``orchestrator.singleton`` is present while ``max-instances`` is 1. Valid
     but redundant — the count is already the default (AC-8).
@@ -57,6 +63,7 @@ from ..topology import (
     DEFAULT_MAX_INSTANCES,
     resolve_orchestrator_instances,
     resolve_topology,
+    topology_explicit,
 )
 
 _PROJECT_CONFIG = ".meta-config/project.yaml"
@@ -65,6 +72,7 @@ _PROJECT_CONFIG = ".meta-config/project.yaml"
 CHECK_DEGRADED = "orchestrator-topology.degraded"
 CHECK_HYBRID_UNVERIFIED = "orchestrator-topology.hybrid-unverified"
 CHECK_MAIN_CHAT_SUPERSEDES = "orchestrator-topology.main-chat-supersedes"
+CHECK_MAIN_CHAT_DERIVED_PRIMARY = "orchestrator-topology.main-chat-derived-primary"
 CHECK_GATE_INACTIVE = "orchestrator-topology.gate-inactive"
 CHECK_DEFAULT_AGENT_CONFLICT = "orchestrator-topology.default-agent-conflict"
 CHECK_SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
@@ -259,6 +267,38 @@ def check_orchestrator_topology(
                 validate=False,
             )
             seen: set = set()
+
+            # D-Q1 (AC-1/AC-2): ``main-chat`` makes the main chat the
+            # orchestrator; the role is not emitted. A *derived* primary is
+            # therefore inert — a dangling pointer the user never wrote. A
+            # declared topology next to ``main-chat`` stays the hard
+            # validator's error (config.py), not a second WARNING here.
+            if (
+                mode == "main-chat"
+                and not topology_explicit(config, provider)
+                and resolution.effective == "primary"
+            ):
+                _append_once(
+                    findings,
+                    seen,
+                    CHECK_MAIN_CHAT_DERIVED_PRIMARY,
+                    _PROJECT_CONFIG,
+                    f"orchestrator.mode is 'main-chat' for provider "
+                    f"'{provider}', but the unset orchestrator.topology derives "
+                    f"'primary' (providers.{provider}.primary-role names the "
+                    "role and it is in the active set). In main-chat the role "
+                    "is not emitted, so the derived position is inert. Remedy: "
+                    f"declare orchestrator.provider-overrides.{provider}."
+                    "topology: subagent (legal next to mode: main-chat), or "
+                    "remove the derivation source. Declaring "
+                    "orchestrator.topology at project scope next to mode: "
+                    "main-chat is an ERROR, not a remedy.",
+                    f"Declare orchestrator.provider-overrides.{provider}."
+                    "topology: subagent, or remove the derivation source "
+                    f"(providers.{provider}.primary-role / its active-set "
+                    "membership).",
+                    severity=Severity.WARNING,
+                )
 
             # P3 multiplicity axis (AC-8/AC-9). ``validate=False`` never
             # raises: a same-scope contradiction returned by the hard
