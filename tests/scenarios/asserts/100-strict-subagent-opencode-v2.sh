@@ -140,7 +140,9 @@ if grep -qF "orchestrator-topology.gate-inactive" "$LOG_DIR/validate.log"; then
 fi
 
 # --- 6. Prefix guard: the BLOCKED scenario stays outside the 10* match. -----
-list10="$(bash "$REPO_ROOT/tests/scenarios/run.sh" --list 10)" \
+# `env -u` drops the inherited CI shard selector: this assertion is about the
+# prefix filter alone, and a shard 3/4 would otherwise show only `101-…`.
+list10="$(env -u SCENARIO_SHARD -u SCENARIO_TOTAL bash "$REPO_ROOT/tests/scenarios/run.sh" --list 10)" \
     || fail "could not list the 10* scenario selection"
 for expected in 100-strict-subagent-opencode-v2 101-strict-primary-opencode-v2 \
                 102-main-chat-derived-primary 104-claude-strict-subagent; do
