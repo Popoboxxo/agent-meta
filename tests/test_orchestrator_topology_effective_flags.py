@@ -336,20 +336,32 @@ _UNSET = object()
 #: freezes that source rendered with the CURRENT renderer.
 _BASELINE_TEMPLATE_COMMIT = "aaed14c2"
 
+#: The baseline source is frozen as a committed fixture: ``git show`` exits 128
+#: on a shallow CI clone, so the test must never depend on repository history.
+_BASELINE_TEMPLATE_FIXTURE = (
+    _TOPOLOGY_GOLDEN / f"baseline-{_BASELINE_TEMPLATE_COMMIT}-orchestrator.md"
+)
+
 #: Frontmatter lines that legitimately move with a template release. The body
 #: (everything after the closing ``---``) must stay byte-identical.
 _VOLATILE_FRONTMATTER_KEYS = ("version", "generated-from")
 
 
 def orchestrator_template_at(commit: str) -> str:
-    """Return the orchestrator template committed at *commit* (baseline source)."""
-    import subprocess
+    """Return the orchestrator template frozen for *commit* (baseline source).
 
-    return subprocess.check_output(
-        ["git", "show", f"{commit}:agents/1-generic/orchestrator.md"],
-        cwd=_REPO_ROOT,
-        text=True,
+    Reads the committed fixture
+    ``tests/fixtures/topology-golden/baseline-<commit>-orchestrator.md`` instead
+    of ``git show <commit>:agents/1-generic/orchestrator.md`` — a shallow CI
+    clone carries no history for the baseline commit.
+    """
+    fixture = _TOPOLOGY_GOLDEN / f"baseline-{commit}-orchestrator.md"
+    assert fixture.is_file(), (
+        f"missing committed baseline fixture {fixture.relative_to(_REPO_ROOT).as_posix()} — "
+        f"generate it once with `git show "
+        f"{_BASELINE_TEMPLATE_COMMIT}:agents/1-generic/orchestrator.md` in a full clone"
     )
+    return fixture.read_text(encoding="utf-8")
 
 
 def _provider_config(provider: str, config: dict):
@@ -506,8 +518,9 @@ def test_unset_topology_subagent_render_is_byte_identical(provider, tmp_path):
     """
     golden_path = _TOPOLOGY_GOLDEN / f"orchestrator.unset-derived-subagent.{provider.lower()}.md"
     assert golden_path.is_file(), (
-        f"missing frozen baseline {golden_path.name} — regenerate it from "
-        f"`git show {_BASELINE_TEMPLATE_COMMIT}:agents/1-generic/orchestrator.md` "
+        f"missing frozen baseline {golden_path.name} — regenerate it by replaying "
+        f"the committed fixture "
+        f"`{_BASELINE_TEMPLATE_FIXTURE.relative_to(_REPO_ROOT).as_posix()}` "
         "through render_orchestrator(provider, ...)"
     )
     baseline = golden_path.read_text(encoding="utf-8")
@@ -527,16 +540,22 @@ def test_unset_topology_subagent_render_is_byte_identical(provider, tmp_path):
 
 
 def test_frozen_baseline_fixture_replays_the_baseline_template(tmp_path):
-    """The fixture really is ``aaed14c2`` + current renderer (no hand edits)."""
+    """The fixture really is ``aaed14c2`` + current renderer (no hand edits).
+
+    Replays the committed ``baseline-aaed14c2-orchestrator.md`` fixture through
+    the CURRENT renderer and requires byte identity with the frozen
+    ``orchestrator.unset-derived-subagent.claude.md`` golden. No repository
+    history is read, so the check also runs on a shallow CI clone.
+    """
     baseline_source = orchestrator_template_at(_BASELINE_TEMPLATE_COMMIT)
     replayed = render_orchestrator("Claude", tmp_path / "replay", template_text=baseline_source)
     frozen = (
         _TOPOLOGY_GOLDEN / "orchestrator.unset-derived-subagent.claude.md"
     ).read_text(encoding="utf-8")
     assert replayed == frozen, (
-        "the frozen baseline fixture drifted from `git show "
-        f"{_BASELINE_TEMPLATE_COMMIT}:agents/1-generic/orchestrator.md` rendered "
-        "with the current renderer"
+        "the frozen baseline fixture drifted from the committed fixture "
+        f"`{_BASELINE_TEMPLATE_FIXTURE.relative_to(_REPO_ROOT).as_posix()}` "
+        "rendered with the current renderer"
     )
 
 

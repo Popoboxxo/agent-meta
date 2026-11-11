@@ -114,6 +114,15 @@ The three `unset-derived-subagent.*` files are generated from
 working-tree template renders the same BODY in that state and that only
 `version:` and `generated-from:` move (the two release pins).
 
+The baseline template itself is frozen as
+`baseline-aaed14c2-orchestrator.md` (bytes of
+`git show aaed14c2:agents/1-generic/orchestrator.md`, 410 lines). CI may check
+out a shallow clone where that commit is absent, so
+`test_frozen_baseline_fixture_replays_the_baseline_template` reads this fixture
+instead of calling `git show`. Do not edit it: the exact bytes are the replay
+contract. Regenerate it only from a full clone with the same command that
+created it.
+
 `schema-property-paths.json` freezes the recursive `properties` path set of
 `config/project-config.schema.json` at `a41745e` (pre-implementation, 331
 paths). `test_schema_has_no_new_properties` fails on any added or removed
