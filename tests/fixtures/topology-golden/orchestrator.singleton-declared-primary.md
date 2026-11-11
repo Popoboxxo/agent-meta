@@ -1,0 +1,1 @@
+**Singleton (session entry):** Worker → `orchestrator` → HARD REJECT, always. The orchestrator **is** the session entry point; a `task(subagent_type="orchestrator")` call is always a HARD REJECT (G1/G3). A position without provider support degrades loudly to `subagent` (see `docs/concepts/active/orchestrator-topology.md`).

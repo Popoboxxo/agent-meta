@@ -796,6 +796,106 @@ def _insert_managed_block_above_foreign_content(existing: str, new_managed: str)
     return new_managed.rstrip("\n") + "\n\n" + existing
 
 
+def _position_aware_agent_hints(
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+    target_name: str | None,
+    *,
+    active_set,
+    position: str,
+) -> dict[str, str]:
+    """Render ``AGENT_HINTS``/``AGENT_HINTS_CLAUDE`` for the physical target file.
+
+    The entry hint is a position statement, so it must be true for EVERY reader
+    of the file this render writes (SPEC orchestrator topology §5-G5/AC-20):
+
+    * provider-own file -> the provider's own ``position`` (Stage 4 resolved it
+      once and put it into ``variables``; this helper never re-resolves it);
+    * shared file -> the positions of ALL active sharers, resolved with the ONE
+      shared resolver (:func:`lib.topology.resolve_topology`, same ``config``
+      and per-sync ``active_set``). All agree -> that position; they disagree
+      -> ``"neutral"`` (no statement that would be false for one of them).
+
+    Sharers are iterated sorted so the result can never depend on the
+    ``provider_config`` insertion order (no sync-order oscillation).
+    """
+    from .providers import load_provider_capabilities, resolve_providers
+    from .topology import resolve_topology
+
+    orch_config = config.get("orchestrator", {})
+    orch_config = orch_config if isinstance(orch_config, dict) else {}
+    overrides = orch_config.get("provider-overrides", {})
+    overrides = overrides if isinstance(overrides, dict) else {}
+
+    shared_users = _shared_context_users(
+        provider, provider_config, config, target_name=target_name,
+        # Defensive for synthetic provider catalogs (unit tests/adapters): the
+        # real sync validates the catalog at config-load time, so this only
+        # affects callers that pass a provider_config the project never names.
+        tolerate_unknown=True,
+    )
+    # Legacy callers (unit tests, ``_build_managed_block``) pass a plain role
+    # set where the sync pipeline passes the per-sync ActiveSet. ``build_agent_hints``
+    # expects the object form; the historical behaviour for the plain form is
+    # "resolve locally", so normalise instead of crashing.
+    hint_active_set = active_set if hasattr(active_set, "roles") else None
+    active_providers = set(
+        resolve_providers(config, provider_config or {}, tolerate_unknown=True)
+    )
+    capabilities = load_provider_capabilities(agent_meta_root)
+
+    positions: dict[str, str] = {}
+    for sharer in sorted(shared_users):
+        if sharer == provider:
+            # Authoritative for the renderer's own provider: Stage 4 already
+            # resolved it (never a fourth resolution).
+            positions[sharer] = position
+            continue
+        if sharer not in active_providers:
+            # An inactive sharer never writes the file, so its position cannot
+            # be contradicted (IC-15 no. 1: only active sharers count).
+            continue
+        override = overrides.get(sharer)
+        positions[sharer] = resolve_topology(
+            config,
+            sharer,
+            provider_config=provider_config,
+            capabilities=capabilities.get(sharer, {}),
+            mode=_resolve_orch_mode(
+                orch_config, override if isinstance(override, dict) else None
+            ),
+            active_set=active_set,
+        ).effective
+
+    distinct = set(positions.values())
+    chosen = positions.get(provider, position) if len(distinct) <= 1 else "neutral"
+
+    # build_agent_hints owns the main-chat branch; give it the CURRENT
+    # provider's mode (provider override first) instead of the project-global
+    # one, so a provider-scoped main-chat renders the main-chat wording.
+    provider_override = overrides.get(provider)
+    provider_mode = _resolve_orch_mode(
+        orch_config, provider_override if isinstance(provider_override, dict) else None
+    )
+    render_config = dict(config)
+    render_orch = dict(orch_config)
+    render_orch["mode"] = provider_mode
+    render_config["orchestrator"] = render_orch
+
+    return {
+        "AGENT_HINTS": build_agent_hints(
+            render_config, agent_meta_root, include_table=True,
+            active_set=hint_active_set, position=chosen,
+        ),
+        "AGENT_HINTS_CLAUDE": build_agent_hints(
+            render_config, agent_meta_root, include_table=False,
+            active_set=hint_active_set, position=chosen,
+        ),
+    }
+
+
 def _sync_managed_block_context(
     agent_meta_root: Path,
     project_root: Path,
@@ -808,6 +908,8 @@ def _sync_managed_block_context(
     target_name: str | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for providers with a context file using HTML managed blocks.
 
@@ -815,6 +917,11 @@ def _sync_managed_block_context(
     ``per-provider`` dispatch (IC-09); ``adapter_line`` is the provider-native
     core reference injected into the managed block when the provider reads an
     adapter file. Both default to the legacy single-file behaviour.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword and
+    never resolved here. The provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags
+    are read from the passed ``variables`` dict (Stage 4 owns the resolution);
+    this strategy never re-resolves the position.
     """
 
     pc = provider_config[provider]
@@ -825,19 +932,9 @@ def _sync_managed_block_context(
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
 
-    # build_agent_hints is imported at module top level — the lazy import was
-    # vestigial (agents does not import context; Issue #478 cleanup, guarded
-    # by tests/test_import_acyclicity.py).
-    orch_config = config.get("orchestrator", {})
-    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
-    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
-    
-    local_config = config.copy()
-    if "orchestrator" in local_config:
-        local_orch = local_config["orchestrator"].copy()
-        local_orch["mode"] = _orch_mode
-        local_config["orchestrator"] = local_orch
-
+    # build_agent_hints is imported at module top level — agents does not import
+    # context, so the helper below can call it directly (Issue #478 cleanup,
+    # guarded by tests/test_import_acyclicity.py).
     # Driven by the `has_dedicated_context_file` capability flag (issue #631)
     # instead of a literal `provider == "Claude"` check -- Claude is the only
     # provider with dedicated context-file handling today (own static-header
@@ -846,10 +943,20 @@ def _sync_managed_block_context(
     has_dedicated = pc.get("has_dedicated_context_file", False)
 
     variables = variables.copy()
+    # G5/AC-20: the entry hint is a position statement. The decision (own file
+    # vs. shared file, mixed sharer positions) lives here, where provider,
+    # target file and sharer set are known; ``build_agent_hints`` only selects
+    # the text block. The provider's own position comes from the Stage-4 flags
+    # already present in ``variables`` (never re-resolved here).
+    position = variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral")
+    hints = _position_aware_agent_hints(
+        config, provider, provider_config, agent_meta_root, context_file,
+        active_set=active_set, position=position,
+    )
     if has_dedicated:
-        variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(local_config, agent_meta_root, include_table=False)
+        variables["AGENT_HINTS_CLAUDE"] = hints["AGENT_HINTS_CLAUDE"]
     else:
-        variables["AGENT_HINTS"] = build_agent_hints(local_config, agent_meta_root, include_table=True)
+        variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
 
     # Claude's CLAUDE.md static part is handled by sync_claude_md_static() in the
     # main sync loop; this strategy only refreshes the managed block for Claude.
@@ -898,12 +1005,20 @@ def _sync_opencode_context(
     provider_config: dict,
     target_name: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for Opencode: rules embedded into AGENTS.md managed block.
 
     ``target_name`` overrides the physical filename chosen by the
     ``per-provider`` dispatch (IC-09); it defaults to the provider's
     ``context_file``.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword
+    and never resolved here: the effective-topology position arrives already
+    resolved in ``variables`` (Stage 4). The set is forwarded to the
+    managed-block render, which uses it to keep the position axis of a
+    *shared* physical file deterministic (G5/AC-20).
     """
 
     pc = provider_config[provider]
@@ -963,6 +1078,7 @@ def _sync_opencode_context(
             provider=provider, provider_config=provider_config, project_root=project_root,
             target_name=target_name,
             platform_vars=platform_vars,
+            active_set=active_set,
         )
         # The "agents-managed" template ends with a trailing newline after its
         # own closing marker, but managed_pattern's match never consumes any
@@ -1152,6 +1268,8 @@ def _sync_continue_context(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Strategy for Continue: project-context.md + config.yaml comment block."""
     from .extensions import render_managed_block, update_managed_block
@@ -1159,6 +1277,20 @@ def _sync_continue_context(
     pc = provider_config[provider]
     context_file = pc.get("context_file")
     if context_file:
+        # G5/AC-20 + AC-16: the Continue context file is provider-own, so its
+        # entry hint must keep the position text (this repo: the historic
+        # ``subagent`` wording). The provider-less global ``AGENT_HINTS`` from
+        # ``config.build_variables`` is neutral, so overwrite it here for this
+        # provider's dict. The dict is the same per-provider object handed to
+        # ``sync_pipeline.converge_managed_block_context`` right after this
+        # strategy, so the run-1 fixpoint renders the SAME bytes (AC-4) instead
+        # of falling back to the neutral global value.
+        hints = _position_aware_agent_hints(
+            config, provider, provider_config, agent_meta_root, context_file,
+            active_set=active_set,
+            position=variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral"),
+        )
+        variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
         ctx_path = project_root / context_file
         template_path = agent_meta_root / pc["context_template"]
         rel_ctx = str(ctx_path.relative_to(project_root))
@@ -1400,8 +1532,16 @@ def _dispatch_context_strategy(
     target_name: str | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
-    """Capability-driven render dispatch shared by both topology modes."""
+    """Capability-driven render dispatch shared by both topology modes.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword:
+    it is forwarded unchanged to the three strategies so every context seam
+    sees exactly the set the emission/rules seams used (AC-30). It is never
+    resolved here and never defaulted.
+    """
     pc = provider_config.get(provider, {})
     _write_dispatch_depth(
         agent_meta_root, project_root, provider, provider_config, log, dry_run
@@ -1412,18 +1552,20 @@ def _dispatch_context_strategy(
         _sync_opencode_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
-            platform_vars=platform_vars,
+            platform_vars=platform_vars, active_set=active_set,
         )
     elif _has_capability(pc, "context-config-comment"):
         _sync_continue_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, platform_vars=platform_vars,
+            active_set=active_set,
         )
     elif _has_capability(pc, "context-managed-block"):
         _sync_managed_block_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
             adapter_line=adapter_line, platform_vars=platform_vars,
+            active_set=active_set,
         )
 
 
@@ -1526,6 +1668,8 @@ def sync_context_adapters_for_provider(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> None:
     """Write the adapter file of an adapter-capable provider (``per-provider``).
 
@@ -1535,6 +1679,9 @@ def sync_context_adapters_for_provider(
     never routed here. ``resolve_context_filename`` (IC-08) is not consulted —
     it feeds legacy cleanup only. A missing/blank adapter file is a
     ``log.warning`` + return (never silent); ``dry_run`` never writes.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword,
+    forwarded to the dispatch unchanged.
     """
     pc = provider_config.get(provider, {})
     if pc.get("context_adapter") is not True:
@@ -1552,6 +1699,7 @@ def sync_context_adapters_for_provider(
         target_name=adapter_file,
         adapter_line=_adapter_reference_line(config, pc),
         platform_vars=platform_vars,
+        active_set=active_set,
     )
     if safe_path(project_root, adapter_file).exists():
         _record_adapter_managed(project_root, adapter_file, log, dry_run)
@@ -1600,6 +1748,8 @@ def sync_context_for_provider(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ):
     """Create or update the context file for a given provider.
 
@@ -1615,6 +1765,12 @@ def sync_context_for_provider(
     ``context_adapter_file`` via ``sync_context_adapters_for_provider``, every
     other provider renders the canonical core (``context_file.core_file``).
     The default ``unified`` topology keeps the exact legacy path.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required keyword
+    (no default — a ``None`` default would neuter the shared-set contract) and
+    forwarded unchanged to every strategy. The provider-scoped
+    ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags are resolved once by
+    ``sync_pipeline._sync_stage_contexts`` and arrive in ``variables``.
     """
     pc = provider_config.get(provider)
     if not pc:
@@ -1629,6 +1785,7 @@ def sync_context_for_provider(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
                 platform_vars=platform_vars,
+                active_set=active_set,
             )
             return
         _dispatch_context_strategy(
@@ -1636,12 +1793,14 @@ def sync_context_for_provider(
             provider, provider_config,
             target_name=_core_context_filename(config),
             platform_vars=platform_vars,
+            active_set=active_set,
         )
     else:
         _dispatch_context_strategy(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config,
             platform_vars=platform_vars,
+            active_set=active_set,
         )
 
     # IC-07 (Task 2b.4): the compact profile's rule REFERENCE sections reach
@@ -2364,6 +2523,83 @@ def sync_compact_reference_skills(
         )
 
 
+def _shared_topology_flags(
+    active_shared_users: list[str],
+    config: dict,
+    provider_config: dict,
+    agent_meta_root: Path,
+    active_set,
+) -> dict[str, str]:
+    """Return the ONE deterministic effective-position flags for a shared file.
+
+    A physical context file that more than one active provider renders is
+    written by each sharer in turn, so it must render identically every time
+    (issue #638/#794 oscillation guard). A position-specific statement violates
+    that as soon as the sharers resolve to different positions — the file would
+    flip on every sync and ``--check`` never converges (spec §5-G5/AC-20).
+
+    Rule: resolve every active sharer's effective state with the ONE resolver
+    (:func:`lib.topology.resolve_topology`, same inputs, same per-sync
+    ``active_set``) and
+
+    * all sharers agree -> write exactly that state (byte-identical to the
+      single-sharer render, so the pure ``subagent`` case stays untouched);
+    * the sharers disagree -> neutralise all position flags and the explicit
+      flag, so the consumers fall back to their historic else branch (a
+      directive, not a position claim).
+
+    The state is the pair ``(effective, source != "derived")`` — two sharers
+    that resolve the same position but differ in explicitness would also render
+    different text (``_EFFECTIVE_EXPLICIT`` gates a second wording).
+
+    Provider differences come from the capability data and the provider
+    registry only — never from a provider-name branch. The audit strings
+    ``ORCH_TOPOLOGY_EFFECTIVE``/``_EFFECTIVE_SOURCE`` are deliberately not
+    touched: they are not consumed by this render.
+    """
+    from .providers import load_provider_capabilities
+    from .topology import resolve_topology
+
+    orch_config = config.get("orchestrator", {}) or {}
+    provider_overrides = orch_config.get("provider-overrides", {}) or {}
+    capabilities = load_provider_capabilities(agent_meta_root)
+
+    states: set[tuple[str, bool]] = set()
+    for sharer in active_shared_users:
+        resolution = resolve_topology(
+            config,
+            sharer,
+            provider_config=provider_config,
+            capabilities=capabilities.get(sharer, {}),
+            mode=_resolve_orch_mode(orch_config, provider_overrides.get(sharer)),
+            active_set=active_set,
+        )
+        states.add((resolution.effective, resolution.source != "derived"))
+
+    if len(states) != 1:
+        # Mixed positions (or mixed explicitness): no position-specific claim.
+        return {
+            "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "false",
+            "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "false",
+        }
+
+    effective, explicit = next(iter(states))
+    return {
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "true" if explicit else "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": (
+            "true" if effective == "primary" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": (
+            "true" if effective == "subagent" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": (
+            "true" if effective == "hybrid" else "false"
+        ),
+    }
+
+
 def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
@@ -2374,6 +2610,8 @@ def _build_managed_block(
     project_root: Path | None = None,
     target_name: str | None = None,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> str:
     from .delegation_table import exclude_name_only, get_active_agents_data
     from .rules import (
@@ -2454,6 +2692,9 @@ def _build_managed_block(
     # stay per-provider by design (determinism scope AC-25 / R7).
     from .providers import load_provider_capabilities
 
+    # Active sharers of this physical file, hoisted: the gate tier (below) and
+    # the orchestrator topology axis (G5) both need the same set.
+    active_shared_users: list[str] = [provider]
     if provider_config:
         from .providers import (
             resolve_providers,
@@ -2469,6 +2710,20 @@ def _build_managed_block(
                     provider_config,
                     load_provider_capabilities(agent_meta_root),
                     config,
+                )
+            )
+            # G5/AC-20 (same determinism contract, independent of the gate
+            # tier above): the position axis must not carry a provider-specific
+            # claim either. A single active sharer keeps the provider-scoped
+            # Stage-4 flags already present in ``variables`` -- re-resolving
+            # there would be the fourth resolution of the run.
+            local_vars.update(
+                _shared_topology_flags(
+                    active_shared_users,
+                    config,
+                    provider_config,
+                    agent_meta_root,
+                    active_set,
                 )
             )
 

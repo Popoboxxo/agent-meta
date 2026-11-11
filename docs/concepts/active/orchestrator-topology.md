@@ -66,6 +66,45 @@ Provider und Lauf. Eine unveränderte `no`-Zelle ohne Deklaration warnt nicht.
 Ein Mechanismus-Wort (`sequential-text`) wandert nach `degradation_reason` und
 wird nie als Topologie-Wert durchgereicht.
 
+## Positionen
+
+> Spec §3.8.1/§3.8.2. Eine **Position** ist die tatsächliche Session-Form, in
+> der die Orchestrator-Rolle arbeitet. `mode` und `topology` sind die
+> Config-Achsen, aus denen sie folgt — sie sind **nicht** dasselbe wie die
+> Position: die Session-Form ist zur Sync-Zeit nicht entscheidbar (D-Q2).
+
+| ID | Position | Wer startet | Wer spawnt | Rolle emittiert? | `default_agent` | Gate-Tier / Wirkung | A2A / Checkpointing | Hops |
+|---|---|---|---|---|---|---|---|---|
+| **POS-1** | **Main-Chat-als-Orchestrator** (`mode: main-chat`) | Nutzer im Main Chat | niemand — kein Subagent, kein zusätzlicher Hop | **nein**; `role_emitted_for_provider` liefert `False` (`scripts/lib/active_set.py:206-217`) | **keiner**: der Sync schreibt keinen; ein nutzereigener Wert bleibt und wird gewarnt (`scripts/lib/isolation.py:910-924`) | **kein Runtime-Gate**: die Rolle existiert nicht, die Gate-Regel ist inert (D-Q5) | kein Orchestrator-State; Checkpoints im Main-Chat-Scope | **0** |
+| **POS-2** | **Delegierter Orchestrator** (`topology: subagent` mit `mode: strict` oder `advisory`) | Main Chat | Main Chat spawnt den Orchestrator als Subagent | **ja**, Frontmatter `mode: subagent` (`scripts/lib/provider_transform.py:1052`, `:1298`) | **keiner** — bewusst, damit kein Entry-Point auf eine nicht startbare Rolle zeigt | so stark wie das Tier: `hook` = erzwungen (Claude), `plugin` = `observe` + `permissions[]`-Deny, `permission` = PARTIAL, ohne Hooks = Prompt-Konvention; wo der Deny bewusst nicht geschrieben wird, ist `orchestrator-topology.gate-inactive` Pflicht (§6.4) | voll (`a2a-v1` + Checkpoints) | **1** |
+| **POS-3** | **Session-Einstieg** (`topology: primary`) | Nutzer startet im Orchestrator | niemand — er **ist** der Einstieg | **ja**, Frontmatter `mode: primary` (`scripts/lib/provider_transform.py:496-497`) | `orchestrator` (Managed-Merge mit Rollback, #1006) | Tier wie POS-2, zusätzlich Write-Scope-Lock (`scripts/lib/provider_transform.py:529-531`) und Deny an den Einstieg gekoppelt (`scripts/lib/isolation.py:926-932`) | voll | **0** (nur wenn die Session tatsächlich dort startet) |
+
+POS-3 ist die **dritte, optionale** Position: nicht jeder Provider unterstützt
+sie (Gemini degradiert, `config/provider-capabilities.yaml:263-266`), und sie
+verlangt eine Nutzerentscheidung beim Session-Start, die der Sync nicht
+erzwingen kann (D-Q2). POS-1 und POS-2 sind auf OpenCode **beide** first-class
+(D-OQ2); keine von beiden wird abgewertet.
+
+### Mapping `mode` × `topology` → Position
+
+`topology` ist je Zeile entweder **ungesetzt** (Ableitung durch
+`resolve_topology`) oder **deklariert**. Die Ableitung liefert `primary` nur,
+wenn `providers.<P>.primary-role` die Rolle nennt **und** sie im ActiveSet
+liegt (`scripts/lib/topology.py:135-140`), sonst `subagent`.
+
+| `mode` | `topology` | aufgelöste Position (`effective`) | Positions-ID | Rolle emittiert? | `default_agent` | Gate-Tier / Wirkung | A2A / Checkpointing | Hops |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | `ungesetzt` (primary-role im ActiveSet) | `primary` | POS-3 | ja, `mode: primary` | `orchestrator` | Tier erzwingt (`hook`/`plugin`-Deny) bzw. PARTIAL (`permission`) | voll | 0 |
+| `strict` | `ungesetzt` (keine primary-role) | `subagent` | POS-2 | ja, `mode: subagent` | keiner | `gate-inactive` (ehrlich), prompt-basiert | voll | 1 |
+| `strict` | `primary` | `primary` | POS-3 | ja, `mode: primary` | `orchestrator` | Tier + Write-Scope-Lock + Deny | voll | 0 |
+| `strict` | `subagent` | `subagent` | POS-2 | ja, `mode: subagent` | keiner | `gate-inactive`, prompt-basiert (D-Q2-Tabelle) | voll | 1 |
+| `advisory` | `ungesetzt` | abgeleitet (`primary` oder `subagent`) | POS-3 bzw. POS-2 | ja | abhängig von der Ableitung | Tier + Advisory-Zusage | voll | 0 bzw. 1 |
+| `advisory` | `primary` | `primary` | POS-3 | ja, `mode: primary` | `orchestrator` | Tier + Advisory-Zusage | voll | 0 |
+| `advisory` | `subagent` | `subagent` | POS-2 | ja, `mode: subagent` | keiner | `gate-inactive`; **Empfehlung erst nach #1182** (D-OQ3) | voll | 1 |
+| `main-chat` | `ungesetzt` | Ableitung wäre `primary`, ist aber **inert** | POS-1 | **nein** | keiner; WARN `orchestrator-topology.main-chat-derived-primary` (D-Q1) | kein Gate | kein Orchestrator-State | 0 |
+| `main-chat` | `primary` | **Validierungs-ERROR** (`scripts/lib/config.py:557-563`), rc ≠ 0 | keine Position | nein | keiner | harter Validator; die Config ist ungültig | entfällt mit der Config | entfällt mit der Config |
+| `main-chat` | `subagent` | `subagent`, aber inert (provider-override oder cross-scope) | POS-1 | **nein** | keiner | kein Gate; `orchestrator-topology.main-chat-supersedes` | kein Orchestrator-State | 0 |
+
 ## `mode` × `topology` — Interaktionsmatrix
 
 Die Achsen sind orthogonal: `topology` ändert nie die Gate-Stärke, `mode`
@@ -82,11 +121,143 @@ entfernt die Rolle, damit ist jede Topologie gegenstandslos.
 v1-Verhalten: weil `topology_verified_state.hybrid == UNVERIFIED` ist,
 degradiert jede `hybrid`-Zelle in v1 auf `subagent` (Fail-safe).
 
+**Abgeleitete Topologie (B-11, D-Q1).** Die Matrix beschreibt nur die
+**deklarierte** Topologie. Ist `orchestrator.topology` ungesetzt, leitet der
+Resolver `primary` **nur dann** ab, wenn `providers.<P>.primary-role` die Rolle
+nennt **und** sie im ActiveSet liegt; andernfalls leitet er `subagent` ab. Unter
+`mode: main-chat` ist diese Ableitung **inert** — sie erzeugt genau eine WARNING
+`orchestrator-topology.main-chat-derived-primary` (die Rolle wird dort nicht
+emittiert, die abgeleitete Position ist gegenstandslos).
+
 `mode: main-chat` im selben Scope wie eine Topologie (auch im selben Objekt)
 ist ein **harter Validator-ERROR** (rc ≠ 0). Cross-Scope (Provider-Override
 `mode: main-chat` bei global gesetzter Topologie) ist eine WARNING
 `orchestrator-topology.main-chat-supersedes`; die Topologie ist dann **inert**,
 nicht still übersteuert.
+
+## Positions-Matrix je Surface
+
+> Datenquelle: Design §12.2–§12.6
+> ([`2026-11-09-orchestrator-mode-topology-design.md`](../../specs/2026-11-09-orchestrator-mode-topology-design.md)).
+> Die Tabellen sind **Daten**, keine Meinung: jede Begründung nennt die tragende
+> Code-Stelle, jede Verdict-Zelle beginnt mit genau einem Wort aus dem
+> geschlossenen Vokabular.
+
+**Positionen:** die Spalte „Position" nennt nur die Positions-ID; die drei
+Positionen (POS-1/POS-2/POS-3) sind einmalig im Abschnitt
+[Positionen](#positionen) definiert.
+
+**Urteil-Vokabular:** `RECOMMENDED` (genau eine pro Surface) · `ALLOWED`
+(funktioniert, mit benannten Kosten) · `DEGRADED` (deklariert, effektiv aber
+`subagent`) · `FORBIDDEN` (Validator-ERROR oder strukturell unausführbar).
+
+**`hybrid` ist keine eigene Zeile:** jede `hybrid`-Zelle ist `UNVERIFIED ⇒
+subagent` und erscheint deshalb unter `subagent` (kein Neuaufrollen von #1077).
+
+#### Surface `v1` — OpenCode v1 (`surface-version: v1`, Tier `permission` PARTIAL)
+
+| mode | topology (decl→eff) | Position | Urteil | Gate-Tier | Write-Scope-Lock | Recursion | Hop | A2A / Checkpoint |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | `primary`→`primary` | POS-3 | ALLOWED (optional, 0 Hop) | `permission` (PARTIAL, `runtime-gate-tiers.md:38`) | aktiv (`provider_transform.py:529-531`) | `subagent_depth` nur bei `inject-subagent-depth` (`provider-capabilities.yaml:211`); Plattform-Limit | 0 | `a2a-v1` + `.meta-viz`-Checkpoints aktiv (`plan-ledger.md:30-32`) |
+| `strict` | `subagent`→`subagent` | POS-2 | **RECOMMENDED** (Default, D-OQ1) | Gate suspendiert, `gate-inactive`-WARN (`isolation.py:932-962`) | **nicht** gesetzt | dito, +1 Ebene | 1 | dito |
+| `advisory` | `primary`→`primary` | POS-3 | ALLOWED | `permission` | aktiv | dito | 0 | dito |
+| `advisory` | `subagent`→`subagent` | POS-2 | ALLOWED (Team-Empfehlung, **setzt #1182 voraus**) | Gate suspendiert | nicht gesetzt | dito | 1 | dito |
+| `main-chat` | `primary`→`primary` | POS-1 (keine Rolle) | **FORBIDDEN** (declared) / WARN (derived, D-Q1) | keiner (Rolle fehlt) | entfällt | entfällt | 0 | kein Orchestrator-State |
+| `main-chat` | `subagent`→`subagent` | POS-1 | ALLOWED nur **cross-scope** (inert + `main-chat-supersedes`) | keiner | entfällt | entfällt | 0 | kein Orchestrator-State |
+
+#### Surface `v2` — OpenCode v2 (`surface-version: v2`, Tier `plugin` observe + `permissions[]`-Deny)
+
+| mode | topology (decl→eff) | Position | Urteil | Gate-Tier | Write-Scope-Lock | Recursion | Hop | A2A / Checkpoint |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | `primary`→`primary` | POS-3 | ALLOWED (optional) | `plugin` = **observe**; Deny tragend ist der `permissions[]`-Deny (**nicht** das Plugin) (`runtime-gate-tiers.md:50-53`) | aktiv | `subagent_depth` (Capability `required_depth: 2`, `provider-capabilities.yaml:211`) | 0 | `a2a-v1` + `.meta-viz`-Checkpoints aktiv (`plan-ledger.md:30-32`) |
+| `strict` | `subagent`→`subagent` | POS-2 | **RECOMMENDED** (Default, D-OQ1) — **erst nach G7** | Gate suspendiert (`gate-inactive`), **kein Deny**; Session-/Context-Ownership bleibt beim Main Chat | **nicht** gesetzt | dito | 1 | dito |
+| `advisory` | `primary`→`primary` | POS-3 | ALLOWED | `plugin` + `permissions[]`-Deny | aktiv | dito | 0 | dito |
+| `advisory` | `subagent`→`subagent` | POS-2 | ALLOWED (Team-Empfehlung, **setzt #1182 voraus**) | Gate suspendiert | nicht gesetzt | dito | 1 | dito |
+| `main-chat` | `primary`→`primary` | POS-1 (keine Rolle) | **FORBIDDEN** (declared) / WARN (derived, D-Q1) | keiner | entfällt | entfällt | 0 | kein Orchestrator-State |
+| `main-chat` | `subagent`→`subagent` | POS-1 | ALLOWED nur cross-scope (inert + WARN) | keiner | entfällt | entfällt | 0 | kein Orchestrator-State |
+
+> **v2-Pin:** Nicht-`primary`-Rollen werden hart auf `mode: subagent` gesetzt
+> (`provider_transform.py:498-499`). Genau deshalb ist `subagent` auf v2
+> **technisch** sauber — und genau deshalb ist der topology-blinde Reconcile
+> (G7) der einzige verbleibende Defekt.
+
+> **Bedingung (`DECIDED 2026-11-09`, D-OQ3):** `advisory × subagent` ist die
+> Team-Empfehlung, aber **erst nach dem Fix von #1182** (`context-profile:
+> compact` bricht für `advisory` ab). Bis dahin ist `strict × subagent` die
+> belastbare Team-Empfehlung; Szenario `103` bleibt `BLOCKED (#1182)`.
+
+#### Surface `Claude` — Tier `hook`, kein `primary-role`
+
+| mode | topology (decl→eff) | Position | Urteil | Gate-Tier | Write-Scope-Lock | Recursion | Hop | A2A / Checkpoint |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | ungesetzt→`subagent` | POS-2 | **RECOMMENDED** | `hook` (voll, `runtime-gate-tiers.md:36`) | entfällt (kein `mode: primary`-Konzept) | Subagent-Nesting-Limit der Plattform (`a2a-delegation-gates.md:30-32`) | 1 | `a2a-v1`/Checkpoints provider-gestützt (`plan-ledger.md:30-32`) |
+| `strict` | `primary`→`primary` | POS-3 | ALLOWED (nur explizit deklariert) | `hook` | Guard-Hook statt Agent-Frontmatter-Deny | dito | 0 | dito |
+| `advisory` | `primary`→`primary` | POS-3 | ALLOWED | `hook` | Guard-Hook | dito | 0 | dito |
+| `advisory` | `subagent`→`subagent` | POS-2 | ALLOWED (Team-Empfehlung, **setzt #1182 voraus**) | `hook` | entfällt | dito | 1 | dito |
+| `main-chat` | `primary`→`primary` | POS-1 (keine Rolle) | **FORBIDDEN** (declared) / WARN (derived, D-Q1) | keiner (Rolle fehlt) | entfällt | entfällt | 0 | kein Orchestrator-State |
+| `main-chat` | `subagent`→`subagent` | POS-1 | ALLOWED nur cross-scope (inert + WARN) | keiner | entfällt | entfällt | 0 | kein Orchestrator-State |
+
+> **Caveat `strict × primary` (Rev. 2 / R-02):** „Hop 0" gilt **nur**, wenn die
+> Session tatsächlich im `orchestrator` startet. Claude hat kein
+> `mode: primary`-Konzept und `main_agent_selectable: true`
+> (`provider-capabilities.yaml:144`): eine Main-Chat-Session **darf** den
+> Orchestrator spawnen (der legale `hook`-Kanal), kostet dann aber 1 Hop. Die
+> Rev.-1-Regel „kein Spawn-Kanal" ist deshalb **falsch** und in G1 ersatzlos
+> gestrichen.
+
+#### Surface `Gemini` — Gemini / Antigravity (Tier `hook`, `primary` nicht unterstützt)
+
+| mode | topology (decl→eff) | Position | Urteil | Gate-Tier | Write-Scope-Lock | Recursion | Hop | A2A / Checkpoint |
+|---|---|---|---|---|---|---|---|---|
+| `strict` | `primary`→**`subagent`** | POS-2 (degradiert) | DEGRADED (+ `orchestrator-topology.degraded`) | `hook` (`runtime-gate-tiers.md:36`) | nicht gesetzt | Roster (`provider-capabilities.yaml:256`) / Plattform-Limit | 1 | `a2a-v1`/Checkpoints provider-gestützt (`plan-ledger.md:30-32`) |
+| `strict` | `subagent`→`subagent` | POS-2 | **RECOMMENDED** | `hook` | nicht gesetzt | dito | 1 | dito |
+| `advisory` | `primary`→`subagent` | POS-2 (degradiert) | DEGRADED (WARN) | `hook` | nicht gesetzt | dito | 1 | dito |
+| `advisory` | `subagent`→`subagent` | POS-2 | ALLOWED (Team-Empfehlung, **setzt #1182 voraus**) | `hook` | nicht gesetzt | dito | 1 | dito |
+| `main-chat` | `primary`→`subagent` | POS-1 (keine Rolle) | **FORBIDDEN** (declared) / WARN (derived) | keiner (Rolle fehlt) | entfällt | entfällt | 0 | kein Orchestrator-State |
+| `main-chat` | `subagent`→`subagent` | POS-1 | ALLOWED nur cross-scope (inert + WARN) | keiner | entfällt | entfällt | 0 | kein Orchestrator-State |
+
+## Kosten und Empfehlung
+
+**Hop-Definition** (Spec §4, D-Q4): **POS-3 = 0 Hop**, **POS-2 = 1 Hop**,
+**POS-1 = 0 Hop**. Ein Hop ist genau ein Spawn des Orchestrators durch den Main
+Chat; ein Hop ist Kontext- und Latenz-Kosten, nie ein Governance-Gewinn.
+
+**Schwelle:** **S ≤2 Dateien → direkter Dispatch** (kein Orchestrator-Hop);
+M/L/XL laufen über den Orchestrator (`spec-plan-workflow.md:29-32`).
+
+**ESTIMATE:** 4–8k Tokens pro Session-Start für den Orchestrator-Einstieg.
+Messmethode: `wc -c <datei> / 4` über die drei Einstiegsdateien (Agent-Prompt,
+eingebettete Rules, Projekt-Kontext). Der Wert ist **nicht gemessen**, sondern
+geschätzt — er ist keine Messbehauptung.
+
+**Empfehlung (Einzelnutzer):** Default ist **`strict × subagent`** (POS-2,
+1 Hop). **`strict × primary`** (POS-3) ist eine **gleichwertige** Option:
+gleiche Governance, kein Hop, dafür Session-Start-Bindung — der Sync kann den
+Start in der Rolle nicht erzwingen.
+
+**Empfehlung (Team):** `advisory × subagent` — **erst nach #1182**
+(`context-profile: compact` bricht für `advisory` ab). Bis dahin gilt auch im
+Team `strict × subagent`.
+
+## Evidenz-Index (Matrix)
+
+| Aussage | Quelle |
+|---|---|
+| Ableitung/`effective`-Invariante | `scripts/lib/topology.py:135-140`, `:72-77` |
+| Fallback/Degradierung | `scripts/lib/topology.py:147-183`, `config/provider-capabilities.yaml:263-266` |
+| `mode` beeinflusst Position nicht | `scripts/lib/topology.py:196-206` |
+| Same-Scope-ERROR, Cross-Scope-WARN | `scripts/lib/config.py:435-463`, `:538-563` |
+| v1/v2-Emission + Pin | `scripts/lib/provider_transform.py:488-499` |
+| Write-Scope-Lock | `scripts/lib/provider_transform.py:529-531` |
+| Tier-Präzedenz und Zusagen | `docs/concepts/runtime-gate-tiers.md:36-55`, `:64-69` |
+| v2-Deny-Invariante (D1a) | `scripts/lib/isolation.py:1351-1404`, `:1856-1889` |
+| Auto-Commit/Dispatch-Defaults | `scripts/lib/config.py:2003` |
+| S/M/L/XL-Schwellen | `rules/1-generic/spec-plan-workflow.md:29-32` |
+| Capability-Zellen | `config/provider-capabilities.yaml:148-151`, `:206-209`, `:263-266` |
+| Registry-Keys Opencode | `config/ai-providers.yaml:260-274`, `:314-325` |
+| Position POS-1: Rolle nicht emittiert | `scripts/lib/active_set.py:206-217` |
+| Position POS-1: dangling `default_agent` nur gewarnt | `scripts/lib/isolation.py:910-924` |
+| Position POS-2/POS-3: Frontmatter-`mode` | `scripts/lib/provider_transform.py:494-499`, `:1052`, `:1298` |
 
 ## Multi-Instanz-Vertrag — **P3, shipped**
 
@@ -94,6 +265,13 @@ nicht still übersteuert.
 > des ausgelieferten Vertrags — nicht mehr nur entworfen. Der Default bleibt
 > N=1: **N=1 ist byte-identisch** zu vorher (keine Rollen-, Dateinamen-,
 > Session-ID- oder Render-Änderung ohne gesetzten Key).
+
+> **Statuskorrektur (2026-11-09, #1190, B-7).** Die Vorgänger-Spec
+> [`2026-11-04-orchestrator-topology-spec.md`](../../specs/2026-11-04-orchestrator-topology-spec.md)
+> führt die Multi-Instanz-Passage in `:791-792` noch als reinen Entwurf
+> („designed, not shipped"). Diese Zeile ist **überholt** und wird bewusst
+> **nicht** editiert (D1–D10 bleiben unangetastet); verbindlich ist
+> „P3, shipped".
 
 - `orchestrator.max-instances` (integer **1..8**, Default **1**) ist der
   kanonische Multiplizitäts-Key; `orchestrator.singleton` ist ein

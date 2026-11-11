@@ -24,6 +24,7 @@ from .context_profile import (
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
+    _effective_topology_flags,
     _instance_flags,
     _orch_mode_flags,
     _resolve_orch_mode,
@@ -2009,6 +2010,13 @@ def _build_orch_variables(
     # can reuse the same logic in scripts/sync.py.
     _orch_mode = _resolve_orch_mode(orch_config)
     variables.update(_orch_mode_flags(_orch_mode))
+    # AC-24 (G8): in ``main-chat`` mode the orchestrator agent is deliberately
+    # not emitted (``active_set.role_emitted_for_provider``), so the render-facing
+    # role flag must not claim a spawnable orchestrator. The ActiveSet keeps the
+    # role in ``roles`` (permission scans, routability questions) — this is the
+    # prose flag only, and it is global-mode scoped exactly like ROLE_* itself.
+    if _orch_mode == "main-chat":
+        variables["ROLE_ORCHESTRATOR_ACTIVE"] = "false"
 
     # ORCH_TOPOLOGY_*: provider-LESS (global) block, wired exactly like the
     # ORCH_MODE_* flags above. IC-4 pins its value to the PROJECT declaration:
@@ -2025,6 +2033,40 @@ def _build_orch_variables(
         explicit=_project_topology is not None,
         source="project" if _project_topology is not None else "derived",
     ))
+
+    # ORCH_TOPOLOGY_EFFECTIVE*: provider-LESS start value, i.e. the
+    # non-authoritative basis (G2, RVW2-1190-09). It is built from the PROJECT
+    # declaration only — no provider loop, no capability cells, no active set:
+    # a provider override must never leak into the global dict.
+    # * declared  := orchestrator.topology (None when unset)
+    # * effective := declared when it is a valid topology, else the fail-safe
+    #                "subagent" (the hard enum error stays in
+    #                _validate_orchestrator_topology)
+    # * source    := "project" when declared, else "derived"
+    # Every provider-scoped render seam (context.py, rules.py, … from Task 4
+    # onward) MUST overwrite all seven flags via
+    # variables._provider_topology_flags(); this dict is never authoritative.
+    # Kept as a literal marker: tests/test_orchestrator_topology_effective_
+    # flags.py::test_global_block_is_documented_as_non_authoritative pins it.
+    from .topology import VALID_TOPOLOGIES, TopologyResolution
+
+    _declared_topology = (
+        None if _project_topology is None else str(_project_topology).strip()
+    )
+    _global_resolution = TopologyResolution(
+        declared=_declared_topology,
+        effective=(
+            _declared_topology
+            if _declared_topology in VALID_TOPOLOGIES
+            else "subagent"
+        ),
+        source="project" if _declared_topology is not None else "derived",
+        derived_from=None,
+        degraded_from=None,
+        degradation_reason=None,
+        verification_state=None,
+    )
+    variables.update(_effective_topology_flags(_global_resolution, mode=_orch_mode))
 
     # ORCH_MAX_INSTANCES / ORCH_SINGLETON_DECLARED: provider-LESS (global)
     # project-scope block (P3, AC-8). The unset count is the single-instance

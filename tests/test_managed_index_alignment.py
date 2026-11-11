@@ -54,6 +54,7 @@ def test_rules_write_empty_index_and_clean_stale_entry(tmp_path: Path) -> None:
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
         provider="Claude", provider_config=provider_config, variables={},
+        active_set=frozenset(),
     )
 
     index_path = rules_dir / ".agent-meta-managed"
@@ -206,6 +207,7 @@ def test_auto_generate_false_emits_warning_without_write(tmp_path: Path) -> None
         {"context_file": {"auto_generate": False}},
         provider_config, ["Claude"], {},
         argparse.Namespace(dry_run=False), log,
+        active_set=frozenset(),
     )
 
     assert context_file.read_text(encoding="utf-8") == "ORIGINAL"
@@ -232,6 +234,7 @@ def test_deactivated_provider_emits_warning_without_write(tmp_path: Path) -> Non
         tmp_path / "agent-meta", project_root, config,
         provider_config, ["Claude"], {},
         argparse.Namespace(dry_run=False), log,
+        active_set=frozenset(),
     )
 
     assert not (project_root / ".claude" / "CLAUDE.md").exists()

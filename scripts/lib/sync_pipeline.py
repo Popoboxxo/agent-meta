@@ -150,6 +150,7 @@ from lib.skills import (
 )
 from lib.release_scaffold import scaffold_release_process
 from lib.spec_plan_scaffold import scaffold_spec_plan_dirs
+from lib.variables import _provider_topology_flags
 from lib.viz import (
     get_gitignore_entries as viz_gitignore_entries,
 )
@@ -734,12 +735,23 @@ def _sync_stage_contexts(
     provider_config: dict, providers: list, variables: dict,
     args: argparse.Namespace, log: SyncLog,
     platform_vars: dict | None = None,
+    *,
+    active_set,
 ) -> tuple[bool, bool, list]:
     """Stage 4: per-provider context sync loop.
 
     Returns ``(debug_mode, allow_committed_secrets, mcp_gitignore_extras)`` —
     the flags feed stage 6, the accumulator list is appended to by stage 6
     (by reference) and read by stage 11.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17/AC-30), required
+    keyword-only (no default: a ``None`` default would let the derive step fall
+    back to the empty set and silently render ``subagent`` everywhere). This
+    stage is the ONE resolution point of the provider-scoped effective
+    topology: ``_provider_topology_flags`` runs exactly once per provider and
+    its result is mixed into that provider's ``provider_variables`` — the
+    provider-less basis from ``config._build_orch_variables`` is never read by a
+    render seam (AC-30 ratchet).
     """
     # Per-provider sync
     debug_mode = config.get("debug-mode", False)
@@ -760,11 +772,12 @@ def _sync_stage_contexts(
         # recomputed ORCH_MODE_* flags — the shared `variables` dict is never mutated.
         _orch_config = config.get("orchestrator", {})
         _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+        # ONE mode resolution for this provider: it feeds the ORCH_MODE_* flags,
+        # the effective-topology helper below and (via variables) the render.
+        _provider_mode = _resolve_orch_mode(_orch_config, _provider_override)
         if _provider_override and _provider_override.get("mode") is not None:
             provider_variables = dict(variables)
-            provider_variables.update(
-                _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
-            )
+            provider_variables.update(_orch_mode_flags(_provider_mode))
         else:
             provider_variables = variables
         if not _context_auto_generate(config):
@@ -778,6 +791,17 @@ def _sync_stage_contexts(
         caps = load_provider_capabilities(agent_meta_root).get(provider, {})
         provider_variables = dict(provider_variables)
         provider_variables.update(runtime_gate_vars(pc, caps, config))
+        # Effective-topology axis (G2/G3, issue #1190): the provider-less basis
+        # from config.py is NOT authoritative. Resolve the position for THIS
+        # provider once (same helper/set as emission and rules) and overwrite the
+        # basis before any context renderer consumes the dict (AC-20/AC-30).
+        provider_variables.update(_provider_topology_flags(
+            config,
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=_provider_mode,
+            active_set=active_set,
+        ))
         # Path migration (Task 11): resolve the discovery surface for every
         # writer/renderer below and move the managed artifacts off the old paths
         # (backup-first, user files untouched). Config-driven no-op unless
@@ -787,7 +811,7 @@ def _sync_stage_contexts(
         provider_config[provider] = pc
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config,
-                                  platform_vars=platform_vars)
+                                  platform_vars=platform_vars, active_set=active_set)
         # Continue run1 fixpoint (AC-4): a scaffolded config-comment context file
         # gets the steady-state managed block immediately, capability-gated —
         # never by provider name.
@@ -1332,6 +1356,38 @@ def emit_topology_summary(
         log.note("topology", line)
 
 
+def _provider_override_vars(
+    config: dict, provider: str, agent_meta_root: Path, *, active_set,
+) -> dict:
+    """Return the per-provider orchestrator flags for the override branch (T6).
+
+    ``orchestrator.provider-overrides.<Provider>.mode`` narrows the mode for
+    THIS provider only, so the branch needs both axes — ``ORCH_MODE_*`` and the
+    provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` — resolved from the same
+    per-sync ``active_set`` the emission side used (G3, AC-18/AC-30). Before
+    T6 the branch wrote only ``ORCH_MODE_*``, so an overridden provider fell
+    back to the provider-less (non-authoritative) topology basis.
+    """
+    orch_config = config.get("orchestrator", {})
+    orch_config = orch_config if isinstance(orch_config, dict) else {}
+    overrides = orch_config.get("provider-overrides", {})
+    override = overrides.get(provider) if isinstance(overrides, dict) else None
+    override = override if isinstance(override, dict) else None
+
+    provider_mode = _resolve_orch_mode(orch_config, override)
+    flags = _orch_mode_flags(provider_mode)
+    flags.update(
+        _provider_topology_flags(
+            config,
+            provider,
+            agent_meta_root=agent_meta_root,
+            mode=provider_mode,
+            active_set=active_set,
+        )
+    )
+    return flags
+
+
 def _sync_stage_per_provider(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -1356,6 +1412,10 @@ def _sync_stage_per_provider(
     """
     from lib.mcp import load_mcp_registry
     from lib.external_tools import load_external_tools_registry
+    # G7/AC-22: the surface reconcile consumes the topology resolved once per
+    # provider below — imported here, not at module level, keeping the import
+    # surface of this stage small.
+    from lib.topology import resolve_topology, topology_explicit
 
     mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
     external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
@@ -1413,7 +1473,9 @@ def _sync_stage_per_provider(
             provider_variables = dict(variables)
             if _orch_override_active:
                 provider_variables.update(
-                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
+                    _provider_override_vars(
+                        config, provider, agent_meta_root, active_set=active_set,
+                    )
                 )
             if _sub_override_active:
                 # Flags AND SUBAGENT_PERMISSIONS_BLOCK from one resolver (M2).
@@ -1471,7 +1533,7 @@ def _sync_stage_per_provider(
             sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                        platform_vars=platform_vars, variables=provider_variables,
                        rules_dir=pc.get("rules_dir"), provider=provider,
-                       provider_config=provider_config)
+                       provider_config=provider_config, active_set=active_set)
             sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                              rules_dir=pc.get("rules_dir"))
         _cleanup_retired_rules_dirs(project_root, config, provider_config, providers,
@@ -1487,7 +1549,8 @@ def _sync_stage_per_provider(
             # rules_read_channels itself. No provider names.
             sync_embedded_rule_files(agent_meta_root, project_root, config, log,
                                      args.dry_run, variables=provider_variables,
-                                     provider=provider, provider_config=provider_config)
+                                     provider=provider, provider_config=provider_config,
+                                     active_set=active_set)
         # MCP: generate rule files + provider configs + collect gitignore entries
         try:
             mcp_extras = generate_mcp_artifacts(
@@ -1595,10 +1658,28 @@ def _sync_stage_per_provider(
         # the surface-switch rollback. Deliberately outside the ``== "permission"``
         # block above (Spec-A freeze) and BEFORE the managed-key merge (spec
         # §3.4 data flow); a no-op for non-owners.
+        #
+        # G7/AC-22: the reconcile does NOT resolve the topology itself (that
+        # would be a third resolution point per provider and run) — it receives
+        # the one resolved here, from the same inputs the render seams use.
+        topology = resolve_topology(
+            config,
+            provider,
+            provider_config=provider_config,
+            capabilities=caps,
+            mode=_resolve_orch_mode(_orch_config, _provider_override),
+            active_set=active_set,
+        )
+        if not topology_explicit(config, provider) and active_set is None:
+            # Same guard as the Spec-A writer (``_sync_opencode_runtime_gate``):
+            # without active-set information the derivation can only fall back
+            # to ``subagent``, which would silently withhold an entry point the
+            # caller had no information about (AC-6 byte identity).
+            topology = None
         reconcile_opencode_surface_gate(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
-            active_set=active_set,
+            active_set=active_set, topology=topology,
         )
         # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
         # Deliberately outside the ``== "permission"`` block above (Spec-A

@@ -144,6 +144,11 @@ leitet die Severity aus derselben Tier ab (Check-ID unverändert
 | `permission` | INFO („partial enforcement, no provenance") |
 | `advisory` | WARNING (Default); ERROR nur bei `orchestrator.require-runtime-gate: true` |
 
+Derselbe `--validate`-Kanal meldet zusätzlich den INFO `orchestrator-strict.direct-dispatch-inert`,
+wenn `orchestrator.mode: main-chat` gesetzt ist **und** `direct-dispatch-enabled` vorhanden ist —
+dort hat der Key keinen Konsumenten (die Orchestrator-Rolle wird nicht emittiert); unter `strict`
+oder `advisory` ist er wirksam und es entsteht kein Finding.
+
 `orchestrator.require-runtime-gate` ist ein Boolean-Sibling-Key (Default `false`,
 D-C2). `runtime-gate.plugin-mode` (`enum: [observe, enforce]`, Default `observe`) ist
 der Phase-1-Schema-Key (IC-16) und beeinflusst die Erzeugung des Artefakts nicht:

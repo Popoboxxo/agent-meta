@@ -159,6 +159,7 @@ def test_generated_context_file_has_no_raw_platform_placeholders(tmp_path, provi
         _REPO_ROOT, project_root, config, variables, log,
         dry_run=False, provider=provider, provider_config=provider_config,
         platform_vars=platform_vars,
+        active_set=frozenset(),
     )
 
     context_file = provider_config[provider]["context_file"]

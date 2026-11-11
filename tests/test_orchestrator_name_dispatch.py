@@ -53,7 +53,8 @@ def _render_section3(provider: str) -> str:
         template.index("## 3. Intent routing"):
         template.index("## 4.")
     ]
-    merged = _build_provider_vars({}, provider, _build_variables(), _AGENT_META_ROOT)
+    merged = _build_provider_vars({}, provider, _build_variables(), _AGENT_META_ROOT,
+                                   active_set=frozenset())
     rendered = substitute(section, merged, "test", SyncLog())
     return strip_inactive_conditional_blocks(rendered, merged)
 
@@ -61,7 +62,8 @@ def _render_section3(provider: str) -> str:
 def _rendered_routing_payload(provider: str) -> dict:
     """Parse the rendered ``INTENT_ROUTING_TOOLS`` payload in the provider's
     own handoff format (json vs yaml_text_block)."""
-    merged = _build_provider_vars({}, provider, _build_variables(), _AGENT_META_ROOT)
+    merged = _build_provider_vars({}, provider, _build_variables(), _AGENT_META_ROOT,
+                                   active_set=frozenset())
     rendered = substitute(
         "before\n\n{{INTENT_ROUTING_TOOLS}}\n\nafter", merged, "test", SyncLog()
     )

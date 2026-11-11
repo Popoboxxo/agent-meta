@@ -72,6 +72,15 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # shrink-only and must not take new entries.
     "ORCH_TOPOLOGY", "ORCH_TOPOLOGY_EXPLICIT", "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT", "ORCH_TOPOLOGY_HYBRID", "ORCH_TOPOLOGY_SOURCE",
+    # Effective-topology axis (G2, issue #1190, AC-15): the five boolean flags
+    # are emitted by variables._effective_topology_flags and must be
+    # fail-closed registrations; the two string names
+    # (ORCH_TOPOLOGY_EFFECTIVE, ORCH_TOPOLOGY_EFFECTIVE_SOURCE) are audit-only
+    # and never conditionals.
+    "ORCH_TOPOLOGY_EFFECTIVE", "ORCH_TOPOLOGY_EFFECTIVE_SOURCE",
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT", "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT", "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
     # Orchestrator multiplicity axis (P3, AC-8): emitted by
     # variables._instance_flags via config.build_variables. Register here — the
     # builder ratchet is shrink-only and must not take new entries.

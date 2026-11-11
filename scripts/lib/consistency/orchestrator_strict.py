@@ -38,6 +38,11 @@ _CHECK_ID = "orchestrator-strict.no-hook-support"
 #: never masquerades as a no-hook-support finding.
 _DEFAULT_FLIP_CHECK_ID = "orchestrator-strict.default-flip-grace"
 
+#: D-Q5: ``direct-dispatch-enabled`` has no consumer under ``mode: main-chat``
+#: (the orchestrator role is not emitted). Project-level statement -> exactly
+#: one INFO per run, emitted before the provider loop.
+_DISPATCH_INERT_CHECK_ID = "orchestrator-strict.direct-dispatch-inert"
+
 #: D2b grace window — pure data, version-driven, provider-agnostic.
 #:
 #: The strict DEFAULT is ``true`` (D1b, one source: ``variables._resolve_orch_mode``).
@@ -219,6 +224,28 @@ def check_orchestrator_strict_hook_support(project_root: Path, config: dict,
     # grace notice disappears at 2.1.0 and nothing replaced it.
     if not isinstance(orch, dict):
         return findings
+
+    # D-Q5 (issue #1190): under ``mode: main-chat`` the orchestrator role is not
+    # emitted, so ``direct-dispatch-enabled`` has no consumer -- a project-level
+    # statement, therefore before the provider loop (exactly one INFO per run).
+    # Presence, not truthiness: the key expresses an intent even when ``false``.
+    # Deliberately NOT behind the strict gate: ``_resolve_effective_strict`` is
+    # False for ``main-chat``, the only mode this check is about.
+    global_mode = _resolve_orch_mode(orch, validate=False)
+    if global_mode == "main-chat" and "direct-dispatch-enabled" in orch:
+        findings.append(Finding(
+            Severity.INFO,
+            _DISPATCH_INERT_CHECK_ID,
+            ".meta-config/project.yaml",
+            "orchestrator.direct-dispatch-enabled is set but orchestrator.mode is "
+            "'main-chat' — in main-chat the orchestrator role is not emitted, so the "
+            "key has no consumer. If main-chat is intended: remove the key. If direct "
+            "dispatch is intended: run with mode: strict or mode: advisory — there the "
+            "key is effective and renders the 'Task decomposition & delegation' section "
+            "of the orchestrator agent.",
+            "Remove direct-dispatch-enabled, or run with mode: strict/advisory where "
+            "the key is effective.",
+        ))
 
     capabilities = providers_lib.load_provider_capabilities(agent_meta_root)
 

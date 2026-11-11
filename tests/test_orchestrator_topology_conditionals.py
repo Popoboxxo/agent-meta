@@ -17,19 +17,26 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.lib import standalone as standalone_module  # noqa: E402
+from scripts.lib import variables as variables_module  # noqa: E402
+from scripts.lib.consistency import placeholders as placeholders_module  # noqa: E402
 from scripts.lib.consistency.placeholders import (  # noqa: E402
     _BUILTIN_VARS,
     check_builder_known_set,
 )
+from scripts.lib.consistency.report import Severity  # noqa: E402
 from scripts.lib.standalone import (  # noqa: E402
     _CONDITIONAL_FALSE_FLAGS,
     render_standalone_agent,
 )
 from scripts.lib.variables import (  # noqa: E402
     _FALSE_DEFAULT_CONDITIONALS,
+    _TOPOLOGY_CONDITIONAL_FLAGS,
     strip_inactive_conditional_blocks,
 )
 
@@ -178,3 +185,157 @@ def test_instance_flags_are_in_the_strip_whitelist():
 
 def test_builder_known_set_has_no_instance_flag_findings():
     assert check_builder_known_set(_REPO_ROOT) == []
+
+
+# --- G2 effective-topology flags (issue #1190, Task 2, AC-15) --------------
+# The five boolean flags of the *effective* axis are opt-in exactly like the
+# declared position flags: an absent value must read INACTIVE (fail-closed),
+# otherwise a consumer project that never configures the effective axis would
+# render the new branch. The two string flags are audit values and must never
+# appear in a boolean registration.
+
+_EFFECTIVE_BOOL_FLAGS = (
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
+)
+
+_EFFECTIVE_STRING_FLAGS = (
+    "ORCH_TOPOLOGY_EFFECTIVE",
+    "ORCH_TOPOLOGY_EFFECTIVE_SOURCE",
+)
+
+_EFFECTIVE_BUILDER_VARS = _EFFECTIVE_BOOL_FLAGS + _EFFECTIVE_STRING_FLAGS
+
+
+def _effective_probe(flag: str) -> str:
+    return f"Head\n{{{{#if {flag}}}}}NEW{{{{else}}}}OLD{{{{/if}}}}\nTail"
+
+
+@pytest.mark.parametrize("flag", _EFFECTIVE_BOOL_FLAGS)
+def test_new_effective_flags_are_false_default(flag):
+    probe = _effective_probe(flag)
+    # Absent => engine default (inactive) => else branch only.
+    absent = strip_inactive_conditional_blocks(probe, {})
+    assert absent == "Head\nOLD\nTail"
+    assert "NEW" not in absent
+    # An explicit "false" behaves identically to absence.
+    assert strip_inactive_conditional_blocks(probe, {flag: "false"}) == "Head\nOLD\nTail"
+    # A present "true" proves the name is resolvable (whitelisted), i.e. the
+    # conditional actually fires instead of leaking through orphan cleanup.
+    assert strip_inactive_conditional_blocks(probe, {flag: "true"}) == "Head\nNEW\nTail"
+
+
+@pytest.mark.parametrize("flag", _EFFECTIVE_BOOL_FLAGS)
+def test_false_default_registration_is_load_bearing(monkeypatch, flag):
+    probe = _effective_probe(flag)
+    assert strip_inactive_conditional_blocks(probe, {}) == "Head\nOLD\nTail"
+    # Drop exactly this flag from `_FALSE_DEFAULT_CONDITIONALS`: the engine's
+    # generic default (absent => block active) opens the if-branch.
+    monkeypatch.setattr(
+        variables_module,
+        "_FALSE_DEFAULT_CONDITIONALS",
+        frozenset(_FALSE_DEFAULT_CONDITIONALS) - {flag},
+    )
+    leaked = strip_inactive_conditional_blocks(probe, {})
+    assert leaked == "Head\nNEW\nTail"
+    assert "OLD" not in leaked
+
+
+@pytest.mark.parametrize("flag", _EFFECTIVE_BOOL_FLAGS)
+def test_strip_whitelist_registration_is_load_bearing(monkeypatch, flag):
+    probe = _effective_probe(flag)
+    assert strip_inactive_conditional_blocks(probe, {}) == "Head\nOLD\nTail"
+    # Drop exactly this flag from the static strip whitelist and keep it absent
+    # from the variables dict: the block is no longer resolvable, so the
+    # orphaned-marker cleanup keeps both branches instead of picking one.
+    monkeypatch.setattr(
+        variables_module,
+        "_TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS",
+        frozenset(variables_module._TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS) - {flag},
+    )
+    leaked = strip_inactive_conditional_blocks(probe, {})
+    assert "NEW" in leaked and "OLD" in leaked
+
+
+@pytest.mark.parametrize("flag", _EFFECTIVE_BOOL_FLAGS)
+def test_standalone_registration_is_load_bearing(monkeypatch, flag):
+    probe = _effective_probe(flag)
+    assert strip_inactive_conditional_blocks(probe, dict(_CONDITIONAL_FALSE_FLAGS)) == (
+        "Head\nOLD\nTail"
+    )
+    patched = dict(_CONDITIONAL_FALSE_FLAGS)
+    patched.pop(flag)
+    monkeypatch.setattr(standalone_module, "_CONDITIONAL_FALSE_FLAGS", patched)
+    # Isolate the standalone channel: the engine-wide fail-closed default is
+    # also removed for this name, so the literal "false" the standalone dict
+    # carries is the only guard left. Without it the if-branch leaks.
+    monkeypatch.setattr(
+        variables_module,
+        "_FALSE_DEFAULT_CONDITIONALS",
+        frozenset(_FALSE_DEFAULT_CONDITIONALS) - {flag},
+    )
+    leaked = strip_inactive_conditional_blocks(probe, patched)
+    assert "NEW" in leaked
+    # Restoring the standalone entry closes the branch again even though the
+    # engine default is still absent.
+    assert strip_inactive_conditional_blocks(probe, dict(_CONDITIONAL_FALSE_FLAGS)) == (
+        "Head\nOLD\nTail"
+    )
+
+
+@pytest.mark.parametrize("flag", _EFFECTIVE_BOOL_FLAGS)
+def test_builtin_vars_registration_is_load_bearing(monkeypatch, flag):
+    assert check_builder_known_set(_REPO_ROOT) == []
+    real_derive = placeholders_module.derive_builder_vars
+    monkeypatch.setattr(
+        placeholders_module,
+        "_BUILTIN_VARS",
+        frozenset(_BUILTIN_VARS) - {flag},
+    )
+    # The builder emits all seven names in the real pipeline (T1/T3); simulate
+    # that output so the check sees the flag as builder-derived.
+    monkeypatch.setattr(
+        placeholders_module,
+        "derive_builder_vars",
+        lambda root: real_derive(root) | set(_EFFECTIVE_BUILDER_VARS),
+    )
+    findings = check_builder_known_set(_REPO_ROOT)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert findings[0].check == "placeholders.builder-known-set"
+    assert flag in findings[0].message
+
+
+def test_string_flags_are_not_conditionals():
+    bool_registrations = (
+        _FALSE_DEFAULT_CONDITIONALS,
+        _TOPOLOGY_CONDITIONAL_FLAGS,
+        variables_module._TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS,
+        frozenset(_CONDITIONAL_FALSE_FLAGS),
+    )
+    for flag in _EFFECTIVE_STRING_FLAGS:
+        for registration in bool_registrations:
+            assert flag not in registration, (
+                f"{flag} is an audit string and must not be a boolean conditional"
+            )
+    # The pre-existing string flags stay out of the three boolean sets too
+    # (`_CONDITIONAL_FALSE_FLAGS` carries ORCH_TOPOLOGY="" as render fallback).
+    for flag in ("ORCH_TOPOLOGY", "ORCH_TOPOLOGY_SOURCE"):
+        for registration in bool_registrations[:3]:
+            assert flag not in registration
+
+
+def test_standalone_and_builtin_vars_carry_new_names():
+    for flag in _EFFECTIVE_BOOL_FLAGS:
+        assert _CONDITIONAL_FALSE_FLAGS.get(flag) == "false", (
+            f"{flag} must be registered as a literal 'false' in "
+            "_CONDITIONAL_FALSE_FLAGS (standalone has no project config)"
+        )
+    assert set(_EFFECTIVE_BUILDER_VARS) <= _BUILTIN_VARS, (
+        "all seven effective-axis names (five bool + two audit strings) must be "
+        "registered in _BUILTIN_VARS"
+    )
+

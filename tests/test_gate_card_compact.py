@@ -44,6 +44,15 @@ Rebaseline log:
 - Issue #1151 (audit G1): the ``use-orchestrator`` Git-Delegation block gained the
   strict-mode sentence and one sentence that worker subagents without the ``git``
   sentinel cannot run ``git init``/config writes/``git stash`` (lines 14-15). Nothing else.
+- Issue #1190 (mode-topology gate, Task 21): the compact golden takes the
+  intended ``a2a-delegation-gates`` G1/G2/G3 topology wording. It also moves
+  from ``# CRITICAL GATE (runtime-partially enforced)`` to the plain
+  ``# CRITICAL GATE``: the fixture had frozen a ``GATE_PARTIAL`` block because
+  this module's ``provider_config`` fixture loaded the registry WITHOUT the
+  project config (Opencode resolved to ``permission`` instead of the verified
+  plugin tier). The fixture now loads like production
+  (``load_providers_config(root, config)``); the committed ``AGENTS.md`` is the
+  reference and the render is byte-identical to it.
 """
 from __future__ import annotations
 
@@ -59,7 +68,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib.config import build_variables, load_config
-from lib.context import _build_managed_block, _update_managed_html_block, build_gate_card
+from lib.context import (
+    _build_managed_block,
+    _position_aware_agent_hints,
+    _update_managed_html_block,
+    build_gate_card,
+)
 from lib.io import SyncError
 from lib.log import SyncLog
 from lib.mcp import (
@@ -113,8 +127,13 @@ def loaded_config():
 
 
 @pytest.fixture(scope="module")
-def provider_config():
-    return load_providers_config(_REPO_ROOT)
+def provider_config(loaded_config):
+    # Production loader contract: the project config resolves the provider
+    # surface/provider-options that decide the runtime gate tier. A bare
+    # registry load downgrades Opencode to ``permission`` and renders a
+    # ``GATE_PARTIAL`` block for the shared AGENTS.md that the real sync
+    # (and the committed file) never produces.
+    return load_providers_config(_REPO_ROOT, loaded_config)
 
 
 @pytest.fixture(scope="module")
@@ -140,6 +159,7 @@ def _render(profile, project_root, config, provider_config, capabilities):
     return _build_managed_block(
         _REPO_ROOT, cfg, variables, SyncLog(), provider=_PROVIDER,
         provider_config=provider_config, project_root=project_root,
+        active_set=frozenset(),
     )
 
 
@@ -310,6 +330,7 @@ def test_compact_entry_over_hard_cap_raises(
         _build_managed_block(
             _REPO_ROOT, config, variables, SyncLog(), provider=_PROVIDER,
             provider_config=provider_config, project_root=tmp_path,
+            active_set=frozenset(),
         )
 
 
@@ -334,6 +355,18 @@ def _entry_file_block(
         provider, provider_config, capabilities, project_root, config
     )
     pc = provider_config[provider]
+    # Mirror production ``_sync_managed_block_context``: the entry hint is a
+    # position statement, so the shared writer replaces the provider-less global
+    # hints with the position-aware render (G5/AC-20) before the template is
+    # built. Without this the helper would compare the neutral default against
+    # the committed topology-specific text.
+    hints = _position_aware_agent_hints(
+        config, provider, provider_config, _REPO_ROOT, pc.get("context_file"),
+        active_set=frozenset(),
+        position=variables.get("ORCH_TOPOLOGY_EFFECTIVE", "neutral"),
+    )
+    variables["AGENT_HINTS"] = hints["AGENT_HINTS"]
+    variables["AGENT_HINTS_CLAUDE"] = hints["AGENT_HINTS_CLAUDE"]
     target = project_root / pc["context_file"]
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(

@@ -40,8 +40,8 @@ die drei `env:`-Gruppen `SUBPROCESS_SHARD_1`, `SUBPROCESS_SHARD_2` und
 `SUBPROCESS_SHARD_3` in `.github/workflows/orchestration-test.yml`. Der Job
 `subprocess-shard` übergibt genau eine Gruppe als Positionsargumente, die
 `test`-Shards bauen aus der Vereinigung ihre `--ignore=<file>`-Argumente.
-Aktuell sind es 15 Module mit 451 Tests in drei disjunkten Gruppen
-(78 / 183 / 190 Tests).
+Aktuell sind es 16 Module mit 459 Tests in drei disjunkten Gruppen
+(79 / 190 / 190 Tests).
 
 Die Gruppen sind modul-disjunkt, und der `test`-Job prüft das bei jedem Lauf:
 Vereinigung exakt 15 Dateien, keine Datei in zwei Gruppen, jede Datei existiert

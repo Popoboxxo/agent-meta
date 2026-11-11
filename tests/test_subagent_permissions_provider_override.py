@@ -29,12 +29,14 @@ def test_build_provider_vars_uses_provider_override_bundle():
             "provider-overrides": {"Opencode": {"mode": "strict"}},
         },
     }
-    opencode = _build_provider_vars({}, "Opencode", {}, _REPO_ROOT, config=config)
+    opencode = _build_provider_vars({}, "Opencode", {}, _REPO_ROOT, config=config,
+                                      active_set=frozenset())
     assert opencode["SUBAGENT_PERMISSIONS_MODE"] == "strict"
     assert opencode["SUBAGENT_PERMISSIONS_STRICT"] == "true"
     assert opencode["SUBAGENT_PERMISSIONS_BLOCK"] == render_subagent_permission_block("strict")
 
-    claude = _build_provider_vars({}, "Claude", {}, _REPO_ROOT, config=config)
+    claude = _build_provider_vars({}, "Claude", {}, _REPO_ROOT, config=config,
+                                    active_set=frozenset())
     assert claude["SUBAGENT_PERMISSIONS_MODE"] == "off"
     assert claude["SUBAGENT_PERMISSIONS_BLOCK"] == ""
     assert claude["SUBAGENT_PERMISSIONS_ENABLED"] == "false"
@@ -42,7 +44,8 @@ def test_build_provider_vars_uses_provider_override_bundle():
 
 def test_build_provider_vars_without_config_keeps_backward_compat():
     # Omitting config keeps the historic 4-arg behavior (no bundle injected).
-    merged = _build_provider_vars({}, "Claude", {"X": "1"}, _REPO_ROOT)
+    merged = _build_provider_vars({}, "Claude", {"X": "1"}, _REPO_ROOT,
+                                    active_set=frozenset())
     assert merged["X"] == "1"
     assert "SUBAGENT_PERMISSIONS_MODE" not in merged
 

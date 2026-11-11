@@ -10,7 +10,8 @@ re-introducing the historic agents ↔ config ↔ context import cycle
     (substitute() delegates its replacement pass to the shared escape-safe
     core in substitution.py — issue #476)
   * Orchestrator-mode flags  — _resolve_orch_mode(), _orch_mode_flags()
-  * Topology flags          — _topology_flags() (IC-4)
+  * Topology flags          — _topology_flags() (IC-4),
+    _effective_topology_flags()/_provider_topology_flags() (G2/G3)
 
 This module depends only on the neutral low-level layer (io, log) and the
 stdlib. It must never import agents/config/context/rules or any higher-level
@@ -22,10 +23,14 @@ import re
 import sys
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .io import SyncError
 from .log import SyncLog
 from .substitution import substitute_placeholders
+
+if TYPE_CHECKING:  # topology stays a lazy runtime import (see __doc__)
+    from .topology import TopologyResolution
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
 
@@ -63,6 +68,14 @@ _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+    # Effective-topology axis (G2, issue #1190, AC-15): opt-in exactly like
+    # the declared position. Absent must read INACTIVE so a consumer project
+    # that never configures the effective axis renders the historic branch.
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
     # Orchestrator multiplicity axis (P3, AC-8): opt-in exactly like the
     # position flags. An absent value must read as inactive so a consumer
     # project without ``max-instances``/``singleton`` keeps the historic
@@ -82,6 +95,21 @@ _TOPOLOGY_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
     "ORCH_TOPOLOGY_PRIMARY",
     "ORCH_TOPOLOGY_SUBAGENT",
     "ORCH_TOPOLOGY_HYBRID",
+})
+
+#: The five boolean flags of the *effective* topology axis (G2, issue #1190).
+#: Opt-in: an absent value must read inactive (AC-15 fail-closed), so the names
+#: are statically whitelisted here in addition to ``_FALSE_DEFAULT_CONDITIONALS``
+#: — without a whitelist entry the orphaned-marker cleanup would keep both
+#: branches of an absent flag. The two string flags (``ORCH_TOPOLOGY_EFFECTIVE``,
+#: ``ORCH_TOPOLOGY_EFFECTIVE_SOURCE``) are audit-only and stay out of every
+#: boolean registration.
+_TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS: frozenset[str] = frozenset({
+    "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT",
+    "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY",
+    "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT",
+    "ORCH_TOPOLOGY_EFFECTIVE_HYBRID",
+    "ORCH_TOPOLOGY_INERT",
 })
 
 #: P3 instance flags registered in the strip whitelist. Unlike the topology
@@ -356,6 +384,84 @@ def _topology_flags(topology: str, *, explicit: bool, source: str) -> dict:
     }
 
 
+def _effective_topology_flags(
+    resolution: TopologyResolution, *, mode: str
+) -> dict[str, str]:
+    """Return the flat ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags (G2).
+
+    Reports the *resolved* position instead of the declaration: ``effective``
+    is what the provider can actually do, so it differs from ``ORCH_TOPOLOGY``
+    whenever the value was derived or degraded.
+
+    ``ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT`` is the Rev. 2 K-1 formula
+    ``source != "derived"`` — never ``effective != declared``, which would be
+    true for every unset key and open the ``{{#if}}`` branch in default
+    consumers.
+
+    The two string flags (``_EFFECTIVE``, ``_EFFECTIVE_SOURCE``) and
+    ``_EFFECTIVE_EXPLICIT`` are audit values; only the three position flags
+    and ``ORCH_TOPOLOGY_INERT`` are ``{{#if}}`` conditionals. ``effective`` is
+    never ``"none"`` — the inert case is expressed exclusively through
+    ``ORCH_TOPOLOGY_INERT`` (``mode == "main-chat"``), keeping the resolver
+    invariant untouched.
+    """
+    from .topology import VALID_TOPOLOGIES
+
+    effective = resolution.effective
+    assert effective in VALID_TOPOLOGIES  # never "none", resolver invariant
+    return {
+        "ORCH_TOPOLOGY_EFFECTIVE": effective,
+        "ORCH_TOPOLOGY_EFFECTIVE_SOURCE": resolution.source,
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": (
+            "true" if resolution.source != "derived" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": (
+            "true" if effective == "primary" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": (
+            "true" if effective == "subagent" else "false"
+        ),
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": (
+            "true" if effective == "hybrid" else "false"
+        ),
+        "ORCH_TOPOLOGY_INERT": "true" if mode == "main-chat" else "false",
+    }
+
+
+def _provider_topology_flags(
+    config: dict,
+    provider: str,
+    *,
+    agent_meta_root: Path,
+    mode: str,
+    active_set,
+) -> dict[str, str]:
+    """Return the provider-scoped ``ORCH_TOPOLOGY_EFFECTIVE_*`` flags (G2/G3).
+
+    The single render seam for the effective axis: the already-resolved
+    position + the per-sync ActiveSet are passed to the render seams; no
+    fourth resolver. ``resolve_topology`` is the ONE resolver and is called
+    exactly once here; ``active_set`` is a required keyword (never resolved
+    here, never defaulted — the caller owns the per-sync ActiveSet) and
+    ``mode`` arrives already resolved by ``_resolve_orch_mode``.
+
+    Provider differences come from the capability data and the provider
+    registry only — this helper never branches on a provider name.
+    """
+    from .providers import load_provider_capabilities, load_providers_config
+    from .topology import resolve_topology
+
+    resolution = resolve_topology(
+        config,
+        provider,
+        provider_config=load_providers_config(agent_meta_root),
+        capabilities=load_provider_capabilities(agent_meta_root).get(provider, {}),
+        mode=mode,
+        active_set=active_set,
+    )
+    return _effective_topology_flags(resolution, mode=mode)
+
+
 def _instance_flags(max_instances, *, singleton_declared: bool) -> dict:
     """Return the flat ``ORCH_MAX_INSTANCES``/``ORCH_SINGLETON_DECLARED`` flags.
 
@@ -586,6 +692,9 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # variables dict does not carry them yet (absent => inactive, AC-18).
     conditional_vars.update({k for k in variables if k.startswith("ORCH_TOPOLOGY_")})
     conditional_vars.update(_TOPOLOGY_CONDITIONAL_FLAGS)
+    # G2 effective axis: statically whitelisted so an absent flag resolves to
+    # its (inactive) else branch instead of keeping both branches (AC-15).
+    conditional_vars.update(_TOPOLOGY_EFFECTIVE_CONDITIONAL_FLAGS)
     # P3 instance flags (AC-8): statically whitelisted so an absent value is
     # inactive even when the variables dict does not carry it yet.
     conditional_vars.update(_INSTANCE_CONDITIONAL_FLAGS)

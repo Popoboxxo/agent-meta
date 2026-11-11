@@ -259,6 +259,7 @@ def test_provider_override_is_honored_on_the_render_path():
 
     # Render path shared by context.py/rules.py: provider override wins.
     provider_vars = _merged_rule_vars(
-        _REPO_ROOT, _REPO_ROOT, config, "Continue", {"has_rules": False}, None
+        _REPO_ROOT, _REPO_ROOT, config, "Continue", {"has_rules": False}, None,
+        active_set=frozenset(),
     )
     assert provider_vars["REPO_CONTAINMENT_ENABLED"] == "false"

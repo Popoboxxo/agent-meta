@@ -45,6 +45,13 @@ documented reason):
   both goldens = main's goldens plus exactly G4's deltas (classify-gate sentence,
   planner gate, slimming only: feature-lifecycle approve stage + neutral commit task)
   and the 8.11.1 version pins.
+* Issue #1190 (mode-topology gate, template 8.11.1 -> 8.12.0): both goldens move
+  by exactly the two release pins (``version``/``generated-from``) and the
+  intended singleton topology wording (the repo declares ``topology: subagent``,
+  so the explicit branch renders). An unset key still renders the legacy line
+  byte-for-byte (AC-16/AC-27), pinned by
+  ``tests/fixtures/topology-golden/orchestrator.unset-derived-subagent.*``.
+  No other line changed.
 """
 from __future__ import annotations
 
@@ -142,7 +149,10 @@ def _render_orchestrator(profile, project_root: Path):
         source_path, _PROVIDER, project_name, _REPO_ROOT, project_root,
         target_path, log, pc=pc,
     )
-    merged = _build_provider_vars(pc, _PROVIDER, variables, _REPO_ROOT, config=config)
+    merged = _build_provider_vars(
+        pc, _PROVIDER, variables, _REPO_ROOT, config=config,
+        active_set=frozenset(),
+    )
     merged.setdefault("PIPELINE_DETAILS_DIR", ".claude/pipeline-details")
     content = _apply_content_pipeline(
         content, config, _PROVIDER, merged, rel_source, None, _REPO_ROOT, log

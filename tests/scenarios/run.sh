@@ -129,13 +129,20 @@ matches_filter() {
 
 # Sorted, locale-independent scenario name list. `LC_ALL=C sort` keeps the
 # order identical on every runner; no `mapfile` (absent in macOS bash 3.2).
+# `blocked-*` configs are deliberately outside the executable catalog (e.g.
+# `blocked-103` = BLOCKED #1182) and there is no SKIP concept, so they are
+# filtered here while `registry.md` keeps listing them as BLOCKED.
 SCENARIO_NAMES=()
 while IFS= read -r name; do
     SCENARIO_NAMES+=("$name")
 done < <(
     for cfg in "$CONFIGS_DIR"/*.project.yaml; do
         [ -e "$cfg" ] || continue
-        basename "$cfg" .project.yaml
+        name="$(basename "$cfg" .project.yaml)"
+        case "$name" in
+            blocked-*) continue ;;
+        esac
+        printf '%s\n' "$name"
     done | LC_ALL=C sort
 )
 

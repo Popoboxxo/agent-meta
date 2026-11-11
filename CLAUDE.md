@@ -99,7 +99,7 @@ Die Knowledge Engine ist aktiviert. Domäne: **internal-docs**.
 - **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 <!-- agent-meta:managed-end -->
 
-**Singleton-Regel:** Es existiert genau EIN `orchestrator` pro Session — der vom `main_chat` gespawnte. Worker-Agents dürfen niemals `task(subagent_type="orchestrator", ...)` aufrufen. Verstoß = Deadlock / Routing-Konflikt.
+**Singleton-Regel:** Es gibt genau EINEN `orchestrator` pro Session — wo er lebt, bestimmt `orchestrator.topology`: unter `subagent`/`hybrid` spawnt ihn der `main_chat`, unter `primary` **ist** er der Session-Einstieg (POS-3). In jeder Position gilt: Worker-Agents dürfen niemals `task(subagent_type="orchestrator", ...)` aufrufen — HARD REJECT. Verstoß = Deadlock / Routing-Konflikt.
 
 ---
 

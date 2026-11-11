@@ -1168,6 +1168,7 @@ class TestTier3TempProjectSync:
             agent_meta_root, project_root, config, log, dry_run=False,
             platform_vars=platform_vars, variables={}, provider="Claude",
             provider_config=_synthetic_provider_config(),
+            active_set=frozenset(),
         )
 
         skill_path = project_root / ".claude" / "skills" / "integration-development" / "SKILL.md"
@@ -1205,6 +1206,7 @@ class TestTier3TempProjectSync:
             agent_meta_root, project_root, config, log, dry_run=False,
             platform_vars=platform_vars, variables={}, provider="Claude",
             provider_config=_synthetic_provider_config(),
+            active_set=frozenset(),
         )
 
         agent_text = (project_root / ".claude" / "agents" / "developer.md").read_text(encoding="utf-8")
@@ -1255,6 +1257,7 @@ class TestTier3TempProjectSync:
             platform_vars=platform_vars, variables=variables,
             rules_dir=claude_pc.get("rules_dir"), provider="Claude",
             provider_config=provider_config,
+            active_set=frozenset(),
         )
 
         agents_dir = project_root / ".claude" / "agents"
@@ -1298,6 +1301,7 @@ class TestTier3TempProjectSync:
             platform_vars=platform_vars, variables=variables,
             rules_dir=".gemini/rules", provider="Gemini",
             provider_config=provider_config,
+            active_set=frozenset(),
         )
         gemini_rule = project_root / ".gemini" / "rules" / "integration-development.md"
         assert gemini_rule.exists()

@@ -191,6 +191,7 @@ def test_shared_managed_block_identical_with_gate_vars(loaded_config):
             provider=provider,
             provider_config=provider_config,
             project_root=_REPO_ROOT,
+            active_set=frozenset(),
         )
 
     baseline = renders[_ACTIVE_AGENTS_MD_SHARERS[0]]
@@ -330,6 +331,7 @@ def test_gate_only_neutralised_orch_mode_still_diverges(loaded_config):
             provider=provider,
             provider_config=provider_config,
             project_root=_REPO_ROOT,
+            active_set=frozenset(),
         )
 
     baseline = _render("Opencode", config)
@@ -356,6 +358,7 @@ def test_gate_only_neutralised_orch_mode_still_diverges(loaded_config):
         return _build_managed_block(
             _REPO_ROOT, hint_config, variables, SyncLog(),
             provider=provider, provider_config=op_cfg, project_root=_REPO_ROOT,
+            active_set=frozenset(),
         )
 
     assert "UNIQUE-GEMINI-HINT-SENTINEL" not in _render_with(op, "Gemini")
@@ -419,6 +422,7 @@ def _provider_scoped_local_var_diff(monkeypatch, loaded_config, cfg) -> set:
                 provider=provider,
                 provider_config=provider_config,
                 project_root=_REPO_ROOT,
+                active_set=frozenset(),
             )
         return box
 
@@ -460,6 +464,7 @@ def test_gate_only_neutralised_repo_containment_still_diverges(
             provider=provider,
             provider_config=provider_config,
             project_root=_REPO_ROOT,
+            active_set=frozenset(),
         )
 
     # Baseline: identical provider-scoped config -> byte-identical render.
@@ -576,6 +581,7 @@ def test_single_agents_md_managed_block_write_per_sync_run(tmp_path, loaded_conf
         sync_context_for_provider(
             _REPO_ROOT, project_root, config, variables, log,
             dry_run=dry_run, provider=provider, provider_config=provider_config,
+            active_set=frozenset(),
         )
         return log
 

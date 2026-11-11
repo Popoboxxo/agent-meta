@@ -58,6 +58,7 @@ def synced_project(tmp_path):
             sync_context_for_provider(
                 REPO_ROOT, project_root, config, variables, log,
                 dry_run=False, provider=provider, provider_config=provider_config,
+                active_set=frozenset(),
             )
         return (project_root / "AGENTS.md").read_text(encoding="utf-8")
 
@@ -109,6 +110,7 @@ def shared_agents_md_project(tmp_path):
             sync_context_for_provider(
                 REPO_ROOT, project_root, config, variables, log,
                 dry_run=False, provider=provider, provider_config=provider_config,
+                active_set=frozenset(),
             )
         return (project_root / "AGENTS.md").read_bytes()
 
@@ -140,6 +142,7 @@ def continue_project(tmp_path):
         sync_context_for_provider(
             REPO_ROOT, project_root, config, variables, log,
             dry_run=False, provider="Continue", provider_config=provider_config,
+            active_set=frozenset(),
         )
         converge_managed_block_context(
             project_root, context_file, variables, log,
@@ -171,6 +174,7 @@ def test_continue_convergence_preserves_user_content(tmp_path):
     sync_context_for_provider(
         REPO_ROOT, project_root, config, variables, log,
         dry_run=False, provider="Continue", provider_config=provider_config,
+        active_set=frozenset(),
     )
     target = project_root / context_file
     user_note = "\n<!-- user note outside the managed block -->\n"

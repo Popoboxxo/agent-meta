@@ -45,8 +45,10 @@ _REQUIRED_RULE_ANCHORS = (
 # maintainer notes as an HTML comment (IC-08).
 _REQUIRED_COMPACT_ANCHORS = {
     "gate-card": (
+        # #1190 G1: "MAIN CHAT darf nicht selbst editieren" is no longer
+        # position-stable (an effective ``primary`` provider states the
+        # position instead); the heading stays the contract anchor.
         "# CRITICAL GATE",
-        "MAIN CHAT darf nicht selbst editieren",
         "## Git Delegation",
         "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.",
         "# Branch-Guard",
@@ -55,7 +57,9 @@ _REQUIRED_COMPACT_ANCHORS = {
         "Verwende Conventional Commits (feat, fix, chore).",
         "# Sprachregeln",
         "## Enforced Gates (aktiv prüfen — HARD REJECT)",
-        "Orchestrator-Singleton:",
+        # #1190 T8: gate 2 branches three ways; the history-only
+        # "Orchestrator-Singleton:" label is not position-stable anymore.
+        "2. **Orchestrator-",
         "# MCP Hard Prohibitions",
         "`delete_conclusion`, `set_config`",
         "`browser_run_code_unsafe`",

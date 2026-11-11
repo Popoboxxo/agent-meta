@@ -445,12 +445,14 @@ def test_build_provider_vars_resolves_intent_routing_tools(tmp_path):
                                       "Gemini": '{"name": "route_intent"}'},
         "INTENT_ROUTING_TABLE": "table",
     }
-    merged = _build_provider_vars({}, "Opencode", variables, tmp_path)
+    merged = _build_provider_vars({}, "Opencode", variables, tmp_path,
+                                    active_set=frozenset())
     assert merged["INTENT_ROUTING_TOOLS"] == '{"name": "route_intent"}'
     # The prerender key stays present but must not leak into a placeholder
     # value; other providers' entries remain for their own sync runs.
     assert merged["_INTENT_ROUTING_TOOL_DEFS"] == variables["_INTENT_ROUTING_TOOL_DEFS"]
-    gemini_merged = _build_provider_vars({}, "Gemini", variables, tmp_path)
+    gemini_merged = _build_provider_vars({}, "Gemini", variables, tmp_path,
+                                          active_set=frozenset())
     assert gemini_merged["INTENT_ROUTING_TOOLS"] != merged["INTENT_ROUTING_TOOLS"] or \
         gemini_merged is not merged
 
@@ -459,7 +461,8 @@ def test_build_provider_vars_empty_without_prerender(tmp_path):
     """Missing prerender key (legacy variables dicts) → "" (fail-soft)."""
     from scripts.lib.agent_sync import _build_provider_vars
 
-    merged = _build_provider_vars({}, "Opencode", {}, tmp_path)
+    merged = _build_provider_vars({}, "Opencode", {}, tmp_path,
+                                    active_set=frozenset())
     assert merged["INTENT_ROUTING_TOOLS"] == ""
 
 
@@ -504,7 +507,8 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
     assert set(variables["_INTENT_ROUTING_TOOL_DEFS"]) == set(active_providers)
     for provider in active_providers:
         tool_format = str(engine.get_capabilities(provider).get("handoff_format") or "")
-        merged = _build_provider_vars({}, provider, variables, _AGENT_META_ROOT)
+        merged = _build_provider_vars({}, provider, variables, _AGENT_META_ROOT,
+                                          active_set=frozenset())
         log = SyncLog()
         rendered = substitute(
             "before\n\n{{INTENT_ROUTING_TOOLS}}\n\nafter", merged, "test", log
@@ -554,7 +558,8 @@ def test_build_provider_vars_route_intent_callable_defaults_false(tmp_path):
     capability getter; without a capability entry it is the fail-safe ``false``."""
     from scripts.lib.agent_sync import _build_provider_vars
 
-    merged = _build_provider_vars({}, "Opencode", {}, tmp_path)
+    merged = _build_provider_vars({}, "Opencode", {}, tmp_path,
+                                    active_set=frozenset())
     assert merged["ROUTE_INTENT_CALLABLE"] == "false"
 
 
@@ -578,7 +583,8 @@ def _render_intent_routing_section(provider, monkeypatch=None, callable_value=No
         template.index("## 3. Intent routing"):
         template.index("## 4. Developer tier selection")
     ]
-    merged = _build_provider_vars({}, provider, dict(_BASE_VARIABLES), _AGENT_META_ROOT)
+    merged = _build_provider_vars({}, provider, dict(_BASE_VARIABLES), _AGENT_META_ROOT,
+                                   active_set=frozenset())
     rendered = substitute(section, merged, "test", SyncLog())
     return strip_inactive_conditional_blocks(rendered, merged)
 

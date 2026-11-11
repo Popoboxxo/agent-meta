@@ -10,7 +10,7 @@
 > (`primary | subagent | hybrid`) wird die *Position* des Orchestrators
 > explizit: unter `subagent`/`hybrid` spawnt der **Main Chat** den
 > Orchestrator, während Worker weiterhin hart abgelehnt werden. Die
-> Multi-Instanz-Erweiterung ist dort als **„P3, designed, not shipped"**
+> Multi-Instanz-Erweiterung ist dort als **„P3, shipped"**
 > markiert. Siehe [Orchestrator-Topologie](orchestrator-topology.md).
 
 ---

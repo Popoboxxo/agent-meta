@@ -59,6 +59,7 @@ def test_embed_false_rule_leaves_block_when_group_has_file_channel(env):
         REPO_ROOT, config, env["variables"], env["log"],
         provider="Opencode", provider_config=env["provider_config"],
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" not in block  # body left the embed
     assert "## Übrige Regeln (Lazy-Load)" in block  # pointer took its place
@@ -75,6 +76,7 @@ def test_embed_false_rule_embeds_without_file_channel(env):
         REPO_ROOT, config, env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" in block  # fallback: embedded, not lost
     assert "## Übrige Regeln (Lazy-Load)" not in block
@@ -89,6 +91,7 @@ def test_inactive_weak_sharer_does_not_veto_file_channel(env):
         REPO_ROOT, _no_worktree_override(env), env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# No Worktree Isolation" not in block
     assert "## Übrige Regeln (Lazy-Load)" in block
@@ -101,6 +104,7 @@ def test_embedded_rule_files_written_for_opencode(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Opencode",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     for name in ("sync-interface", "architecture", "conventions", "admin-ui"):
         skill = tmp_path / ".opencode" / "skills" / name / "SKILL.md"
@@ -120,6 +124,7 @@ def test_embedded_rule_files_written_for_weak_provider(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="ZCode",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert (tmp_path / ".zcode" / "skills" / "sync-interface" / "SKILL.md").exists()
 
@@ -131,6 +136,7 @@ def test_embedded_rule_files_noop_for_native_rules_provider(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Claude",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert not (tmp_path / ".claude" / "skills").exists()
 
@@ -143,6 +149,7 @@ def test_embedded_rule_files_written_for_unread_rules_dir_provider(env, tmp_path
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Gemini",
         provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     assert (tmp_path / ".gemini" / "skills" / "submodule-protection" / "SKILL.md").exists()
 
@@ -158,6 +165,7 @@ def test_shared_block_identical_with_and_without_embed_false(env):
             REPO_ROOT, config, env["variables"], env["log"],
             provider=provider, provider_config=env["provider_config"],
             project_root=REPO_ROOT,
+            active_set=frozenset(),
         )
         for provider in ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
     }
@@ -178,6 +186,7 @@ def test_mcp_and_tool_sections_leave_block_on_file_channel(env):
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=env["provider_config"],
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     for gone in ("# MCP: honcho", "# MCP: playwright", "# MCP: reqogniloom",
                  "## Erlaubte Tools", "# External Tool: graphify",
@@ -197,6 +206,7 @@ def test_mcp_and_tool_sections_embed_without_file_channel(env):
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
         project_root=REPO_ROOT,
+        active_set=frozenset(),
     )
     assert "# MCP: honcho" in block
     assert "## Erlaubte Tools" in block
@@ -339,6 +349,7 @@ def test_orphaned_rule_is_swept_from_repo_config_skills_dir(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], rules_dir=rules_dir,
         provider="Claude", provider_config=env["provider_config"],
+        active_set=frozenset(),
     )
     # The per-writer cleanup cannot remove the orphan: its stem left the
     # rules universe, and the merge-mode index keeps unowned entries.

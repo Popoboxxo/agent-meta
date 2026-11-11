@@ -579,6 +579,7 @@ def test_ac07_missing_ceiling_is_a_violation():
 # entry: Copilot always-loaded 31,206 -> 31,852 (main +575 B, G4 rules +71 B). Left inside
 # the tolerance: rules +71 B, orchestrator +20 B, harness-roster +519..+564 B, roster
 # always-loaded +845..+1,192 B; the multi-provider AGENTS.md stays 12,519 B.
+# RE-PIN (2026-11-10, #1190 G1 primary gate text + T8/T10/T18 wording): Opencode entry-file 3,807 -> 4,724 B (Opencode is the only provider that derives `primary`).
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
     "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34792, "rules": 18208},
     "Codex": {"always-loaded": 625634, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
@@ -587,7 +588,7 @@ _IST_COMPACT: Dict[str, Dict[str, int]] = {
     "Gemini": {"always-loaded": 11274, "entry-file": 11274, "orchestrator": 36105},
     "KimiCode": {"always-loaded": 633773, "entry-file": 3749, "harness-roster": 630350, "orchestrator": 35659},
     "Mammouth": {"always-loaded": 629072, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},
-    "Opencode": {"always-loaded": 628610, "entry-file": 3807, "harness-roster": 625129, "orchestrator": 34428},
+    "Opencode": {"always-loaded": 628610, "entry-file": 4724, "harness-roster": 625129, "orchestrator": 34428},
     "ZCode": {"always-loaded": 631646, "entry-file": 4652, "harness-roster": 627320, "orchestrator": 34298},
 }
 

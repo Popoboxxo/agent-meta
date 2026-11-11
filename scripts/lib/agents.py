@@ -137,6 +137,7 @@ def build_agent_hints(
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
     active_set: "ActiveSet | None" = None,
+    position: str = "neutral",
 ) -> str:
     """Generate agent usage hints for {{AGENT_HINTS}}.
 
@@ -147,6 +148,13 @@ def build_agent_hints(
       True  → full output: entry-point hint + per-agent role/description table.
       False → entry-point hint only. Used for providers (e.g. Claude) that inject
               agent descriptions natively — the table would be a ~1.5 KB duplication.
+
+    ``position`` selects the entry-point text ONLY — this function resolves
+    nothing (no provider, no target file, no sharer set; SPEC orchestrator
+    topology §5-G5). Callers that know the physical file and its readers pass
+    the resolved effective position ("primary"/"subagent"); the default
+    ``"neutral"`` is the safe statement every reader can rely on and is what
+    the provider-less global callers (``config.build_variables``) use.
 
     The active set is the shared Layer-2 resolution (gates + whitelist ∩
     generatable templates), identical to the routing targets. ``active_set``
@@ -169,9 +177,22 @@ def build_agent_hints(
         _is_main_chat_mode = not _orch_cfg.get("enabled", True)
 
     has_orchestrator = "orchestrator" in active_roles and not _is_main_chat_mode
-    if has_orchestrator:
+    if has_orchestrator and position == "primary":
+        # AC-20: the role is this session's entry. Deliberately no absolute
+        # spawnability claim — a provider may still support the subagent form.
+        lines.append(
+            "> **Einstiegspunkt:** Diese Session startet im `orchestrator`-Agenten. Ein Start im Main Chat erfüllt das Gate nur bei Delegation an den `orchestrator` — siehe `use-orchestrator.md`."
+        )
+    elif has_orchestrator and position == "subagent":
+        # AC-16 (RVW2-1190-01): the historic wording stays byte-identical.
         lines.append(
             "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
+        )
+    elif has_orchestrator:
+        # Mixed/unknown position (e.g. a shared file whose active sharers
+        # disagree): state only what is true for every reader (§5-G5).
+        lines.append(
+            "> **Einstiegspunkt:** Entwicklungsaufgaben laufen über den `orchestrator`-Agenten. Ob er der Session-Einstieg ist oder ein Subagent, hängt von `orchestrator.topology` ab — siehe `use-orchestrator.md`."
         )
     elif _is_main_chat_mode:
         lines.append(

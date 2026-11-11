@@ -431,7 +431,11 @@ def _render_context(mode: str | None, workdir: Path) -> str:
         context_block["mode"] = mode
         config["context_file"] = context_block
     variables, _ = build_variables(config, REPO_ROOT)
-    provider_config = load_providers_config(REPO_ROOT)
+    # Production loads the registry WITH the project config (surface /
+    # provider-options) so the per-provider gate tier reflects the verified
+    # plugin runtime. Loading it bare resolves Opencode to ``permission`` and
+    # renders a gate variant the shared AGENTS.md never carries.
+    provider_config = load_providers_config(REPO_ROOT, config)
     capabilities = load_provider_capabilities(REPO_ROOT)
     log = SyncLog()
 
@@ -460,6 +464,7 @@ def _render_context(mode: str | None, workdir: Path) -> str:
         sync_context_for_provider(
             REPO_ROOT, workdir, config, provider_variables_for(provider), log,
             dry_run=False, provider=provider, provider_config=provider_config,
+            active_set=frozenset(),
         )
     if mode == "compact":
         # The bootstrap block lives in the AGENTS.md injected footer and is
@@ -674,6 +679,7 @@ def test_540_d3b_compact_claude_renders_managed_block_without_placeholders(tmp_p
     sync_context_for_provider(
         REPO_ROOT, tmp_path, config, variables, log,
         dry_run=False, provider="Claude", provider_config=provider_config,
+        active_set=frozenset(),
     )
     claude_md = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
     assert "<!-- agent-meta:managed-begin -->" in claude_md
@@ -765,6 +771,7 @@ def _render_provider_context(provider: str, workdir: Path):
     sync_context_for_provider(
         REPO_ROOT, workdir, config, variables, SyncLog(),
         dry_run=False, provider=provider, provider_config=provider_config,
+        active_set=frozenset(),
     )
     return context_file, target.read_text(encoding="utf-8")
 
@@ -808,6 +815,7 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
     sync_rules(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False, variables=variables,
         rules_dir=rules_dir, provider=provider, provider_config=provider_config,
+        active_set=frozenset(),
     )
 
     for name, full_marker in _PLATFORM_RULE_FULL_MARKERS.items():
@@ -867,6 +875,7 @@ def test_540_compact_opencode_separates_platform_rules_via_file_channel(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False,
         variables=variables, provider="Opencode",
         provider_config=_load_providers(REPO_ROOT),
+        active_set=frozenset(),
     )
     for name, anchor in (
         ("sync-interface", "## Branch-Guard-Erweiterung für agent-meta"),

@@ -2176,3 +2176,41 @@ tests/test_opencode_v2_surface.py tests/test_template_slimming_equivalence.py -q
 9 von 1099 Hashes geändert (der `orchestrator`-Agent-Render aller neun
 Provider), 0 added/removed, per Entry gepatcht (kein `--write`).
 `AC01_EXCEPTIONS` wurde nicht erweitert.
+
+## 25. Re-Baseline `orchestrator` für den Modus-Topologie-Abschluss (#1190, Task 21)
+
+> **Anlass:** Task 21 (`docs/plans/2026-11-09-orchestrator-mode-topology-plan.md`)
+> schließt das AC-16/AC-26/AC-27-Gate. Die Goldens waren seit
+> `2ec750f7` (Template 8.11.1 -> 8.12.0, Topologie-Wording) rot.
+
+**Geändert (3 Fixtures):** `orchestrator.md` in `slimming-golden` und
+`compact-golden` sowie `agents-managed.md` in `compact-golden`.
+
+- `slimming-golden/orchestrator.md` und `compact-golden/orchestrator.md`: nur
+  die beiden Release-Pins (`version: 8.11.1 -> 8.12.0`,
+  `generated-from: 1-generic/orchestrator.md@8.12.0`) und die
+  **beabsichtigte** Singleton-Topologie-Zeile (Repo deklariert
+  `topology: subagent` -> expliziter Zweig). Ungesetzter Key rendert
+  byte-identisch weiter (AC-16/AC-27), separat gepinnt in
+  `tests/fixtures/topology-golden/orchestrator.unset-derived-subagent.*`.
+- `compact-golden/agents-managed.md`: beabsichtigtes G1/G2/G3-Wording der
+  `a2a-delegation-gates`. Zusätzlich korrigiert: der Fixture war ein
+  `GATE_PARTIAL`-Block eingefroren, weil der Test-Helper die Provider-Registry
+  ohne Projekt-Config lud (Opencode -> `permission`). Der Helper lädt jetzt wie
+  die Produktion (`load_providers_config(root, config)`); das committete
+  `AGENTS.md` ist die Referenz und der Render ist byte-gleich.
+
+**Ursache:** `2ec750f7` hat Template/Rule-Wording und Version bewusst geändert,
+die Goldens aber nicht nachgezogen; der Gate-Tier-Drift war ein Test-Helper-Gap,
+kein Produktionsfehler.
+
+**Verifikation:** `pytest tests/test_compact_rule_channels.py
+tests/test_context_compact_mode.py tests/test_gate_card_compact.py
+tests/test_orchestrator_compact_sections.py
+tests/test_template_slimming_equivalence.py
+tests/test_orchestrator_topology_effective_flags.py
+tests/test_orchestrator_topology_docs.py -q` -> alle grün;
+`python3 scripts/sync.py --check` rc `0`; `python3 scripts/sync.py` ohne
+getrackten Diff. `_GOLDEN_ROLE_COUNT`, `_NORMALIZATIONS`, `_LOCATORS`,
+`_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation bleiben
+unverändert.

@@ -33,7 +33,11 @@ _HISTORIC_ELSE_BRANCH = (
     "→ HARD REJECT (siehe `singleton-orchestrator-architecture.md`)."
 )
 
-_OPEN = "{{#if ORCH_TOPOLOGY_EXPLICIT}}"
+# #1190 T8: the Gate-2 block is three-way; the explicit declaration lives in
+# the nested ``ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT`` block, so the extractor
+# anchors there -- the surrounding primary/else branches are covered by
+# ``tests/test_orchestrator_template_topology_wording.py``.
+_OPEN = "{{#if ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT}}"
 _ELSE = "{{else}}"
 _CLOSE = "\n{{/if}}"
 
@@ -67,6 +71,14 @@ def test_unset_topology_renders_word_identical_else_branch():
     variables = {
         "ORCH_TOPOLOGY_EXPLICIT": "false",
         "ORCH_TOPOLOGY": "",
+        # Effective axis for an unset key: derived ``subagent`` (K-1: not explicit).
+        "ORCH_TOPOLOGY_EFFECTIVE": "subagent",
+        "ORCH_TOPOLOGY_EFFECTIVE_SOURCE": "derived",
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "true",
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "false",
+        "ORCH_TOPOLOGY_INERT": "false",
         "ORCH_MAX_INSTANCES": "1",
         "ROLE_ORCHESTRATOR_ACTIVE": "true",
     }
@@ -86,6 +98,14 @@ def test_n1_renders_the_singular_limit():
     rendered = _render_gate({
         "ORCH_TOPOLOGY_EXPLICIT": "true",
         "ORCH_TOPOLOGY": "subagent",
+        # Declared ``subagent`` -> the effective axis reports the same position.
+        "ORCH_TOPOLOGY_EFFECTIVE": "subagent",
+        "ORCH_TOPOLOGY_EFFECTIVE_SOURCE": "project",
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "true",
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "true",
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "false",
+        "ORCH_TOPOLOGY_INERT": "false",
         "ORCH_MAX_INSTANCES": "1",
         "ROLE_ORCHESTRATOR_ACTIVE": "true",
     })
@@ -100,6 +120,14 @@ def test_n_greater_than_one_names_the_limit():
     rendered = _render_gate({
         "ORCH_TOPOLOGY_EXPLICIT": "true",
         "ORCH_TOPOLOGY": "hybrid",
+        # Declared ``hybrid`` -> the effective axis reports the same position.
+        "ORCH_TOPOLOGY_EFFECTIVE": "hybrid",
+        "ORCH_TOPOLOGY_EFFECTIVE_SOURCE": "project",
+        "ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT": "true",
+        "ORCH_TOPOLOGY_EFFECTIVE_PRIMARY": "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_SUBAGENT": "false",
+        "ORCH_TOPOLOGY_EFFECTIVE_HYBRID": "true",
+        "ORCH_TOPOLOGY_INERT": "false",
         "ORCH_MAX_INSTANCES": "4",
         "ROLE_ORCHESTRATOR_ACTIVE": "true",
     })
@@ -124,13 +152,15 @@ def test_merged_rule_vars_resolves_effective_instance_count(tmp_path):
     }
 
     claude = _merged_rule_vars(
-        _REPO_ROOT, tmp_path, config, "Claude", {}, None
+        _REPO_ROOT, tmp_path, config, "Claude", {}, None,
+        active_set=frozenset(),
     )
     assert claude["ORCH_MAX_INSTANCES"] == "4"
     assert claude["ORCH_TOPOLOGY_EXPLICIT"] == "true"
 
     continue_vars = _merged_rule_vars(
-        _REPO_ROOT, tmp_path, config, "Continue", {}, None
+        _REPO_ROOT, tmp_path, config, "Continue", {}, None,
+        active_set=frozenset(),
     )
     assert continue_vars["ORCH_MAX_INSTANCES"] == "1"
 

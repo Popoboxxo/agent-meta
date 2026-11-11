@@ -98,6 +98,7 @@ env:
     tests/test_sync_validation_gate.py
     tests/test_unread_channels_removed.py
     tests/test_continue_prompts_active_set.py
+    tests/test_opencode_positions.py
   SUBPROCESS_SHARD_3: >-
     tests/test_compact_matrix.py
     tests/test_knowledge_engine.py
@@ -279,9 +280,9 @@ jobs:
           # c) the two unions must have the expected, fixed sizes.
           subprocess_union = {p for _n, paths in subprocess_groups for p in paths}
           heavy_union = {p for _n, paths in heavy_groups for p in paths}
-          if len(subprocess_union) != 15:
+          if len(subprocess_union) != 16:
               errors.append(
-                  f"subprocess union is {len(subprocess_union)} entries, expected 15"
+                  f"subprocess union is {len(subprocess_union)} entries, expected 16"
               )
           if len(heavy_union) != 17:
               errors.append(
