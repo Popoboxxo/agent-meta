@@ -33,8 +33,15 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib.consistency.report import Severity  # noqa: E402
 from lib.consistency.topology import check_orchestrator_topology  # noqa: E402
-from lib.providers import load_provider_capabilities  # noqa: E402
-from lib.topology import resolve_topology  # noqa: E402
+from lib.providers import load_provider_capabilities, runtime_gate_vars  # noqa: E402
+from lib.topology import TopologyResolution, resolve_topology  # noqa: E402
+from lib.variables import (  # noqa: E402
+    _effective_topology_flags,
+    _orch_mode_flags,
+    _topology_flags,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 
 # Markdown inline link target, same shape the docs consistency checks use.
 _LINK_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")
@@ -556,8 +563,9 @@ def test_gemini_primary_degrades_with_one_warning():
 #
 # B-1 … B-11 (spec §9.1) are absolute singleton claims that must be
 # topology-qualified, a contradictory P3 status, one rendered gate variant and
-# two README gaps. B-9 is a render defect (checked against the generated rule,
-# not against text); B-5/B-6 were already fixed in T8 and are pinned here so
+# two README gaps. B-9 is a render defect (checked against the rule source
+# rendered in-process, not against prose); B-5/B-6 were already fixed in T8 and
+# are pinned here so
 # the template branches cannot regress.
 #
 # Spec/review/plan files are intentionally excluded: they quote the defect.
@@ -570,8 +578,43 @@ _MAIN_CHAT_CONCEPT = (
     _REPO_ROOT / "docs" / "concepts" / "active" / "main-chat-orchestrator-mode.md"
 )
 _ORCHESTRATOR_TEMPLATE = _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
-_GENERATED_GATE_RULE = _REPO_ROOT / ".claude" / "rules" / "use-orchestrator.md"
+# The RULE SOURCE, not the generated `.claude/rules/` copy: that tree is
+# gitignored, so a fresh CI checkout has no rendered rule at all. The test
+# renders the source in-process instead (see ``_render_gate_rule``).
+_GATE_RULE_SOURCE = _REPO_ROOT / "rules" / "1-generic" / "use-orchestrator.md"
 _ADR_0002 = _REPO_ROOT / "docs" / "adr" / "0002-orchestrator-mode-topology.md"
+
+#: Machine flags of an enforced (``hook``) provider — the only tier that
+#: renders the suffixless ``# CRITICAL GATE`` heading.
+_ENFORCED_PC = {"has_hooks": True, "hook_protocol": "claude-code-json"}
+
+
+def _render_gate_rule() -> str:
+    """Render ``rules/1-generic/use-orchestrator.md`` with this repo's flags.
+
+    Mirrors the production substitute-then-strip order (``rules.py::sync_rules``)
+    and builds the effective-topology axis from the real T1 seam, exactly like
+    ``tests/test_use_orchestrator_topology_rendering.py``. Flags: ``strict``
+    mode, an enforced (``hook``) provider tier and this repository's declared
+    ``subagent`` position.
+    """
+    resolution = TopologyResolution(
+        declared="subagent",
+        effective="subagent",
+        source="project",
+        derived_from=None,
+        degraded_from=None,
+        degradation_reason=None,
+        verification_state="DOCUMENTED",
+    )
+    flags = _orch_mode_flags("strict")
+    flags.update(runtime_gate_vars(_ENFORCED_PC, {}, {}))
+    flags.update(_topology_flags("subagent", explicit=True, source="project"))
+    flags.update(_effective_topology_flags(resolution, mode="strict"))
+
+    source = _text(_GATE_RULE_SOURCE)
+    rendered = substitute(source, flags, _GATE_RULE_SOURCE.name, None)
+    return strip_inactive_conditional_blocks(rendered, flags)
 
 # Normalized (see ``_normalized``) forbidden literals: an absolute singleton
 # claim. It is only allowed when a topology qualifier sits in the same block.
@@ -713,11 +756,15 @@ _GATE_VARIANT_MARKERS = (
 
 
 def test_gate_render_is_single_variant_per_file():
-    """B-9: a rendered rule carries exactly one gate variant."""
-    content = _text(_GENERATED_GATE_RULE)
+    """B-9: a rendered rule carries exactly one gate variant.
+
+    Rendered in-process from ``rules/1-generic/use-orchestrator.md`` — the
+    generated ``.claude/rules/`` tree is gitignored and absent in CI.
+    """
+    content = _render_gate_rule()
     headers = _GATE_HEADER_RE.findall(content)
     assert len(headers) == 1, (
-        "the rendered `.claude/rules/use-orchestrator.md` must carry exactly "
+        "the rendered `rules/1-generic/use-orchestrator.md` must carry exactly "
         f"one `# CRITICAL GATE` header, found {len(headers)}: {headers!r}."
     )
     if headers[0] == "":
