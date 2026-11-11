@@ -727,22 +727,43 @@ def _tracked_diff() -> str:
     return result.stdout
 
 
-def test_declaration_is_deterministic():
-    """Two consecutive sync runs leave every tracked artifact byte-identical.
-
-    ``--check`` is the second half of AC-31: after a real sync the drift check
-    must be clean, otherwise the declaration is not a fixed point.
-    """
-    before_hashes = _tracked_hashes()
-    before_diff = _tracked_diff()
-
-    sync = subprocess.run(
-        [sys.executable, str(_SYNC)],
+def _run_sync(*args: str) -> subprocess.CompletedProcess:
+    """Run ``sync.py`` in the repo root with *args* (no shell, no mutation of cwd)."""
+    return subprocess.run(
+        [sys.executable, str(_SYNC), *args],
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=SYNC_TIMEOUT,
     )
+
+
+def test_declaration_is_deterministic():
+    """Two consecutive sync runs leave every tracked artifact byte-identical.
+
+    The FIRST run is a baseline normalisation, not part of the measurement: a
+    fresh checkout is **not** a fixed point of the committed sidecar
+    (``.meta-config/generated-file-hashes.json``). Sync regenerates the
+    gitignored provider trees and then recomputes the sidecar from the
+    resulting on-disk state, so in a fresh checkout the committed sidecar need
+    not describe the tree the run starts from; the first sync reconciles it.
+    Concretely, the test-role renders embed ``{{PYTEST_BASETEMP}}``
+    (``<tempdir>/<user>/pytest-agent-meta``), so a checkout on another
+    machine/CI runner regenerates those agent files and the sidecar on the
+    first run. Measuring from the normalised tree keeps this assertion about
+    idempotency (the actual contract) instead of about the committed
+    baseline's environment.
+
+    ``--check`` is the second half of AC-31: after a real sync the drift check
+    must be clean, otherwise the declaration is not a fixed point.
+    """
+    initial = _run_sync()
+    assert initial.returncode == 0, (initial.stdout + initial.stderr)[-2500:]
+
+    before_hashes = _tracked_hashes()
+    before_diff = _tracked_diff()
+
+    sync = _run_sync()
     assert sync.returncode == 0, (sync.stdout + sync.stderr)[-2500:]
 
     assert _tracked_hashes() == before_hashes, (
@@ -751,11 +772,5 @@ def test_declaration_is_deterministic():
     )
     assert _tracked_diff() == before_diff, _tracked_diff()
 
-    check = subprocess.run(
-        [sys.executable, str(_SYNC), "--check"],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=SYNC_TIMEOUT,
-    )
+    check = _run_sync("--check")
     assert check.returncode == 0, (check.stdout + check.stderr)[-2500:]
