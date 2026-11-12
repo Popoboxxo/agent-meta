@@ -1078,6 +1078,24 @@ class APIError extends Error {
   }
 }
 
+// POST tier presets; on the server's lossy-save refusal (YAML comments would
+// be dropped) ask once and retry the same body with __allow_lossy__. Returns
+// false when the user declines (nothing saved).
+async function postTierPresetsConfirmingLoss(body) {
+  try {
+    await api.post("/api/tier-presets/update", body);
+    return true;
+  } catch (err) {
+    if (err.status !== 400 || !String(err.message).includes("refusing lossy YAML save")) throw err;
+    if (!confirm("Saving will drop comments in tier-presets.yaml. Continue?")) {
+      toast("Save cancelled, nothing changed", "info");
+      return false;
+    }
+    await api.post("/api/tier-presets/update", { ...body, __allow_lossy__: true });
+    return true;
+  }
+}
+
 /* =========================================================================
  * State manager (with undo stack)
  * ========================================================================= */
@@ -10909,7 +10927,7 @@ async function viewTierPresets() {
       }
     };
     try {
-      await api.post("/api/tier-presets/update", tierPresetsData);
+      if (!await postTierPresetsConfirmingLoss(tierPresetsData)) return;
       toast("Preset added!", "success");
       await loadData();
     } catch (err) {
@@ -10952,7 +10970,7 @@ async function viewTierPresets() {
           delete newPresetsData[pid].providers[pName];
         }
       });
-      await api.post("/api/tier-presets/update", newPresetsData);
+      if (!await postTierPresetsConfirmingLoss(newPresetsData)) return;
       toast("Saved", "success");
       await loadData();
     } catch (err) {
