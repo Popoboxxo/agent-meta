@@ -46,6 +46,7 @@ def test_warns_when_preexisting_broad_rule_shadows_managed_block(tmp_path):
     assert "Claude" in warnings[0]
     assert ".claude/agents/" in warnings[0]
     assert ".gitignore:1:.claude/" in warnings[0]
+    assert "gitignore: {ignore-provider-dirs: true}" in warnings[0]  # AC-1085c-1
 
 
 def test_no_warning_when_nothing_is_ignored(tmp_path):
