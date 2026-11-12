@@ -367,3 +367,34 @@ def test_drift_is_changed_files_scoped(tmp_path):
         changed_files={"docs/plans/2026-09-13-demo.md"},
     )
     assert len(_drift(in_scope)) == 1
+
+
+_DRAFT_SPEC = "# Demo — Spec\n> Status: DRAFT\n"
+
+
+def test_dashed_task_headers_still_trigger_approval_gate(tmp_path):
+    _write(tmp_path, _DRAFT_SPEC, _plan("### T1 — step one\n### T2 — step two\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert any(f.check == "spec_plan_approval_marker" and f.severity == Severity.ERROR
+               for f in findings)
+
+
+def test_task_like_headers_without_parsed_tasks_report_explicit_finding(tmp_path):
+    _write(tmp_path, _GOOD_SPEC, _plan("### T1 — step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert any(f.check == "spec_plan_no_tasks_detected" and f.severity == Severity.WARNING
+               for f in findings)
+
+
+def test_canonical_task_headers_produce_no_new_findings(tmp_path):
+    _write(tmp_path, _GOOD_SPEC, _plan("### Task T1: step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert not any(f.check == "spec_plan_no_tasks_detected" for f in findings)
+    assert not any(f.check == "spec_plan_approval_marker" for f in findings)
+
+
+def test_bold_approved_value_counts_as_approved(tmp_path):
+    spec = _GOOD_SPEC.replace("> Status: APPROVED (2026-09-13)", "> Status: **APPROVED** — 2026-09-13")
+    _write(tmp_path, spec, _plan("### T1 — step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert not any(f.check == "spec_plan_approval_marker" for f in findings)

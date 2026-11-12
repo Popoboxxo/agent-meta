@@ -53,6 +53,11 @@ _DATED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 # Hyphen-aware task header. The single source of truth lives in
 # ``plan_identity`` so parser, ledger writer and validator cannot drift (IC-07).
 _TASK_HEADER_RE = TASK_HEADER_RE
+# Looser dialect detector (`### T1 — x`, `## Task 1:`); only feeds the approval
+# gate and the no-tasks warning, never the ledger parser.
+_TASK_LIKE_HEADER_RE = re.compile(
+    r"(?m)^#{2,4}[ \t]+(?:Task[ \t]+)?T?[0-9]+[A-Za-z0-9._-]*[ \t]*(?::|[—–)-])"
+)
 
 _AGENT_FIELD_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Agent:(?:\*\*)?[ \t]*([\w.-]+)"
@@ -83,7 +88,7 @@ _SPEC_ID_RE = re.compile(r"spec-id:[ \t]*([A-Za-z0-9._-]+)")
 # Approval marker: `> Status: APPROVED` and bold `**Status:** APPROVED` both
 # count (real design docs use the bold form; carry-forward from Task 9 review).
 _APPROVED_RE = re.compile(
-    r"(?im)^[ \t]*>?[ \t]*\**Status:\**[ \t]*APPROVED\b"
+    r"(?im)^[ \t]*>?[ \t]*\**Status:\**[ \t]*\**APPROVED\b"
 )
 _PLACEHOLDER_PATTERNS = (
     ("TODO", re.compile(r"\bTODO\b")),
@@ -195,6 +200,7 @@ def check_spec_plan_workflow(
         project_root, specs, plans, texts, task_test_traceability, findings,
     )
     _check_approval_markers(project_root, plans, texts, findings)
+    _check_task_detection(project_root, plans, texts, findings)
     _check_ledger_format(project_root, plans, findings)
     _check_ledger_drift(project_root, plans, texts, findings, block.get("ledger-drift"))
     _check_plan_graph(project_root, plans, texts, findings)
@@ -487,7 +493,11 @@ def _check_approval_markers(
         match = _SPEC_FIELD_RE.search(text)
         if not match:
             continue
-        has_tasks = bool(_parse_plan_tasks(text)) or parse_plan_ledger(plan)["checkboxes"] > 0
+        has_tasks = (
+            bool(_parse_plan_tasks(text))
+            or bool(_TASK_LIKE_HEADER_RE.search(text))
+            or parse_plan_ledger(plan)["checkboxes"] > 0
+        )
         if not has_tasks:
             continue
         ref = match.group(1).strip().strip("`").strip()
@@ -503,6 +513,26 @@ def _check_approval_markers(
                     f"spec '{ref}' is not APPROVED although the plan has tasks",
                     suggestion="approve the spec ('Status: APPROVED') before "
                                "scheduling plan tasks",
+                )
+            )
+
+
+def _check_task_detection(
+    project_root: Path,
+    plans: list[Path],
+    texts: dict[Path, str],
+    findings: list[Finding],
+) -> None:
+    for plan in plans:
+        text = texts.get(plan, "")
+        if _TASK_LIKE_HEADER_RE.search(text) and not _parse_plan_tasks(text):
+            findings.append(
+                Finding(
+                    Severity.WARNING,
+                    "spec_plan_no_tasks_detected",
+                    _rel(project_root, plan),
+                    "task-like headers found but no canonical task parsed",
+                    suggestion="use '### Task <id>: <title>'",
                 )
             )
 
