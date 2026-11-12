@@ -89,3 +89,11 @@ entries:
   - path: "scripts/lib/se_export/github_issues_adapter.py"
     symbol: "_run_gh"
     reason: "external-cli: generic gh command runner; the gh CLI owns its temp files"
+  - path: "scripts/check_plan_refs.py"
+    symbol: "run"
+    reason: "external-cli: 'gh issue view' read-only lookup; the gh CLI owns its temp files"
+
+  # -- git plumbing: git owns its temp files --------------------------------
+  - path: "scripts/check_plan_refs.py"
+    symbol: "_git"
+    reason: "git-plumbing: read-only rev-parse/ls-tree/show/grep against a ref; git owns its temp files"
