@@ -397,6 +397,67 @@ def test_pytest_basetemp_rejects_temp_root_inside_project(tmp_path, monkeypatch)
     assert exc.value.code == "tmp-sink.system-temp-exception"
 
 
+def _pin_env(monkeypatch, sink: Path) -> None:
+    """Env-based framework pin (TMPDIR/TEMP/TMP) with a cold tempdir cache."""
+    sink.mkdir(parents=True, exist_ok=True)
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(key, str(sink))
+    monkeypatch.setattr(tempfile, "tempdir", None)
+
+
+def _clean_env(monkeypatch) -> None:
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(tempfile, "tempdir", None)
+
+
+def test_pytest_basetemp_under_pin_is_outside_root(tmp_path, monkeypatch):
+    """U2-10 (#1189): the pin is not evidence about the system temp root."""
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    paths = resolve_tmp_paths(tmp_path, _exception_cfg())
+    assert not paths.pytest_basetemp.startswith(str(tmp_path))
+    assert paths.pytest_basetemp.endswith(os.sep + "pytest-agent-meta")
+
+
+def test_pytest_basetemp_matches_clean_env_baseline(tmp_path, monkeypatch):
+    """U2-11: same value as in the same env without the pin (K-7)."""
+    _clean_env(monkeypatch)
+    baseline = resolve_tmp_paths(tmp_path, _exception_cfg()).pytest_basetemp
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    assert resolve_tmp_paths(tmp_path, _exception_cfg()).pytest_basetemp == baseline
+
+
+def test_pytest_basetemp_custom_tmpdir_is_masked_by_pin(tmp_path, monkeypatch):
+    """U2-11 (2nd case): a caller TMPDIR is hidden by the pin by design."""
+    _clean_env(monkeypatch)
+    baseline = resolve_tmp_paths(tmp_path, _exception_cfg()).pytest_basetemp
+    custom = tmp_path.parent / "custom-tmpdir"
+    custom.mkdir(exist_ok=True)
+    monkeypatch.setenv("TMPDIR", str(custom))
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    got = resolve_tmp_paths(tmp_path, _exception_cfg()).pytest_basetemp
+    assert got == baseline
+    assert not got.startswith(str(custom))
+
+
+def test_pytest_basetemp_disabled_sink_with_tmpdir_in_sink_raises(tmp_path, monkeypatch):
+    """U2-12: without an active sink there is no pin to discount."""
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    with pytest.raises(rc.TmpSinkError) as exc:
+        resolve_tmp_paths(tmp_path, _exception_cfg(sink_enabled=False))
+    assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
+def test_pytest_basetemp_rejects_sink_subdirectory_as_temp_root(tmp_path, monkeypatch):
+    """U2-13 / D3: a sub-directory of the sink is not the pin itself."""
+    sub = tmp_path / ".tmp" / "sub"
+    sub.mkdir(parents=True)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(sub))
+    with pytest.raises(rc.TmpSinkError) as exc:
+        resolve_tmp_paths(tmp_path, _exception_cfg())
+    assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
 def test_pytest_basetemp_rejects_quote_in_value(tmp_path, monkeypatch):
     """IC-04: a ``"`` would break ``--basetemp="<path>"``."""
     system_temp = _system_temp_outside_project(tmp_path)
@@ -691,3 +752,21 @@ def test_framework_render_modules_call_tmp_env():
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         }
         assert "tmp_env" in called, relative
+
+
+def test_render_under_pin_matches_baseline(tmp_path, monkeypatch):
+    """AC-1189-09/23: PYTEST_BASETEMP/TEST_COMMANDS do not depend on the pin."""
+    (tmp_path / ".meta-config").mkdir()
+    config = {
+        "project": {"name": "scratch", "prefix": "sc", "short": "sc"},
+        "ai-providers": ["Claude"],
+        "roles": ["orchestrator"],
+        "variables": {"TEST_COMMANDS": "python3 -m pytest --basetemp={{PYTEST_BASETEMP}}"},
+    }
+    _clean_env(monkeypatch)
+    baseline, _ = build_variables(config, REPO_ROOT, tmp_path)
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    pinned, _ = build_variables(config, REPO_ROOT, tmp_path)
+    assert pinned["PYTEST_BASETEMP"] == baseline["PYTEST_BASETEMP"]
+    assert pinned["TEST_COMMANDS"] == baseline["TEST_COMMANDS"]
+    assert not pinned["PYTEST_BASETEMP"].startswith(str(REPO_ROOT))
