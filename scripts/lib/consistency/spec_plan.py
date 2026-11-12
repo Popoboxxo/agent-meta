@@ -205,6 +205,8 @@ def check_spec_plan_workflow(
     _check_ledger_format(project_root, plans, findings)
     _check_ledger_drift(project_root, plans, texts, findings, block.get("ledger-drift"))
     _check_plan_graph(project_root, plans, texts, findings)
+    from .checkpoint_tracking import check_checkpoint_references
+    findings.extend(check_checkpoint_references(project_root, plans))
     return findings
 
 

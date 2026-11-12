@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
-from .io import SyncError, _load_yaml_or_json
+from .io import SyncError, _load_yaml_or_json, run_git_check_ignore
 from .repo_containment import canonical_tmp_sink_path, tmp_sink_path_error
 
 DEFAULT_PROGRESS_DIR = ".meta-viz/progress"
@@ -177,6 +177,23 @@ def _absolute_and_rel(root: Path, rel: str) -> Tuple[Path, str]:
     return absolute, normalized
 
 
+def _gitignore_findings(root: Path, checkpoint_rel: str, progress_rel: str) -> list:
+    """Warn per gitignored dir; skipped silently without a usable git repo (#1000)."""
+    out: list = []
+    for rel, code, key in (
+        (checkpoint_rel, "progress.checkpoint-dir-ignored", "progress.checkpoint-dir"),
+        (progress_rel, "progress.progress-dir-ignored", "progress.dir"),
+    ):
+        result = run_git_check_ignore(rel, str(root))
+        if result is not None and result.returncode == 0:
+            out.append(ProgressPathFinding(
+                "warning", code,
+                "'{0}' is gitignored; references to it dangle in fresh clones. "
+                "Set '{1}' to a tracked path to opt out.".format(rel, key),
+            ))
+    return out
+
+
 def resolve_progress_paths(
     project_root: Path,
     config: Optional[dict] = None,
@@ -225,6 +242,7 @@ def resolve_progress_paths(
 
     progress_dir, progress_rel = _absolute_and_rel(root, progress_raw)
     checkpoint_dir, checkpoint_rel = _absolute_and_rel(root, checkpoint_raw)
+    findings.extend(_gitignore_findings(root, checkpoint_rel, progress_rel))
 
     return ResolvedProgressPaths(
         progress_dir=progress_dir,
