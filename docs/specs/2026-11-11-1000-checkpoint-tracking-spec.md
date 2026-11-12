@@ -1,5 +1,5 @@
 # Checkpoint-Tracking (#1000) — Spec
-> Status: DRAFT
+> Status: APPROVED (User, 2026-11-12)
 > Datum: 2026-11-12 | Ist-Anker: Worktree `fix/phase-c-sync-config` | Plan: `docs/superpowers/plans/2026-11-11-phase-c-sync-config.md` (Task 0b, Task 13) | Schwester-Spec: `docs/specs/2026-11-11-phase-c-sync-config-spec.md`
 > Issue: #1000 "design: plan/handoff checkpoints live in gitignored .meta-viz/ — references dangle in fresh clones"
 

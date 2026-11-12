@@ -1,5 +1,5 @@
 # Phase C Sync/Config-Robustheit — Spec
-> Status: DRAFT
+> Status: APPROVED (User, 2026-11-12)
 > Datum: 2026-11-12 | Ist-Anker: `origin/main 53460042` (Worktree `fix/phase-c-sync-config`) | Plan: `docs/superpowers/plans/2026-11-11-phase-c-sync-config.md` (Task 0)
 > Issues (M): #1085 b/c, #1155 (Rest: F5 + `--fail-on-p0`, F10), #1195, #1208, #1182, #1183, #1180, #1086 h (`priority`)
 
@@ -206,8 +206,8 @@ Anzahl AC: #1085c 2, #1085b/F5 8, #1155 F10/F4/F7 4, #1195 9, #1208 4, #1182 6, 
 
 **Offene Fragen** (Optionen, Empfehlung zuerst):
 
-- **Q1 (#1208, Ursache):** Die Blindstelle ist weder im Code belegt (Managed-Block-Writer loggt im Dry-Run, S5) noch reproduziert. Optionen: (A, empfohlen) Repro-Test zuerst; Fix an der Stelle, die der Test belegt (Entscheidungsregel S5). (B) Writer pauschal ändern ohne Repro: nicht empfohlen (würde eine wirkungslose Änderung committen). Keine User-Rückfrage nötig, wenn A gilt; die Spec-Freigabe bestätigt A.
-- **Q2 (#1183, Reichweite):** Regel, die weder im Gate noch nativ noch als Skill erreichbar ist. Optionen: (A, empfohlen, Plan-Linie) nur WARN `context.rule-compacted-away`; (B) zusätzlich einen Voll-Regel-Skill schreiben (größerer Eingriff in `sync_compact_reference_skills`, neue Skill-Artefakte). Empfehlung A; B wäre ein eigenes Issue.
+- **Q1 (#1208, Ursache): beantwortet: Option A (Repro zuerst).** Die Blindstelle ist weder im Code belegt (Managed-Block-Writer loggt im Dry-Run, S5) noch reproduziert. Optionen: (A, empfohlen) Repro-Test zuerst; Fix an der Stelle, die der Test belegt (Entscheidungsregel S5). (B) Writer pauschal ändern ohne Repro: nicht empfohlen (würde eine wirkungslose Änderung committen). Keine User-Rückfrage nötig, wenn A gilt; die Spec-Freigabe bestätigt A.
+- **Q2 (#1183, Reichweite): beantwortet: Option A (nur Warnung).** Regel, die weder im Gate noch nativ noch als Skill erreichbar ist. Optionen: (A, empfohlen, Plan-Linie) nur WARN `context.rule-compacted-away`; (B) zusätzlich einen Voll-Regel-Skill schreiben (größerer Eingriff in `sync_compact_reference_skills`, neue Skill-Artefakte). Empfehlung A; B wäre ein eigenes Issue.
 - **Q3 (#1182, Warn-Wortlaut): GESCHLOSSEN.** Wortlaut aus Issue #1182 übernommen, siehe S6.
 
 **Risiken.**
