@@ -336,6 +336,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "written/changed or an [ERROR] was recorded, exit 0 "
                              "if everything is up to date. "
                              "Use to fail CI when provider context files are out of sync.")
+    parser.add_argument("--fail-on-p0", action="store_true",
+                        help="Opt-in: exit 1 after a plain sync if any [P0] finding or "
+                             "[ERROR] was recorded (default: exit 0). CI sets this itself.")
     parser.add_argument("--validate", action="store_true",
                         help="Validate sync output against the configured test repository. "
                              "Resolves test-repo.path from project.yaml (relative or absolute), "

@@ -123,7 +123,7 @@ jobs:
       # directories, which are gitignored on self-hosting -- a fresh checkout
       # has no skills. Generate the output before checking it.
       - name: Generate sync output
-        run: python scripts/sync.py
+        run: python scripts/sync.py --fail-on-p0
       # Drift gate: the working tree must not change. gitignored provider
       # outputs do not appear; a managed file that the sync regenerates
       # differently (e.g. a forgotten .gitignore or AGENTS.md update) does.

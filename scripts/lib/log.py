@@ -17,6 +17,7 @@ class SyncLog:
         self.skipped: list[str] = []
         self.unchanged: list[str] = []
         self.infos: list[str] = []
+        self.p0: list[str] = []
         self.debugs: list[str] = []
         self._seen_warnings: set[str] = set()
         # Sync-run-scoped signatures of already-reported agent-override
@@ -37,7 +38,7 @@ class SyncLog:
         """
         self.actions.append(f"[{tag:<8}]  {target:<50}  ({source})")
 
-    def warn(self, message: str):
+    def warn(self, message: str, p0: bool = False):
         """Record a warning message, deduplicating repeated warnings.
 
         The same warning is emitted only once to keep the report readable.
@@ -51,11 +52,13 @@ class SyncLog:
             return
         self._seen_warnings.add(message)
         self.warnings.append(f"[WARN]   {message}")
+        if p0:  # consumed by --fail-on-p0
+            self.p0.append(message)
         print(f"  !  {message}", file=sys.stderr)
 
-    def warning(self, message: str):
+    def warning(self, message: str, p0: bool = False):
         """Alias for warn(). Record a warning message."""
-        self.warn(message)
+        self.warn(message, p0=p0)
 
     def error(self, target: str, message: str):
         """Record an error for a target with error message.

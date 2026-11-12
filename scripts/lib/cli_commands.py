@@ -1747,6 +1747,11 @@ def _run_common_tail(ctx: _SyncContext) -> None:
         print("  i  Provider context files are up to date.")
         sys.exit(0)
 
+    if getattr(args, "fail_on_p0", False) and (log.p0 or log.errors):
+        print(f"  X  {len(log.p0)} P0 finding(s), {len(log.errors)} error(s) "
+              f"- failing (--fail-on-p0).", file=sys.stderr)
+        sys.exit(1)
+
     if getattr(args, "admin", False):
         admin_script = agent_meta_root / "scripts" / "admin-server.py"
         if not admin_script.exists():

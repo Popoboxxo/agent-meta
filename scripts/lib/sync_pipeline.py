@@ -1894,9 +1894,9 @@ def _sync_stage_gitignore(
         project_root, providers, provider_config,
         ignore_provider_dirs=gitignore_cfg.get("ignore-provider-dirs", False),
     ):
-        log.warning(f"[P0] {shadow_warning}")
+        log.warning(f"[P0] {shadow_warning}", p0=True)
     for keep_warning in detect_invisible_keep_paths(project_root, gitignore_cfg):
-        log.warning(f"[P0] {keep_warning}")
+        log.warning(f"[P0] {keep_warning}", p0=True)
 
 
 def _dedupe_preserving_order(entries: list[str]) -> list[str]:
