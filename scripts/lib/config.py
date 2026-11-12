@@ -7,7 +7,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -90,7 +89,10 @@ from .reflection import (
 )
 from .repo_containment import (
     TMP_SINK_CLEANUP_MODES,
+    TmpSinkError,
     default_repo_containment_block,
+    resolve_sink_absolute,
+    system_temp_root,
     tmp_sink_location_error,
     tmp_sink_path_error,
 )
@@ -929,12 +931,22 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             exc_enabled or not sink_enabled
         )
         if uses_system_temp:
-            temp_root = tempfile.gettempdir()
-            if _path_is_inside(config_path.parent.parent, temp_root):
+            # Un-pinned root: the framework pin TMPDIR=<sink> is not evidence
+            # about the platform temp root (#1189).
+            project_root = config_path.parent.parent
+            try:
+                temp_root = system_temp_root(
+                    project_root, resolve_sink_absolute(project_root, config)
+                )
+            except TmpSinkError as exc:
+                _fail(str(exc))
+            if _path_is_inside(project_root, temp_root):
                 _fail(
                     "tmp-sink.system-temp-exception: platform temp root "
                     f"{temp_root!r} is inside the project root — the "
-                    "exception cannot take effect."
+                    "exception cannot take effect. If this is a stale "
+                    "framework pin: open a new shell or re-run "
+                    "'python scripts/sync.py'."
                 )
 
     path = sink.get("path")

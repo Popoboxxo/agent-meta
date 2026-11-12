@@ -129,8 +129,14 @@ assert CAUSE in message, (
     f"got: {message!r}"
 )
 PY
-summary_lines="$(grep -cE "^\[WARN\].*opencode-v2 gate \(permissions deny\) NOT written for provider" "$LOG_DIR/sync.log" || true)"
-[ "$summary_lines" = "1" ] || fail "the WARNINGS summary must carry the v2 gate warning exactly once, got $summary_lines"
+# Since #1086d stdout no longer repeats the warnings: the message streams once
+# (`  !  ...`) and the WARNINGS block shrinks to `WARNINGS: N (see above)`.
+stream_lines="$(grep -cE "^ +! +.*opencode-v2 gate \(permissions deny\) NOT written for provider" "$LOG_DIR/sync.log" || true)"
+[ "$stream_lines" = "1" ] || fail "the v2 gate warning must stream exactly once, got $stream_lines"
+if grep -qE "^\[WARN\].*opencode-v2 gate" "$LOG_DIR/sync.log"; then
+    fail "the WARNINGS summary must not repeat the v2 gate warning on stdout (#1086d)"
+fi
+grep -qE "^WARNINGS: [1-9][0-9]* \(see above\)$" "$LOG_DIR/sync.log" || fail "the WARNINGS summary must reference the streamed warnings (WARNINGS: N (see above))"
 
 # --- 5. No gate-inactive finding on the v2 surface (tier plugin). -----------
 if grep -qF "orchestrator-topology.gate-inactive" "$LOG_DIR/validate.log"; then

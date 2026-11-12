@@ -28,6 +28,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -74,24 +75,37 @@ from lib.io import load_yaml_file
 def _tmp_sink_env(root: Path) -> dict | None:
     """Return a git-subprocess env pinned to the project tmp-sink.
 
-    ``None`` means "inherit the parent environment": the sink may legitimately
-    be disabled, and a read-only consistency run must still work then (the
-    repository rollback lever is ``tmp-sink.enabled: false``). Configuration
-    errors are reported by ``sync.py --validate``; this helper never raises.
+    ``None`` means "inherit the parent environment" and is returned **only**
+    for the three defined states: no project config, a *disabled* sink (the
+    rollback lever is ``tmp-sink.enabled: false``), or the framework ``lib``
+    not being importable (one warning on stderr). Any other failure raises
+    ``TmpSinkError("tmp-sink.pin-unavailable", ...)``; ``main`` maps it to
+    Exit 2 instead of running git unpinned (#1189, IC-5a/IC-5b).
     """
     config_path = Path(root) / ".meta-config" / "project.yaml"
     if not config_path.exists():
         return None
     try:
         from lib.config import load_config
+        from lib.repo_containment import TmpSinkError
         from lib.tmp_paths import resolve_tmp_paths, tmp_env
-
+    except ImportError:
+        print(
+            "  !  tmp-sink pin unavailable: framework lib not importable; "
+            "inheriting environment",
+            file=sys.stderr,
+        )
+        return None
+    try:
         paths = resolve_tmp_paths(Path(root), load_config(config_path))
         if not paths.enabled:
             return None
         return tmp_env(paths)
-    except Exception:  # noqa: BLE001 - a read-only check must not depend on the sink
-        return None
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 - load_config may exit
+        raise TmpSinkError(
+            "tmp-sink.pin-unavailable",
+            f"{exc}; repair: python scripts/sync.py --validate",
+        ) from exc
 
 
 def get_changed_files(root: Path) -> set[str]:
@@ -321,7 +335,17 @@ def main() -> int:
             print(f"ERROR: File not found: {specific_file}", file=sys.stderr)
             return 2
 
-    findings = run_checks(root, changed_only=args.changed, specific_file=specific_file)
+    from lib.repo_containment import TmpSinkError
+
+    try:
+        findings = run_checks(root, changed_only=args.changed, specific_file=specific_file)
+    except TmpSinkError as exc:
+        # Exit 2 is shared with "File not found" (script error, K-8).
+        if args.json:
+            print(json.dumps({"error": "tmp-sink.pin-unavailable", "detail": exc.message}))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     if args.json:
         exit_code = print_json_report(findings)

@@ -510,7 +510,9 @@ def detect_shadowed_provider_roots(
             f"({source_rule}) that predates the agent-meta managed block -- "
             "every generated file is untracked with no warning (`git ls-files` "
             "shows nothing). Narrow that rule, or add an exception via "
-            "gitignore.exceptions in .meta-config/project.yaml."
+            "gitignore.exceptions in .meta-config/project.yaml. "
+            "For self-hosting repos set gitignore: {ignore-provider-dirs: true} "
+            "to silence this warning."
         )
     return warnings
 

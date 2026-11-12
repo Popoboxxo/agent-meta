@@ -39,6 +39,9 @@ Normal:
     max: claude-fable-5-1
   providers:
     Claude:
+      # #1086g (documented as-is, no behaviour change): here `max` equals `powerful`
+      # (claude-opus-5-5) and only `ultra` is the top model; the Gemini block below
+      # likewise maps max = powerful = ultra.
       tiers:
         nano: claude-haiku-5-5
         fast: claude-haiku-5-5

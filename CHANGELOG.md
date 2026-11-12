@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- **tmp-sink pin vs. system temp (#1189):** the framework-owned pin (`TMPDIR=<sink>`) is no longer mistaken for the system temp root, so `TMPDIR=<root>/.tmp python3 scripts/sync.py --validate` no longer fails with `tmp-sink.system-temp-exception`; the exception check and `PYTEST_BASETEMP` use the un-pinned root. Boundary: pytest without `--basetemp` inherits the pin (`tests/conftest.py` warns only).
+- **Pin policy abort (#1189):** a broken or unresolvable tmp-sink config now aborts instead of silently spawning an unpinned child (`tmp-sink.pin-unavailable`): exit 2 for `sync.py`, `consistency-check.py` and the eval, exit 1 for `admin-server.py start`; inheriting the environment is limited to "no config", "sink disabled" and "framework lib not importable".
+- **`admin-server.py start`/`restart` (#1189):** a busy port now exits 1 before any spawn (`cannot bind <host>:<port>`); a dead child exits 1 with the log tail and no stale PID file; Viz/MCP children are verified by liveness (`poll()`) instead of a fixed sleep; zombie children are no longer reported as running; `/api/health` additionally returns `pid` (no `root`). Option A (token-free `/api/health`) was deliberately rejected. The post-start verification is a heuristic: a failure after the confirm window shows up in `status` and the log, not as a `failed to start` line.
+
 ## [2.0.0-beta.8] - 2026-11-08
 
 ### Changed

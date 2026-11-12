@@ -59,6 +59,7 @@ SPEC_SEVERITY = {
     "context-profile.marker-in-rule": Severity.ERROR,
     "context.declared-surface-empty": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
     "context.legacy-artifact-present": Severity.WARNING,
+    "context.dangling-doc-pointer": Severity.WARNING,
 }
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
@@ -66,9 +67,8 @@ PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # (AC-12) was promoted in the 1.24 follow-up: after Copilot declares its
 # path-scoped .github/instructions channel (Task 1.29), the 9x4 matrix reports
 # zero findings. declared-surface-empty keeps its WARN: it is gated by
-# ``content_expected`` (surfaces that are empty by design -- skills without
-# lazy rules, MCP without active servers -- are not reported), so there is no
-# false-positive class left that would require a global exemption.
+# ``content_expected`` (surfaces empty by design -- skills without lazy rules,
+# MCP without active servers -- are not reported), so no global exemption is needed.
 PHASE1_PROMOTED = frozenset({
     "context.dangling-pointer", "context.rule-unreachable",
     "context-profile.marker-in-rule",
@@ -264,6 +264,7 @@ def check_over_soft_cap(
             continue
         caps = capabilities.get(provider) or {}
         context_file = str(caps.get("context_file", ""))
+        others = [o for o in active_providers if o != provider and context_file and context_file == (capabilities.get(o) or {}).get("context_file")]
         for key, unit in (("context_soft_cap_bytes", "bytes"),
                           ("context_soft_cap_chars", "chars"),
                           ("context_soft_cap_lines", "lines")):
@@ -281,7 +282,8 @@ def check_over_soft_cap(
             if value > cap:
                 findings.append(_warn(
                     "context.over-soft-cap", context_file,
-                    f"{provider}: entry file has {value} {unit}, soft cap is {cap} {unit}",
+                    f"{provider}: entry file has {value} {unit}, soft cap is {cap} {unit}"
+                    + (f" (shared with: {', '.join(others)})" if others else ""),
                     "shrink the entry file or move reference content into lazy skills"))
     return findings
 

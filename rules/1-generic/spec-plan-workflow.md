@@ -78,6 +78,7 @@ keine Security boundary (Terminologie:
 - Ablage: Specs liegen unter `{{SPEC_PLAN_SPECS_DIR}}`.
 - Approval-Marker: `Status: APPROVED` (maschinenlesbar, Datum ergänzen).
 - Trace-Anker: `spec-id: SPEC-<slug>` — der Plan referenziert diesen Wert.
+- Plan-Umsetzungsstand: im selben PR wie die dokumentierte Phase committen und nur getrackte Pfade zitieren (nie `.meta-viz/`-Checkpoints).
 - Fragen werden einzeln gestellt (nicht als Fragenkatalog), Lösungen als 2–3 Ansätze
   mit Trade-offs; das Design wird abschnittsweise abgenommen.
 

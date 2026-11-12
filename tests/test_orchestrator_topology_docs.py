@@ -190,12 +190,21 @@ def test_concept_doc_links_spec_and_a2a_rule():
     )
 
 
-def test_a2a_rule_links_the_topology_doc():
-    assert "docs/concepts/active/orchestrator-topology.md" in _text(_A2A_RULE), (
-        "rules/1-generic/a2a-delegation-gates.md must link the concept doc "
-        "(AC-4 cross-link); the link lives in the explicit topology branch so "
-        "the unset render stays byte-identical."
+def test_a2a_rule_states_topology_inline():
+    # #1180: the rule carries the core topology limits inline, no doc pointer.
+    text = _text(_A2A_RULE)
+    assert "docs/concepts" not in text, (
+        "rules/1-generic/a2a-delegation-gates.md must not point at docs/concepts "
+        "(#1180: core limits are inline)."
     )
+    lowered = _normalized(text)
+    for phrase in (
+        "orchestrator-topologie",
+        "g1 ein worker dispatcht nie einen orchestrator",
+        "g3 ein orchestrator dispatcht nie einen orchestrator",
+        "degradiert laut auf subagent",
+    ):
+        assert phrase in lowered, f"a2a rule must state inline: {phrase!r}"
 
 
 def test_singleton_architecture_links_the_topology_doc():

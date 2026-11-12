@@ -968,6 +968,8 @@ def _sync_stage_legacy_cleanup(
 # still passed through for API stability but no longer drives pruning.
 SYNC_BACKUP_MAX_AGE_DAYS = 30
 SYNC_BACKUP_MAX_PER_SOURCE = 3
+# #1195: per-directory cap; the newest backup of every source is never pruned.
+SYNC_BACKUP_MAX_TOTAL_PER_DIR = 30
 
 
 def _deactivated_provider_warning(provider: str) -> str:
@@ -1036,6 +1038,7 @@ def _prune_managed_sync_backups(
             managed_dir, project_root, log, args.dry_run,
             max_age_days=SYNC_BACKUP_MAX_AGE_DAYS,
             max_per_source=SYNC_BACKUP_MAX_PER_SOURCE,
+            max_total=SYNC_BACKUP_MAX_TOTAL_PER_DIR,
         )
 
 
@@ -1894,9 +1897,9 @@ def _sync_stage_gitignore(
         project_root, providers, provider_config,
         ignore_provider_dirs=gitignore_cfg.get("ignore-provider-dirs", False),
     ):
-        log.warning(f"[P0] {shadow_warning}")
+        log.warning(f"[P0] {shadow_warning}", p0=True)
     for keep_warning in detect_invisible_keep_paths(project_root, gitignore_cfg):
-        log.warning(f"[P0] {keep_warning}")
+        log.warning(f"[P0] {keep_warning}", p0=True)
 
 
 def _dedupe_preserving_order(entries: list[str]) -> list[str]:
@@ -1990,10 +1993,13 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     # Issue #1091: an invalid block must not break sync (existing projects
     # keep syncing, rc=0), but commit authority is disabled fail-safe and the
     # user is told loudly. No time-based grace.
-    for _violation in auto_commit_violations(config):
+    _violations = auto_commit_violations(config)
+    for _violation in _violations:
         log.warn(
             f"auto_commit is invalid ({_violation}); "
-            "commit authority disabled (mode: off)")
+            "allowlist not rewritten (an existing one stays as-is)")
+    if _violations:
+        return
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
     resolved["eligible_roles"] = [
         role for role in resolved["eligible_roles"] if active_set.has(role)
@@ -2043,7 +2049,7 @@ def _sync_stage_context_checks(
     for message in profile_info_messages or ():
         log.note("context-profile", message)
     try:
-        from lib.consistency import active_set_refs, context_budget
+        from lib.consistency import active_set_refs, context_budget, doc_pointers
         from lib.context_report import measure_artifacts, merge_provider_mappings
 
         provider_config = load_providers_config(agent_meta_root, config)
@@ -2060,6 +2066,20 @@ def _sync_stage_context_checks(
         ]
         for line in context_profile_info_lines(resolved_profiles, agent_meta_root):
             log.note("context-profile.unverified", line)
+        from lib.context_profile import context_profile_override_warnings
+        from lib.providers import resolve_context_filename
+
+        for line in context_profile_override_warnings(
+            config, providers,
+            {
+                p: resolve_context_filename(
+                    (provider_config.get(p) or {}).get("context_file", "CLAUDE.md"),
+                    p, provider_config.get(p) or {},
+                )
+                for p in providers
+            },
+        ):
+            log.warn(line)
         report = None
         try:  # measure once, shared by hard/soft cap checks
             report = measure_artifacts(project_root, providers, capabilities)
@@ -2074,6 +2094,7 @@ def _sync_stage_context_checks(
             (context_budget, "check_marker_in_rule", {}),
             (context_budget, "check_declared_surface_empty", {}),
             (context_budget, "check_legacy_artifact_present", {}),
+            (doc_pointers, "check_dangling_doc_pointer", {}),
             (active_set_refs, "check_dangling_dispatch", {}),
             (active_set_refs, "check_dangling_mention", {}),
             (active_set_refs, "check_unresolved_placeholder", {}),

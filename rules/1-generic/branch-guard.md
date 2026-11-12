@@ -18,4 +18,6 @@ blockiert (fail closed); die Meldung nennt Submodul, Ziel und Ausweg (ohne
 ## Bekannte Grenzen
 
 Erkennung per Tokenizer, kein Shell-Parser — Indirektion (`eval`, `$(...)`, `xargs`) bleibt unerkannt.
-Lücken-Liste (#551/#592/#809), Guard-Einstufung: `docs/concepts/branch-guard-known-limits.md`.
+Nicht erkannt (#551/#592/#809): `eval "git commit ..."`, direkte Schreibzugriffe auf `.git/`, andere Git-Tools (`hub`, `gh repo ...`), `$(...)`/Backticks als Indirektion.
+Das Destructive-Gate (#809) sieht nur direkte `rm`-Aufrufe (kein `find -delete`, `xargs rm`, Variablen-Pfade, Pfad-Traversal).
+Einstufung: Convention boundary (Akzident-Netz, kein Ersatz für Backups); Security-Eigenschaften nur für das Destructive-Gate und den DoD-Push-Check (fail-closed ohne `python3`, #595).

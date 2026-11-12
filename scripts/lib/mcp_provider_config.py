@@ -327,11 +327,17 @@ def _read_json_lenient(path: Path) -> dict | None:
     return read_json_lenient(path)
 
 
-def _config_rel_label(path: Path) -> str:
-    """Log label for a provider config file: include the containing directory
-    when there is one, so sibling configs (.vscode/mcp.json vs .cursor/mcp.json)
-    stay distinguishable in sync.log instead of both reading as "mcp.json".
+def _config_rel_label(path: Path, project_root: Path | None = None) -> str:
+    """Log label for a provider config file: relative to *project_root* when
+    given (so a root-level file reads ".mcp.json", not "<checkout>/.mcp.json"),
+    else name plus containing directory so sibling configs (.vscode/mcp.json
+    vs .cursor/mcp.json) stay distinguishable in sync.log.
     """
+    if project_root is not None:
+        try:
+            return path.relative_to(project_root).as_posix()
+        except ValueError:
+            pass
     rel = str(path.name)
     if path.parent.name:
         rel = str(path.relative_to(path.parent.parent))
@@ -390,13 +396,14 @@ def _update_json_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Merge mcp_entries into a JSON settings file under mcp_key.
 
     Reads the existing file (if any), updates the MCP key, writes clean JSON.
     Warns and skips if the file cannot be parsed.
     """
-    rel = _config_rel_label(path)
+    rel = _config_rel_label(path, project_root)
     existing = _read_existing_json_dict(path, rel, log)
     if existing is None:
         return
@@ -417,6 +424,7 @@ def _update_zcode_json_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Merge mcp_entries into .zcode/config.json under the NESTED mcp.servers key.
 
@@ -424,7 +432,7 @@ def _update_zcode_json_config(
     not from a top-level key. All other keys in the file (user model config
     etc.) are preserved; only `mcp.servers` is replaced wholesale.
     """
-    rel = _config_rel_label(path)
+    rel = _config_rel_label(path, project_root)
     existing = _read_existing_json_dict(path, rel, log)
     if existing is None:
         return
@@ -441,6 +449,7 @@ def _update_opencode_v2_json_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Merge mcp_entries into an opencode.json under the NESTED mcp.servers key.
 
@@ -450,7 +459,7 @@ def _update_opencode_v2_json_config(
     (`artifact_validate._validate_opencode_v2`), so a flat v1 server map must
     not survive the v1→v2 switch. Every other top-level key is preserved.
     """
-    rel = _config_rel_label(path)
+    rel = _config_rel_label(path, project_root)
     existing = _read_existing_json_dict(path, rel, log)
     if existing is None:
         return
@@ -467,6 +476,7 @@ def _update_continue_yaml_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Merge mcpServers into a Continue config.yaml file.
 
@@ -608,6 +618,7 @@ def _update_codex_toml_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Inject a managed [mcp_servers.*] block into a Codex config.toml file.
 
@@ -618,7 +629,7 @@ def _update_codex_toml_config(
     include/import mechanism for a second TOML file (V8), so this committed
     block is the only MCP surface and carries ${VAR} env references directly.
     """
-    rel = _config_rel_label(path)
+    rel = _config_rel_label(path, project_root)
 
     block_content = (
         f"{CODEX_TOML_BLOCK_BEGIN}\n"
@@ -863,6 +874,7 @@ def generate_provider_configs(
                 dry_run=dry_run,
                 allow_secrets=allow_committed_secrets,
                 config=config,
+                project_root=project_root,
             )
 
     # --- Local/secrets provider config (only when secrets.local.yaml exists) ---
@@ -876,6 +888,7 @@ def generate_provider_configs(
             allow_secrets=True,  # local files are always meant to be gitignored
             config=config,
             verify_gitignored=True,  # verify that assumption instead of trusting it (#586)
+            project_root=project_root,
         )
 
 
@@ -887,6 +900,7 @@ def _warn_kimi_unresolved_env_refs(
     mcp_entries: dict,
     fmt: str,
     log: SyncLog,
+    project_root: Path | None = None,
 ) -> None:
     """AC-8 / issue #843 F7: flag inline ``${VAR}`` env references for KimiCode.
 
@@ -908,7 +922,7 @@ def _warn_kimi_unresolved_env_refs(
     """
     if fmt != "kimi-json":
         return
-    rel = _config_rel_label(path)
+    rel = _config_rel_label(path, project_root)
     for server_name, entry in mcp_entries.items():
         if not _ENV_VAR_REF_RE.search(
             json.dumps(entry, ensure_ascii=False, default=str)
@@ -932,6 +946,7 @@ def _write_provider_config(
     allow_secrets: bool,
     config: dict | None = None,
     verify_gitignored: bool = False,
+    project_root: Path | None = None,
 ) -> None:
     """Dispatch to format-specific writer.
 
@@ -941,34 +956,34 @@ def _write_provider_config(
     ``mcp`` key. The v2 split lives in the ``opencode-json-v2`` value, which
     writes the nested ``mcp.servers`` shape.
     """
-    _warn_kimi_unresolved_env_refs(path, mcp_entries, fmt, log)
+    _warn_kimi_unresolved_env_refs(path, mcp_entries, fmt, log, project_root)
     if fmt in ("claude-settings", "gemini-settings", "antigravity-mcp-json", "kimi-json"):
         _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored)
+                             verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "opencode-json":
         _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored)
+                             verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "opencode-json-v2":
         # v2 writes the nested `mcp.servers` key and replaces any flat v1
         # server map left under `mcp` (the v2 contract allows no flat keys
         # next to `servers`).
         _update_opencode_v2_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                        verify_gitignored=verify_gitignored)
+                                        verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "vscode-settings":
         # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...}
         # settings shape — NOT the Claude {"mcpServers": ...} key
         # (issue #674 Phase 3.3).
         _update_json_config(path, "servers", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored)
+                             verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                      verify_gitignored=verify_gitignored)
+                                      verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "codex-toml-mcp":
         _update_codex_toml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                  verify_gitignored=verify_gitignored)
+                                  verify_gitignored=verify_gitignored, project_root=project_root)
     elif fmt == "zcode-json":
         _update_zcode_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                  verify_gitignored=verify_gitignored)
+                                  verify_gitignored=verify_gitignored, project_root=project_root)
     else:
         log.warning(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
 

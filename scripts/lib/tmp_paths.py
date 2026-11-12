@@ -25,7 +25,6 @@ from __future__ import annotations
 import getpass
 import os
 import shlex
-import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
@@ -217,11 +216,9 @@ def _current_user() -> str:
         return "user"
 
 
-def _system_temp_basetemp() -> str:
-    """``<tempfile.gettempdir()>/<user>/pytest-agent-meta`` — no literal."""
-    return os.path.join(
-        tempfile.gettempdir(), _current_user(), _PYTEST_BASETEMP_DIRNAME
-    )
+def _system_temp_basetemp(temp_root: str) -> str:
+    """``<temp_root>/<user>/pytest-agent-meta`` — no literal."""
+    return os.path.join(temp_root, _current_user(), _PYTEST_BASETEMP_DIRNAME)
 
 
 def _is_inside(base: str, candidate: str) -> bool:
@@ -248,15 +245,17 @@ def resolve_pytest_basetemp(project_root: Path, paths: TmpPaths) -> str:
     AC-34).
     """
     exception = paths.system_temp_exception
-    uses_system_temp = False
+    temp_root: Optional[str] = None
+    # The framework pin (TMPDIR=<sink>) is not the system temp root (#1189).
+    sink = paths.absolute if paths.enabled else None
     if exception.enabled and exception.pytest_basetemp:
-        value = _system_temp_basetemp()
-        uses_system_temp = True
+        temp_root = rc.system_temp_root(project_root, sink)
+        value = _system_temp_basetemp(temp_root)
     elif paths.enabled and paths.absolute is not None:
         value = os.path.join(str(paths.absolute), _PYTEST_SINK_SUBDIR)
     elif exception.pytest_basetemp:
-        value = _system_temp_basetemp()
-        uses_system_temp = True
+        temp_root = rc.system_temp_root(project_root, sink)
+        value = _system_temp_basetemp(temp_root)
     else:
         raise rc.TmpSinkError(
             "tmp-sink.system-temp-exception",
@@ -271,13 +270,13 @@ def resolve_pytest_basetemp(project_root: Path, paths: TmpPaths) -> str:
             "line break (it is embedded as --basetemp=\"<path>\").",
         )
 
-    if uses_system_temp:
+    if temp_root is not None:
         project_real = os.path.realpath(os.fspath(project_root))
-        temp_real = os.path.realpath(tempfile.gettempdir())
+        temp_real = os.path.realpath(temp_root)
         if _is_inside(project_real, temp_real):
             raise rc.TmpSinkError(
                 "tmp-sink.system-temp-exception",
-                f"platform temp root {tempfile.gettempdir()!r} is inside the "
+                f"platform temp root {temp_root!r} is inside the "
                 "project root — the exception cannot take effect.",
             )
 

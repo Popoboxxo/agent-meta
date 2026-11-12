@@ -191,23 +191,47 @@ def _admin_tmp_env(root: Path) -> dict | None:
 
     The pin comes from :func:`lib.tmp_paths.tmp_env` (IC-18/ADR-12): TMPDIR,
     TEMP and TMP point at the absolute sink while PATH/HOME are inherited.
-    ``None`` means "inherit the parent environment" and is returned for a
-    disabled sink (a supported state, ``tmp-sink.disabled`` must not block the
-    admin lifecycle) or an unresolvable configuration — those are reported by
-    ``sync.py --validate`` already, so a CLI start never fails because of it.
+    ``None`` means "inherit the parent environment" and is returned **only**
+    for the three defined states: no project config, a *disabled* sink, or the
+    framework ``lib`` not being importable (one warning on stderr). Any other
+    failure raises ``TmpSinkError("tmp-sink.pin-unavailable", ...)``; callers
+    use :func:`_admin_tmp_env_or_exit` (Exit 2) instead of spawning an
+    unpinned child (#1189, IC-5a/IC-5b).
     """
     config_path = Path(root) / ".meta-config" / "project.yaml"
     if not config_path.exists():
         return None
     try:
+        from lib.repo_containment import TmpSinkError
         from lib.tmp_paths import resolve_tmp_paths, tmp_env
-
+    except ImportError:
+        print(
+            "  !  tmp-sink pin unavailable: framework lib not importable; "
+            "inheriting environment",
+            file=sys.stderr,
+        )
+        return None
+    try:
         paths = resolve_tmp_paths(Path(root), load_config(config_path))
         if not paths.enabled:
             return None
         return tmp_env(paths)
-    except Exception:  # noqa: BLE001 - admin lifecycle must not depend on the sink
-        return None
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 - load_config may exit
+        raise TmpSinkError(
+            "tmp-sink.pin-unavailable",
+            f"{exc}; repair: python scripts/sync.py --validate",
+        ) from exc
+
+
+def _admin_tmp_env_or_exit(root: Path) -> dict | None:
+    """Like :func:`_admin_tmp_env`, but map ``TmpSinkError`` to Exit 2."""
+    from lib.repo_containment import TmpSinkError
+
+    try:
+        return _admin_tmp_env(root)
+    except TmpSinkError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict,
@@ -600,7 +624,7 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
              "--port", str(args.admin_port),
              "--root", str(agent_meta_root)],
             check=False,
-            env=_admin_tmp_env(agent_meta_root),
+            env=_admin_tmp_env_or_exit(agent_meta_root),
         )
         return None
 
@@ -1506,6 +1530,9 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # `_run_consistency_checks` -- so --validate prints the family exactly once.
     from lib.consistency.temp_literals import check_temp_literals
     _strict_findings += check_temp_literals(agent_meta_root, project_root, config)
+    # Gitignored checkpoint/progress dirs (#1000): WARNING only, exit code unchanged.
+    from lib.consistency.checkpoint_tracking import check_checkpoint_dir_ignored
+    _strict_findings += check_checkpoint_dir_ignored(project_root, config)
     _strict_exit_code = 0
     if _strict_findings:
         _strict_exit_code = print_report(_strict_findings, project_root, changed_only=False)
@@ -1747,6 +1774,11 @@ def _run_common_tail(ctx: _SyncContext) -> None:
         print("  i  Provider context files are up to date.")
         sys.exit(0)
 
+    if getattr(args, "fail_on_p0", False) and (log.p0 or log.errors):
+        print(f"  X  {len(log.p0)} P0 finding(s), {len(log.errors)} error(s) "
+              f"- failing (--fail-on-p0).", file=sys.stderr)
+        sys.exit(1)
+
     if getattr(args, "admin", False):
         admin_script = agent_meta_root / "scripts" / "admin-server.py"
         if not admin_script.exists():
@@ -1758,7 +1790,7 @@ def _run_common_tail(ctx: _SyncContext) -> None:
                  "--port", str(args.admin_port),
                  "--root", str(agent_meta_root)],
                 check=False,
-                env=_admin_tmp_env(agent_meta_root),
+                env=_admin_tmp_env_or_exit(agent_meta_root),
             )
 
     if not getattr(args, "check", False) and not getattr(args, "admin", False) and not args.dry_run:

@@ -96,6 +96,8 @@ from lib.log import SyncLog
 from lib.sync_pipeline import (
     SYNC_BACKUP_MAX_AGE_DAYS as _PREVIEW_PRUNE_MAX_AGE_DAYS,
     SYNC_BACKUP_MAX_PER_SOURCE as _PREVIEW_PRUNE_MAX_PER_SOURCE,
+    SYNC_BACKUP_MAX_TOTAL_PER_DIR as _PREVIEW_PRUNE_MAX_TOTAL,
+    _managed_dirs_for_prune,
 )
 from lib.se_validate import _handle_validate_se
 from lib.spec_plan_validate import _handle_validate_spec_plan
@@ -336,6 +338,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "written/changed or an [ERROR] was recorded, exit 0 "
                              "if everything is up to date. "
                              "Use to fail CI when provider context files are out of sync.")
+    parser.add_argument("--fail-on-p0", action="store_true",
+                        help="Opt-in: exit 1 after a plain sync if any [P0] finding or "
+                             "[ERROR] was recorded (default: exit 0). CI sets this itself.")
     parser.add_argument("--validate", action="store_true",
                         help="Validate sync output against the configured test repository. "
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
@@ -471,6 +476,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="Delete a specific backup archive")
     parser.add_argument("--prune-backups", action="store_true",
                         help="Delete old backups according to retention policy")
+    parser.add_argument("--prune-sync-backups", action="store_true",
+                        help="Prune *.sync-backup-* files in managed dirs (per-source + "
+                             "per-dir cap, gitignored only); with --dry-run only list them")
 
     # Config audit
     parser.add_argument("--audit-config", action="store_true",
@@ -639,8 +647,34 @@ def _preview_backups_to_prune(
         return []
     return sorted(
         _relative_posix(path, project_root)
-        for path in select_prunable_sync_backups(target_dir, max_per_source)
+        for path in select_prunable_sync_backups(
+            target_dir, max_per_source,
+            max_total=_PREVIEW_PRUNE_MAX_TOTAL, project_root=project_root)
     )
+
+
+def _handle_prune_sync_backups(ctx: _SyncContext) -> None:
+    """Handle ``--prune-sync-backups`` (#1195): prune or (--dry-run) list candidates."""
+    import json
+
+    from lib.generated_file_drift import prune_sync_backups
+    from lib.providers import load_providers_config
+
+    provider_config = load_providers_config(ctx.agent_meta_root, ctx.config)
+    candidates: list = []
+    for managed_dir in _managed_dirs_for_prune(ctx.project_root, ctx.config, provider_config):
+        if ctx.args.dry_run:
+            candidates += _preview_backups_to_prune(managed_dir, ctx.project_root)
+        else:
+            candidates += prune_sync_backups(
+                managed_dir, ctx.project_root, ctx.log, False,
+                max_age_days=_PREVIEW_PRUNE_MAX_AGE_DAYS,
+                max_per_source=_PREVIEW_PRUNE_MAX_PER_SOURCE,
+                max_total=_PREVIEW_PRUNE_MAX_TOTAL)
+    print(json.dumps({"dry_run": bool(ctx.args.dry_run), "candidates": sorted(candidates)},
+                     indent=2, ensure_ascii=False))
+    ctx.read_only = True  # skip the common tail (summary/index writes)
+    ctx.mode = "prune-sync-backups"
 
 
 def _cleanup_fingerprint(stale_entries: list) -> str:
@@ -778,6 +812,7 @@ _MODE_HANDLERS = [
     (lambda a: a.list_backups, _handle_list_backups),
     (lambda a: a.delete_backup, _handle_delete_backup),
     (lambda a: a.prune_backups, _handle_prune_backups),
+    (lambda a: a.prune_sync_backups, _handle_prune_sync_backups),
     (lambda a: a.validate, _handle_validate),
     (lambda a: a.validate_se, _handle_validate_se),
     (lambda a: a.validate_spec_plan, _handle_validate_spec_plan),
@@ -788,7 +823,7 @@ _MODE_HANDLERS = [
 
 
 # Modes that run _build_context with dry_run forced on and stdout on stderr.
-_STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "deactivation_status",
+_STDOUT_CLEAN_MODES = ("cleanup_preview", "prune_sync_backups", "context_report", "deactivation_status",
                        "doctor", "optimize_config", "apply_config_patch")
 
 

@@ -59,6 +59,7 @@ from scripts.lib.providers import (
     load_providers_config,
     resolve_providers,
 )
+from scripts.lib.repo_containment import TmpSinkError
 from scripts.lib.tmp_paths import resolve_tmp_paths, tmp_env
 
 EVAL_DIR = _REPO_ROOT / "tests" / "routing-llm-eval"
@@ -698,19 +699,26 @@ def _tmp_sink_env(base: dict | None = None) -> dict:
     """Merge the tmp-sink pin into a child-process environment (IC-18/ADR-12).
 
     The provider wrappers are shell scripts that may create temp files, so
-    ``TMPDIR``/``TEMP``/``TMP`` must point at the absolute sink. A disabled
-    sink (or an unreadable config) keeps the inherited environment: this is a
-    paid, user-gated eval and must not fail merely because the sink is off.
+    ``TMPDIR``/``TEMP``/``TMP`` must point at the absolute sink. Always
+    returns a ``dict``. A missing config or a *disabled* sink keeps the
+    inherited environment (content-equal copy of ``base``); an unreadable or
+    broken config raises ``TmpSinkError("tmp-sink.pin-unavailable", ...)`` so
+    the paid eval aborts before any spend instead of running unpinned (#1189).
     """
     env = dict(os.environ if base is None else base)
     config_path = _REPO_ROOT / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return env
     try:
         paths = resolve_tmp_paths(_REPO_ROOT, load_config(config_path))
         if not paths.enabled:
             return env
         return tmp_env(paths, env)
-    except Exception:  # noqa: BLE001 - eval must not fail on sink resolution
-        return env
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 - load_config may exit
+        raise TmpSinkError(
+            "tmp-sink.pin-unavailable",
+            f"{exc}; repair: python scripts/sync.py --validate",
+        ) from exc
 
 
 def call_provider(
@@ -720,24 +728,29 @@ def call_provider(
     contract: Path,
     timeout: float,
     eval_dir: Path = EVAL_DIR,
+    env: dict | None = None,
 ) -> str:
-    """Invoke one provider wrapper and return its stdout."""
+    """Invoke one provider wrapper and return its stdout.
+
+    ``env`` is an already pinned child environment (``run_class`` resolves it
+    once per class); without it the pin is resolved here.
+    """
     script = Path(eval_dir) / "provider-{}.sh".format(provider)
     if not script.is_file():
         raise ProviderError("provider wrapper not found: {}".format(script))
     shell = _shell()
-    env = _tmp_sink_env(os.environ.copy())
+    child_env = dict(_tmp_sink_env(os.environ.copy()) if env is None else env)
     prefix = re.sub(r"[^A-Za-z0-9]+", "_", provider).upper()
     model_var = "{}_ROUTING_EVAL_MODEL".format(prefix)
-    env[model_var] = model_id
+    child_env[model_var] = model_id
     # Provider wrapper input is env-only. On Windows `bash` may be WSL bash,
     # which forwards only WSLENV-listed variables; list both and flag the
     # contract as a path so WSL translates `C:/...` to `/mnt/...`. Git Bash and
     # Linux ignore WSLENV and use the plain inherited values.
-    env["EVAL_OUTPUT_CONTRACT"] = contract.as_posix()
-    env["WSLENV"] = ":".join(
+    child_env["EVAL_OUTPUT_CONTRACT"] = contract.as_posix()
+    child_env["WSLENV"] = ":".join(
         entry
-        for entry in (env.get("WSLENV", ""), "EVAL_OUTPUT_CONTRACT/p", model_var)
+        for entry in (child_env.get("WSLENV", ""), "EVAL_OUTPUT_CONTRACT/p", model_var)
         if entry
     )
     # cwd is the eval dir, so the relative script name avoids drive-letter
@@ -747,7 +760,7 @@ def call_provider(
         proc = subprocess.run(
             argv,
             cwd=str(eval_dir),
-            env=env,
+            env=child_env,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -776,6 +789,8 @@ def run_class(
     eval_dir: Path = EVAL_DIR,
 ) -> dict:
     runs: List[dict] = []
+    # Resolve the pin once, before any paid call (#1189): a broken pin aborts.
+    pinned_env = _tmp_sink_env(os.environ.copy())
     for index in range(1, repeat + 1):
         predictions: Dict[str, Optional[dict]] = {}
         errors: List[dict] = []
@@ -788,9 +803,12 @@ def run_class(
                     contract,
                     timeout,
                     eval_dir,
+                    env=pinned_env,
                 )
                 predictions[str(case["id"])] = parse_prediction(text)
             except ProviderError:
+                raise
+            except TmpSinkError:
                 raise
             except Exception as exc:  # timeout, parse error: count as a miss
                 predictions[str(case["id"])] = None
@@ -1018,15 +1036,19 @@ def main(
 
         return _runner
 
-    result = eval_gate.run_with_approval(
-        estimate,
-        approval_input,
-        [make_runner(item) for item in model_classes],
-        skip_path,
-        emit=lambda text: None,
-        reason="declined by user (role-routing eval)",
-        today=run_date.isoformat(),
-    )
+    try:
+        result = eval_gate.run_with_approval(
+            estimate,
+            approval_input,
+            [make_runner(item) for item in model_classes],
+            skip_path,
+            emit=lambda text: None,
+            reason="declined by user (role-routing eval)",
+            today=run_date.isoformat(),
+        )
+    except TmpSinkError as exc:
+        print("error: {}".format(exc), file=sys.stderr)
+        return 2
     if result["status"] == eval_gate.AWAITING_APPROVAL:
         print(
             "status: awaiting-approval -- no provider was called. Re-run with "

@@ -644,6 +644,10 @@ repo_containment:
       toolchain-caches: false       # Opt-in (Q3): true => pip/npm-Cache in den Env-Pin-Block
 ```
 
+> **Nachtrag (#1189, `SPEC-1189-tmp-sink-pin-vs-system-temp`):** Die Definition „System-Temp =
+> `tempfile.gettempdir()`" gilt **abzüglich des framework-eigenen Pins**: geprüft wird der
+> ungepinnte Root (ohne `TMPDIR`/`TEMP`/`TMP`). Die Vorgänger-ACs bleiben inhaltlich unverändert.
+
 **Begründung der Empfehlung:**
 
 1. **13-Fehlschläge-Mechanik:** Option A kann sie nicht heilen (J, Absatz 2); nur ein Basetemp außerhalb

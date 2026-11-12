@@ -202,6 +202,32 @@ def context_profile_log_lines(config: dict, providers: Iterable[str]) -> List[st
     return lines
 
 
+def context_profile_override_warnings(
+    config: dict,
+    providers: Iterable[str],
+    context_files: Mapping[str, str] | None = None,
+) -> List[str]:
+    """One warning per provider whose explicit ``context_file.mode: full``
+    overrides an active ``compact`` profile (#1182).
+
+    ``context_files`` maps provider -> entry-file name (falls back to the
+    provider name when unknown).
+    """
+    lines: List[str] = []
+    for provider in providers:
+        resolved = resolve_context_profile(config, provider)
+        if resolved.profile == "compact" and resolved.sources[
+            "context_file_mode"
+        ] == "explicit" and resolved.context_file_mode == "full":
+            name = (context_files or {}).get(provider, provider)
+            lines.append(
+                f"context-profile.mode-override: '{name}' renders "
+                "context_file.mode=full while context-profile=compact is active; "
+                "the compact render (gate card, roster, reference skills) still applies"
+            )
+    return lines
+
+
 def context_profile_variables(
     config: dict,
     provider: str,

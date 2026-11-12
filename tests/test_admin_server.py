@@ -2926,3 +2926,667 @@ def test_dotdot_traversal_still_blocked(tmp_path):
     mgr = admin_server.ConfigManager(_symlinked_root(tmp_path), mode="project_admin")
     with pytest.raises(admin_server.SecurityError):
         mgr.resolve_path("../etc")
+
+
+class TestTmpSinkEnvPolicy:
+    """#1189 IC-5a/IC-5b: the pin helper fails loud, it never silently unpins."""
+
+    @staticmethod
+    def _project(tmp_path: Path, body: str) -> Path:
+        root = tmp_path / "proj"
+        (root / ".meta-config").mkdir(parents=True)
+        (root / ".meta-config" / "project.yaml").write_text(
+            "project: {name: t, prefix: t, short: t}\n" + body, encoding="utf-8"
+        )
+        return root
+
+    def test_pin_returns_sink_env_when_config_valid(self, tmp_path, monkeypatch):
+        root = self._project(tmp_path, "repo_containment:\n  tmp-sink:\n    path: .tmp\n")
+        monkeypatch.setenv("TMPDIR", str(tmp_path))  # outer env is irrelevant
+        env = admin_server._tmp_sink_env(root)
+        sink = str(Path(os.path.realpath(root / ".tmp")))
+        assert env["TMPDIR"] == env["TEMP"] == env["TMP"] == sink
+
+    def test_broken_config_raises_pin_unavailable(self, tmp_path):
+        from lib.repo_containment import TmpSinkError
+
+        root = self._project(tmp_path, 'repo_containment: "x"\n')
+        with pytest.raises(TmpSinkError) as exc:
+            admin_server._tmp_sink_env(root)
+        assert exc.value.code == "tmp-sink.pin-unavailable"
+        assert "python scripts/sync.py --validate" in exc.value.message
+
+    def test_missing_config_returns_none(self, tmp_path):
+        assert admin_server._tmp_sink_env(tmp_path) is None
+
+    def test_disabled_sink_returns_none(self, tmp_path):
+        root = self._project(
+            tmp_path, "repo_containment:\n  tmp-sink:\n    enabled: false\n"
+        )
+        assert admin_server._tmp_sink_env(root) is None
+
+    def test_docstring_drops_inherited_env_promise(self):
+        doc = admin_server._tmp_sink_env.__doc__
+        assert "keeps operating with the inherited env" not in doc
+        assert "tmp-sink.pin-unavailable" in doc
+
+
+class TestPinErrorInApiCallers:
+    """#1189 IC-5b: API callers turn ``TmpSinkError`` into a result, not a crash."""
+
+    @staticmethod
+    def _boom(*_a, **_k):
+        from lib.repo_containment import TmpSinkError
+
+        raise TmpSinkError("tmp-sink.pin-unavailable", "broken; repair: python scripts/sync.py --validate")
+
+    def test_sync_executor_pin_error_returns_success_false(self, tmp_path, monkeypatch):
+        (tmp_path / "scripts").mkdir()
+        (tmp_path / "scripts" / "sync.py").write_text("# stub", encoding="utf-8")
+        monkeypatch.setattr(admin_server, "_tmp_sink_env", self._boom)
+        run = mock.Mock()
+        monkeypatch.setattr(admin_server.subprocess, "run", run)
+        executor = admin_server.SyncExecutor(tmp_path)
+        result = executor._run(["--validate"])
+        assert result["success"] is False
+        assert result["returncode"] == -1
+        assert "tmp-sink pin unavailable:" in result["output"]
+        run.assert_not_called()
+        status = tmp_path / admin_server.SyncExecutor.STATUS_FILE
+        assert json.loads(status.read_text(encoding="utf-8"))["last_run_exit_code"] == -1
+
+    def test_consistency_service_pin_error_returns_error_field(self, tmp_path, monkeypatch):
+        (tmp_path / "scripts").mkdir()
+        (tmp_path / "scripts" / "consistency-check.py").write_text("# stub", encoding="utf-8")
+
+        class _Handler:
+            root = tmp_path
+
+        monkeypatch.setattr(admin_server, "_tmp_sink_env", self._boom)
+        run = mock.Mock()
+        monkeypatch.setattr(subprocess, "run", run)
+        service = admin_server.AuditService(admin_server.ServiceContext(_Handler))
+        result = service.run_consistency_check()
+        assert "tmp-sink pin unavailable:" in result["error"]
+        assert result["findings"] == []
+        assert result["summary"] == {"total": 0, "errors": 0, "warnings": 0}
+        run.assert_not_called()
+
+
+# --------------------------------------------------------------------------- #
+# Start robustness (#1189 Unit 2): zombie guard + health pid                  #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or not os.path.exists("/proc/self/stat"),
+    reason="needs POSIX fork and /proc",
+)
+def test_is_pid_running_false_for_zombie():
+    pid = os.fork()
+    if pid == 0:
+        os._exit(0)
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+            if stat.rsplit(")", 1)[1].split()[0] == "Z":
+                break
+            time.sleep(0.01)
+        assert admin_server._is_pid_running(pid) is False
+    finally:
+        os.waitpid(pid, 0)
+
+
+def test_is_pid_running_keeps_true_for_live_pid():
+    assert admin_server._is_pid_running(os.getpid()) is True
+
+
+def test_health_payload_contains_pid_and_no_root(monkeypatch):
+    handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+    handler._send_json = mock.Mock()
+    monkeypatch.setattr(admin_server.AdminRequestHandler, "version", "9.9.9", raising=False)
+    monkeypatch.setattr(admin_server.AdminRequestHandler, "mode", "super_admin", raising=False)
+    handler._route_get_health()
+    payload = handler._send_json.call_args[0][0]
+    assert payload == {
+        "status": "ok", "version": "9.9.9", "mode": "super_admin", "pid": os.getpid(),
+    }
+    assert "root" not in payload
+
+
+# --------------------------------------------------------------------------- #
+# Start robustness (#1189 Unit 2): pre-flight bind probe                      #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def sockets_ok(request):
+    # socket_enabled only exists with pytest-socket (not installed in CI)
+    try:
+        request.getfixturevalue("socket_enabled")
+    except pytest.FixtureLookupError:
+        pass
+
+
+def _listener(host="127.0.0.1"):
+    import socket
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.bind((host, 0))
+    srv.listen(1)
+    return srv, srv.getsockname()[1]
+
+
+def _free_port():
+    srv, port = _listener()
+    srv.close()
+    return port
+
+
+def test_probe_port_bindable_false_while_listener_holds_port(sockets_ok):
+    srv, port = _listener()
+    try:
+        ok, reason = admin_server._probe_port_bindable("127.0.0.1", port)
+    finally:
+        srv.close()
+    assert ok is False
+    assert "EADDRINUSE" in reason
+
+
+def test_probe_port_bindable_releases_port_immediately(sockets_ok):
+    import socket
+    port = _free_port()
+    assert admin_server._probe_port_bindable("127.0.0.1", port) == (True, "")
+    assert admin_server._probe_port_bindable("127.0.0.1", port) == (True, "")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", port))
+
+
+def test_probe_port_bindable_skips_port_zero():
+    with mock.patch("socket.getaddrinfo") as gai, mock.patch("socket.socket") as sock:
+        assert admin_server._probe_port_bindable("127.0.0.1", 0) == (True, "skipped:port-0")
+    gai.assert_not_called()
+    sock.assert_not_called()
+
+
+def test_probe_port_bindable_never_raises():
+    import errno
+    import socket
+    with mock.patch("socket.getaddrinfo", side_effect=socket.gaierror(-2, "Name or service not known")):
+        ok, reason = admin_server._probe_port_bindable("nope.invalid", 8000)
+    assert ok is False and "Name or service not known" in reason
+    fake = mock.MagicMock()
+    fake.bind.side_effect = PermissionError(errno.EACCES, "Permission denied")
+    with mock.patch("socket.socket", return_value=fake):
+        ok, reason = admin_server._probe_port_bindable("127.0.0.1", 80)
+    assert (ok, reason) == (False, "EACCES: Permission denied")
+    fake.close.assert_called_once()
+
+
+def test_probe_port_bindable_uses_ipv4_for_localhost(sockets_ok):
+    import socket
+    # IPv6 entry listed first: the probe must still follow the child's AF_INET.
+    infos = [
+        (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::1", 0, 0, 0)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0)),
+    ]
+
+    def fake_gai(host, port, *a, **kw):
+        return [(f, t, p, c, (sa[0], port) + sa[2:]) for f, t, p, c, sa in infos]
+
+    srv, port = _listener()
+    try:
+        with mock.patch("socket.getaddrinfo", side_effect=fake_gai):
+            busy = admin_server._probe_port_bindable("localhost", port)
+    finally:
+        srv.close()
+    assert busy[0] is False and "EADDRINUSE" in busy[1]
+    with mock.patch("socket.getaddrinfo", side_effect=fake_gai):
+        assert admin_server._probe_port_bindable("localhost", port) == (True, "")
+
+
+def test_probe_port_bindable_uses_ipv6_for_ipv6_literal(sockets_ok):
+    import socket
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+            s.bind(("::1", 0))
+            port = s.getsockname()[1]
+    except OSError:
+        pytest.skip("no IPv6 loopback")
+    assert admin_server._probe_port_bindable("::1", port) == (True, "")
+
+
+# --------------------------------------------------------------------------- #
+# Start robustness (#1189 Unit 2): _wait_for_admin confirm window             #
+# --------------------------------------------------------------------------- #
+
+
+class _FakeProc:
+    def __init__(self, pid=4242, exit_after_polls=None, code=0):
+        self.pid = pid
+        self._polls = 0
+        self._exit_after = exit_after_polls
+        self._code = code
+
+    def poll(self):
+        self._polls += 1
+        if self._exit_after is not None and self._polls > self._exit_after:
+            return self._code
+        return None
+
+
+class _FakeResponse:
+    def __init__(self, status, payload):
+        self.status = status
+        self._body = json.dumps(payload).encode("utf-8")
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _FakeOpener:
+    """``script(call_index) -> (status, payload)``; status ``None`` = refused."""
+
+    def __init__(self, script):
+        self.script = script
+        self.calls = []
+
+    def open(self, req, timeout=None):
+        import urllib.error
+        idx = len(self.calls)
+        self.calls.append(req)
+        status, payload = self.script(idx)
+        if status is None:
+            raise urllib.error.URLError("refused")
+        if status == 200:
+            return _FakeResponse(200, payload)
+        raise urllib.error.HTTPError(req.full_url, status, "x", {}, io.BytesIO(b"{}"))
+
+
+_OK = {"status": "ok", "version": "1", "mode": "super_admin", "pid": 4242}
+_FAST = dict(timeout=0.3, interval=0.01, confirm_grace=0.05)
+
+
+def _wait(monkeypatch, script, proc=None, **kw):
+    opener = _FakeOpener(script)
+    monkeypatch.setattr(admin_server, "_health_opener", lambda: opener)
+    params = dict(expected_mode="super_admin", token_configured=False, **_FAST)
+    params.update(kw)
+    result = admin_server._wait_for_admin(
+        proc or _FakeProc(), "127.0.0.1", 7421, **params)
+    return result, opener
+
+
+def test_wait_for_admin_success_with_pid(monkeypatch):
+    result, _ = _wait(monkeypatch, lambda i: (200, _OK))
+    assert result == (True, "")
+
+
+def test_wait_for_admin_timeout(monkeypatch):
+    result, _ = _wait(monkeypatch, lambda i: (None, None))
+    assert result == (False, "timeout")
+
+
+def test_wait_for_admin_wrong_pid(monkeypatch):
+    result, _ = _wait(monkeypatch, lambda i: (200, dict(_OK, pid=1)))
+    assert result == (False, "identity:pid")
+
+
+def test_wait_for_admin_wrong_mode_without_pid(monkeypatch):
+    payload = {"status": "ok", "version": "1", "mode": "project_admin"}
+    result, _ = _wait(monkeypatch, lambda i: (200, payload))
+    assert result == (False, "identity:mode")
+
+
+def test_wait_for_admin_exited(monkeypatch):
+    result, _ = _wait(monkeypatch, lambda i: (None, None), proc=_FakeProc(exit_after_polls=0))
+    assert result == (False, "exited:0")
+
+
+def test_wait_for_admin_token_mode_accepts_stable_401(monkeypatch):
+    result, _ = _wait(monkeypatch, lambda i: (401, None), token_configured=True)
+    assert result == (True, "")
+
+
+def test_wait_for_admin_single_401_is_not_success(monkeypatch):
+    result, _ = _wait(
+        monkeypatch, lambda i: (401, None), proc=_FakeProc(exit_after_polls=3),
+        token_configured=True, timeout=1.0, confirm_grace=0.5)
+    assert result == (False, "exited:0")
+
+
+def test_wait_for_admin_window_resets_after_non_ok(monkeypatch):
+    times = {}
+
+    def script(i):
+        if i == 1:
+            times["bad"] = time.monotonic()
+            return 502, None
+        return 401, None
+
+    result, _ = _wait(monkeypatch, script, token_configured=True,
+                      timeout=0.5, interval=0.02, confirm_grace=0.1)
+    assert result == (True, "")
+    assert time.monotonic() - times["bad"] >= 0.1
+
+
+def test_start_confirm_grace_lt_verify_timeout():
+    assert admin_server.START_CONFIRM_GRACE < admin_server.START_VERIFY_TIMEOUT
+    assert (admin_server.START_VERIFY_TIMEOUT, admin_server.START_VERIFY_INTERVAL,
+            admin_server.START_CONFIRM_GRACE) == (5.0, 0.1, 1.0)
+
+
+def test_wait_for_admin_sends_no_authorization_header(monkeypatch):
+    monkeypatch.setenv("ADMIN_UI_TOKEN", "s3cret")
+    result, opener = _wait(monkeypatch, lambda i: (401, None), token_configured=True)
+    assert result == (True, "")
+    assert opener.calls
+    for req in opener.calls:
+        assert req.get_header("Authorization") is None
+        assert req.full_url == "http://127.0.0.1:7421/api/health"
+
+
+def test_wait_for_admin_maps_wildcard_host_to_loopback(monkeypatch):
+    opener = _FakeOpener(lambda i: (200, _OK))
+    monkeypatch.setattr(admin_server, "_health_opener", lambda: opener)
+    admin_server._wait_for_admin(_FakeProc(), "0.0.0.0", 7421, expected_mode="super_admin",
+                                 token_configured=False, **_FAST)
+    assert opener.calls[0].full_url == "http://127.0.0.1:7421/api/health"
+
+
+def test_wait_for_admin_ignores_proxy_and_follows_no_redirect(monkeypatch, sockets_ok):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _Redirect(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", "http://127.0.0.1:9/elsewhere")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), _Redirect)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("http_proxy", "http://127.0.0.1:9")
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
+    try:
+        result = admin_server._wait_for_admin(
+            _FakeProc(), "127.0.0.1", srv.server_address[1], expected_mode="super_admin",
+            token_configured=False, **_FAST)
+    finally:
+        srv.shutdown()
+        srv.server_close()
+    assert result == (False, "health:302")
+
+
+# --------------------------------------------------------------------------- #
+# Start robustness (#1189 Unit 2): _admin_start_detached flow                 #
+# --------------------------------------------------------------------------- #
+
+
+_REAL_WAIT = admin_server._wait_for_admin
+
+
+class _SpawnProc(_FakeProc):
+    def __init__(self, log_line="", **kw):
+        super().__init__(**kw)
+        self.log_line = log_line
+        self.terminated = False
+
+    def terminate(self):
+        self.terminated = True
+
+    kill = terminate
+
+
+def _start_args(root, port=7421, **kw):
+    import argparse
+    ns = dict(root=str(root), host="127.0.0.1", port=port, admin_token=None,
+              allowed_hosts=None, watch=False, no_viz=True)
+    ns.update(kw)
+    return argparse.Namespace(**ns)
+
+
+@pytest.fixture
+def start_env(monkeypatch, tmp_path):
+    """Spawn faked: Popen yields a ``_SpawnProc`` and never runs a child."""
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
+    monkeypatch.setattr(admin_server, "_probe_port_bindable", lambda h, p: (True, ""))
+    state = {"proc": _SpawnProc(pid=4242), "popen_calls": 0}
+
+    def fake_popen(cmd, **kw):
+        state["popen_calls"] += 1
+        proc = state["proc"]
+        if proc.log_line:
+            kw["stdout"].write(proc.log_line + "\n")
+            kw["stdout"].flush()
+        return proc
+
+    monkeypatch.setattr(admin_server.subprocess, "Popen", fake_popen)
+    state["pid_file"] = tmp_path / admin_server.ADMIN_PID_FILE
+    return state
+
+
+def test_admin_start_aborts_without_spawn_when_port_busy(
+        monkeypatch, tmp_path, capsys, sockets_ok):
+    popen = mock.Mock()
+    monkeypatch.setattr(admin_server.subprocess, "Popen", popen)
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
+    srv, port = _listener()
+    try:
+        with pytest.raises(SystemExit) as exc:
+            admin_server._admin_start_detached(_start_args(tmp_path, port=port))
+    finally:
+        srv.close()
+    assert exc.value.code == 1
+    popen.assert_not_called()
+    assert not (tmp_path / admin_server.ADMIN_PID_FILE).exists()
+    out = capsys.readouterr().out
+    assert "cannot bind" in out and f"127.0.0.1:{port}" in out
+
+
+def test_admin_start_dead_child_exits_1_with_log_tail(tmp_path, start_env, capsys):
+    start_env["proc"] = _SpawnProc(
+        log_line="tmp-sink.pin-unavailable: broken", exit_after_polls=0, code=1)
+    with pytest.raises(SystemExit) as exc:
+        admin_server._admin_start_detached(_start_args(tmp_path))
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "failed to start" in out and "tmp-sink.pin-unavailable: broken" in out
+    assert not start_env["pid_file"].exists()
+
+
+def test_admin_start_writes_pid_before_verification(monkeypatch, tmp_path, start_env):
+    seen = {}
+
+    def fake_wait(proc, host, port, **kw):
+        seen["pid"] = start_env["pid_file"].read_text(encoding="utf-8")
+        return True, ""
+
+    monkeypatch.setattr(admin_server, "_wait_for_admin", fake_wait)
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert seen["pid"] == "4242"
+    assert start_env["pid_file"].read_text(encoding="utf-8") == "4242"
+
+
+def test_admin_start_missing_health_exits_1_and_cleans_pid(
+        monkeypatch, tmp_path, start_env, capsys):
+    monkeypatch.setattr(admin_server, "_wait_for_admin", lambda *a, **k: (False, "timeout"))
+    with pytest.raises(SystemExit) as exc:
+        admin_server._admin_start_detached(_start_args(tmp_path))
+    assert exc.value.code == 1
+    assert start_env["proc"].terminated is True
+    assert not start_env["pid_file"].exists()
+    assert "failed to start" in capsys.readouterr().out
+
+
+def test_admin_start_pin_error_exits_1_without_spawn(monkeypatch, tmp_path, start_env, capsys):
+    from lib.repo_containment import TmpSinkError
+
+    def boom(root, base=None):
+        raise TmpSinkError("tmp-sink.pin-unavailable", "broken config")
+
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", boom)
+    with pytest.raises(SystemExit) as exc:
+        admin_server._admin_start_detached(_start_args(tmp_path))
+    assert exc.value.code == 1
+    assert start_env["popen_calls"] == 0
+    out = capsys.readouterr().out
+    assert "  !  tmp-sink pin unavailable:" in out and "  i  Reparatur:" in out
+
+
+def _capture_wait(monkeypatch):
+    got = {}
+
+    def fake_wait(proc, host, port, **kw):
+        got.update(kw)
+        return True, ""
+
+    monkeypatch.setattr(admin_server, "_wait_for_admin", fake_wait)
+    return got
+
+
+def test_admin_start_token_configured_from_admin_ui_token_env(
+        monkeypatch, tmp_path, start_env):
+    got = _capture_wait(monkeypatch)
+    monkeypatch.setenv("ADMIN_UI_TOKEN", "s3cret")
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert got["token_configured"] is True
+    # end to end: the verification itself never sends the token
+    opener = _FakeOpener(lambda i: (401, None))
+    monkeypatch.setattr(admin_server, "_health_opener", lambda: opener)
+    monkeypatch.setattr(admin_server, "_wait_for_admin", _REAL_WAIT)
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
+    monkeypatch.setattr(admin_server, "_probe_port_bindable", lambda h, p: (True, ""))
+    monkeypatch.setattr(admin_server.subprocess, "Popen", lambda *a, **k: _SpawnProc(pid=4242))
+    monkeypatch.setenv("ADMIN_UI_TOKEN", "s3cret")
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert opener.calls and all(r.get_header("Authorization") is None for r in opener.calls)
+
+
+def test_admin_start_token_configured_from_token_file(monkeypatch, tmp_path, start_env):
+    got = _capture_wait(monkeypatch)
+    monkeypatch.delenv("ADMIN_UI_TOKEN", raising=False)
+    token_file = tmp_path / "tok"
+    token_file.write_text("filetoken\n", encoding="utf-8")
+    monkeypatch.setattr(admin_server, "_load_admin_ui_config", lambda root: {
+        "token": None, "token_file": str(token_file)})
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert got["token_configured"] is True and got["expected_mode"] == "project_admin"
+    monkeypatch.setattr(admin_server, "_load_admin_ui_config", lambda root: {
+        "token": None, "token_file": None})
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert got["token_configured"] is False
+
+
+def test_restart_dead_child_exits_1(monkeypatch, tmp_path, start_env):
+    # alive pid (kill(pid, 0) succeeds) but poll() reports the exit
+    start_env["proc"] = _SpawnProc(pid=os.getpid(), exit_after_polls=0, code=3)
+    monkeypatch.setattr(admin_server.time, "sleep", lambda s: None)
+    monkeypatch.setattr(admin_server, "_admin_stop", lambda args: None)
+    monkeypatch.setattr(sys, "argv", ["admin-server.py", "restart", "--root", str(tmp_path),
+                                      "--port", "7421", "--no-viz"])
+    with pytest.raises(SystemExit) as exc:
+        admin_server.main()
+    assert exc.value.code == 1
+    assert not start_env["pid_file"].exists()
+
+
+# --------------------------------------------------------------------------- #
+# Start robustness (#1189 Unit 2): VizManager._start liveness                 #
+# --------------------------------------------------------------------------- #
+
+
+def _viz_start(tmp_path, monkeypatch, proc, spawn=True):
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
+    calls = []
+
+    def fake_popen(cmd, **kw):
+        calls.append(cmd)
+        if proc.log_line:
+            kw["stdout"].write(proc.log_line + "\n")
+            kw["stdout"].flush()
+        return proc
+
+    monkeypatch.setattr(admin_server.subprocess, "Popen", fake_popen)
+    pid_file = tmp_path / ".meta-viz" / "viz.pid"
+    ok = admin_server.VizManager(tmp_path)._start(
+        ["x"], pid_file, tmp_path / ".meta-viz" / "viz.log", "Viz")
+    return ok, pid_file, calls
+
+
+def test_viz_manager_start_dead_child_returns_false_and_cleans_pid(
+        tmp_path, monkeypatch, capsys):
+    proc = _SpawnProc(log_line="boom: port in use", pid=os.getpid(), exit_after_polls=0, code=1)
+    monkeypatch.setattr(admin_server.time, "sleep", lambda s: None)
+    ok, pid_file, _ = _viz_start(tmp_path, monkeypatch, proc)
+    assert ok is False
+    assert not pid_file.exists()
+    out = capsys.readouterr().out
+    assert "failed to start -- see" in out and "boom: port in use" in out
+
+
+def test_viz_manager_start_alive_child_returns_true(tmp_path, monkeypatch):
+    monkeypatch.setattr(admin_server, "VIZ_START_GRACE", 0.1)
+    ok, pid_file, _ = _viz_start(tmp_path, monkeypatch, _SpawnProc(pid=os.getpid()))
+    assert ok is True and pid_file.read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_viz_manager_start_pin_error_returns_false_without_spawn(
+        tmp_path, monkeypatch, capsys):
+    from lib.repo_containment import TmpSinkError
+
+    def boom(root, base=None):
+        raise TmpSinkError("tmp-sink.pin-unavailable", "broken config")
+
+    popen = mock.Mock()
+    monkeypatch.setattr(admin_server, "_tmp_sink_env", boom)
+    monkeypatch.setattr(admin_server.subprocess, "Popen", popen)
+    pid_file = tmp_path / ".meta-viz" / "viz.pid"
+    ok = admin_server.VizManager(tmp_path)._start(
+        ["x"], pid_file, tmp_path / ".meta-viz" / "viz.log", "Viz")
+    assert ok is False
+    popen.assert_not_called()
+    assert not pid_file.exists()
+    assert "Viz not started: tmp-sink pin unavailable:" in capsys.readouterr().out
+
+
+def test_viz_manager_uses_viz_start_grace_not_verify_timeout():
+    assert admin_server.VIZ_START_GRACE == 1.5
+    assert admin_server.VIZ_START_GRACE is not admin_server.START_VERIFY_TIMEOUT
+
+
+def test_admin_server_boot_under_pin_yields_version(tmp_path, monkeypatch):
+    root = tmp_path
+    (root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+    (root / "agents" / "1-generic").mkdir(parents=True)
+    (root / ".meta-config").mkdir()
+    (root / ".meta-config" / "project.yaml").write_text(
+        'agent-meta-version: "2.0.0-beta.1"\n'
+        "ai-providers: [Claude]\n"
+        "dod-preset: rapid-prototyping\n"
+        "variables:\n  PROJECT_NAME: pin\n  PROJECT_PREFIX: pn\n",
+        encoding="utf-8")
+    (root / "scripts").mkdir()
+    for name in ("viz-report.py", "viz-logger.py"):
+        (root / "scripts" / name).write_text("# stub", encoding="utf-8")
+    sink = root / ".tmp"
+    sink.mkdir()
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(key, str(sink))
+    monkeypatch.setattr(tempfile, "tempdir", None)
+    with mock.patch.object(admin_server, "_DaemonThreadingHTTPServer") as srv_cls:
+        srv_cls.return_value = mock.Mock()
+        server = admin_server.AdminServer(root, port=0, enable_viz=False)
+    assert server._read_version() == "2.0.0-beta.1"  # from project.yaml
+    with mock.patch.object(admin_server.VizManager, "_start", return_value=True) as start:
+        server.viz_manager.start_all()
+    assert start.called

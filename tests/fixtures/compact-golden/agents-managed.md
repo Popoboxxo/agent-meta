@@ -50,7 +50,7 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
       oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
-   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
+   degradiert laut auf `subagent`.
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 
 # MCP Hard Prohibitions
@@ -61,6 +61,8 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 - **honcho:** `delete_conclusion`, `set_config` — absolut verboten.
 - **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
 - **reqogniloom:** `workspace.close`, `workspace.reactivate`, `workspace.delete`, `permissions.set_rule`, `permissions.list`, `permissions.revoke`, `permissions.check`, `admin.backup_create`, `admin.backup_list`, `admin.restore`, `audit.query`, `audit.ai_review`, `events.dlq_list`, `events.dlq_replay`, `user.create`, `user.assign_role`, `user.list`, `user.deactivate` — absolut verboten.
+
+Weitere Regeln als Skills: a2a-delegation-gates, admin-ui, architecture, brainstorming-gate, branch-guard, conventions, issue-lifecycle, lifecycle-tasks, plan-ledger, provider-agnostic, se-cascade-adr-standard, se-cascade-artifact-taxonomy, se-cascade-review-lifecycle, security-paved-roads, session-conclusion, session-recovery, spec-plan-workflow, submodule-protection, sync-interface, threat-model-4-questions, writing-plans
 
 
 

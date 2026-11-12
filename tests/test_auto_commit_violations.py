@@ -160,14 +160,13 @@ def test_validate_rc1_on_custom_without_script(tmp_path):
     assert _sync(p, "--validate").returncode == 1
 
 
-def test_sync_rc0_but_allowlist_fail_safe(tmp_path):
+def test_sync_rc0_but_allowlist_not_rewritten(tmp_path):
+    # #1142: invalid block -> warning, no allowlist write (stale one stays).
     p = _project(tmp_path, "auto_commit:\n  mode: auto\n  triggers: [custom]\n")
     r = _sync(p)
     assert r.returncode == 0, r.stderr
-    data = json.loads(
-        (p / ".meta-config" / "auto-commit-allowlist.json").read_text(encoding="utf-8"))
-    assert data["mode"] == "off" and data["eligible_roles"] == []
-    assert "commit authority disabled" in r.stderr
+    assert not (p / ".meta-config" / "auto-commit-allowlist.json").exists()
+    assert "auto_commit is invalid" in r.stderr
 
 
 def test_validate_rc0_on_valid_config(tmp_path):

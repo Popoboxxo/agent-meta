@@ -15,7 +15,9 @@ class SyncLog:
         self.warnings: list[str] = []
         self.errors: list[str] = []
         self.skipped: list[str] = []
+        self.unchanged: list[str] = []
         self.infos: list[str] = []
+        self.p0: list[str] = []
         self.debugs: list[str] = []
         self._seen_warnings: set[str] = set()
         # Sync-run-scoped signatures of already-reported agent-override
@@ -36,7 +38,7 @@ class SyncLog:
         """
         self.actions.append(f"[{tag:<8}]  {target:<50}  ({source})")
 
-    def warn(self, message: str):
+    def warn(self, message: str, p0: bool = False):
         """Record a warning message, deduplicating repeated warnings.
 
         The same warning is emitted only once to keep the report readable.
@@ -50,11 +52,13 @@ class SyncLog:
             return
         self._seen_warnings.add(message)
         self.warnings.append(f"[WARN]   {message}")
+        if p0:  # consumed by --fail-on-p0
+            self.p0.append(message)
         print(f"  !  {message}", file=sys.stderr)
 
-    def warning(self, message: str):
+    def warning(self, message: str, p0: bool = False):
         """Alias for warn(). Record a warning message."""
-        self.warn(message)
+        self.warn(message, p0=p0)
 
     def error(self, target: str, message: str):
         """Record an error for a target with error message.
@@ -75,6 +79,10 @@ class SyncLog:
             reason: Reason for skipping.
         """
         self.skipped.append(f"[SKIP]   {target:<50}  ({reason})")
+
+    def note_unchanged(self, target: str):
+        """Record a target whose content was already up to date (not a skip)."""
+        self.unchanged.append(f"[SAME]   {target}")
 
     def note(self, target: str, reason: str):
         """Record an info-level note about a target.
@@ -156,14 +164,17 @@ class SyncLog:
             lines += ["", "ERRORS", "------"]
             lines += self.errors
 
+        warn_start = len(lines)
         if self.warnings:
             lines += ["", "WARNINGS", "--------"]
             lines += self.warnings
         else:
             lines += ["", "WARNINGS", "--------", "(none)"]
+        warn_end = len(lines)
 
         summary = (
-            f"{len(self.actions)} action(s)  |  {len(self.skipped)} skipped  |  "
+            f"{len(self.actions)} action(s)  |  {len(self.unchanged)} unchanged  |  "
+            f"{len(self.skipped)} skipped  |  "
             f"{len(self.warnings)} warning(s)"
         )
         if self.errors:
@@ -179,5 +190,12 @@ class SyncLog:
         content = "\n".join(lines) + "\n"
         if not dry_run:
             log_path.write_text(content, encoding="utf-8")
+        # Warnings were already echoed to stderr when raised; the file stays
+        # complete but stdout does not repeat them (#1086d).
+        shown = content
+        if self.warnings:
+            shown = "\n".join(
+                lines[:warn_start] + ["", f"WARNINGS: {len(self.warnings)} (see above)"]
+                + lines[warn_end:]) + "\n"
         print()
-        print(content)
+        print(shown)

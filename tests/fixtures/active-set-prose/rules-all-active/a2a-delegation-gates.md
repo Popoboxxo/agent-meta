@@ -14,7 +14,7 @@ den praktischen Fehlerfall ab:
 
 | Check | Status | Begründung |
 |---|---|---|
-| `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
+| `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. |
 | Plattform-Tiefenlimit | Hinweis | Laut Plattform-Doku (Claude Code, in diesem Repo nicht verifiziert): Subagenten schachteln bis 3 Ebenen unter dem Main Chat; änderbar über die Env-Var `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. |
 | `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | live (Soft Gate) | sync liest den Key (Default 10, geklemmt 1–50) in `A2A_MAX_DEPTH`; der Orchestrator rendert ihn als Soft Gate `depth>10`. Kein Hard-Reject: der enforced-Pfad wurde aus `validate_envelope()` entfernt |
 

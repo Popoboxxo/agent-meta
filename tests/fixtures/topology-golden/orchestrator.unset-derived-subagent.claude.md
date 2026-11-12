@@ -406,6 +406,8 @@ resume exactly at `next_task_ref` — never silently skip or reorder.
 **Cleanup:** max checkpoint size: 50 KB — truncate large `context` fields. Checkpoints
 are never deleted automatically (neither by age nor on session start).
 
+**Persistence scope:** `.meta-viz/**` is ephemeral and gitignored; plans must not cite resume state there (dangles in fresh clones) — cite a tracked path or set `progress.checkpoint-dir` to one. Commit the plan "Umsetzungsstand" in the same PR as its phase. See `progress.checkpoint-dir-ignored` (`--validate`).
+
 **Progress file (issue #682 §6, Tier model — live-progress-channel design, 2026-09-10):** if the
 runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py`,
 distinct from the manually-written checkpoint format above), it writes `.meta-viz/progress/current.md`

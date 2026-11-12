@@ -416,8 +416,19 @@ def check_keyword_overlap(project_root: Path, active_providers: Sequence[str],
         patterns = (roles.get(role) or {}).get("routing_patterns") or {}
         for kw in patterns.get("keywords") or []:
             owners.setdefault(str(kw).strip().casefold(), set()).add(role)
+    def _priority_note(rs: set) -> str:
+        # #1086h: informational only -- no resolution happens here.
+        prios = []
+        for r in rs:
+            p = ((roles.get(r) or {}).get("routing") or {}).get("priority")
+            if isinstance(p, int) and not isinstance(p, bool):
+                prios.append((-p, r, p))
+        prios.sort()
+        return "; priority: " + ", ".join(f"{r}={p}" for _, r, p in prios) if prios else ""
+
     return [Finding(
         Severity.INFO, CHECK_KEYWORD_OVERLAP, "config/role-defaults.yaml",
-        f"keyword '{tok}' is shared by routable roles: {', '.join(sorted(rs))}",
+        f"keyword '{tok}' is shared by routable roles: {', '.join(sorted(rs))}"
+        f"{_priority_note(rs)}",
         "Sharpen the keyword or keep it covered by collision eval cases")
         for tok, rs in sorted(owners.items()) if len(rs) >= 2]

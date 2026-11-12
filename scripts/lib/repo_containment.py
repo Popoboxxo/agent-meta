@@ -327,6 +327,26 @@ def _resolve_sink_dir(
     return Path(pathmod.realpath(pathmod.join(root, *parts)))
 
 
+def resolve_sink_absolute(
+    project_root: "str | os.PathLike[str]", config: Optional[dict]
+) -> Optional[Path]:
+    """Return the realpath-resolved sink dir, or ``None`` (IC-2, #1189).
+
+    ``None`` when the sink is disabled or its configured path is invalid.
+    :func:`resolve_effective_repo_containment` silently falls back to the
+    ``.tmp`` default for an invalid path (emitting a
+    ``repo-containment.tmp-sink-path`` finding); this wrapper must not adopt
+    that fallback, so the finding is checked explicitly. Never exits, never
+    logs.
+    """
+    effective = resolve_effective_repo_containment(config)
+    if not effective.tmp_sink_enabled:
+        return None
+    if any(f.code == "repo-containment.tmp-sink-path" for f in effective.findings):
+        return None
+    return _resolve_sink_dir(project_root, effective)
+
+
 def tmp_sink_path_error(
     path: Any,
     project_root: "str | os.PathLike[str] | None" = None,
@@ -360,7 +380,8 @@ def tmp_sink_path_error(
 def tmp_sink_location_error(path: str, project_root: Path) -> Optional[str]:
     """Return an error when the sink resolves outside the repo or in system temp.
 
-    Only place that consults :func:`tempfile.gettempdir` in the sink context.
+    One of two places that consult :func:`tempfile.gettempdir` in the sink
+    context (the other is :func:`system_temp_root`, #1189).
     A sink inside the project root is always valid, even when the platform
     temp dir points into it (TMPDIR=<root>/.tmp, #1136). Otherwise a sink under
     the system temp dir is reported only when the project root itself is *not*
@@ -564,14 +585,82 @@ class TmpSinkError(Exception):
     """Output-path resolution failure carrying a stable error code (IC-34).
 
     ``code`` is ``tmp-sink.disabled``, ``tmp-sink.invalid-path``,
-    ``tmp-sink.invalid-segment`` or ``out-outside-tmp-sink``; when a *tool* is
-    given every code is prefixed ``<tool>.<code>``. Callers map it to Exit 2.
+    ``tmp-sink.invalid-segment``, ``out-outside-tmp-sink``,
+    ``tmp-sink.pin-unavailable`` (framework pin cannot be built, #1189) or
+    ``tmp-sink.system-temp-exception`` (no un-pinned temp root outside the
+    project); when a *tool* is given every code is prefixed
+    ``<tool>.<code>``. Callers map it to Exit 2; the ``admin-server.py``
+    lifecycle (``start``) maps it to Exit 1 instead.
     """
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")
         self.code = code
         self.message = message
+
+
+def _candidate_temp_dirs() -> list:
+    """Stdlib temp-dir candidate order, without side effects.
+
+    shortcut: prefers the private stdlib helper when present, else a documented
+    re-implementation; upgrade if CPython changes the candidate order.
+    """
+    helper = getattr(tempfile, "_candidate_tempdir_list", None)
+    if helper is not None:
+        return list(helper())
+    names = [os.environ.get(k) for k in ("TMPDIR", "TEMP", "TMP")]
+    if os.name == "nt":
+        local = os.environ.get("LOCALAPPDATA")
+        names += [os.path.join(local, "Temp")] if local else []
+    else:
+        names += ["/tmp", "/var/tmp", "/usr/tmp"]
+    names.append(os.getcwd())
+    return [n for n in names if n]
+
+
+def system_temp_root(
+    project_root: "str | os.PathLike[str]", sink_dir: Optional[Path]
+) -> str:
+    """Return the system temp root *without* the framework pin (IC-1, #1189).
+
+    The ``TMPDIR=<sink>`` pin is a transport detail, never evidence about the
+    platform temp root. Read-only: mutates neither ``os.environ`` nor
+    ``tempfile.tempdir`` (thread-safe). If :func:`tempfile.gettempdir` does not
+    resolve to the sink, it is returned verbatim; otherwise the first stdlib
+    candidate that is an absolute existing dir, not the sink and not inside the
+    project root is returned. Raises ``TmpSinkError`` when none exists.
+    """
+    code = "tmp-sink.system-temp-exception"
+    try:
+        observed = tempfile.gettempdir()
+    except OSError as exc:
+        raise TmpSinkError(code, f"cannot determine the system temp root: {exc}")
+
+    def real(path: str) -> str:
+        return os.path.normcase(os.path.realpath(path))
+
+    if sink_dir is None or real(observed) != real(os.fspath(sink_dir)):
+        return observed
+    root_real = real(os.fspath(project_root))
+    sink_real = real(os.fspath(sink_dir))
+    for cand in _candidate_temp_dirs():
+        if not cand or not os.path.isabs(cand) or not os.path.isdir(cand):
+            continue
+        cand_real = real(cand)
+        if cand_real == sink_real:
+            continue
+        try:
+            if os.path.commonpath([root_real, cand_real]) == root_real:
+                continue
+        except ValueError:
+            pass
+        return cand
+    raise TmpSinkError(
+        code,
+        "the platform temp root resolves to the tmp-sink and no alternative "
+        "outside the project root exists; set TMPDIR to a directory outside "
+        "the project.",
+    )
 
 
 def _sink_error_code(code: str, tool: str) -> str:

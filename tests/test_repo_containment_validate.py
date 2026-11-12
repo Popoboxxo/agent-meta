@@ -341,3 +341,46 @@ def test_system_temp_exception_rejects_temp_root_inside_project(
     err = capsys.readouterr().err
     assert "tmp-sink.system-temp-exception" in err
     assert "inside the project root" in err
+
+
+def test_load_config_under_pin_with_explicit_block_passes(tmp_path, monkeypatch):
+    """U3-15 (#1189): load_config must not reject the framework pin."""
+    import tempfile
+
+    from lib.config import load_config
+
+    sink = tmp_path / ".tmp"
+    sink.mkdir()
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(key, str(sink))
+    monkeypatch.setattr(tempfile, "tempdir", None)
+    path = _config_path(tmp_path)
+    path.write_text(
+        "project: {name: t, prefix: t, short: t}\n"
+        "repo_containment:\n"
+        "  tmp-sink:\n"
+        "    path: .tmp\n"
+        "    system-temp-exception:\n"
+        "      enabled: true\n"
+        "      reason: unit-test\n",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config["repo_containment"]["tmp-sink"]["path"] == ".tmp"
+
+
+def test_system_temp_exception_message_contains_stale_pin_repair_hint(
+    tmp_path, capsys, monkeypatch
+):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    with pytest.raises(SystemExit) as exc:
+        _validate(_exception(enabled=True, reason="unit-test"), tmp_path)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "inside the project root" in err
+    assert (
+        "If this is a stale framework pin: open a new shell or re-run "
+        "'python scripts/sync.py'."
+    ) in err

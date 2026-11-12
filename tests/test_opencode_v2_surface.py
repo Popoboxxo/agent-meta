@@ -5499,10 +5499,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # `slimming-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 #1190 M3 (2026-11-10): ac01-baseline re-pinned after the intentional AC-17 topology wording (orchestrator 8.12.0, Opencode primary branch) — slimming/compact-golden unchanged.
 # #1190 T21 (2026-11-10): re-frozen after the intentional topology wording/version rebaseline (orchestrator 8.12.0, G1/G4); no other fixture tree changed.
+# #1180/#1000 (2026-11-12): ac01-baseline re-pinned (24 hashes: rule pointer inlining + spec-plan-workflow bullet); compact-golden re-pinned (agents-managed.md a2a pointer removed); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "fc718eac217c12277b22387d721e0ee133d555a8357305e317b18a665bc93710",
-    "slimming-golden": "0028e50a6f3267cf59fde73f74e431290d9a3644b6562a020546aa5bdf231764",
-    "compact-golden": "8e5308d718179a0f4c48cc44d7c6c8436a7bda03b87773dd453887fdfd12785b",
+    "ac01-baseline": "60944d2c7f1348c4924290849832b4584e624cd460235437e9cb020a8ac47670",
+    "slimming-golden": "20a43e78730a04e7879f0ad5dcd60d19979abb7d3aafb6c51d95aaa47ba6ae46",
+    "compact-golden": "3463b046b3ceaa17e61d7f51eb3163b2afeac52cd9fd13d16caff0bb512d8504",
 }
 
 

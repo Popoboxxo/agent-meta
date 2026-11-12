@@ -39,17 +39,21 @@ from __future__ import annotations
 
 import argparse
 import copy
+import errno
 import json
 import hmac
 import logging
 import os
 import queue
 import re
+import socket
 import stat
 import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -313,11 +317,12 @@ def _tmp_sink_env(root: Path, base: dict | None = None) -> dict | None:
 
     The pin comes from :func:`lib.tmp_paths.tmp_env` (TMPDIR/TEMP/TMP absolute
     and inherited ``PATH``/``HOME`` merged in, IC-18/ADR-12). ``None`` means
-    "inherit the parent environment" and is returned for a *disabled* sink
-    (a supported state) or when no project config is available — an admin
-    start/stop must never fail because the sink is off. Configuration errors
-    are already surfaced by ``sync.py --validate``; at runtime the server
-    keeps operating with the inherited env instead of blocking its UI.
+    "inherit the parent environment" and is returned **only** for the three
+    defined states: no project config, a *disabled* sink, or the framework
+    ``lib`` not being importable (a single warning on stderr). Every other
+    failure (unreadable/invalid config, unresolvable sink) raises
+    ``TmpSinkError("tmp-sink.pin-unavailable", ...)`` so the caller aborts
+    visibly instead of spawning an unpinned child (#1189, IC-5a/IC-5b).
     """
     config_path = Path(root) / ".meta-config" / "project.yaml"
     if not config_path.exists():
@@ -325,14 +330,41 @@ def _tmp_sink_env(root: Path, base: dict | None = None) -> dict | None:
     try:
         _ensure_scripts_on_path(Path(root))
         from lib.config import load_config
+        from lib.repo_containment import TmpSinkError
         from lib.tmp_paths import resolve_tmp_paths, tmp_env
-
+    except ImportError:
+        print(
+            "  !  tmp-sink pin unavailable: framework lib not importable; "
+            "inheriting environment",
+            file=sys.stderr,
+        )
+        return None
+    try:
         paths = resolve_tmp_paths(Path(root), load_config(config_path))
         if not paths.enabled:
             return None
         return tmp_env(paths, base)
-    except Exception:  # noqa: BLE001 - admin lifecycle must not depend on the sink
-        return None
+    # SystemExit: load_config exits on a broken config; in a request thread it
+    # would be swallowed without any message.
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        raise TmpSinkError(
+            "tmp-sink.pin-unavailable",
+            f"{exc}; repair: python scripts/sync.py --validate",
+        ) from exc
+
+
+class _NoTmpSinkError(Exception):
+    """Never raised; stands in for ``TmpSinkError`` when ``lib`` is missing."""
+
+
+def _tmp_sink_error_class(root: Path) -> type:
+    """Return ``lib.repo_containment.TmpSinkError`` (lazy, for ``except``)."""
+    try:
+        _ensure_scripts_on_path(Path(root))
+        from lib.repo_containment import TmpSinkError
+    except ImportError:
+        return _NoTmpSinkError
+    return TmpSinkError
 
 
 def _is_bare_backup_name(name: Any) -> bool:
@@ -580,9 +612,157 @@ def _is_pid_running(pid: int | None) -> bool:
             return False
         else:
             os.kill(pid, 0)
-            return True
+            return not _is_zombie(pid)
     except (OSError, ProcessLookupError):
         return False
+
+
+def _is_zombie(pid: int) -> bool:
+    """True if ``/proc/<pid>/stat`` reports state ``Z`` (POSIX, best effort).
+
+    Any read/parse failure (no procfs, macOS, race) means "not known to be a
+    zombie", so callers keep the plain ``kill(pid, 0)`` answer (#1189, IC-6).
+    """
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        # Field 2 (comm) may contain spaces/parens: state follows the last ")".
+        return stat.rsplit(")", 1)[1].split()[0] == "Z"
+    except (OSError, IndexError):
+        return False
+
+
+def _probe_port_bindable(host: str, port: int) -> tuple[bool, str]:
+    """Pre-flight: could a child bind ``(host, port)``? Never raises (#1189, IC-12).
+
+    Binds and closes immediately (no ``listen``/``accept``, ``SO_REUSEADDR``
+    like ``HTTPServer.allow_reuse_address``, no ``SO_REUSEPORT``). Prefers
+    AF_INET because ``_DaemonThreadingHTTPServer`` binds AF_INET; AF_INET6 only
+    when the host has no IPv4 entry (IPv6 literal). Port 0 is not probed.
+
+    Scope: a snapshot. Between ``close()`` and the child bind another process
+    may take the port (TOCTOU), and the probe proves nothing about who holds a
+    busy port. ``VizManager._start`` is not probed (own config ports).
+    """
+    if port == 0:
+        return True, "skipped:port-0"
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM,
+                                   flags=socket.AI_PASSIVE)
+        chosen = next((i for i in infos if i[0] == socket.AF_INET), infos[0])
+        family, sockaddr = chosen[0], chosen[4]
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(sockaddr)
+        finally:
+            sock.close()
+    except OSError as exc:  # socket.gaierror is an OSError subclass
+        name = errno.errorcode.get(exc.errno, type(exc).__name__)
+        return False, f"{name}: {exc.strerror or exc}"
+    except IndexError:
+        return False, "no address for host"
+    return True, ""
+
+
+VIZ_START_GRACE = 1.5        # viz/mcp children: no health contract, liveness only (s)
+START_VERIFY_TIMEOUT = 5.0   # candidate search window (s)
+START_VERIFY_INTERVAL = 0.1  # pause between health probes (s)
+START_CONFIRM_GRACE = 1.0    # criterion must hold this long, uninterrupted (s)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):  # noqa: D401
+        return None
+
+
+def _health_opener() -> urllib.request.OpenerDirector:
+    """Opener without proxies and without redirects (health probe only)."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+
+
+def _health_probe(opener, url: str) -> tuple[int | None, Any]:
+    """One token-less GET; ``(None, None)`` when nothing answered."""
+    try:
+        with opener.open(urllib.request.Request(url), timeout=1.0) as resp:
+            try:
+                return resp.status, json.loads(resp.read().decode("utf-8"))
+            except ValueError:
+                return resp.status, None
+    except urllib.error.HTTPError as exc:
+        return exc.code, None
+    except (OSError, ValueError):
+        return None, None
+
+
+def _wait_for_admin(
+    proc: subprocess.Popen,
+    host: str,
+    port: int,
+    *,
+    expected_mode: str,
+    token_configured: bool,
+    timeout: float = START_VERIFY_TIMEOUT,
+    interval: float = START_VERIFY_INTERVAL,
+    confirm_grace: float = START_CONFIRM_GRACE,
+) -> tuple[bool, str]:
+    """Heuristic start check over the child lifetime -- no success guarantee.
+
+    Success = the candidate criterion (token-less ``/api/health`` 200 with
+    matching pid/mode, or HTTP 401 when a token is configured) holds
+    uninterrupted for ``confirm_grace`` seconds AND the child is still alive.
+    It does NOT prove the child bound the port: if the window ends before the
+    child reaches its bind, an already-running port holder can still look like
+    success; the failing child then exits afterwards (visible via ``status``
+    and the log). The deterministic part is ``_probe_port_bindable`` before the
+    spawn. ``timeout`` bounds the candidate search; a running window may
+    overrun it by at most ``confirm_grace``. No token is ever sent (#1189).
+    """
+    probe_host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(host, host)
+    if ":" in probe_host:
+        probe_host = f"[{probe_host}]"
+    url = f"http://{probe_host}:{port}/api/health"
+    opener = _health_opener()
+    deadline = time.monotonic() + timeout
+    confirm_since: float | None = None
+    seen_candidate = False
+    last_status: int | None = None
+    last_reason = ""
+    while True:
+        code = proc.poll()
+        if code is not None:
+            return False, f"exited:{code}"
+        if confirm_since is None and time.monotonic() >= deadline:
+            break
+        status, data = _health_probe(opener, url)
+        ok, reason = False, ""
+        if status is not None:
+            last_status = status
+            if token_configured:
+                ok = status == 401
+            elif status == 200 and isinstance(data, dict) and data.get("status") == "ok":
+                if "pid" in data:
+                    ok, reason = data["pid"] == proc.pid, "identity:pid"
+                else:
+                    ok, reason = data.get("mode") == expected_mode, "identity:mode"
+            elif status == 200:
+                reason = "identity:body"
+            if not ok and not reason:
+                reason = f"health:{status}"
+        if ok:
+            seen_candidate = True
+            now = time.monotonic()
+            if confirm_since is None:
+                confirm_since = now
+            if now - confirm_since >= confirm_grace:
+                code = proc.poll()
+                return (True, "") if code is None else (False, f"exited:{code}")
+        else:
+            confirm_since = None
+            last_reason = reason
+        time.sleep(interval)
+    if seen_candidate:
+        return False, f"unconfirmed:{last_status}"
+    return False, last_reason or "timeout"
 
 
 def _read_pid(pid_file: Path) -> int | None:
@@ -633,6 +813,12 @@ class VizManager:
             except PermissionError:
                 pass
 
+        try:
+            child_env = _tmp_sink_env(self.root)
+        except _tmp_sink_error_class(self.root) as exc:
+            print(f"  !  {label} not started: tmp-sink pin unavailable: {exc}")
+            return False
+
         # The child inherits a duplicate of this FD, so the parent closes
         # its own copy once Popen() returns to avoid a handle leak.
         with open(log_file, "a", encoding="utf-8") as log_fh:
@@ -647,7 +833,7 @@ class VizManager:
                     startupinfo=si,
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                     cwd=str(self.root),
-                    env=_tmp_sink_env(self.root),
+                    env=child_env,
                 )
             else:
                 proc = subprocess.Popen(
@@ -656,19 +842,24 @@ class VizManager:
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                     cwd=str(self.root),
-                    env=_tmp_sink_env(self.root),
+                    env=child_env,
                 )
 
         pid_file.write_text(str(proc.pid), encoding="utf-8")
-        time.sleep(1.5)
+        # A healthy child never exits, so success is only provable by the
+        # child still being alive after the grace window (poll, not kill(0)).
+        deadline = time.monotonic() + VIZ_START_GRACE
+        while proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
 
-        if _is_pid_running(proc.pid):
+        if proc.poll() is None:
             print(f"  +  {label} started (PID: {proc.pid})")
             return True
-        else:
-            print(f"  !  {label} failed to start -- see {log_file}")
-            pid_file.unlink(missing_ok=True)
-            return False
+        print(f"  !  {label} failed to start -- see {log_file}")
+        for line in _log_tail(log_file):
+            print(f"     | {line}")
+        pid_file.unlink(missing_ok=True)
+        return False
 
     def _stop(self, pid_file: Path, label: str) -> None:
         pid = _read_pid(pid_file)
@@ -1357,6 +1548,7 @@ class SyncExecutor:
                 "returncode": -1,
             }
         cmd = [sys.executable, str(self.sync_script), *extra_args]
+        pin_error = _tmp_sink_error_class(self.root)
         try:
             proc = subprocess.run(  # noqa: PLW1510
                 cmd,
@@ -1377,6 +1569,12 @@ class SyncExecutor:
             }
         except subprocess.TimeoutExpired:
             result = {"success": False, "output": "sync.py timed out (300s)", "returncode": -1}
+        except pin_error as exc:
+            result = {
+                "success": False,
+                "output": f"tmp-sink pin unavailable: {exc}",
+                "returncode": -1,
+            }
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
             result = {"success": False, "output": f"sync.py failed: {exc}", "returncode": -1}
         self._record_run(result)
@@ -1740,6 +1938,7 @@ class AuditService:
         # mode the script lives under ".agent-meta/scripts/", not the top-level
         # "scripts/" — use the same resolution every other asset lookup uses.
         check_script = resolve_asset(self._ctx.root, "scripts", "consistency-check.py")
+        pin_error = _tmp_sink_error_class(self._ctx.root)
         try:
             r = subprocess.run(  # noqa: PLW1510
                 [sys.executable, str(check_script), "--json"],
@@ -1755,6 +1954,12 @@ class AuditService:
             return {
                 "error": "Failed to parse JSON output",
                 "output": r.stdout,
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+        except pin_error as exc:
+            return {
+                "error": f"tmp-sink pin unavailable: {exc}",
                 "findings": [],
                 "summary": {"total": 0, "errors": 0, "warnings": 0},
             }
@@ -3796,6 +4001,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "status": "ok",
             "version": self.__class__.version,
             "mode": self.__class__.mode,
+            # No `root`: the endpoint may be token-free; a pid is enough for
+            # the start verification identity check (#1189, IC-10).
+            "pid": os.getpid(),
         })
 
     def _route_get_mode(self) -> None:
@@ -6019,7 +6227,27 @@ class AdminServer:
 # the server in the foreground until Ctrl+C.
 
 
+def _log_tail(log_file: Path, lines: int = 20) -> list[str]:
+    """Last ``lines`` lines of ``log_file`` (empty if unreadable)."""
+    try:
+        text = log_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    return text.splitlines()[-lines:]
+
+
 def _admin_start_detached(args: argparse.Namespace) -> None:
+    """Start the admin server detached and verify the child (#1189, IC-8).
+
+    Order: already-running check, bind pre-flight (deterministic, before any
+    spawn), pin env (``TmpSinkError`` aborts before the spawn), spawn, PID file
+    immediately, heuristic child verification, success message.
+
+    Limit (AC-1189-17b): the verification is a heuristic over the child
+    lifetime. If a failure only surfaces after the confirm window, this parent
+    has already returned; it is then visible through ``status`` and the log,
+    NOT as a ``failed to start`` line.
+    """
     root = Path(args.root).resolve()
     pid_file = root / ADMIN_PID_FILE
     log_file = root / ADMIN_LOG_FILE
@@ -6029,6 +6257,19 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
         print(f"  -  Admin UI already running (PID: {existing_pid})")
         print(f"  i  URL: http://{args.host}:{args.port}")
         return
+
+    ok, reason = _probe_port_bindable(args.host, args.port)
+    if not ok:
+        print(f"  !  cannot bind {args.host}:{args.port}: {reason}")
+        print("  i  Port belegt? Anderen --port wählen.")
+        sys.exit(1)
+
+    try:
+        child_env = _tmp_sink_env(root)
+    except _tmp_sink_error_class(root) as exc:
+        print(f"  !  tmp-sink pin unavailable: {exc}")
+        print("  i  Reparatur: python scripts/sync.py --validate")
+        sys.exit(1)
 
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     if log_file.exists():
@@ -6061,26 +6302,46 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 cwd=str(root),
-                env=_tmp_sink_env(root),
+                env=child_env,
             )
         else:
             proc = subprocess.Popen(
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 start_new_session=True, cwd=str(root),
-                env=_tmp_sink_env(root),
+                env=child_env,
             )
 
+    # Written at once so status/stop/second start work during verification.
     pid_file.write_text(str(proc.pid), encoding="utf-8")
-    time.sleep(1.5)
 
-    if _is_pid_running(proc.pid):
+    # Same token sources/priority as the child (AdminServer.__init__): the
+    # child reads admin-ui.token-file itself, so resolve it here too.
+    admin_cfg = _load_admin_ui_config(root)
+    token_configured = _resolve_admin_token(
+        cli_token=args.admin_token,
+        config_token=admin_cfg["token"],
+        config_token_file=admin_cfg["token_file"],
+    ) is not None
+    verified, why = _wait_for_admin(
+        proc, args.host, args.port,
+        expected_mode=detect_mode(root), token_configured=token_configured,
+    )
+    if verified:
         print(f"  +  Admin UI started (PID: {proc.pid})")
+        print("  i  Child alive after the confirm window; port answers as expected")
         print(f"  i  URL:  http://{args.host}:{args.port}")
         print(f"  i  Logs: {log_file}")
-    else:
-        print(f"  !  Admin UI failed to start -- see {log_file}")
-        pid_file.unlink(missing_ok=True)
-        sys.exit(1)
+        return
+
+    try:
+        proc.terminate()
+    except OSError:
+        pass
+    pid_file.unlink(missing_ok=True)
+    print(f"  !  Admin UI failed to start ({why}) -- see {log_file}")
+    for line in _log_tail(log_file):
+        print(f"     | {line}")
+    sys.exit(1)
 
 
 def _admin_stop(args: argparse.Namespace) -> None:
