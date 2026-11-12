@@ -384,7 +384,7 @@ def _write_json_config(
                      dry_run=dry_run, verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, log_label)
     else:
-        log.skip(rel, "unchanged")
+        log.note_unchanged(rel)
 
 
 def _update_json_config(
@@ -551,7 +551,7 @@ def _update_continue_yaml_config(
                       verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, "mcp-registry → mcpServers")
     else:
-        log.skip(rel, "unchanged")
+        log.note_unchanged(rel)
 
 
 # Bearer-token env indirection (V8): the committed placeholder form
@@ -674,7 +674,7 @@ def _update_codex_toml_config(
                      dry_run=dry_run, verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, "mcp-registry → mcp_servers")
     else:
-        log.skip(rel, "unchanged")
+        log.note_unchanged(rel)
 
 
 # ---------------------------------------------------------------------------

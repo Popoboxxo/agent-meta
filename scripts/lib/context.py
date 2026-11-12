@@ -3743,7 +3743,7 @@ def sync_prompts_for_continue(
                          dry_run=dry_run):
             log.action("WRITE", rel_out, f"{layer}/{source_path.name} [prompt/{prompt_mode}]")
         else:
-            log.skip(rel_out, "unchanged")
+            log.note_unchanged(rel_out)
 
     # Stale cleanup
     managed_index = prompts_dir / ".agent-meta-managed"

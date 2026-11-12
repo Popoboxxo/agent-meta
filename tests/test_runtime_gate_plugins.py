@@ -179,7 +179,7 @@ def test_second_sync_is_idempotent(tmp_path: Path) -> None:
 
     log = _sync(project_root, _pc())
     assert target.read_text(encoding="utf-8") == first
-    assert any("unchanged" in entry for entry in log.skipped)
+    assert bool(log.unchanged)
 
 
 def test_plugin_relpath_is_config_driven() -> None:

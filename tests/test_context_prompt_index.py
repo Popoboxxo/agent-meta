@@ -148,7 +148,7 @@ def test_unchanged_prompt_logs_no_write_action(tmp_path: Path) -> None:
     )
 
     assert second.actions == [], f"unchanged prompt must not log an action: {second.actions}"
-    assert any("unchanged" in s for s in second.skipped), second.skipped
+    assert bool(second.unchanged), second.skipped
 
 
 def test_changed_prompt_logs_write_action(tmp_path: Path) -> None:

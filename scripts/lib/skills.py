@@ -559,7 +559,7 @@ def sync_external_skills_for_provider(
                          dry_run=dry_run, allow_secrets=True):
             log.action("WRITE", rel_agent, f"0-external/{skill_name}@{commit}")
         else:
-            log.skip(rel_agent, "unchanged")
+            log.note_unchanged(rel_agent)
 
 
         skill_target_dir = safe_path(skills_dir, skill_name)
@@ -573,7 +573,7 @@ def sync_external_skills_for_provider(
                          dry_run=dry_run, allow_secrets=True):
             log.action("COPY", rel_entry, entry_src_label)
         else:
-            log.skip(rel_entry, "unchanged")
+            log.note_unchanged(rel_entry)
 
         for af in additional:
             af_source = skill_source_dir / af
@@ -587,7 +587,7 @@ def sync_external_skills_for_provider(
                              dry_run=dry_run, allow_secrets=True):
                 log.action("COPY", rel_af, af_src_label)
             else:
-                log.skip(rel_af, "unchanged")
+                log.note_unchanged(rel_af)
 
     _write_skills_managed_index(skills_dir, now_managed, dry_run, universe=set(skills.keys()))
 

@@ -274,7 +274,7 @@ def sync_commands_for_provider(
         if write_checked(target_path, content, log, rel_source, dry_run=dry_run):
             log.action("COPY", rel_out, rel_source)
         else:
-            log.skip(rel_out, "unchanged")
+            log.note_unchanged(rel_out)
 
     # IC-01/IC-08 (R-06): deletion routed through cleanup_stale_managed_files
     # (fail-soft per file, byte-identical DELETE log line).
