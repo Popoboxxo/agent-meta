@@ -590,7 +590,7 @@ def sync_hooks(
             if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
                 log.action("COPY", rel_out, rel_source)
             else:
-                log.skip(rel_out, "unchanged")
+                log.note_unchanged(rel_out)
         except Exception as exc:
             log.warning(f"Failed to deploy hook {rel_out}: {exc}")
             continue
@@ -646,7 +646,7 @@ def sync_hooks(
                 "file": output_name,
             })
             log.note(str(target_path.relative_to(project_root)),
-                     f"registered in settings.json (event: {event})")
+                     f"registered in {pc.get('hooks_config_file') or settings_file_rel} (event: {event})")
         elif event in NON_RUNTIME_HOOK_EVENTS:
             # Not a runtime hook and not enabled: it has no settings.json
             # registration path at all — invoked explicitly instead.

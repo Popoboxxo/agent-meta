@@ -264,6 +264,7 @@ def check_over_soft_cap(
             continue
         caps = capabilities.get(provider) or {}
         context_file = str(caps.get("context_file", ""))
+        others = [o for o in active_providers if o != provider and context_file and context_file == (capabilities.get(o) or {}).get("context_file")]
         for key, unit in (("context_soft_cap_bytes", "bytes"),
                           ("context_soft_cap_chars", "chars"),
                           ("context_soft_cap_lines", "lines")):
@@ -281,7 +282,8 @@ def check_over_soft_cap(
             if value > cap:
                 findings.append(_warn(
                     "context.over-soft-cap", context_file,
-                    f"{provider}: entry file has {value} {unit}, soft cap is {cap} {unit}",
+                    f"{provider}: entry file has {value} {unit}, soft cap is {cap} {unit}"
+                    + (f" (shared with: {', '.join(others)})" if others else ""),
                     "shrink the entry file or move reference content into lazy skills"))
     return findings
 
