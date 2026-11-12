@@ -313,11 +313,12 @@ def _tmp_sink_env(root: Path, base: dict | None = None) -> dict | None:
 
     The pin comes from :func:`lib.tmp_paths.tmp_env` (TMPDIR/TEMP/TMP absolute
     and inherited ``PATH``/``HOME`` merged in, IC-18/ADR-12). ``None`` means
-    "inherit the parent environment" and is returned for a *disabled* sink
-    (a supported state) or when no project config is available — an admin
-    start/stop must never fail because the sink is off. Configuration errors
-    are already surfaced by ``sync.py --validate``; at runtime the server
-    keeps operating with the inherited env instead of blocking its UI.
+    "inherit the parent environment" and is returned **only** for the three
+    defined states: no project config, a *disabled* sink, or the framework
+    ``lib`` not being importable (a single warning on stderr). Every other
+    failure (unreadable/invalid config, unresolvable sink) raises
+    ``TmpSinkError("tmp-sink.pin-unavailable", ...)`` so the caller aborts
+    visibly instead of spawning an unpinned child (#1189, IC-5a/IC-5b).
     """
     config_path = Path(root) / ".meta-config" / "project.yaml"
     if not config_path.exists():
@@ -325,14 +326,41 @@ def _tmp_sink_env(root: Path, base: dict | None = None) -> dict | None:
     try:
         _ensure_scripts_on_path(Path(root))
         from lib.config import load_config
+        from lib.repo_containment import TmpSinkError
         from lib.tmp_paths import resolve_tmp_paths, tmp_env
-
+    except ImportError:
+        print(
+            "  !  tmp-sink pin unavailable: framework lib not importable; "
+            "inheriting environment",
+            file=sys.stderr,
+        )
+        return None
+    try:
         paths = resolve_tmp_paths(Path(root), load_config(config_path))
         if not paths.enabled:
             return None
         return tmp_env(paths, base)
-    except Exception:  # noqa: BLE001 - admin lifecycle must not depend on the sink
-        return None
+    # SystemExit: load_config exits on a broken config; in a request thread it
+    # would be swallowed without any message.
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        raise TmpSinkError(
+            "tmp-sink.pin-unavailable",
+            f"{exc}; repair: python scripts/sync.py --validate",
+        ) from exc
+
+
+class _NoTmpSinkError(Exception):
+    """Never raised; stands in for ``TmpSinkError`` when ``lib`` is missing."""
+
+
+def _tmp_sink_error_class(root: Path) -> type:
+    """Return ``lib.repo_containment.TmpSinkError`` (lazy, for ``except``)."""
+    try:
+        _ensure_scripts_on_path(Path(root))
+        from lib.repo_containment import TmpSinkError
+    except ImportError:
+        return _NoTmpSinkError
+    return TmpSinkError
 
 
 def _is_bare_backup_name(name: Any) -> bool:
@@ -1357,6 +1385,7 @@ class SyncExecutor:
                 "returncode": -1,
             }
         cmd = [sys.executable, str(self.sync_script), *extra_args]
+        pin_error = _tmp_sink_error_class(self.root)
         try:
             proc = subprocess.run(  # noqa: PLW1510
                 cmd,
@@ -1377,6 +1406,12 @@ class SyncExecutor:
             }
         except subprocess.TimeoutExpired:
             result = {"success": False, "output": "sync.py timed out (300s)", "returncode": -1}
+        except pin_error as exc:
+            result = {
+                "success": False,
+                "output": f"tmp-sink pin unavailable: {exc}",
+                "returncode": -1,
+            }
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
             result = {"success": False, "output": f"sync.py failed: {exc}", "returncode": -1}
         self._record_run(result)
@@ -1740,6 +1775,7 @@ class AuditService:
         # mode the script lives under ".agent-meta/scripts/", not the top-level
         # "scripts/" — use the same resolution every other asset lookup uses.
         check_script = resolve_asset(self._ctx.root, "scripts", "consistency-check.py")
+        pin_error = _tmp_sink_error_class(self._ctx.root)
         try:
             r = subprocess.run(  # noqa: PLW1510
                 [sys.executable, str(check_script), "--json"],
@@ -1755,6 +1791,12 @@ class AuditService:
             return {
                 "error": "Failed to parse JSON output",
                 "output": r.stdout,
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+        except pin_error as exc:
+            return {
+                "error": f"tmp-sink pin unavailable: {exc}",
                 "findings": [],
                 "summary": {"total": 0, "errors": 0, "warnings": 0},
             }

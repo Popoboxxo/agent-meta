@@ -2926,3 +2926,88 @@ def test_dotdot_traversal_still_blocked(tmp_path):
     mgr = admin_server.ConfigManager(_symlinked_root(tmp_path), mode="project_admin")
     with pytest.raises(admin_server.SecurityError):
         mgr.resolve_path("../etc")
+
+
+class TestTmpSinkEnvPolicy:
+    """#1189 IC-5a/IC-5b: the pin helper fails loud, it never silently unpins."""
+
+    @staticmethod
+    def _project(tmp_path: Path, body: str) -> Path:
+        root = tmp_path / "proj"
+        (root / ".meta-config").mkdir(parents=True)
+        (root / ".meta-config" / "project.yaml").write_text(
+            "project: {name: t, prefix: t, short: t}\n" + body, encoding="utf-8"
+        )
+        return root
+
+    def test_pin_returns_sink_env_when_config_valid(self, tmp_path, monkeypatch):
+        root = self._project(tmp_path, "repo_containment:\n  tmp-sink:\n    path: .tmp\n")
+        monkeypatch.setenv("TMPDIR", str(tmp_path))  # outer env is irrelevant
+        env = admin_server._tmp_sink_env(root)
+        sink = str(Path(os.path.realpath(root / ".tmp")))
+        assert env["TMPDIR"] == env["TEMP"] == env["TMP"] == sink
+
+    def test_broken_config_raises_pin_unavailable(self, tmp_path):
+        from lib.repo_containment import TmpSinkError
+
+        root = self._project(tmp_path, 'repo_containment: "x"\n')
+        with pytest.raises(TmpSinkError) as exc:
+            admin_server._tmp_sink_env(root)
+        assert exc.value.code == "tmp-sink.pin-unavailable"
+        assert "python scripts/sync.py --validate" in exc.value.message
+
+    def test_missing_config_returns_none(self, tmp_path):
+        assert admin_server._tmp_sink_env(tmp_path) is None
+
+    def test_disabled_sink_returns_none(self, tmp_path):
+        root = self._project(
+            tmp_path, "repo_containment:\n  tmp-sink:\n    enabled: false\n"
+        )
+        assert admin_server._tmp_sink_env(root) is None
+
+    def test_docstring_drops_inherited_env_promise(self):
+        doc = admin_server._tmp_sink_env.__doc__
+        assert "keeps operating with the inherited env" not in doc
+        assert "tmp-sink.pin-unavailable" in doc
+
+
+class TestPinErrorInApiCallers:
+    """#1189 IC-5b: API callers turn ``TmpSinkError`` into a result, not a crash."""
+
+    @staticmethod
+    def _boom(*_a, **_k):
+        from lib.repo_containment import TmpSinkError
+
+        raise TmpSinkError("tmp-sink.pin-unavailable", "broken; repair: python scripts/sync.py --validate")
+
+    def test_sync_executor_pin_error_returns_success_false(self, tmp_path, monkeypatch):
+        (tmp_path / "scripts").mkdir()
+        (tmp_path / "scripts" / "sync.py").write_text("# stub", encoding="utf-8")
+        monkeypatch.setattr(admin_server, "_tmp_sink_env", self._boom)
+        run = mock.Mock()
+        monkeypatch.setattr(admin_server.subprocess, "run", run)
+        executor = admin_server.SyncExecutor(tmp_path)
+        result = executor._run(["--validate"])
+        assert result["success"] is False
+        assert result["returncode"] == -1
+        assert "tmp-sink pin unavailable:" in result["output"]
+        run.assert_not_called()
+        status = tmp_path / admin_server.SyncExecutor.STATUS_FILE
+        assert json.loads(status.read_text(encoding="utf-8"))["last_run_exit_code"] == -1
+
+    def test_consistency_service_pin_error_returns_error_field(self, tmp_path, monkeypatch):
+        (tmp_path / "scripts").mkdir()
+        (tmp_path / "scripts" / "consistency-check.py").write_text("# stub", encoding="utf-8")
+
+        class _Handler:
+            root = tmp_path
+
+        monkeypatch.setattr(admin_server, "_tmp_sink_env", self._boom)
+        run = mock.Mock()
+        monkeypatch.setattr(subprocess, "run", run)
+        service = admin_server.AuditService(admin_server.ServiceContext(_Handler))
+        result = service.run_consistency_check()
+        assert "tmp-sink pin unavailable:" in result["error"]
+        assert result["findings"] == []
+        assert result["summary"] == {"total": 0, "errors": 0, "warnings": 0}
+        run.assert_not_called()
