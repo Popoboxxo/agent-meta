@@ -20,6 +20,7 @@ can run Bash themselves may ever hold the hook sentinel.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -161,7 +162,21 @@ _TRIGGERS = (
     "file-count-threshold",
     "custom",
 )
-_KEYS = {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan"}
+_STATIC_KEYS = frozenset(
+    {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan"})
+_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "config" / "project-config.schema.json"
+
+
+def _load_schema_keys(path: Path = _SCHEMA_PATH) -> frozenset:
+    """Allowed auto_commit keys from the schema; static fallback if unreadable."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        return frozenset(doc["properties"]["auto_commit"]["properties"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return _STATIC_KEYS
+
+
+_KEYS = _load_schema_keys()
 
 
 def auto_commit_violations(config: dict) -> list[str]:
@@ -221,7 +236,10 @@ def auto_commit_violations(config: dict) -> list[str]:
 
     unknown = sorted(set(ac_cfg) - _KEYS)
     if unknown:
-        violations.append(f"auto_commit has unknown key(s): {', '.join(unknown)}")
+        violations.append(
+            f"auto_commit has unknown key(s): {', '.join(unknown)} "
+            f"(allowed: {', '.join(sorted(_KEYS))}; "
+            "source: config/project-config.schema.json)")
 
     threshold = ac_cfg.get("file_count_threshold", 5)
     if not _is_positive_integer(threshold):

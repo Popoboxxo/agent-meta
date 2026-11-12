@@ -624,7 +624,6 @@ def test_ac_b4_user_keys_survive_managed_merge(tmp_path):
         "plugin": ["acme.js"],
         "instructions": ["AGENTS.md"],
         "model": "opencode-go/deepseek-v4-pro",
-        "subagent_depth": 9,
         "mcp": {"servers": {"my-own": {"type": "local", "command": ["x"]}}},
     }
     _write_json(project / "opencode.json", user_doc)
@@ -642,7 +641,7 @@ def test_ac_b4_user_keys_survive_managed_merge(tmp_path):
     )
 
     doc = _read_json(project / "opencode.json")
-    for key in ("plugin", "instructions", "model", "subagent_depth", "mcp"):
+    for key in ("plugin", "instructions", "model", "mcp"):
         assert doc[key] == user_doc[key], f"user key {key!r} was modified"
     assert doc["experimental"]["subagent_depth"] == 3
     assert doc["providers"]["opencode-go"] == provider_value
@@ -5709,3 +5708,44 @@ def test_changelog_mentions_opencode_v2_support():
     assert "cli.json" in section, (
         "the 2.0.0-beta.3 section must document the managed cli.json"
     )
+
+
+def test_dead_top_level_subagent_depth_removed_on_existing_v2_project(tmp_path):
+    framework = _write_capabilities(tmp_path / "fw", "Opencode", 3)
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"subagent_depth": 3, "plugin": ["acme.js"]})
+    log = _run(project, _config(depth=3), {"Opencode": _v2_pc()}, framework)
+    doc = _read_json(project / "opencode.json")
+    assert "subagent_depth" not in doc
+    assert doc["experimental"]["subagent_depth"] == 3
+    assert doc["plugin"] == ["acme.js"]
+    assert any("dead top-level key 'subagent_depth'" in a for a in log.actions), log.actions
+
+
+def test_dead_key_removal_is_idempotent(tmp_path):
+    framework = _write_capabilities(tmp_path / "fw", "Opencode", 3)
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"subagent_depth": 3, "plugin": ["acme.js"]})
+    _run(project, _config(depth=3), {"Opencode": _v2_pc()}, framework)
+    before = (project / "opencode.json").read_bytes()
+    log2 = _run(project, _config(depth=3), {"Opencode": _v2_pc()}, framework)
+    assert (project / "opencode.json").read_bytes() == before
+    assert not any("dead top-level key" in a for a in log2.actions)
+
+
+def test_v1_surface_keeps_top_level_subagent_depth(tmp_path):
+    framework = _write_capabilities(tmp_path / "fw", "Opencode", 3)
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"subagent_depth": 3})
+    before = (project / "opencode.json").read_bytes()
+    _run(project, _config(), {"Opencode": _v1_pc()}, framework)
+    assert (project / "opencode.json").read_bytes() == before
+
+
+def test_validator_flags_top_level_subagent_depth_in_v2_doc():
+    from lib.artifact_validate import validate_json_document
+    bad = validate_json_document('{"subagent_depth": 3}', "opencode-json-v2", "opencode.json")
+    assert len(bad) == 1 and "subagent_depth" in bad[0].message
+    assert "experimental.subagent_depth" in bad[0].suggestion
+    assert validate_json_document('{"experimental": {"subagent_depth": 3}}',
+                                  "opencode-json-v2", "opencode.json") == []

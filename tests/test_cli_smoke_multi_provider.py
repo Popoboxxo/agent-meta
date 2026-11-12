@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.timeouts import SLOW_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
 _PROVIDERS = sorted(
@@ -50,7 +52,8 @@ def project(tmp_path_factory):
 def _sync(root: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(_SYNC), "--config", str(root / ".meta-config" / "project.yaml"), *args],
-        cwd=root, capture_output=True, text=True, timeout=300,
+        cwd=root, capture_output=True, text=True, timeout=SLOW_TIMEOUT,
+        encoding="utf-8", errors="replace",
     )
 
 

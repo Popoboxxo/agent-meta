@@ -214,10 +214,18 @@ def test_validate_json_document_v2_flat_mcp_is_error() -> None:
     assert errors
 
 
-def test_validate_json_document_v2_accepts_subagent_depth() -> None:
-    # IC-15 Nr. 16: subagent_depth is retained on the v2 surface, not v1-only.
-    text = '{"mcp": {"servers": {}}, "subagent_depth": 2}'
+def test_validate_json_document_v2_accepts_experimental_subagent_depth() -> None:
+    # #1194: subagent_depth lives under experimental on the v2 surface.
+    text = '{"mcp": {"servers": {}}, "experimental": {"subagent_depth": 2}}'
     assert validate_json_document(text, "opencode-json-v2", "opencode.json") == []
+
+
+def test_validate_json_document_v2_flags_top_level_subagent_depth() -> None:
+    # #1194: a top-level subagent_depth is a dead key -> ERROR.
+    text = '{"mcp": {"servers": {}}, "subagent_depth": 2}'
+    findings = validate_json_document(text, "opencode-json-v2", "opencode.json")
+    assert [f.severity for f in findings] == ["ERROR"]
+    assert "subagent_depth" in findings[0].message
 
 
 def test_validate_json_document_v1_flat_mcp_is_clean() -> None:

@@ -1078,6 +1078,24 @@ class APIError extends Error {
   }
 }
 
+// POST tier presets; on the server's lossy-save refusal (YAML comments would
+// be dropped) ask once and retry the same body with __allow_lossy__. Returns
+// false when the user declines (nothing saved).
+async function postTierPresetsConfirmingLoss(body) {
+  try {
+    await api.post("/api/tier-presets/update", body);
+    return true;
+  } catch (err) {
+    if (err.status !== 400 || !String(err.message).includes("refusing lossy YAML save")) throw err;
+    if (!confirm("Saving will drop comments in tier-presets.yaml. Continue?")) {
+      toast("Save cancelled, nothing changed", "info");
+      return false;
+    }
+    await api.post("/api/tier-presets/update", { ...body, __allow_lossy__: true });
+    return true;
+  }
+}
+
 /* =========================================================================
  * State manager (with undo stack)
  * ========================================================================= */
@@ -6231,6 +6249,26 @@ function checkboxField(label, value, onChange, help) {
   return field;
 }
 
+// options: [{ name, id }] — onChange receives the checked names in options order.
+function checkboxGroupField(label, options, selected, onChange, help) {
+  const field = el("fieldset", { class: "field", style: "border:none; padding:0; margin:0;" });
+  field.appendChild(el("legend", { class: "field-label" }, [label]));
+  const chosen = new Set(Array.isArray(selected) ? selected : []);
+  options.forEach(({ name, id }) => {
+    const cb = el("input", { type: "checkbox", id });
+    cb.checked = chosen.has(name);
+    cb.addEventListener("change", () => {
+      if (cb.checked) chosen.add(name); else chosen.delete(name);
+      onChange(options.map(o => o.name).filter(n => chosen.has(n)));
+    });
+    field.appendChild(el("div", { class: "flex-row", style: "gap:var(--space-2);" }, [
+      cb, el("label", { for: id }, [name]),
+    ]));
+  });
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
+  return field;
+}
+
 function tagEditorField(label, values, onChange, helpText) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
@@ -7673,7 +7711,8 @@ async function viewProjectAutoCommit() {
     "Mode",
     ["off", "suggest", "auto", "custom"],
     ac.mode || "off",
-    v => { ac.mode = v; },
+    // updateThresholdVisibility is declared below; it only runs on user change, after setup.
+    v => { ac.mode = v; updateThresholdVisibility(); },
     {
       off: "off — only the git role commits (default)",
       suggest: "suggest — propose a commit message, never run git",
@@ -7697,17 +7736,25 @@ async function viewProjectAutoCommit() {
 
   const triggerPanel = el("div", { class: "panel" });
   triggerPanel.appendChild(el("h2", {}, ["Triggers (mode: auto)"]));
-  triggerPanel.appendChild(tagEditorField(
+  triggerPanel.appendChild(checkboxGroupField(
     "Triggers",
+    TRIGGERS.map(name => ({ name, id: `auto-commit-trigger-${name}` })),
     Array.isArray(ac.triggers) ? ac.triggers : [],
-    v => { ac.triggers = v; },
-    `Any one firing commits (OR'd). Allowed: ${TRIGGERS.join(", ")}. Only consulted under mode "auto".`
+    v => { ac.triggers = v; updateThresholdVisibility(); },
+    `Any one firing commits (OR'd). Only consulted under mode "auto".`
   ));
-  triggerPanel.appendChild(a11yField({
+  const thresholdField = a11yField({
     id: "auto-commit-threshold", label: "File count threshold",
     help: "Only read when the file-count-threshold trigger is active. Commit after this many changed files (default: 5).",
     control: thresholdInput,
-  }));
+  });
+  const updateThresholdVisibility = () => {
+    const show = (ac.mode || "off") === "auto"
+      && Array.isArray(ac.triggers) && ac.triggers.includes("file-count-threshold");
+    thresholdField.style.display = show ? "" : "none";
+  };
+  updateThresholdVisibility();
+  triggerPanel.appendChild(thresholdField);
   wrap.appendChild(triggerPanel);
 
   // ── Custom script & secret scan ──────────────────────────────────────────
@@ -7750,13 +7797,18 @@ async function viewProjectAutoCommit() {
         customScriptInput.focus();
         return;
       }
-      const out = { mode };
+      // Clone the loaded object so unknown keys (e.g. authority_overrides) survive the save (#1206).
+      const out = clone(ac);
+      out.mode = mode;
       if (mode === "auto") {
         out.triggers = triggers;
         const thr = parseInt(thresholdInput.value, 10);
         out.file_count_threshold = isNaN(thr) ? 5 : Math.max(1, thr);
+      } else {
+        delete out.triggers;
+        delete out.file_count_threshold;
       }
-      if (script) out.custom_script = script;
+      if (script) { out.custom_script = script; } else { delete out.custom_script; }
       out.secret_scan = ac.secret_scan !== false;
       try { await saveProjectSection("auto_commit", out, status); }
       catch { /* toast + inline status are surfaced by saveProjectSection */ }
@@ -10904,7 +10956,7 @@ async function viewTierPresets() {
       }
     };
     try {
-      await api.post("/api/tier-presets/update", tierPresetsData);
+      if (!await postTierPresetsConfirmingLoss(tierPresetsData)) return;
       toast("Preset added!", "success");
       await loadData();
     } catch (err) {
@@ -10947,7 +10999,7 @@ async function viewTierPresets() {
           delete newPresetsData[pid].providers[pName];
         }
       });
-      await api.post("/api/tier-presets/update", newPresetsData);
+      if (!await postTierPresetsConfirmingLoss(newPresetsData)) return;
       toast("Saved", "success");
       await loadData();
     } catch (err) {

@@ -367,3 +367,54 @@ def test_drift_is_changed_files_scoped(tmp_path):
         changed_files={"docs/plans/2026-09-13-demo.md"},
     )
     assert len(_drift(in_scope)) == 1
+
+
+_DRAFT_SPEC = "# Demo — Spec\n> Status: DRAFT\n"
+
+
+def test_dashed_task_headers_still_trigger_approval_gate(tmp_path):
+    _write(tmp_path, _DRAFT_SPEC, _plan("### T1 — step one\n### T2 — step two\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert any(f.check == "spec_plan_approval_marker" and f.severity == Severity.ERROR
+               for f in findings)
+
+
+def test_task_like_headers_without_parsed_tasks_report_explicit_finding(tmp_path):
+    _write(tmp_path, _GOOD_SPEC, _plan("### T1 — step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert any(f.check == "spec_plan_no_tasks_detected" and f.severity == Severity.WARNING
+               for f in findings)
+
+
+def test_canonical_task_headers_produce_no_new_findings(tmp_path):
+    _write(tmp_path, _GOOD_SPEC, _plan("### Task T1: step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert not any(f.check == "spec_plan_no_tasks_detected" for f in findings)
+    assert not any(f.check == "spec_plan_approval_marker" for f in findings)
+
+
+def test_bold_approved_value_counts_as_approved(tmp_path):
+    spec = _GOOD_SPEC.replace("> Status: APPROVED (2026-09-13)", "> Status: **APPROVED** — 2026-09-13")
+    _write(tmp_path, spec, _plan("### T1 — step one\n"))
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    assert not any(f.check == "spec_plan_approval_marker" for f in findings)
+
+
+def test_classify_spec_suffix_is_spec():
+    from lib.consistency.spec_plan import _classify
+    assert _classify("2026-11-09-x-spec.md") == "spec"
+    assert _classify("2026-11-09-x-design.md") == "spec"
+    assert _classify("2026-11-09-x-plan.md") == "plan"
+    assert _classify("2026-11-09-x-spike.md") == "spike"
+
+
+def test_spec_suffix_file_is_not_blamed_for_missing_spec_field(tmp_path):
+    (tmp_path / "docs" / "specs").mkdir(parents=True)
+    (tmp_path / "docs" / "plans").mkdir(parents=True)
+    (tmp_path / "docs" / "specs" / "2026-09-13-demo-spec.md").write_text(
+        _GOOD_SPEC.replace("SPEC-demo", "SPEC-demo2"), encoding="utf-8")
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    spec_fs = [f for f in findings if f.file.endswith("-spec.md")]
+    assert not any("no '**Spec:**' reference" in f.message for f in spec_fs)
+    assert any("spec-id 'SPEC-demo2' is not referenced by any plan" in f.message
+               for f in spec_fs)

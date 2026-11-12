@@ -5068,6 +5068,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
             if not isinstance(data, dict):
                 return self._send_json({"error": "Payload must be a JSON object"}, status=400)
+            from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
+            data = dict(data)
+            # issue #1173: consume the lossy-save opt-in before preset
+            # validation so it is neither rejected nor persisted.
+            allow_lossy = bool(data.pop(ALLOW_LOSSY_KEY, False))
             for preset_id, preset_val in data.items():
                 if not isinstance(preset_val, dict) or (
                     "tiers" not in preset_val and "mapping" not in preset_val
@@ -5085,8 +5091,34 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                             prov_val.pop("source", None)
             path = resolve_asset(self.__class__.root, "config") / "tier-presets.yaml"
             path.parent.mkdir(parents=True, exist_ok=True)
+            from lib.io import yaml_dump_preserving_multiline
+
+            new_text = yaml_dump_preserving_multiline(
+                yaml,
+                data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            # issue #1173: same diff guard as ai-providers (#847) — PyYAML
+            # drops comments, so abort unless ``allow_lossy`` was requested.
+            if path.exists():
+                from lib.yaml_roundtrip import (
+                    YamlRoundTripLoss,
+                    assert_roundtrip_preserved,
+                )
+
+                try:
+                    assert_roundtrip_preserved(
+                        path.read_text(encoding="utf-8"),
+                        new_text,
+                        context=f"config/{path.name}",
+                        allow_lossy=allow_lossy,
+                    )
+                except YamlRoundTripLoss as exc:
+                    return self._send_json({"error": str(exc)}, status=400)
             with path.open("w", encoding="utf-8") as fh:
-                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+                fh.write(new_text)
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_TIER_PRESETS_UPDATE")
