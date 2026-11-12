@@ -208,3 +208,36 @@ def test_valid_config_still_renders_enabled_commit_authority(tmp_path):
     rendered = (p / ".opencode" / "agents" / "developer.md").read_text(encoding="utf-8")
     assert "`auto_commit.mode: auto` enabled" in rendered
     assert "Commit authority (issue #694): off" not in rendered
+
+
+def _schema_keys():
+    schema = json.loads((REPO_ROOT / "config" / "project-config.schema.json")
+                        .read_text(encoding="utf-8"))
+    return set(schema["properties"]["auto_commit"]["properties"])
+
+
+def test_static_fallback_equals_schema_properties():
+    from lib import auto_commit
+    assert set(auto_commit._STATIC_KEYS) == _schema_keys()
+
+
+def test_schema_only_key_is_accepted(tmp_path):
+    # a key added only in the schema must not be reported as unknown
+    from lib import auto_commit
+    schema = json.loads((REPO_ROOT / "config" / "project-config.schema.json")
+                        .read_text(encoding="utf-8"))
+    schema["properties"]["auto_commit"]["properties"]["authority_overrides"] = {"type": "object"}
+    path = tmp_path / "schema.json"
+    path.write_text(json.dumps(schema), encoding="utf-8")
+    assert "authority_overrides" in auto_commit._load_schema_keys(path)
+
+
+def test_missing_schema_falls_back_to_static_keys(tmp_path):
+    from lib import auto_commit
+    assert auto_commit._load_schema_keys(tmp_path / "missing.json") == auto_commit._STATIC_KEYS
+
+
+def test_unknown_key_message_names_key_and_source():
+    v = auto_commit_violations({"auto_commit": {"mode": "off", "bogus": 1}})
+    msg = [m for m in v if "bogus" in m][0]
+    assert "config/project-config.schema.json" in msg and "allowed:" in msg
