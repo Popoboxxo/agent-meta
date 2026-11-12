@@ -176,14 +176,23 @@ def test_changelog_mentions_964_items():
     assert "#964" in section
 
 
-def test_branch_guard_limits_moved_to_concept_doc():
-    # #1161: the rule keeps both anchored headings and points at the doc that
-    # carries the full known-limits text moved out of the always-on rule.
+def test_branch_guard_limits_inline():
+    # #1161 moved the limits to a concept doc; #1180 (spec S8, decision 40)
+    # made the rule self-contained again: core limits inline, no docs/concepts path.
     rule = _read("rules/1-generic/branch-guard.md")
     doc = _read("docs/concepts/branch-guard-known-limits.md")
     assert "## Guard-Terminologie: Convention Boundary vs. Security Boundary" in rule
     assert "## Bekannte Grenzen" in rule
-    assert "docs/concepts/branch-guard-known-limits.md" in rule
+    assert "docs/concepts" not in rule
+    for inline in (
+        "Indirektion (`eval`, `$(...)`, `xargs`) bleibt unerkannt",
+        "(#551/#592/#809)",
+        "direkte Schreibzugriffe auf `.git/`",
+        "andere Git-Tools (`hub`, `gh repo ...`)",
+        "Destructive-Gate (#809)",
+        "#595",
+    ):
+        assert inline in rule, inline
     for gap in (
         '1. `eval "git commit ..."` wird nicht erkannt.',
         "2. Direkte Schreibzugriffe auf `.git/` werden nicht geprüft.",
