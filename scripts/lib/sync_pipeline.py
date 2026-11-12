@@ -1990,10 +1990,13 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     # Issue #1091: an invalid block must not break sync (existing projects
     # keep syncing, rc=0), but commit authority is disabled fail-safe and the
     # user is told loudly. No time-based grace.
-    for _violation in auto_commit_violations(config):
+    _violations = auto_commit_violations(config)
+    for _violation in _violations:
         log.warn(
             f"auto_commit is invalid ({_violation}); "
-            "commit authority disabled (mode: off)")
+            "allowlist not rewritten (an existing one stays as-is)")
+    if _violations:
+        return
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
     resolved["eligible_roles"] = [
         role for role in resolved["eligible_roles"] if active_set.has(role)
