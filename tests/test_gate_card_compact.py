@@ -53,6 +53,8 @@ Rebaseline log:
   plugin tier). The fixture now loads like production
   (``load_providers_config(root, config)``); the committed ``AGENTS.md`` is the
   reference and the render is byte-identical to it.
+- Issue #1183: the compact render appends one pointer line
+  (``Weitere Regeln als Skills: ...``) to the gate card; nothing else changed.
 """
 from __future__ import annotations
 

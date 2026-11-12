@@ -62,6 +62,8 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 - **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
 - **reqogniloom:** `workspace.close`, `workspace.reactivate`, `workspace.delete`, `permissions.set_rule`, `permissions.list`, `permissions.revoke`, `permissions.check`, `admin.backup_create`, `admin.backup_list`, `admin.restore`, `audit.query`, `audit.ai_review`, `events.dlq_list`, `events.dlq_replay`, `user.create`, `user.assign_role`, `user.list`, `user.deactivate` — absolut verboten.
 
+Weitere Regeln als Skills: a2a-delegation-gates, admin-ui, architecture, brainstorming-gate, branch-guard, conventions, issue-lifecycle, lifecycle-tasks, plan-ledger, provider-agnostic, se-cascade-adr-standard, se-cascade-artifact-taxonomy, se-cascade-review-lifecycle, security-paved-roads, session-conclusion, session-recovery, spec-plan-workflow, submodule-protection, sync-interface, threat-model-4-questions, writing-plans
+
 
 
 ## Agent Directory

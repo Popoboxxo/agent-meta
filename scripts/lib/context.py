@@ -2388,6 +2388,47 @@ def build_gate_card(
     return "\n\n".join(sections) + "\n"
 
 
+def _warn_compacted_away_rules(
+    agent_meta_root, project_root, config, variables, log, provider,
+    shared_users, sharer_caps, native_rules, rule_stems,
+) -> None:
+    """#1183: warn per unreachable rule; append a skill pointer line to GATE_CARD."""
+    from .rule_channels import lazy_skill_channel
+    from .rules import lazy_skill_stems
+
+    skill_stems: frozenset = frozenset()
+    if all(lazy_skill_channel(c) for c in sharer_caps.values()):
+        lazy = set.intersection(*[
+            lazy_skill_stems(agent_meta_root, project_root, config, p, c)
+            for p, c in sharer_caps.items()
+        ])
+        refs = {
+            stem for stem, *_ in compact_reference_skill_rules(
+                agent_meta_root, config, variables, log, shared_users
+            )
+        }
+        skill_stems = frozenset(lazy | refs)
+    gate_stems = frozenset(
+        spec.partition("#")[0] for spec in _load_gate_card_sections(agent_meta_root)
+    )
+    pointed = set()
+    for stem in rule_stems:
+        if stem in skill_stems:
+            pointed.add(stem)
+        if not rule_reachable_in_compact(
+            stem, gate_stems=gate_stems, native_rules=native_rules,
+            skill_stems=skill_stems,
+        ):
+            log.warn(
+                f"context.rule-compacted-away: rule '{stem}' removed for "
+                f"provider '{provider}' without a skills channel"
+            )
+    if pointed:
+        variables["GATE_CARD"] += (
+            "\nWeitere Regeln als Skills: " + ", ".join(sorted(pointed)) + "\n"
+        )
+
+
 def _enforce_compact_hard_cap(
     agent_meta_root: Path,
     config: dict,
@@ -2452,6 +2493,50 @@ def _shared_context_users(
     ] or [provider]
 
 
+def compact_reference_skill_rules(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    shared_users: list,
+) -> list:
+    """(stem, reference, opts, rel_source) of rules whose REFERENCE becomes a skill.
+
+    Single source for ``sync_compact_reference_skills`` (writer) and the block
+    render (pointer line), so every written skill is named and none is missing.
+    """
+    from .rules import collect_rule_sources, provider_opts_skip, resolve_rules
+
+    rule_options = resolve_rules(config, agent_meta_root)
+    found = []
+    for source_path, output_name in collect_rule_sources(
+        agent_meta_root, config.get("platforms", []), config=config
+    ):
+        rule_stem = Path(output_name).stem
+        if not _COMPACT_PLATFORM_RULES.get(rule_stem, {}).get("reference_skill"):
+            continue
+        opts = rule_options.get(rule_stem, {})
+        if all(provider_opts_skip(opts, user) for user in shared_users):
+            continue
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        content = substitute(
+            source_path.read_text(encoding="utf-8"), variables, rel_source, log
+        )
+        content = strip_inactive_conditional_blocks(content, variables)
+        _core, reference = _split_compact_rule(rule_stem, content)
+        if reference:
+            found.append((rule_stem, reference, opts, rel_source))
+    return found
+
+
+def rule_reachable_in_compact(
+    rule_stem: str, *, gate_stems: frozenset, native_rules: bool, skill_stems: frozenset
+) -> bool:
+    """True if the compact profile still delivers *rule_stem* (gate card, native rules or skill)."""
+    return rule_stem in gate_stems or native_rules or rule_stem in skill_stems
+
+
 def sync_compact_reference_skills(
     agent_meta_root: Path,
     project_root: Path,
@@ -2486,12 +2571,7 @@ def sync_compact_reference_skills(
     """
     from .context_profile import context_profile_variables
     from .rule_channels import lazy_skill_channel, provider_channel_caps
-    from .rules import (
-        collect_rule_sources,
-        lazy_skill_stems,
-        provider_opts_skip,
-        resolve_rules,
-    )
+    from .rules import lazy_skill_stems
     from .skill_channel import write_skill_channel_rule
 
     pc = (provider_config or {}).get(provider, {})
@@ -2507,30 +2587,14 @@ def sync_compact_reference_skills(
     if not all(lazy_skill_channel(caps) for caps in sharer_caps.values()):
         return
 
-    rule_options = resolve_rules(config, agent_meta_root)
     already_written = lazy_skill_stems(
         agent_meta_root, project_root, config, provider, sharer_caps[provider]
     )
     skills_target_dir = project_root / skills_dir_rel
-    for source_path, output_name in collect_rule_sources(
-        agent_meta_root, config.get("platforms", []), config=config
+    for rule_stem, reference, opts, rel_source in compact_reference_skill_rules(
+        agent_meta_root, config, variables, log, shared_users
     ):
-        rule_stem = Path(output_name).stem
-        if not _COMPACT_PLATFORM_RULES.get(rule_stem, {}).get("reference_skill"):
-            continue
         if rule_stem in already_written:
-            continue
-        opts = rule_options.get(rule_stem, {})
-        if all(provider_opts_skip(opts, user) for user in shared_users):
-            continue
-        layer = source_path.parts[-2]
-        rel_source = f"rules/{layer}/{source_path.name}"
-        content = substitute(
-            source_path.read_text(encoding="utf-8"), variables, rel_source, log
-        )
-        content = strip_inactive_conditional_blocks(content, variables)
-        _core, reference = _split_compact_rule(rule_stem, content)
-        if not reference:
             continue
         write_skill_channel_rule(
             rule_stem, reference, opts, skills_target_dir, project_root, log,
@@ -2873,6 +2937,7 @@ def _build_managed_block(
     # count); initialized here so the flag assignment after the branch is
     # always well-defined.
     lazy_rule_count = 0
+    compact_rule_stems: list[str] = []
 
     if not has_native_rules:
         rule_options = resolve_rules(config, agent_meta_root)
@@ -2939,6 +3004,7 @@ def _build_managed_block(
             # same physical file (issue #638: union, not current-provider-only).
             if all(_opts_skip(opts, p) for p in shared_users):
                 continue
+            compact_rule_stems.append(rule_stem)
             if rules_file_channel and rule_opts_lazy_channel(opts):
                 # Progressive disclosure (issues #192 Phase 2 + #540 Fix 1):
                 # the rule lives as a separate file; the block gets a pointer
@@ -3091,6 +3157,10 @@ def _build_managed_block(
             )
         local_vars["GATE_CARD"] = build_gate_card(
             agent_meta_root, config, local_vars, log
+        )
+        _warn_compacted_away_rules(
+            agent_meta_root, project_root, config, local_vars, log, provider,
+            shared_users, _sharer_caps, has_native_rules, compact_rule_stems,
         )
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
