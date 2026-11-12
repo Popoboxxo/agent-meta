@@ -137,7 +137,7 @@ class Repo:
 
     def _git(self, *args: str) -> "subprocess.CompletedProcess[str]":
         return subprocess.run(["git", "-C", self.path, *args], capture_output=True, text=True,
-                              errors="replace")
+                              encoding="utf-8", errors="replace")
 
     def exists(self, p: str) -> bool:
         return p in self.files or (p.endswith("/") and p in self.dirs)
@@ -168,7 +168,7 @@ def default_issue_runner(gh: str, repo: str) -> Callable[[int], Optional[str]]:
     """Return state string, None if the issue does not exist, raise RuntimeError otherwise."""
     def run(n: int) -> Optional[str]:
         r = subprocess.run([gh, "issue", "view", str(n), "--json", "state", "-q", ".state"],
-                           capture_output=True, text=True, cwd=repo)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=repo)
         if r.returncode == 0:
             return r.stdout.strip()
         if "Could not resolve" in r.stderr or "not found" in r.stderr.lower():
