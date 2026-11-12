@@ -303,3 +303,23 @@ def test_system_temp_exception_matrix(
     assert expected in err
     if temp_inside_project:
         assert "inside the project root" in err
+
+
+def _pin_env(monkeypatch, sink: Path) -> None:
+    """Env-based framework pin (TMPDIR/TEMP/TMP) with a cold tempdir cache."""
+    sink.mkdir(parents=True, exist_ok=True)
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(key, str(sink))
+    monkeypatch.setattr(tempfile, "tempdir", None)
+
+
+def test_system_temp_exception_accepts_pin_equivalent_temp_root(tmp_path, monkeypatch):
+    """U3-14 (#1189): TMPDIR=<sink> is the pin, not the system temp root."""
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    _validate(_exception(enabled=True, reason="unit-test reason"), tmp_path)
+
+
+def test_system_temp_exception_default_block_is_noop_under_pin(tmp_path, monkeypatch):
+    """U3-16: an absent block is never checked, pin or not."""
+    _pin_env(monkeypatch, tmp_path / ".tmp")
+    _validate({}, tmp_path)
