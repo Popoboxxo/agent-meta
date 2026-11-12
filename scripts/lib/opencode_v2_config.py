@@ -116,6 +116,10 @@ _V2_ONLY_OPTION_KEYS = (
 # (AC-B10/AC-T7): only keys that name a credential are inspected.
 _SECRET_NAME_MARKERS = ("key", "secret", "token")
 
+# Top-level keys the v2 surface ignores (depth lives at experimental.*); a
+# leftover from an older init is removed on sync (#1194).
+_DEAD_TOP_LEVEL_KEYS = ("subagent_depth",)
+
 # State namespaces (spec §3.2) — re-exported from ``isolation``, which owns the
 # state file, so the literals have exactly one source of truth. Each writer
 # reads/writes only its own namespace (IC-09, no clobbering).
@@ -774,6 +778,14 @@ def sync_opencode_v2_managed_keys(
 
     new_state: dict[str, dict] = {}
     changed = False
+    if targets:  # v2 active; on v1/rollback targets is empty -> untouched
+        for dead_key in _DEAD_TOP_LEVEL_KEYS:
+            if existing.pop(dead_key, None) is not None:
+                changed = True
+                log.action(
+                    "REMOVE", committed,
+                    f"opencode-v2 dead top-level key '{dead_key}'",
+                )
     for path in sorted(set(state) | set(targets)):
         result = merge_managed_path(
             path,

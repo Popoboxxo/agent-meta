@@ -436,6 +436,16 @@ def v2_connection_key_violations(connection: object) -> list[tuple[str, str]]:
 def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
     findings: list[Finding] = []
 
+    if "subagent_depth" in doc:
+        findings.append(
+            _finding(
+                path,
+                "opencode-json-v2 carries a top-level 'subagent_depth' "
+                "(dead key)",
+                "use 'experimental.subagent_depth'",
+            )
+        )
+
     mcp = doc.get("mcp")
     if _declares_mcp_content(mcp):
         if not isinstance(mcp, dict):
