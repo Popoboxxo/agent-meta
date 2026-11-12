@@ -882,24 +882,6 @@ def inject_debug_block(content: str, agent_name: str) -> str:
         agent_name=agent_name,
     )
 
-def _map_claude_tools_to_gemini_tools(tools: list) -> list[str]:
-    """Map Claude Code tool names to Gemini native tool names.
-
-    Gemini available tools: code_execution, google_search, url_context.
-    File system tools (Read, Write, Edit, Glob, Grep) are automatically
-    active in the Gemini sandbox and don't need explicit mapping.
-    """
-    mapping = {
-        "Bash": "code_execution",
-        "WebSearch": "google_search",
-        "WebFetch": "url_context",
-    }
-    mapped: set[str] = set()
-    for t in tools:
-        if isinstance(t, str) and t in mapping:
-            mapped.add(mapping[t])
-    return sorted(mapped)
-
 def _map_claude_tools_to_opencode_permissions(
     tools: list,
     deny_list: list[str] | None = None,
