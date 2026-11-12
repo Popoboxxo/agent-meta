@@ -51,7 +51,12 @@ def _wait_http(url, timeout=15):
 
 
 @pytest.fixture
-def viz_root(socket_enabled, tmp_path):
+def viz_root(request, tmp_path):
+    # socket_enabled only exists with pytest-socket (not installed in CI)
+    try:
+        request.getfixturevalue("socket_enabled")
+    except pytest.FixtureLookupError:
+        pass
     port = _free_port()
     # viz-report.py serves docs/ui/live-dashboard.html from <root>/docs
     for name in ("scripts", "docs"):
