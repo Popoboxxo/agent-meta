@@ -59,14 +59,14 @@ def test_override_warning():
     assert context_profile_override_warnings({"context-profile": "compact"}, ["Opencode"]) == []
 
 
-def test_e2e_compact_advisory(tmp_path):
+def _run_sync(tmp_path, extra_yaml):
     cfg = tmp_path / ".meta-config" / "project.yaml"
     cfg.parent.mkdir()
     cfg.write_text(
         'agent-meta-version: "2.0.0-beta.8"\nai-providers:\n- Opencode\n'
         "dod-preset: rapid-prototyping\ncontext-profile: compact\n"
-        "orchestrator:\n  mode: advisory\n"
-        "variables:\n  PROJECT_NAME: t\n  PROJECT_PREFIX: t\n",
+        + extra_yaml
+        + "variables:\n  PROJECT_NAME: t\n  PROJECT_PREFIX: t\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -77,3 +77,19 @@ def test_e2e_compact_advisory(tmp_path):
     )
     assert r.returncode == 0, r.stdout[-1500:] + r.stderr[-1500:]
     assert (tmp_path / "AGENTS.md").exists()
+    return r.stdout + r.stderr
+
+
+def test_e2e_compact_advisory(tmp_path):
+    _run_sync(tmp_path, "orchestrator:\n  mode: advisory\n")
+
+
+def test_e2e_compact_main_chat_warns_once(tmp_path):
+    out = _run_sync(tmp_path, "orchestrator:\n  mode: main-chat\n")
+    assert out.count("context.gate-card: section") == 1, out[-1500:]
+    assert "orchestrator.mode=main-chat" in out
+
+
+def test_e2e_mode_override_warning(tmp_path):
+    out = _run_sync(tmp_path, "context_file:\n  mode: full\n")
+    assert out.count("context-profile.mode-override") == 1, out[-1500:]
