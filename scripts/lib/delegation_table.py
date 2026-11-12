@@ -371,7 +371,7 @@ def get_routing_rules(
             continue
         handoff = role_info.get("handoff")
         handoff = handoff if isinstance(handoff, dict) else {}
-        rules.append({
+        rule = {
             "agent": role_name,
             "tier": role_info.get("workflow_tier", "optional"),
             "parallel": bool(routing.get("parallel", False)),
@@ -383,7 +383,12 @@ def get_routing_rules(
                 str(c) for c in (handoff.get("input_contracts") or [])
                 if str(c).strip() and str(c) in produced
             ],
-        })
+        }
+        # #1086h: emitted only (the LLM resolves overlaps); bool is not an int here.
+        prio = routing.get("priority")
+        if isinstance(prio, int) and not isinstance(prio, bool):
+            rule["priority"] = prio
+        rules.append(rule)
 
     name_index = []
     derived_warnings: set[str] = set()
