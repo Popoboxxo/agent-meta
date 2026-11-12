@@ -6,15 +6,15 @@ Unter opencode mit `auto_commit.mode: auto` entstehen keine inkrementellen Commi
 werden am Task-Ende gebatcht.
 
 **Root Causes (mit Beleg):**
-1. `scripts/lib/auto_commit.py:14` (`_ELIGIBLE_TOOLS = {"Edit","Write"}`) und
-   `is_role_eligible()` (`:32-39`) prüfen **nur** Edit/Write, **nicht** Bash. Der
-   `orchestrator` (Tools `[TodoWrite, Agent, Read, Write]`, `agents/1-generic/orchestrator.md:7-12`)
+1. `scripts/lib/auto_commit.py::_ELIGIBLE_TOOLS` (`{"Edit","Write"}`) und
+   `scripts/lib/auto_commit.py::is_role_eligible` prüfen **nur** Edit/Write, **nicht** Bash. Der
+   `orchestrator` (Tools `[TodoWrite, Agent, Read, Write]`, `agents/1-generic/orchestrator.md:7-12` (Stand 9aa0e0c0))
    und `documenter` (Read/Write/Edit, kein Bash) gelten damit als commit-eligible.
-2. `render_auto_commit_block()` (`auto_commit.py:85-169`) rendert für **jede** Rolle
+   (Stand vor #767; heute: `is_role_eligible` liefert `role_commit_authority(...) == AUTHORITY_DIRECT`.)
+2. `scripts/lib/auto_commit.py::render_auto_commit_block` rendert für **jede** Rolle
    identisch „Commit directly as soon as ANY trigger is true". Der Block ist eine
-   **globale** Variable (`scripts/lib/config.py:1302-1315`, in `_build_core_variables`,
-   Funktionskopf `config.py:1172`), identisch in jedes Template mit
-   `{{#if AUTO_COMMIT_ENABLED}}` substituiert (`orchestrator.md:335-336`).
+   **globale** Variable (`scripts/lib/config.py::_build_core_variables`), identisch in jedes Template mit
+   `{{#if AUTO_COMMIT_ENABLED}}` substituiert (`orchestrator.md:335-336`, Stand 9aa0e0c0).
 3. Der `orchestrator` hat unter opencode `permission.bash: deny`
    (`docs/analysis/evidence/2026-09-30-runtime-opencode-v2.md:63-67`) und kann den Befehl
    gar nicht ausführen → widersprüchliche Anweisung; Git wird bis zum Workflow-Ende
@@ -23,7 +23,7 @@ werden am Task-Ende gebatcht.
    „kann an `git` delegieren". Die meisten schreibfähigen Doku-/Konzept-Rollen
    (`documenter`, `copyeditor`, `technical-writer`, `concept-architect`,
    `concept-specifier`, se-*) haben **weder** Bash **noch** das `Agent`/`Task`-Tool
-   (`_tools_can_spawn`, `scripts/lib/agent_sync.py:65-85`) und können daher **gar nicht**
+   (`scripts/lib/agent_sync.py::_tools_can_spawn`) und können daher **gar nicht**
    committen — weder direkt noch per Delegation. Sie brauchen einen dritten Pfad
    (`notify`): Dateiliste + fertige Commit-Message in den Report, damit der Aufrufer/
    Orchestrator committet.
@@ -63,22 +63,22 @@ oben durch. Der Template-Platzhalter `AUTO_COMMIT_BLOCK` bleibt unverändert; di
 Unterscheidung entsteht ausschließlich in der Rollen-Overlay-Logik des Syncs.
 
 ## Interface Contracts
-- `auto_commit.py:is_role_eligible(role, agent_meta_root, platform=None) -> bool`
+- `scripts/lib/auto_commit.py::is_role_eligible(role, agent_meta_root, platform=None) -> bool`
   **Neu:** True nur bei `Bash` **und** (`Edit` **oder** `Write`) — also
   `Bash` ∧ (`Edit` ∨ `Write`), nicht `Edit` ∧ `Write`. `git`/`explorer` bleiben
   False. Basis bleibt das 1-generic-Frontmatter (`tools:`), provider-agnostisch.
-- `auto_commit.py:role_commit_authority(role, agent_meta_root, platform=None) -> Literal["direct","delegate","notify","none"]`
-  **Neu.** `platform=None` aus Symmetrie zu `is_role_eligible` (`_template_path`,
-  `auto_commit.py:19-29`). Ermittlung:
+- `scripts/lib/auto_commit.py::role_commit_authority(role, agent_meta_root, platform=None) -> Literal["direct","delegate","notify","none"]`
+  **Neu.** `platform=None` aus Symmetrie zu `is_role_eligible` (früher `_template_path`, heute nicht mehr als
+  Modul-Symbol vorhanden; vgl. `scripts/lib/config_audit.py::_template_path_for_role`). Ermittlung:
   - kein Write (weder `Edit` noch `Write`) → `"none"`
   - `Bash` ∧ (`Edit` ∨ `Write`) → `"direct"`
   - (`Edit` ∨ `Write`) ∧ ¬Bash ∧ spawn-fähig → `"delegate"`
   - (`Edit` ∨ `Write`) ∧ ¬Bash ∧ ¬spawn-fähig → `"notify"`
   Spawn-Fähigkeit = `Agent` oder `Task` in `tools` (oder `*`), konsistent mit
-  `agent_sync._tools_can_spawn` (`agent_sync.py:65-85`). Um einen Import-Zyklus zu
+  `scripts/lib/agent_sync.py::_tools_can_spawn`. Um einen Import-Zyklus zu
   vermeiden, darf `auto_commit.py` das Prädikat lazy importieren oder spiegeln —
   der Contract ist die Semantik, nicht der Importpfad.
-- `auto_commit.py:render_auto_commit_block(resolved, authority="direct") -> str`
+- `scripts/lib/auto_commit.py::render_auto_commit_block(resolved, authority="direct") -> str`
   **Erweitert.** Modus domininiert die Authority (siehe Contract weiter unten):
   - `mode == "off"` → `""` (unabhängig von `authority`)
   - `mode == "suggest"` → **dieselbe** propose-only-Prosa für **jede** Authority
@@ -109,14 +109,14 @@ Unterscheidung entsteht ausschließlich in der Rollen-Overlay-Logik des Syncs.
 - **Fail-closed (F4):** ein unbekannter oder `None`-`authority`-Wert wird als
   `"none"` behandelt und rendert `""`; der Default-Parameter `authority="direct"`
   bleibt unverändert (nur ungültige explizite Werte werden herabgestuft).
-- `config.py:_build_core_variables` legt `variables["_AUTO_COMMIT_RESOLVED"]` ab
+- `scripts/lib/config.py::_build_core_variables` legt `variables["_AUTO_COMMIT_RESOLVED"]` ab
   (Präzedenz: `_INTENT_ROUTING_TOOL_DEFS`) statt nur den globalen Text; Auto-commit-
-  Variablen liegen im Block `config.py:1302-1315` innerhalb `_build_core_variables`
-  (Funktionskopf `config.py:1172`).
-- `agent_sync.py:sync_agents_for_provider` überschreibt pro Rolle
+  Variablen liegen im Block um `AUTO_COMMIT_ENABLED` innerhalb
+  `scripts/lib/config.py::_build_core_variables`.
+- `scripts/lib/agent_sync.py::sync_agents_for_provider` überschreibt pro Rolle
   `merged_vars["AUTO_COMMIT_BLOCK"]` und `merged_vars["AUTO_COMMIT_ENABLED"]` direkt
-  nach Zeile `1337` (dort ist `role` bekannt; `merged_vars` wird bereits pro Rolle
-  gebaut, `substitute` in `:654`):
+  nach dem Rollen-Overlay-Punkt (dort ist `role` bekannt; `merged_vars` wird bereits pro Rolle
+  gebaut, `substitute` im selben Loop):
   ```
   authority = role_commit_authority(role, agent_meta_root)
   if resolved.mode == "off":
@@ -134,13 +134,13 @@ Unterscheidung entsteht ausschließlich in der Rollen-Overlay-Logik des Syncs.
 2. `build_variables`: `render_auto_commit_block(...)` global (Default `direct`, dient
    nur als Fallback für Pfade außerhalb des Rollen-Overlays) + `_AUTO_COMMIT_RESOLVED`
    in den Variablen.
-3. `sync_pipeline._sync_stage_auto_commit_allowlist` (`sync_pipeline.py:1479-1494`)
+3. `scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist`
    schreibt `eligible_roles` = nur `direct`-Rollen in
    `.meta-config/auto-commit-allowlist.json`.
-4. Pro Rolle im Agent-Loop (`agent_sync.py:1324-1347`, Overlay nach `:1337`):
+4. Pro Rolle im Agent-Loop (`scripts/lib/agent_sync.py::sync_agents_for_provider`, Overlay nach Rollenbestimmung):
    `role_commit_authority` → `AUTO_COMMIT_BLOCK`/`AUTO_COMMIT_ENABLED` rollen-spezifisch
-   überschreiben → `substitute` (`:654`). **Off-Gate hat Vorrang vor jeder Authority.**
-5. Guard-Hook (`hooks/1-generic/orchestrator-guard-impl.sh:201-232`) liest die Allowlist
+   überschreiben → `substitute`. **Off-Gate hat Vorrang vor jeder Authority.**
+5. Guard-Hook (`hooks/1-generic/orchestrator-guard-impl.sh::_ALLOWLIST`) liest die Allowlist
    unverändert (trust-only). `delegate`-/`notify`-Rollen stehen nicht drin und brauchen
    den Sentinel nicht, da `git` (bzw. der Aufrufer) committet.
 
@@ -227,7 +227,7 @@ Unterscheidung entsteht ausschließlich in der Rollen-Overlay-Logik des Syncs.
   Delegationsanweisung); der User/Orchestrator entscheidet. Keine offene Frage mehr.
 - Risiko: Rollen mit Bash aber ohne Write (z. B. `git`) bleiben `none` — korrekt, eigener
   Pfad (volle Commit-Authority via Bash + eigener Sentinel).
-- Risiko: Plattform-Override könnte `tools:` ersetzen; bereits in `auto_commit.py:19-27`
+- Risiko: Plattform-Override könnte `tools:` ersetzen; bereits in `scripts/lib/auto_commit.py`
   als out-of-scope dokumentiert.
 - Risiko: `notify`-Rollen „verlieren" den Commit, wenn der Aufrufer die Message nicht
   aufgreift. Bewusst: sie committen nie selbst; die Message ist der Contract.
@@ -235,7 +235,7 @@ Unterscheidung entsteht ausschließlich in der Rollen-Overlay-Logik des Syncs.
 ## Scope-Grenzen
 OUT: opencode Runtime-Hook/Plugin, das Trigger **mechanisch** auslöst. auto_commit ist
 bewusst prompt-advisory auf allen Providern ohne Runtime-Dispatch-Gate
-(`subagent_permissions.py:1-7`, `docs/superpowers/plans/2026-09-08-auto-commit-tiers.md`) —
+(`scripts/lib/subagent_permissions.py`, `docs/superpowers/plans/2026-09-08-auto-commit-tiers.md`) —
 ein solcher Gate ist ein separates Feature (eigene Spec). Der Claude-Guard-Hook-Sentinel
 bleibt Claude-only und anderswo harmlos. Keine Template-/`{{#if}}`-Änderungen.
 
