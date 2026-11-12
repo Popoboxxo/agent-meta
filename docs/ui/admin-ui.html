@@ -6249,6 +6249,26 @@ function checkboxField(label, value, onChange, help) {
   return field;
 }
 
+// options: [{ name, id }] — onChange receives the checked names in options order.
+function checkboxGroupField(label, options, selected, onChange, help) {
+  const field = el("fieldset", { class: "field", style: "border:none; padding:0; margin:0;" });
+  field.appendChild(el("legend", { class: "field-label" }, [label]));
+  const chosen = new Set(Array.isArray(selected) ? selected : []);
+  options.forEach(({ name, id }) => {
+    const cb = el("input", { type: "checkbox", id });
+    cb.checked = chosen.has(name);
+    cb.addEventListener("change", () => {
+      if (cb.checked) chosen.add(name); else chosen.delete(name);
+      onChange(options.map(o => o.name).filter(n => chosen.has(n)));
+    });
+    field.appendChild(el("div", { class: "flex-row", style: "gap:var(--space-2);" }, [
+      cb, el("label", { for: id }, [name]),
+    ]));
+  });
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
+  return field;
+}
+
 function tagEditorField(label, values, onChange, helpText) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
@@ -7691,7 +7711,8 @@ async function viewProjectAutoCommit() {
     "Mode",
     ["off", "suggest", "auto", "custom"],
     ac.mode || "off",
-    v => { ac.mode = v; },
+    // updateThresholdVisibility is declared below; it only runs on user change, after setup.
+    v => { ac.mode = v; updateThresholdVisibility(); },
     {
       off: "off — only the git role commits (default)",
       suggest: "suggest — propose a commit message, never run git",
@@ -7715,17 +7736,25 @@ async function viewProjectAutoCommit() {
 
   const triggerPanel = el("div", { class: "panel" });
   triggerPanel.appendChild(el("h2", {}, ["Triggers (mode: auto)"]));
-  triggerPanel.appendChild(tagEditorField(
+  triggerPanel.appendChild(checkboxGroupField(
     "Triggers",
+    TRIGGERS.map(name => ({ name, id: `auto-commit-trigger-${name}` })),
     Array.isArray(ac.triggers) ? ac.triggers : [],
-    v => { ac.triggers = v; },
-    `Any one firing commits (OR'd). Allowed: ${TRIGGERS.join(", ")}. Only consulted under mode "auto".`
+    v => { ac.triggers = v; updateThresholdVisibility(); },
+    `Any one firing commits (OR'd). Only consulted under mode "auto".`
   ));
-  triggerPanel.appendChild(a11yField({
+  const thresholdField = a11yField({
     id: "auto-commit-threshold", label: "File count threshold",
     help: "Only read when the file-count-threshold trigger is active. Commit after this many changed files (default: 5).",
     control: thresholdInput,
-  }));
+  });
+  const updateThresholdVisibility = () => {
+    const show = (ac.mode || "off") === "auto"
+      && Array.isArray(ac.triggers) && ac.triggers.includes("file-count-threshold");
+    thresholdField.style.display = show ? "" : "none";
+  };
+  updateThresholdVisibility();
+  triggerPanel.appendChild(thresholdField);
   wrap.appendChild(triggerPanel);
 
   // ── Custom script & secret scan ──────────────────────────────────────────
