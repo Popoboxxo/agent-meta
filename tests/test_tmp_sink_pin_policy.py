@@ -239,3 +239,21 @@ def test_eval_call_provider_uses_passed_env_and_pins_by_default(tmp_path, monkey
     assert seen[-1]["MARK"] == "1" and "TMPDIR" not in seen[-1]
     ev.call_provider(*args)
     assert seen[-1]["TMPDIR"] == _sink(root)
+
+
+# --- D8 documentation assertions (#1189) -----------------------------------
+
+
+def test_prison_mode_5_5_distinguishes_pin_from_system_temp():
+    text = (REPO_ROOT / "docs/concepts/repo-containment-prison-mode.md").read_text(encoding="utf-8")
+    assert "der framework-eigene Pin" in text and "ist **kein** System-Temp-Root" in text
+    assert "pytest **ohne** `--basetemp` erbt den Pin" in text
+    assert "`tests/conftest.py` warnt nur" in text
+
+
+def test_predecessor_spec_option_c_links_this_spec():
+    text = (REPO_ROOT / "docs/specs/2026-10-24-tmp-sink-injection-spec.md").read_text(encoding="utf-8")
+    option_c = text[text.index("### Option C"):]
+    option_c = option_c[:option_c.index("**Begründung der Empfehlung:**")]
+    assert "SPEC-1189-tmp-sink-pin-vs-system-temp" in option_c
+    assert "abzüglich des framework-eigenen Pins" in option_c

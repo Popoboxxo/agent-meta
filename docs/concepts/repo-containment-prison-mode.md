@@ -432,6 +432,14 @@ Self-Hosting-Tests in `tests/`):
    `.meta-config/project.yaml` (`TEST_COMMANDS`): `python3 -m pytest tests/
    --basetemp={{PYTEST_BASETEMP}}`.
 
+**Pin ist kein System-Temp-Root (#1189):** Die System-Temp-Prüfung (`system-temp-exception`) und
+`{{PYTEST_BASETEMP}}` betrachten den **ungepinnten** System-Temp-Root, also den Temp-Root ohne
+`TMPDIR`/`TEMP`/`TMP`. Der Pin (`TMPDIR=<sink>`, den `sync.py`, Admin-Server und
+Eval ihren Kindprozessen mitgeben) ist ein Transportdetail: der framework-eigene Pin ist **kein** System-Temp-Root;
+eine Config, die nur durch den Pin im Projekt landet, ist deshalb kein Fehler. **Grenze:**
+pytest **ohne** `--basetemp` erbt den Pin und landet im Sink; `tests/conftest.py` warnt nur
+(Punkt 5), es bricht nicht ab. Punkt 1 bleibt unverändert: der kanonische Lauf setzt `--basetemp`.
+
 Punkt 1 hat **zwei** Gründe, nicht nur den Plattenplatz: liegt der Basetemp im Arbeitsbaum,
 dann liegt auch `tmp_path` im Arbeitsbaum. Tests, die die Repo-Wurzel-Erkennung prüfen (sie
 suchen nach `.meta-config/` oder danach, ob ein Pfad innerhalb des Containment-Roots liegt),
