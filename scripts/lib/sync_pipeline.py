@@ -2049,7 +2049,7 @@ def _sync_stage_context_checks(
     for message in profile_info_messages or ():
         log.note("context-profile", message)
     try:
-        from lib.consistency import active_set_refs, context_budget
+        from lib.consistency import active_set_refs, context_budget, doc_pointers
         from lib.context_report import measure_artifacts, merge_provider_mappings
 
         provider_config = load_providers_config(agent_meta_root, config)
@@ -2094,6 +2094,7 @@ def _sync_stage_context_checks(
             (context_budget, "check_marker_in_rule", {}),
             (context_budget, "check_declared_surface_empty", {}),
             (context_budget, "check_legacy_artifact_present", {}),
+            (doc_pointers, "check_dangling_doc_pointer", {}),
             (active_set_refs, "check_dangling_dispatch", {}),
             (active_set_refs, "check_dangling_mention", {}),
             (active_set_refs, "check_unresolved_placeholder", {}),

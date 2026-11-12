@@ -13,8 +13,7 @@
       jede mit eindeutiger `orchestrator_id` und disjunktem Scope. Fehlende
       oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
-   Fehlende Provider-Unterstützung degradiert laut auf `subagent`
-   (siehe `docs/concepts/active/orchestrator-topology.md`).
+   Fehlende Provider-Unterstützung degradiert laut auf `subagent`.
 {{else}}
 {{#if ORCH_TOPOLOGY_EFFECTIVE_EXPLICIT}}
 2. **Orchestrator-Topologie ({{ORCH_TOPOLOGY}}):**
@@ -26,7 +25,7 @@
       oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
-   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
+   degradiert laut auf `subagent`.
 {{else}}
 2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker{{#if ROLE_ORCHESTRATOR_ACTIVE}} → `orchestrator`{{/if}} → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
 {{/if}}
@@ -41,7 +40,7 @@ den praktischen Fehlerfall ab:
 
 | Check | Status | Begründung |
 |---|---|---|
-| `delegation_depth ≤ {{A2A_MAX_DEPTH}}` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
+| `delegation_depth ≤ {{A2A_MAX_DEPTH}}` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. |
 | Plattform-Tiefenlimit | Hinweis | Laut Plattform-Doku (Claude Code, in diesem Repo nicht verifiziert): Subagenten schachteln bis 3 Ebenen unter dem Main Chat; änderbar über die Env-Var `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. |
 | `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | live (Soft Gate) | sync liest den Key (Default 10, geklemmt 1–50) in `A2A_MAX_DEPTH`; der Orchestrator rendert ihn als Soft Gate `depth>{{A2A_MAX_DEPTH}}`. Kein Hard-Reject: der enforced-Pfad wurde aus `validate_envelope()` entfernt |
 
