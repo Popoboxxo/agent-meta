@@ -1,7 +1,7 @@
 # Test requirements for orchestration dry-run
 # Install: pip install -r tests/requirements.txt
 
-# Newer pytest/jsonschema need Python >=3.10; CI still tests 3.9, so 3.9 keeps the old floor.
+# Newer pytest/jsonschema need Python >=3.10; CI still tests 3.9, so 3.9 keeps the old floor. pytest-split 0.11 drops 3.9.
 pytest>=7.0; python_version < "3.10"
 pytest>=9.2.0; python_version >= "3.10"
 pyyaml>=6.0.3
@@ -10,4 +10,5 @@ tomli>=2.5.0; python_version < "3.11"
 jsonschema>=4.0; python_version < "3.10"
 jsonschema>=4.26.0; python_version >= "3.10"
 pytest-xdist>=3.8.0
-pytest-split>=0.8
+pytest-split>=0.8; python_version < "3.10"
+pytest-split>=0.11.0; python_version >= "3.10"
