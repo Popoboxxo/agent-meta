@@ -48,6 +48,7 @@ _DEFAULT_SPIKES_DIR = "docs/spikes"
 # when it matches exactly one of these; anything else is legacy (WARNING).
 _SPIKE_RE = re.compile(r".*-spike\.md$")
 _DESIGN_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+-design\.md$")
+_SPEC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+-spec\.md$")
 _DATED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 
 # Hyphen-aware task header. The single source of truth lives in
@@ -324,7 +325,7 @@ def _matches_template(name: str) -> bool:
 def _classify(name: str) -> str:
     if _SPIKE_RE.match(name):
         return "spike"
-    if _DESIGN_RE.match(name):
+    if _DESIGN_RE.match(name) or _SPEC_RE.match(name):
         return "spec"
     return "plan"
 

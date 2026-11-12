@@ -398,3 +398,23 @@ def test_bold_approved_value_counts_as_approved(tmp_path):
     _write(tmp_path, spec, _plan("### T1 — step one\n"))
     findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
     assert not any(f.check == "spec_plan_approval_marker" for f in findings)
+
+
+def test_classify_spec_suffix_is_spec():
+    from lib.consistency.spec_plan import _classify
+    assert _classify("2026-11-09-x-spec.md") == "spec"
+    assert _classify("2026-11-09-x-design.md") == "spec"
+    assert _classify("2026-11-09-x-plan.md") == "plan"
+    assert _classify("2026-11-09-x-spike.md") == "spike"
+
+
+def test_spec_suffix_file_is_not_blamed_for_missing_spec_field(tmp_path):
+    (tmp_path / "docs" / "specs").mkdir(parents=True)
+    (tmp_path / "docs" / "plans").mkdir(parents=True)
+    (tmp_path / "docs" / "specs" / "2026-09-13-demo-spec.md").write_text(
+        _GOOD_SPEC.replace("SPEC-demo", "SPEC-demo2"), encoding="utf-8")
+    findings = check_spec_plan_workflow(tmp_path, _ENABLED, agent_meta_root=REPO_ROOT)
+    spec_fs = [f for f in findings if f.file.endswith("-spec.md")]
+    assert not any("no '**Spec:**' reference" in f.message for f in spec_fs)
+    assert any("spec-id 'SPEC-demo2' is not referenced by any plan" in f.message
+               for f in spec_fs)

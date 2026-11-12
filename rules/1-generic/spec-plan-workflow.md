@@ -11,6 +11,8 @@ diese Rule gar nicht ausgeliefert.
 classify → spec → approve → plan → execute
 ```
 
+Specs heißen `YYYY-MM-DD-<topic>-design.md` oder `YYYY-MM-DD-<topic>-spec.md`.
+
 1. **classify** — jede Anfrage VOR jeder Implementierung klassifizieren (siehe unten).
 2. **spec** — bei Bounded/Architectural eine Spec nach dem Pflicht-Template schreiben,
    Self-Review, danach `concept-reviewer` (bei L/XL verbindlich).
