@@ -1628,3 +1628,46 @@ def test_f6_09_literal_text_is_not_a_push(repo_on_main, command):
 def test_f6_09_real_ansi_c_push_still_blocks(repo_on_main):
     result = _run_hook(repo_on_main, "git $'\\x70ush' origin main")
     assert result.returncode == 2, result.stderr
+
+
+# --- heredoc body on a line that also carries '&&' / ';' (false positive) ---
+
+_PROSE = ("Merge nach `main` per PR #1224, Squash-Commit 53460042.\n"
+          "`am-dev` Tier-/Alias-ID\n")
+_HEREDOC_CHAINED_TEXT = [
+    f"mkdir -p d && cat > f <<'EOF'\n{_PROSE}EOF\ngh issue comment 898 --body-file f",
+    f"mkdir -p d; cat > f <<'EOF'\n{_PROSE}EOF",
+    "x && cat > f <<EOF\n`a` alias\nEOF",
+    "x; cat > f <<EOF\n`a` alias\nEOF",
+]
+_HEREDOC_CHAINED_BLOCKED = [
+    "x && bash <<EOF\ngit push origin main\nEOF",
+    "x && cat <<EOF | bash\ngit push origin main\nEOF",
+    "x; cat > f <<EOF; bash f\ngit push origin main\nEOF",
+    "git push origin main",
+    "git push --force origin main",
+    "git push origin HEAD:main",
+    "git -C x push origin main",
+]
+
+
+@pytest.mark.parametrize("command", _HEREDOC_CHAINED_TEXT)
+def test_heredoc_chained_text_consumer_is_not_a_push(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", _HEREDOC_CHAINED_BLOCKED)
+def test_heredoc_chained_counter_probes_stay_blocked(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+
+
+def test_heredoc_chained_push_on_main_checkout_stays_blocked(repo_on_main):
+    assert _run_hook(repo_on_main, "git push").returncode == 2
+
+
+def test_heredoc_eval_indirection_behaviour_unchanged(repo_on_feature_branch):
+    # convention boundary: variable indirection is not resolved (documented gap)
+    result = _run_hook(repo_on_feature_branch, "c='git push origin main'; eval \"$c\"")
+    assert result.returncode == 0, result.stderr
