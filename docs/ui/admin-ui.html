@@ -7750,13 +7750,18 @@ async function viewProjectAutoCommit() {
         customScriptInput.focus();
         return;
       }
-      const out = { mode };
+      // Clone the loaded object so unknown keys (e.g. authority_overrides) survive the save (#1206).
+      const out = clone(ac);
+      out.mode = mode;
       if (mode === "auto") {
         out.triggers = triggers;
         const thr = parseInt(thresholdInput.value, 10);
         out.file_count_threshold = isNaN(thr) ? 5 : Math.max(1, thr);
+      } else {
+        delete out.triggers;
+        delete out.file_count_threshold;
       }
-      if (script) out.custom_script = script;
+      if (script) { out.custom_script = script; } else { delete out.custom_script; }
       out.secret_scan = ac.secret_scan !== false;
       try { await saveProjectSection("auto_commit", out, status); }
       catch { /* toast + inline status are surfaced by saveProjectSection */ }
