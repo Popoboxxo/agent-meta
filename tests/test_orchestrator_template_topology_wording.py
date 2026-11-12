@@ -74,8 +74,7 @@ _A2A_EXPLICIT_BLOCK = (
     "      oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).\n"
     "   G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.\n"
     "   Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung\n"
-    "   degradiert laut auf `subagent` (siehe "
-    "`docs/concepts/active/orchestrator-topology.md`)."
+    "   degradiert laut auf `subagent`."
 )
 
 # Derived ``subagent`` position (flag axis inactive): today's ``{{else}}``.

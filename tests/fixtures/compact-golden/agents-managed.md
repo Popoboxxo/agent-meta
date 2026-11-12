@@ -50,7 +50,7 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
       oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
-   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
+   degradiert laut auf `subagent`.
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 
 # MCP Hard Prohibitions

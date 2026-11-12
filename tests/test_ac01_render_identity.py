@@ -1012,6 +1012,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   Opencode matrix project the orchestrator is derived `primary`, so exactly **1 of 1096 hashes moved;
   0 added/removed**: ``Opencode/.opencode/agents/agent-meta-manager.md`` ``c660ad41…`` -> ``82729745…``
   (only the first bullet: "der **ist** der Session-Einstieg" instead of "der vom `main_chat` gespawnte").
+- Issues #1180/#1000 (2026-11-12): **24 of 1096 hashes moved; 0 added/removed**. #1180 inlined the core limits
+  and dropped the ``docs/concepts`` pointers in ``a2a-delegation-gates``/``branch-guard``/``repo-containment``
+  (3 Claude + 3 Continue + 3 Copilot rule files + ``AGENTS.md`` of the six AGENTS.md providers); #1000 added one
+  ``spec-plan-workflow`` bullet that is inlined into the orchestrator artifact (9 providers). Re-written via
+  ``--write``; the ``topology-golden``/``active-set-prose`` a2a fixtures lost the same pointer text.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

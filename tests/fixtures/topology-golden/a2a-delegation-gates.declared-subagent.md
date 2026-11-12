@@ -12,7 +12,7 @@
       oder doppelte ID = HARD ERROR beim Spawn (beide Eigentümer nennen).
    G3 Ein Orchestrator dispatcht NIE einen Orchestrator — HARD REJECT.
    Der Main Chat ist der einzige Aggregator; fehlende Provider-Unterstützung
-   degradiert laut auf `subagent` (siehe `docs/concepts/active/orchestrator-topology.md`).
+   degradiert laut auf `subagent`.
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren. Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als `failed`.
 
 ## Degradierte Checks (Doku-Pflicht, kein Gate — Issue #346)
@@ -23,7 +23,7 @@ den praktischen Fehlerfall ab:
 
 | Check | Status | Begründung |
 |---|---|---|
-| `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
+| `delegation_depth ≤ 10` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. |
 | Plattform-Tiefenlimit | Hinweis | Laut Plattform-Doku (Claude Code, in diesem Repo nicht verifiziert): Subagenten schachteln bis 3 Ebenen unter dem Main Chat; änderbar über die Env-Var `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. |
 | `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | live (Soft Gate) | sync liest den Key (Default 10, geklemmt 1–50) in `A2A_MAX_DEPTH`; der Orchestrator rendert ihn als Soft Gate `depth>10`. Kein Hard-Reject: der enforced-Pfad wurde aus `validate_envelope()` entfernt |
 
