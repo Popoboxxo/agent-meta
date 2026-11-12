@@ -3,7 +3,7 @@ type: "Concept"
 title: "Kernprinzip 7: PAL Variables & Dynamic Template Substitution"
 description: "Dynamisches Variablen-Substitutionssystem zur Anpassung generischer Agenten-Templates an Projekt- und Plattformkontexte."
 tags: [core-principle, architecture, pal, variables, substitution, templating]
-timestamp: "2026-07-27"
+timestamp: "2026-11-11"
 ---
 
 # Kernprinzip 7: PAL Variables & Dynamic Template Substitution
@@ -77,8 +77,8 @@ graph BT
 
 Um eine neue Platzhalter-Variable im Framework einzuführen, sind folgende Schritte erforderlich:
 
-1. **Erfassung in Engine:** Registrierung der Variable in `scripts/lib/config.py` in den Methoden `build_variables()` oder `_inject_dod()`.
-2. **Dokumentation:** Eintrag in der Variablen-Tabelle der globalen `CLAUDE.md` / `AGENTS.md`.
+1. **Erfassung in Engine:** Registrierung der Variable in `scripts/lib/config.py` (`_build_core_variables()` bzw. `build_variables()`).
+2. **Dokumentation:** Projektweite Werte unter `variables:` in `.meta-config/project.yaml`; auto-injizierte Variablen in `docs/guides/features/sync-concept.md` ablegen.
 3. **Template-Nutzung:** Verwendung des Platzhalters `{{%NEUE_VARIABLE%}}` im entsprechenden Agenten-Template.
 
 ---
