@@ -40,3 +40,15 @@ def test_dangling_doc_pointer_check(tmp_path):
 def test_severity_registered_and_no_docs_url_variable():
     assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.WARNING
     assert "DOCS_URL" not in (REPO_ROOT / "scripts/lib/variables.py").read_text(encoding="utf-8")
+
+
+def test_repo_containment_has_no_provider_specific_pointer():
+    text = (REPO_ROOT / "rules/1-generic/repo-containment.md").read_text(encoding="utf-8")
+    assert ".claude/rules/" not in text
+
+
+def test_lazy_table_lists_all_se_cascade_skills():
+    text = (REPO_ROOT / "rules/1-generic/use-lazy-rules.md").read_text(encoding="utf-8")
+    for stem in ("se-cascade-adr-standard", "se-cascade-artifact-taxonomy",
+                 "se-cascade-review-lifecycle"):
+        assert f"| {stem} |" in text

@@ -48,7 +48,7 @@ from tests.test_ac01_render_identity import _make_project, _run_sync  # noqa: E4
 # project costs ~10 s). Mammouth/Continue share the same empty-skills-dir defect
 # (measured in the docstring above) but are not re-rendered here.
 DEFAULT_MATRIX = ["Gemini", "Claude", "Codex"]
-LAZY_TABLE_SKILLS = 15
+LAZY_TABLE_SKILLS = 18
 
 
 def _make_lazy_project(root: Path, provider: str) -> Path:
