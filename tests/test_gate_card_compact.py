@@ -214,9 +214,7 @@ def test_gate_card_sections_are_registered_in_the_registry():
         assert spec in sections, f"gate_card_sections missing {spec!r}"
 
 
-@pytest.mark.parametrize(
-    "spec", ["use-orchestrator#No Such Section", "no-such-rule#Whatever"]
-)
+@pytest.mark.parametrize("spec", ["no-such-rule#Whatever"])
 def test_missing_gate_card_section_raises(
     monkeypatch, tmp_path, loaded_config, provider_config, capabilities, spec
 ):

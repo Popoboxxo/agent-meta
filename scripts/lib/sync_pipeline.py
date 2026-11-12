@@ -2066,6 +2066,20 @@ def _sync_stage_context_checks(
         ]
         for line in context_profile_info_lines(resolved_profiles, agent_meta_root):
             log.note("context-profile.unverified", line)
+        from lib.context_profile import context_profile_override_warnings
+        from lib.providers import resolve_context_filename
+
+        for line in context_profile_override_warnings(
+            config, providers,
+            {
+                p: resolve_context_filename(
+                    (provider_config.get(p) or {}).get("context_file", "CLAUDE.md"),
+                    p, provider_config.get(p) or {},
+                )
+                for p in providers
+            },
+        ):
+            log.warn(line)
         report = None
         try:  # measure once, shared by hard/soft cap checks
             report = measure_artifacts(project_root, providers, capabilities)

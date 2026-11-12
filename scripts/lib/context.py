@@ -2326,6 +2326,18 @@ def _extract_rule_section(rule_text: str, heading: str) -> str | None:
     return "\n".join(lines[start:end]).strip()
 
 
+def _gate_card_mode(variables: dict) -> str:
+    """Orchestrator mode derived from the ORCH_MODE_* flag strings."""
+    for key, mode in (
+        ("ORCH_MODE_STRICT", "strict"),
+        ("ORCH_MODE_ADVISORY", "advisory"),
+        ("ORCH_MODE_MAIN_CHAT", "main-chat"),
+    ):
+        if variables.get(key) == "true":
+            return mode
+    return "unknown"
+
+
 def build_gate_card(
     agent_meta_root: Path,
     config: dict,
@@ -2337,8 +2349,8 @@ def build_gate_card(
     The section names come from ``config/context-anchors.yaml::gate_card_sections``;
     every section is read from its source rule and substituted like the embedded
     rules are, so the card is never a hand-maintained copy. A section whose rule
-    or heading is missing aborts the sync with ``SyncError`` instead of shipping
-    a partial gate card.
+    is missing aborts the sync with ``SyncError``; a missing heading (mode
+    without that section) is warned about and the section is omitted.
     """
     from .rules import collect_rule_sources
 
@@ -2365,10 +2377,13 @@ def build_gate_card(
         content = strip_inactive_conditional_blocks(content, variables)
         section = _extract_rule_section(content, heading)
         if section is None:
-            raise SyncError(
-                f"context.gate-card: section '{heading}' missing in {rel_source} "
-                "(gate_card_sections)"
+            # Entscheidung 41: the heading only exists in some orchestrator
+            # modes; warn and omit the section instead of aborting.
+            log.warn(
+                f"context.gate-card: section '{heading}' not rendered for "
+                f"orchestrator.mode={_gate_card_mode(variables)} ({rel_source})"
             )
+            continue
         sections.append(section)
     return "\n\n".join(sections) + "\n"
 
