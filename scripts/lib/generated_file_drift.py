@@ -25,6 +25,7 @@ Spec: docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md
 from __future__ import annotations
 
 import fnmatch
+import glob
 import json
 import re
 from datetime import datetime
@@ -32,7 +33,10 @@ from pathlib import Path
 from typing import Optional
 
 from .deactivation import get_active_providers
-from .io import content_hash, load_json_file, load_yaml_file, safe_path, write_atomic
+from .io import (
+    content_hash, load_json_file, load_yaml_file, run_git_check_ignore, safe_path,
+    write_atomic,
+)
 from .log import SyncLog
 from .pipelines import resolve_pipeline_details_dir
 from .rule_index import read_managed_index
@@ -148,6 +152,8 @@ def select_prunable_sync_backups(
     target_dir: Path,
     max_per_source: int,
     log: Optional[SyncLog] = None,
+    max_total: Optional[int] = None,
+    project_root: Optional[Path] = None,
 ) -> list[Path]:
     """Pure selection of the ``*.sync-backup-*`` siblings a prune would delete.
 
@@ -161,6 +167,13 @@ def select_prunable_sync_backups(
     CLI ``--cleanup-preview`` (which only reports it) so the two can never
     silently diverge (advisory parity). Fail-soft: a missing/unlistable dir
     yields ``[]``; a listing error is debug-logged when *log* is given.
+
+    *max_total* (#1195, default None = off) adds a per-directory cap: when more
+    than *max_total* backups remain after the per-source pass, the oldest
+    non-protected ones are selected too (the newest backup of each source is
+    protected, so the remainder may stay above the cap). Only backups that
+    ``git check-ignore`` (run in *project_root*) confirms as ignored are added
+    by this pass; no git / no *project_root* / not ignored -> left alone.
     """
     if not target_dir.is_dir():
         return []
@@ -193,6 +206,30 @@ def select_prunable_sync_backups(
         )
         if newer >= keep:
             prunable.append(path)
+
+    if max_total is None or project_root is None:
+        return prunable
+    chosen = set(prunable)
+    remaining = len(backups) - len(chosen)
+    if remaining <= max_total:
+        return prunable
+    newest: dict[str, tuple[datetime, str]] = {}
+    for path, source, stamp in backups:
+        newest[source] = max(newest.get(source, (stamp, path.name)), (stamp, path.name))
+    for path, source, stamp in sorted(backups, key=lambda b: (b[2], b[0].name)):
+        if remaining <= max_total:
+            break
+        if path in chosen or newest[source] == (stamp, path.name):
+            continue
+        try:
+            rel = path.relative_to(project_root).as_posix()
+        except ValueError:
+            continue
+        result = run_git_check_ignore(rel, str(project_root), "-q")
+        if result is None or result.returncode != 0:
+            continue
+        prunable.append(path)
+        remaining -= 1
     return prunable
 
 
@@ -203,6 +240,7 @@ def prune_sync_backups(
     dry_run: bool,
     max_age_days: int,
     max_per_source: int,
+    max_total: Optional[int] = None,
 ) -> list[str]:
     """Delete ``*.sync-backup-*`` siblings in *target_dir* per retention policy.
 
@@ -227,7 +265,9 @@ def prune_sync_backups(
         return []
 
     pruned: list[str] = []
-    for path in select_prunable_sync_backups(target_dir, max_per_source, log):
+    for path in select_prunable_sync_backups(
+        target_dir, max_per_source, log, max_total=max_total, project_root=project_root,
+    ):
         try:
             path.unlink()
         except OSError as exc:
@@ -459,6 +499,25 @@ def resolve_drift_findings(
 
 
 
+def _latest_backup_with_content(target: Path, content: str) -> Optional[Path]:
+    """Newest ``<target>.sync-backup-*`` sibling iff its text equals *content*.
+
+    Fail-safe: any read/list problem -> None (the caller then writes a backup).
+    """
+    try:
+        stamped = [
+            (stamp, p) for p in target.parent.glob(f"{glob.escape(target.name)}.sync-backup-*")
+            if (stamp := _sync_backup_timestamp(p.name)) is not None
+            and _sync_backup_source(p.name) == target.name
+        ]
+        if not stamped:
+            return None
+        latest = max(stamped, key=lambda item: (item[0], item[1].name))[1]
+        return latest if latest.read_text(encoding="utf-8") == content else None
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
 def backup_drifted_files(
     findings: list[dict], project_root: Path, log: SyncLog, dry_run: bool = False,
 ) -> list[str]:
@@ -498,6 +557,14 @@ def backup_drifted_files(
                     f"could not read '{rel_path}' for backup: {type(exc).__name__}: {exc}",
                 )
                 continue
+        latest = _latest_backup_with_content(target, existing_content)
+        if latest is not None:
+            # Same content as the newest backup of this source: reuse it (#1195).
+            try:
+                backups.append(latest.relative_to(project_root).as_posix())
+            except ValueError:
+                backups.append(str(latest))
+            continue
         backup = target.with_name(f"{target.name}.sync-backup-{ts}")
         if not dry_run:
             try:

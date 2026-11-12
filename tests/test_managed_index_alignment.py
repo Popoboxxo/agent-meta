@@ -134,7 +134,7 @@ def test_pipeline_invokes_prune_after_drift(tmp_path: Path, monkeypatch) -> None
     }
     calls: list[tuple] = []
 
-    def _spy(target_dir, prj_root, log, dry_run, max_age_days, max_per_source):
+    def _spy(target_dir, prj_root, log, dry_run, max_age_days, max_per_source, max_total=None):
         calls.append((Path(target_dir), Path(prj_root), dry_run, max_age_days, max_per_source))
         return []
 
@@ -168,7 +168,7 @@ def test_pipeline_prunes_when_drift_detection_disabled(tmp_path: Path, monkeypat
     }
     calls: list[tuple] = []
 
-    def _spy(target_dir, prj_root, log, dry_run, max_age_days, max_per_source):
+    def _spy(target_dir, prj_root, log, dry_run, max_age_days, max_per_source, max_total=None):
         calls.append((Path(target_dir), dry_run, max_age_days, max_per_source))
         return []
 

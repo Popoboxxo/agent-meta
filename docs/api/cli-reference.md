@@ -214,6 +214,7 @@ documented deviation, to be resolved by a later spec revision per AC-26; out of 
 | `--list-backups` | Lists all available backup archives with metadata. |
 | `--delete-backup ARCHIVE` | Deletes a specific backup archive. |
 | `--prune-backups` | Deletes old backups according to the defined retention policy. |
+| `--prune-sync-backups` | Prunes `*.sync-backup-*` files in managed dirs (3 per source, at most 30 per dir; the newest per source and non-gitignored files are never removed). With `--dry-run` it only lists the candidates as JSON. |
 
 ## Cache & Discovery
 

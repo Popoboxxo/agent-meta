@@ -968,6 +968,8 @@ def _sync_stage_legacy_cleanup(
 # still passed through for API stability but no longer drives pruning.
 SYNC_BACKUP_MAX_AGE_DAYS = 30
 SYNC_BACKUP_MAX_PER_SOURCE = 3
+# #1195: per-directory cap; the newest backup of every source is never pruned.
+SYNC_BACKUP_MAX_TOTAL_PER_DIR = 30
 
 
 def _deactivated_provider_warning(provider: str) -> str:
@@ -1036,6 +1038,7 @@ def _prune_managed_sync_backups(
             managed_dir, project_root, log, args.dry_run,
             max_age_days=SYNC_BACKUP_MAX_AGE_DAYS,
             max_per_source=SYNC_BACKUP_MAX_PER_SOURCE,
+            max_total=SYNC_BACKUP_MAX_TOTAL_PER_DIR,
         )
 
 
