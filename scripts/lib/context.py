@@ -2397,7 +2397,8 @@ def _warn_compacted_away_rules(
     from .rules import lazy_skill_stems
 
     skill_stems: frozenset = frozenset()
-    if all(lazy_skill_channel(c) for c in sharer_caps.values()):
+    has_channel = all(lazy_skill_channel(c) for c in sharer_caps.values())
+    if has_channel:
         lazy = set.intersection(*[
             lazy_skill_stems(agent_meta_root, project_root, config, p, c)
             for p, c in sharer_caps.items()
@@ -2419,9 +2420,11 @@ def _warn_compacted_away_rules(
             stem, gate_stems=gate_stems, native_rules=native_rules,
             skill_stems=skill_stems,
         ):
+            # Cause differs: no channel at all vs channel without a skill for this rule.
+            cause = "without a skills channel" if not has_channel else "and no skill exists for it"
             log.warn(
                 f"context.rule-compacted-away: rule '{stem}' removed for "
-                f"provider '{provider}' without a skills channel"
+                f"provider '{provider}' {cause}"
             )
     if pointed:
         variables["GATE_CARD"] += (
