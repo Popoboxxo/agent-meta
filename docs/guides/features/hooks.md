@@ -78,6 +78,24 @@ Jedes Hook-Skript beginnt mit Metadaten-Kommentaren:
 | `hook_protocol` | Protokoll-Key | Optional: Skript nur deployen, wenn der Provider dasselbe `hook_protocol` spricht (z.B. `antigravity-hooks-json`) |
 | `enabled_by_default` | `true`/`false` | Default-Aktivierungszustand. `sync.py` registriert den Hook genau dann automatisch, wenn `true`; pro Projekt überschreibbar via `hooks.<name>.enabled` |
 
+**Hooks aktiver Tools (z.B. `graphify-*-guard`):** Ist ein Tool aktiv, wird
+dessen Hook zwar nach `.claude/hooks/` kopiert, aber **nicht** automatisch
+registriert -- `sync.py` loggt `copied (not enabled)`. Grund: bewusst kein
+Auto-Enable, weil die Hooks Tool-Aufrufe umleiten (Seiteneffekt) und
+`enabled_by_default` dieser Hooks `false` ist. Aktivieren pro Projekt in
+`.meta-config/project.yaml`:
+
+```yaml
+hooks:
+  graphify-read-guard:
+    enabled: true
+  graphify-search-guard:
+    enabled: true
+```
+
+Danach `python scripts/sync.py` erneut ausführen; die Log-Zeile wechselt auf
+`registered in settings.json`.
+
 **Helper-Skripte:** Dateien ohne `# hook:`-Header sind keine eigenständigen Hooks.
 Sie werden immer mitkopiert, aber **nie registriert** — sie werden von einem
 registrierten Hook aufgerufen (z.B. `orchestrator-guard-impl.sh`,

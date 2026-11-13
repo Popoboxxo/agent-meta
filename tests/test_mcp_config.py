@@ -355,7 +355,7 @@ def test_codex_toml_mcp_writer_golden(tmp_path):
     # Idempotent: re-run on unchanged content → skip, file untouched.
     log2 = SyncLog()
     _update_codex_toml_config(path, entries, log2, dry_run=False, allow_secrets=True)
-    assert any("unchanged" in s for s in log2.skipped)
+    assert bool(log2.unchanged)
     assert path.read_text(encoding="utf-8") == content
 
 
@@ -477,7 +477,7 @@ def test_zcode_json_writer_merges_into_existing_config(tmp_path):
     _update_zcode_json_config(
         path, {"srv": {"type": "sse", "url": "https://x"}}, log2, dry_run=False, allow_secrets=True,
     )
-    assert any("unchanged" in s for s in log2.skipped)
+    assert bool(log2.unchanged)
 
 
 def test_kimicode_mcp_config_declares_kimi_json_format():
@@ -566,7 +566,7 @@ def test_write_provider_config_kimi_json_warns_on_unresolved_env_ref(tmp_path):
     assert ".kimi-code/mcp.json" in joined
     assert "bearerTokenEnvVar" in joined
 
-    assert log.skipped
+    assert log.unchanged
     assert log.actions == []
 
 
@@ -608,7 +608,7 @@ def test_write_provider_config_kimi_json_non_dict_entries_do_not_crash(tmp_path)
     _write_provider_config(path, entries, "kimi-json", log, dry_run=True, allow_secrets=True)
 
     assert not any("UNVERIFIED" in w for w in log.warnings)
-    assert log.skipped
+    assert log.unchanged
     assert log.actions == []
 
 
@@ -777,7 +777,7 @@ def test_continue_writer_local_config_gets_name_version_and_request_options(tmp_
     log2 = SyncLog()
     _update_continue_yaml_config(path, entries, log2, dry_run=False, allow_secrets=True)
     assert path.read_text(encoding="utf-8") == content
-    assert any("unchanged" in s for s in log2.skipped)
+    assert bool(log2.unchanged)
 
 
 def test_continue_writer_preserves_existing_name_version(tmp_path):
@@ -853,7 +853,7 @@ def test_write_provider_config_vscode_settings_idempotent(tmp_path):
 
     log2 = SyncLog()
     _write_provider_config(path, entries, "vscode-settings", log2, dry_run=False, allow_secrets=True)
-    assert any("unchanged" in s for s in log2.skipped)
+    assert bool(log2.unchanged)
     assert path.read_text(encoding="utf-8") == first
 
 

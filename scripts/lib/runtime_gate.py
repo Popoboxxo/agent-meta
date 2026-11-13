@@ -271,7 +271,7 @@ def sync_runtime_gate_plugins(
                     if write_checked(target_path, content, log, rel_source, dry_run=dry_run):
                         log.action("COPY", rel_out, rel_source)
                     else:
-                        log.skip(rel_out, "unchanged")
+                        log.note_unchanged(rel_out)
                 except Exception as exc:  # noqa: BLE001 — mirror hook_plugins fail-soft
                     log.warning(f"Failed to deploy runtime-gate plugin {rel_out}: {exc}")
                     now_managed.discard(output_name)

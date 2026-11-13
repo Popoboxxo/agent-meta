@@ -1716,7 +1716,7 @@ def _run_common_tail(ctx: _SyncContext) -> None:
     env_results = generate_env_scripts(config, project_root, dry_run=args.dry_run)
     for rel, status in sorted(env_results.items()):
         if status == "skipped":
-            log.skip(rel, "unchanged")
+            log.note_unchanged(rel)
         elif status != "dry-run":
             log.action("WRITE", rel, f"env script ({status})")
 

@@ -132,7 +132,7 @@ def sync_release_gates(
             if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
                 log.action("COPY", rel_out, rel_source)
             else:
-                log.skip(rel_out, "unchanged")
+                log.note_unchanged(rel_out)
         except Exception as exc:
             log.warning(f"Failed to deploy release gate {rel_out}: {exc}")
             continue
@@ -247,7 +247,7 @@ def _write_release_gate_checksums(
 
     rel = str(manifest_path.relative_to(project_root))
     if is_unchanged(manifest_path, content):
-        log.skip(rel, "unchanged")
+        log.note_unchanged(rel)
         return
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     # write_atomic, not write_checked: hex digests are not secrets, but the
@@ -326,7 +326,7 @@ def sync_hook_lib(
             if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
                 log.action("COPY", rel_out, rel_source)
             else:
-                log.skip(rel_out, "unchanged")
+                log.note_unchanged(rel_out)
         except Exception as exc:
             log.warning(f"Failed to deploy hook lib file {rel_out}: {exc}")
             continue

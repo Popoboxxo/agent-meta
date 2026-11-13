@@ -333,7 +333,7 @@ def generate_external_tool_artifacts(
             if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
                 log.action("WRITE", rel_out, src_label)
             else:
-                log.skip(rel_out, "unchanged")
+                log.note_unchanged(rel_out)
 
         # Remove stale tool-*.md rule files no longer covered by the current
         # active-tool list (tool deactivated in project.yaml or removed from

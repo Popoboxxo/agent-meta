@@ -198,7 +198,7 @@ def test_generate_is_idempotent_second_run_skips(tmp_path):
         agent_meta_root, project_root, {}, provider_config, log2,
         dry_run=False, provider="Claude",
     )
-    assert any("unchanged" in s for s in log2.skipped)
+    assert bool(log2.unchanged)
 
 
 def test_generate_warns_on_missing_declared_hook(tmp_path):
