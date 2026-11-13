@@ -496,7 +496,7 @@ jobs:
           --durations=20 -ra
 
       - name: Upload baseline
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-durations
           path: .test_durations
