@@ -198,7 +198,7 @@ def test_only_promoted_checks_emit_error(default_projects, mappings):
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
     assert cb.PHASE1_PROMOTED == {
         "context.dangling-pointer", "context.rule-unreachable",
-        "context-profile.marker-in-rule",
+        "context-profile.marker-in-rule", "context.dangling-doc-pointer",
     }
     for check, level in cb.EMITTED_SEVERITY.items():
         expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING

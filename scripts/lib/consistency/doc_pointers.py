@@ -16,7 +16,7 @@ def check_dangling_doc_pointer(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """WARNING per backticked ``docs/...md`` path in a generated artifact that does not exist under *project_root*."""
+    """ERROR per backticked ``docs/...md`` path in a generated artifact that does not exist under *project_root*."""
     root = Path(project_root)
     findings, seen = [], set()
     for provider in active_providers:

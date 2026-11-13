@@ -47,6 +47,6 @@ version: 2.0.0
 
 {{/if}}## Anforderungs-Kategorien
 
-Kategorien für `docs/REQUIREMENTS.md`:
+Kategorien für Anforderungen{{REQUIREMENTS_DOC_REF}}:
 
 {{REQ_CATEGORIES_LIST}}

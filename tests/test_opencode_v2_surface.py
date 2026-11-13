@@ -5502,11 +5502,12 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # #1180/#1000 (2026-11-12): ac01-baseline re-pinned (24 hashes: rule pointer inlining + spec-plan-workflow bullet); compact-golden re-pinned (agents-managed.md a2a pointer removed); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # Worktree branch detection (2026-11-13): ac01-baseline re-pinned (dod-push-check 2.5.2 + branch-guard rule line; 11 hashes).
 # (2026-11-13): ac01-baseline re-pinned again after neutral worktree-branch wording in hook/rule comments (dod-push-check 2.5.3 quoted-text handling + branch-guard rule wording; 10 hashes).
+# #1180 REQUIREMENTS_DOC_REF gate (2026-11-13): ac01-baseline re-pinned (14 hashes: 7 CLAUDE.md/AGENTS.md + 7 context-hashes.json); slimming/compact-golden unchanged.
 # git agent sentinel doc (template-git 2.1.3 -> 2.1.4, section 0 text): `ac01-baseline`
 # re-pinned (git agent render of every provider); `slimming-golden` re-pinned (`git.md`
 # version pin + section 0); `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "60f8c949de379481f53d2c6a6a517c6814dbd72ff7da1d68cf50bd27f5b0245e",
+    "ac01-baseline": "4f300e115beda148b71fafcc7b6038abd0edf0835e6769d2c2a0136390923e01",
     "slimming-golden": "42d696d69427e65859193e32abfeb589e3549dc5059e5b46bfb0339d71bd0afa",
     "compact-golden": "3463b046b3ceaa17e61d7f51eb3163b2afeac52cd9fd13d16caff0bb512d8504",
 }

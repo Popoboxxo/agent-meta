@@ -33,7 +33,7 @@
 
 ## Anforderungs-Kategorien
 
-Kategorien für `docs/REQUIREMENTS.md`:
+Kategorien für Anforderungen (`docs/REQUIREMENTS.md`):
 
 - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
 - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)

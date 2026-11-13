@@ -165,7 +165,7 @@ def update_extensions(
         new_content = update_managed_block(existing, new_managed)
 
         if new_content == existing:
-            log.skip(str(ext_file.relative_to(project_root)), "managed block unchanged")
+            log.note_unchanged(str(ext_file.relative_to(project_root)))
         else:
             log.action("UPDATE", str(ext_file.relative_to(project_root)), "managed block")
             if not dry_run:

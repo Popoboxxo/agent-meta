@@ -413,7 +413,7 @@ def _sync_claude_isolation(
     if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
         log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed)}")
     else:
-        log.skip(rel_settings, "provider-isolation unchanged")
+        log.note_unchanged(rel_settings)
     _write_state(state_path, new_managed, dry_run)
 
 
@@ -471,7 +471,7 @@ def _sync_opencode_isolation(
     if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
         log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed_keys)}")
     else:
-        log.skip(rel_settings, "provider-isolation unchanged")
+        log.note_unchanged(rel_settings)
     _write_state(state_path, new_managed_keys, dry_run)
 
 
@@ -1127,7 +1127,7 @@ def _sync_opencode_runtime_gate(
     if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
         log.action("WRITE", rel_settings, ", ".join(action_parts) or "runtime-gate")
     else:
-        log.skip(rel_settings, "runtime-gate unchanged")
+        log.note_unchanged(rel_settings)
     if state_changed:
         _write_state(
             state_path,
@@ -1723,7 +1723,7 @@ def _sync_opencode_v2_gate_permissions(
         ):
             log.action("WRITE", committed, "opencode-v2 gate permissions")
         else:
-            log.skip(committed, "opencode-v2 gate permissions unchanged")
+            log.note_unchanged(committed)
 
     if state_changed:
         _write_state(state_path, new_state, dry_run, _STATE_V2_PERMISSIONS)
@@ -1812,7 +1812,7 @@ def _rollback_opencode_v1_gate_map(
         if write_checked(file_path, content, log, committed, dry_run=dry_run):
             log.action("WRITE", committed, "runtime-gate deny removed: permission map")
         else:
-            log.skip(committed, "runtime-gate deny unchanged")
+            log.note_unchanged(committed)
 
     if gate_state != before:
         _write_state(
@@ -2175,7 +2175,7 @@ def _sync_gemini_isolation(
     if write_checked(target_path, content, log, rel, dry_run=dry_run):
         log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} rule(s))")
     else:
-        log.skip(rel, "provider-isolation unchanged")
+        log.note_unchanged(rel)
 
 
 # ---------------------------------------------------------------------------
@@ -2222,7 +2222,7 @@ def _sync_continue_isolation(
     if write_checked(target_path, content, log, rel, dry_run=dry_run):
         log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} dir(s))")
     else:
-        log.skip(rel, "provider-isolation unchanged")
+        log.note_unchanged(rel)
 
 
 # ---------------------------------------------------------------------------
