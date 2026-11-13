@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.5.2
+# version: 2.5.3
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main (#1210); unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.5.3: a naive-split fragment cut out of the quoted text of a non-executing text consumer (gh --body "... && git push ...", echo, printf) is no longer blocked as a push with a quote spanning a command separator; wrappers (bash -c, eval, xargs) stay fail-closed. v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main; unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -244,7 +244,7 @@ PYEOF
 # detached HEAD or in an unresolvable repository (`--git-dir`, `GIT_DIR=`, or a
 # `-C`/leading `cd` target that is computed, missing, not a repo or detached)
 # are blocked because the destination cannot be determined safely. A literal
-# `-C` chain / leading `cd` is judged by that directory's own HEAD (#1210). A refspec-less
+# `-C` chain / leading `cd` is judged by that directory's own HEAD. A refspec-less
 # push (and a ref without destination) is also judged by the config that
 # routes it: push.default=matching, branch.<n>.merge, remote.<r>.push, and
 # `-c`/GIT_CONFIG* overrides of those on the command line.
@@ -371,7 +371,7 @@ def is_git(tok):
 Push = collections.namedtuple(
     "Push", "args foreign override config cdirs edir ebranch",
     defaults=((), None, None))
-REPO_OPTS = {"--git-dir", "--work-tree"}  # -C is tracked in cdirs (#1210)
+REPO_OPTS = {"--git-dir", "--work-tree"}  # -C is tracked in cdirs
 CONFIG_OPTS = {"-c", "--config", "--config-env"}
 CONFIG_KEYS = ("push.", "remote.", "branch.", "include")
 ENV_FOREIGN = ("GIT_DIR=", "GIT_WORK_TREE=", "GIT_COMMON_DIR=")
@@ -429,7 +429,7 @@ ALIAS_DEPTH = 16
 def git_subcommand(toks):
     # toks[0] is git: skip global options (with their values) and return
     # (subcommand or None, args after it, foreign, override, config, cdirs)
-    # where cdirs lists the -C values in order (#1210) and config lists every (key lower-case, value) set by -c/--config-env
+    # where cdirs lists the -C values in order and config lists every (key lower-case, value) set by -c/--config-env
     # (value None: taken from the environment, unknown).
     j = 1
     foreign, override, config, cdirs = False, (), [], ()
@@ -1067,7 +1067,7 @@ def config_recursion_block(p, pos):
 
 
 def destination_block(p):
-    # Judge the push in its effective directory (#1210): cwd, HEAD, remotes
+    # Judge the push in its effective directory: cwd, HEAD, remotes
     # and config are all read from there, then restored.
     global CURRENT, _refs, _remotes, _cfg, _cfg_ok
     if not p.edir:
@@ -1370,6 +1370,24 @@ def has_ansi_c(cmd):
     return False
 
 
+def is_text_consumer(stmt):
+    # True when every command of the (quote-aware) statement is a NON_EXEC
+    # text consumer (echo, gh, ...): its quoted text never executes. Anything
+    # unparseable or not clearly such a consumer -> False (fail closed).
+    try:
+        segs = list(segments(stmt))
+    except ValueError:
+        return False
+    for toks in segs:
+        i = 0
+        while i < len(toks) and (toks[i] in RESERVED or ASSIGNMENT.match(toks[i])):
+            i += 1
+        if (i >= len(toks) or os.path.basename(toks[i]) not in NON_EXEC
+                or segment_push_args(toks) is not None):
+            return False
+    return bool(segs)
+
+
 def classify(cmd):
     # bash drops backslash-newline before parsing: join continued lines first
     cmd = REDIRECT.sub(" ", strip_heredoc_bodies(cmd.replace("\\\n", "")))
@@ -1390,6 +1408,7 @@ def classify(cmd):
         strip_comment(s).strip()
         for text in texts
         for s in re.split(r"&&|\|\||;|\||&|\n", text) + quoted_statements(text)))
+    qstmts = [strip_comment(s).strip() for text in texts for s in quoted_statements(text)]
     ansi_c = has_ansi_c(cmd)
     parsed = {}  # stmt -> parses as-is (each statement is tokenized once)
     for stmt in stmts:
@@ -1397,6 +1416,12 @@ def classify(cmd):
         # 'alias': '-c alias.p=push p', '--config-env=alias.p=VAR p' (R2-5)
         if ("push" not in plain and not (ansi_c and "$'" in stmt)
                 and "alias" not in plain.lower()):
+            continue
+        # The naive split cut this fragment out of another command's quoted
+        # text (gh --body "... && git push ..."): data, not a push. A fragment
+        # that is itself a quote-aware statement is never skipped.
+        # shortcut: gh alias --shell can still run a push; known limit, see NON_EXEC comment
+        if stmt not in qstmts and any(stmt in q and is_text_consumer(q) for q in qstmts):
             continue
         segs = None
         # A quote opened here and closed on a later line (multi-line -m/--body
@@ -1433,7 +1458,7 @@ def classify(cmd):
     # A cd/pushd/popd anywhere in the command may move the push into another
     # repository whose HEAD and config the hook cannot see (#952): judge it
     # like -C. 'cd .' is a no-op and does not count.
-    # #1210: a leading `cd <literal>` and/or `-C <literal>` whose directory
+    # Worktree branch detection: a leading `cd <literal>` and/or `-C <literal>` whose directory
     # resolves to a worktree on a branch is judged by THAT HEAD; everything
     # else (computed/missing path, detached, pushd/popd, later cd, --git-dir)
     # stays foreign = fail closed.
@@ -1488,7 +1513,7 @@ case "$PUSH_CLASS" in
   none) exit 0 ;;
   tag) IS_TAG_ONLY_PUSH=true ;;
   push) IS_TAG_ONLY_PUSH=false ;;
-  # Branch-Guard (#1210): the classifier names the branch the push runs on
+  # Branch-Guard (worktree branch detection): the classifier names the branch the push runs on
   # (effective -C/cd directory, else the hook cwd) when it is protected.
   "onbranch "*)
     echo "Branch-Guard: Push blocked — you are on '${PUSH_CLASS#onbranch }'." >&2
