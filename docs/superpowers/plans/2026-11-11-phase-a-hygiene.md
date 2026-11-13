@@ -21,6 +21,19 @@ trace:
 > **Querverweis #1086g (Entscheidung 24, Phase C):** Schließen mit Entscheidungskommentar, keine Aktion in Phase A.
 > **Abhängigkeiten:** Welle 0, Phase A hängt von nichts ab. #1190 hing am Merge von #1218; #1218 ist in `origin/main 9aa0e0c0` gemergt, #1190 ist durch Auto-Close geschlossen (Task 9, Entscheidung 38f). Phase B (Welle 1) wartet auf grüne CI, die der Marker-Fix (Task 2) entlastet.
 
+## Änderungsprotokoll
+
+Stand 2026-11-13, gegen `origin/main b36184b5` im Worktree geprüft (nicht nur PR-Beschreibung). Status bleibt **DRAFT** (keine neue Freigabe).
+
+| PR | Zustand | Task | Beleg |
+|---|---|---|---|
+| #1223 | MERGED 2026-11-12 | Task 2 (Marker-Fix), Task 7 (Marker-PR gemergt) | `tests/requirements.txt:13-14` (zwei Marker-Zeilen), `tests/test_requirements_pytest_split_marker.py` (3 Tests, lokal grün) |
+| #1221 | MERGED 2026-11-12 | kein Task dieses Plans | Freshness-Tooling `scripts/check_plan_refs.py` (Frische-Check-Referenzen) |
+| #1145, #1148 | CLOSED (`gh`) | Task 8 | Zustand bestätigt; Schließ-Kommentar und Urheber nicht geprüft, Checkboxen nicht gesetzt |
+| Issues #547, #857, #858, #1007, #1116, #1151, #1150, #1190 | CLOSED (`gh`) | Tasks 3-6, 9 | nur Zustand geprüft, Evidenz-Kommentare/Reihenfolge nicht geprüft, Checkboxen nicht gesetzt |
+
+Offen (Stand `gh`): #946 (Task 10), #885 (Task 12), #977 (Task 11) OPEN; Label `blocked` an #860/#854 vorhanden (Task 13, Kommentar-Inhalt ungeprüft); Task 14 (Teil-Kommentare) und Task 15 ungeprüft. Task 2 Steps 2/5/6 (Rot-Lauf, Resolver-Trockenlauf, `--validate`) und Task 7 Step 2 (CI-Watch) nicht einzeln belegt, daher unabgehakt.
+
 **Goal:** Das Backlog bereinigen: erledigte Issues mit Evidenz-Kommentar schließen, Duplikat-PRs abräumen, Tracker (#977, #885) und Teil-Stände (#1155, #1158..#1161) dokumentieren, blockierte Issues labeln, die Branch/Stash-Tabelle für #946 zur Freigabe vorlegen. Einzige Code-Änderung: der Marker-Fix für `pytest-split` in `tests/requirements.txt`.
 
 **Architecture:** Reiner Operationsplan. Jede Operation ist ein `gh`-Befehl (oder eine Prüfung), der **nicht** ausgeführt wird, bevor der User freigibt. Kommentartexte werden als Dateien unter `.tmp/phase-a/comments/` geschrieben (Roadmap Abschnitt 4: Text als Datei, nicht inline per Shell) und per `--body-file` übergeben. Jede Schließung hat eine Vorprüfung (Gate) und eine Nachprüfung (`gh issue view`).
@@ -128,7 +141,7 @@ Quelle: Roadmap-Entscheidungen 17-34 (`.tmp/decisions-part2.md`, bindend). Origi
 - Wirksamkeit des Markers: Die 3.9-Jobs bekommen `pytest-split>=0.8` (wie heute), die 3.12-Jobs `pytest-split>=0.11.0`. Beide Jobs laufen den `--splits 3 --group N`-Schritt (`orchestration-test.yml:356`). `.github/workflows/validate.yml` installiert nur `requirements.txt` (Zeilen 100, 120) und ist nicht betroffen.
 - Dependabot scannt `/` und `/tests` (`.github/dependabot.yml:5`); die Marker-Zeilen werden von Dependabot als zwei Einträge gelesen. Ob Dependabot beim nächsten Lauf die Marker-Zeilen korrekt fortschreibt, ist nicht verifiziert.
 
-- [ ] Step 1: Test schreiben (rot) in `tests/test_requirements_pytest_split_marker.py`:
+- [x] Step 1: Test schreiben (rot) in `tests/test_requirements_pytest_split_marker.py`:
   ```python
   from pathlib import Path
 
@@ -171,16 +184,16 @@ Quelle: Roadmap-Entscheidungen 17-34 (`.tmp/decisions-part2.md`, bindend). Origi
       assert ver.Version("0.11.0") in sel[0].specifier
   ```
 - [ ] Step 2: `python3 -m pytest tests/test_requirements_pytest_split_marker.py -q` — Erwartung rot: `2 failed, 1 passed` — `test_pytest_split_has_two_marker_lines` schlägt fehl (`1 != 2`), `test_python312_requires_0_11` schlägt fehl (heute `>=0.8` lässt 0.10.0 zu). Review 2026-11-11: in einer Sandbox-Kopie unter `.tmp/` mit Python 3.13 gemessen: alt `2 failed, 1 passed`, mit den Marker-Zeilen `3 passed`. Fehlt `packaging`, werden die Tests übersprungen; dann ist der Test hier nicht aussagekräftig und der Befund geht ins Protokoll.
-- [ ] Step 3: `tests/requirements.txt` ändern: Zeile 13 `pytest-split>=0.8` ersetzen durch genau
+- [x] Step 3: `tests/requirements.txt` ändern: Zeile 13 `pytest-split>=0.8` ersetzen durch genau
   ```text
   pytest-split>=0.8; python_version < "3.10"
   pytest-split>=0.11.0; python_version >= "3.10"
   ```
   und den Kommentar in Zeile 4 um "and pytest-split 0.11 drops 3.9" ergänzen (kein neuer Kommentarblock).
-- [ ] Step 4: `python3 -m pytest tests/test_requirements_pytest_split_marker.py -q` — Erwartung: `3 passed`.
+- [x] Step 4: `python3 -m pytest tests/test_requirements_pytest_split_marker.py -q` — Erwartung: `3 passed`.
 - [ ] Step 5: Resolver-Trockenlauf, soweit lokal verfügbar: `python3 -m pip install --dry-run -r tests/requirements.txt` — Erwartung: exit 0. Ist ein Python 3.9 vorhanden: dasselbe mit `python3.9` (Review 2026-11-11: auf diesem Host kein `/usr/bin/python3.9`). Nicht vorhanden: als "nicht verifiziert" ins Protokoll; die Wirksamkeit belegt dann erst die CI-Matrix des Phase-A-PRs (3.9 und 3.12 grün).
 - [ ] Step 6: `python3 scripts/sync.py --validate` — Erwartung: exit 0 (keine Wirkung erwartet, Regressionsschutz).
-- [ ] Step 7: Commit: `fix(ci): split pytest-split pin by python version`
+- [x] Step 7: Commit: `fix(ci): split pytest-split pin by python version`
 - Akzeptanz: Test `3 passed`; CI-Jobs `test (3.9)` und `test (3.12)` im PR grün. PR-Text als Datei `.tmp/phase-a/pr-body-marker.md`, nicht inline.
 
 ### Task 3a: Evidenz-Check #547 (read-only)
@@ -374,9 +387,9 @@ Duplikat von #1186. Dieses Issue beschreibt das Problem (keine verbindliche Zuor
 **Rolle:** `git` (Push, PR, Merge), Review durch `code-reviewer`. **Hängt ab von:** Task 2.
 **Files:** keine.
 
-- [ ] Step 1: Branch `fix/phase-a-pytest-split-marker` pushen und PR gegen `main` öffnen, Text `--body-file .tmp/phase-a/pr-body-marker.md` (ohne `Closes`/`Fixes`/`Resolves`, Entscheidung 38e); Titel = Commit-Subject aus Task 2.
+- [x] Step 1: Branch `fix/phase-a-pytest-split-marker` pushen und PR gegen `main` öffnen, Text `--body-file .tmp/phase-a/pr-body-marker.md` (ohne `Closes`/`Fixes`/`Resolves`, Entscheidung 38e); Titel = Commit-Subject aus Task 2.
 - [ ] Step 2: CI abwarten: `$GH pr checks <PR> --watch` — Erwartung: `test (3.9)` und `test (3.12)` grün, kein Admin-Bypass.
-- [ ] Step 3: Squash-Merge durch `git`-Rolle nach Freigabe: `$GH pr merge <PR> --squash`.
+- [x] Step 3: Squash-Merge durch `git`-Rolle nach Freigabe: `$GH pr merge <PR> --squash`.
 - Akzeptanz: PR `MERGED`; `git show origin/main:tests/requirements.txt` enthält die zwei Marker-Zeilen.
 
 ### Task 8: Dependabot-PRs #1145 und #1148 schließen
