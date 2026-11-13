@@ -78,9 +78,6 @@ def test_dangling_doc_pointer_makes_check_exit_1(tmp_path):
     (project / ".meta-config").mkdir(parents=True)
     shutil.copy(fixture, project / ".meta-config" / "project.yaml")
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-    # Generated rules point at docs/REQUIREMENTS.md; provide it so the baseline is clean.
-    (project / "docs").mkdir()
-    (project / "docs/REQUIREMENTS.md").write_text("# Requirements\n", encoding="utf-8")
     cfg = str(project / ".meta-config" / "project.yaml")
 
     def run(flag):
@@ -100,3 +97,45 @@ def test_dangling_doc_pointer_makes_check_exit_1(tmp_path):
     out = dangling.stdout + dangling.stderr
     assert dangling.returncode == 1, out[-800:]
     assert "context.dangling-doc-pointer" in out, out[-800:]
+
+
+def _init_p10(tmp_path, with_req):
+    import shutil
+    import subprocess
+
+    fixture = REPO_ROOT / "tests/fixtures/active-set/p10/.meta-config/project.yaml"
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    shutil.copy(fixture, project / ".meta-config" / "project.yaml")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    if with_req:
+        (project / "docs").mkdir()
+        (project / "docs/REQUIREMENTS.md").write_text("# Requirements\n", encoding="utf-8")
+    cfg = str(project / ".meta-config" / "project.yaml")
+
+    def run(flag):
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts/sync.py"), "--config", cfg, flag],
+            cwd=project, capture_output=True, text=True, timeout=300)
+
+    assert run("--init").returncode == 0
+    return project, run
+
+
+def _generated_text(project):
+    files = [project / "CLAUDE.md", *(project / ".claude/rules").glob("*.md")]
+    return "\n".join(f.read_text(encoding="utf-8") for f in files if f.exists())
+
+
+def test_requirements_pointer_only_when_file_exists(tmp_path):
+    """#1180: docs/REQUIREMENTS.md pointer is generated only if the file exists."""
+    project, run = _init_p10(tmp_path / "without", with_req=False)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "context.dangling-doc-pointer" not in out.stdout + out.stderr
+    assert "docs/REQUIREMENTS.md" not in _generated_text(project)
+
+    project, run = _init_p10(tmp_path / "with", with_req=True)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "docs/REQUIREMENTS.md" in _generated_text(project)
