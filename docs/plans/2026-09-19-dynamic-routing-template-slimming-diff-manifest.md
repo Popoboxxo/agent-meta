@@ -2214,3 +2214,16 @@ tests/test_orchestrator_topology_docs.py -q` -> alle grün;
 getrackten Diff. `_GOLDEN_ROLE_COUNT`, `_NORMALIZATIONS`, `_LOCATORS`,
 `_MIGRATED_PATHS`, `_KIND_REGISTRY` und die B2a/B2b-Klassifikation bleiben
 unverändert.
+
+---
+
+## 26. Re-Baseline der Golden-Baseline für `git` (Sentinel-Doku, Abschnitt 0)
+
+> **Anlass:** `agents/1-generic/git.md` Abschnitt 0 korrigiert die veraltete Aussage
+> "no provider forwards that" (seit #683 liefert der PreToolUse-Payload `agent_id`) und
+> die falsche "strict mode"-Bedingung des Mutation-Gates; neuer Satz: der Sentinel
+> deklariert nur die Rolle und umgeht keinen Schutz. Patch-Bump `2.1.3 → 2.1.4`.
+
+**Geändert (1 Fixture):** `git.md` — Frontmatter-`version:`/`generated-from:`-Pin und die
+zwei Absätze in Abschnitt 0. Die übrigen 57 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. AC-01-Manifest per `--write` neu erzeugt.
