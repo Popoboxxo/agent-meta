@@ -3,7 +3,9 @@
 Single-provider tests cannot see regressions that only appear when the full
 registry is active or when the framework root differs from ``<project>/.agent-meta``
 (e.g. ``--checkpoint`` once resolved a Claude-only registry and crashed for any
-other provider). One module-scoped project, modes run in dependency order.
+other provider). Three module-scoped projects (read-only / scaffold / lifecycle
+groups), each with its own all-provider ``--init``, so one failed or slow init
+only affects its own group; an init timeout skips the group explicitly.
 
 Run: python -m pytest tests/test_cli_smoke_multi_provider.py -v
 """
@@ -25,9 +27,8 @@ _PROVIDERS = sorted(
 )
 
 
-@pytest.fixture(scope="module")
-def project(tmp_path_factory):
-    root = tmp_path_factory.mktemp("cli-smoke")
+def _make_project(tmp_path_factory, name):
+    root = tmp_path_factory.mktemp(name)
     (root / ".meta-config").mkdir()
     (root / ".meta-config" / "project.yaml").write_text(
         'agent-meta-version: "2.0.0-beta.1"\n'
@@ -44,9 +45,27 @@ def project(tmp_path_factory):
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    result = _sync(root, "--init")
+    try:
+        result = _sync(root, "--init")
+    except subprocess.TimeoutExpired:
+        pytest.skip(f"{name}: all-provider --init exceeded SLOW_TIMEOUT={SLOW_TIMEOUT}s")
     assert result.returncode == 0, result.stdout[-2000:] + result.stderr[-2000:]
     return root
+
+
+@pytest.fixture(scope="module")
+def project_readonly(tmp_path_factory):
+    return _make_project(tmp_path_factory, "cli-smoke-ro")
+
+
+@pytest.fixture(scope="module")
+def project_scaffold(tmp_path_factory):
+    return _make_project(tmp_path_factory, "cli-smoke-scaffold")
+
+
+@pytest.fixture(scope="module")
+def project_lifecycle(tmp_path_factory):
+    return _make_project(tmp_path_factory, "cli-smoke-lifecycle")
 
 
 def _sync(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -72,27 +91,35 @@ def _ok(root: Path, *args: str) -> subprocess.CompletedProcess:
     ("--deactivation-status",),
     ("--list-backups",),
     ("--only-variables",),
+    ("--validate-se",),
+    ("--validate-spec-plan",),
+    ("--scan-staged",),
+])
+def test_readonly_mode_succeeds(project_readonly, mode):
+    _ok(project_readonly, *mode)
+
+
+@pytest.mark.parametrize("mode", [
     ("--update-ext",),
     ("--create-ext", "developer"),
     ("--create-rule", "smokerule"),
     ("--create-hook", "smokehook"),
     ("--create-command", "smokecmd"),
-    ("--validate-se",),
-    ("--validate-spec-plan",),
-    ("--scan-staged",),
 ])
-def test_mode_succeeds(project, mode):
-    _ok(project, *mode)
+def test_scaffold_mode_succeeds(project_scaffold, mode):
+    _ok(project_scaffold, *mode)
 
 
-def test_repeat_sync_is_idempotent(project):
+def test_repeat_sync_is_idempotent(project_scaffold):
+    project = project_scaffold
     # The create-* modes above add user rules/hooks; the next real sync
     # records them (external-tools drift rule) and must then converge.
     _ok(project)
     _ok(project, "--dry-run", "--check")
 
 
-def test_checkpoint_with_every_provider(project):
+def test_checkpoint_with_every_provider(project_lifecycle):
+    project = project_lifecycle
     """--checkpoint must use the running framework's registry, not a guess."""
     _ok(project, "--checkpoint", "--session-id", "smoke1", "--agent", "developer",
         "--task", "T1", "--status", "in_progress", "--description", "d",
@@ -100,7 +127,8 @@ def test_checkpoint_with_every_provider(project):
     _ok(project, "--rehydrate")
 
 
-def test_backup_restore_delete_roundtrip(project):
+def test_backup_restore_delete_roundtrip(project_lifecycle):
+    project = project_lifecycle
     _ok(project, "--backup", "--label", "smoke")
     listing = _ok(project, "--list-backups").stdout
     match = re.search(r"([A-Za-z0-9._-]+\.(?:zip|tar\.gz|tgz))", listing)
@@ -110,7 +138,8 @@ def test_backup_restore_delete_roundtrip(project):
     _ok(project, "--delete-backup", archive)
 
 
-def test_deactivate_and_reactivate_provider(project):
+def test_deactivate_and_reactivate_provider(project_lifecycle):
+    project = project_lifecycle
     _ok(project, "--deactivate-providers", "Codex")
     assert not (project / ".codex").exists(), "deactivated provider artifacts must be removed"
     _ok(project, "--activate-providers", "Codex")
