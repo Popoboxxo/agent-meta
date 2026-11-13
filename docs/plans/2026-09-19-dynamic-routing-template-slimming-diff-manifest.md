@@ -2221,7 +2221,9 @@ unverändert.
 
 > **Anlass:** `agents/1-generic/git.md` Abschnitt 0 korrigiert die veraltete Aussage
 > "no provider forwards that" (seit #683 liefert der PreToolUse-Payload `agent_id`) und
-> die falsche "strict mode"-Bedingung des Mutation-Gates; neuer Satz: der Sentinel
+> die falsche "strict mode"-Bedingung des Mutation-Gates (es blockt ohne `git`-Sentinel
+> unabhängig vom strict mode; nur die schmale Auto-Commit-Allowlist add/commit mit eigenem
+> Sentinel ist ausgenommen, `orchestrator-guard-impl.sh` Z. 1535); neuer Satz: der Sentinel
 > deklariert nur die Rolle und umgeht keinen Schutz. Patch-Bump `2.1.3 → 2.1.4`.
 
 **Geändert (1 Fixture):** `git.md` — Frontmatter-`version:`/`generated-from:`-Pin und die
