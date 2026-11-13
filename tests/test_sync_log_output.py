@@ -77,16 +77,41 @@ def test_1086e_soft_cap_names_shared_context_file(tmp_path):
     assert "shared with: Opencode" in findings[0].message
 
 
-def test_1086c_no_raw_skip_unchanged_sites():
-    """Guard: no-op targets must use log.note_unchanged, not log.skip(..., '...unchanged')."""
+def _raw_skip_unchanged_lines(source: str) -> list:
+    """Lines of `.skip(...)` calls whose reason (any arg after the first, or any
+    keyword value) mentions 'unchanged' in a literal, f-string or concatenation."""
     import ast
 
-    offenders = []
-    for py in sorted((_ROOT / "scripts").rglob("*.py")):
-        for node in ast.walk(ast.parse(py.read_text(encoding="utf-8"))):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == "skip" and len(node.args) >= 2
-                    and isinstance(node.args[1], ast.Constant)
-                    and "unchanged" in str(node.args[1].value)):
-                offenders.append(f"{py.relative_to(_ROOT)}:{node.lineno}")
+    def mentions(expr) -> bool:
+        return any(isinstance(n, ast.Constant) and "unchanged" in str(n.value)
+                   for n in ast.walk(expr))
+
+    return [
+        node.lineno for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "skip"
+        and any(mentions(e) for e in [*node.args[1:], *(k.value for k in node.keywords)])
+    ]
+
+
+def test_1086c_guard_detects_literal_fstring_and_keyword_sites():
+    for src in (
+        'log.skip(t, "x unchanged")',
+        'log.skip(t, f"{n} unchanged")',
+        'log.skip(t, reason="unchanged")',
+        'log.skip(t, reason=f"{n} unchanged")',
+        'log.skip(t, "a" + "unchanged")',
+        'log.skip(t, 1, "unchanged")',
+    ):
+        assert _raw_skip_unchanged_lines(src) == [1], src
+    assert _raw_skip_unchanged_lines('log.skip(t, "disabled")') == []
+
+
+def test_1086c_no_raw_skip_unchanged_sites():
+    """Guard: no-op targets must use log.note_unchanged, not log.skip(..., '...unchanged')."""
+    offenders = [
+        f"{py.relative_to(_ROOT)}:{line}"
+        for py in sorted((_ROOT / "scripts").rglob("*.py"))
+        for line in _raw_skip_unchanged_lines(py.read_text(encoding="utf-8"))
+    ]
     assert not offenders, offenders

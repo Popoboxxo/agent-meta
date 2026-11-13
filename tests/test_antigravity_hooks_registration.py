@@ -195,7 +195,8 @@ def test_sync_is_idempotent(agent_meta_root, project_root):
     assert any("registered hooks" in a for a in first.actions)
 
     second = _sync(agent_meta_root, project_root)
-    assert second.unchanged and not any("hooks.json" in s or "settings" in s for s in second.actions)
+    assert any(".agents/hooks.json" in u for u in second.unchanged)
+    assert not any("hooks.json" in s or "settings" in s for s in second.actions)
 
 
 def test_stop_event_uses_flat_handler_shape(agent_meta_root, project_root):
