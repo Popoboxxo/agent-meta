@@ -31,14 +31,15 @@ def test_branch_guard_keeps_section_and_809():
 def test_dangling_doc_pointer_check(tmp_path):
     (tmp_path / "AGENTS.md").write_text("see `docs/nicht-vorhanden.md`\n", encoding="utf-8")
     found = dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
-    assert len(found) == 1 and found[0].severity is Severity.WARNING
+    assert len(found) == 1 and found[0].severity is Severity.ERROR
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/nicht-vorhanden.md").write_text("x", encoding="utf-8")
     assert dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None) == []
 
 
 def test_severity_registered_and_no_docs_url_variable():
-    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.WARNING
+    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
+    assert cb.EMITTED_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
     assert "DOCS_URL" not in (REPO_ROOT / "scripts/lib/variables.py").read_text(encoding="utf-8")
 
 
