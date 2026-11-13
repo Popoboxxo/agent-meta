@@ -1774,3 +1774,43 @@ def test_1210_unresolvable_target_stays_blocked(main_checkout_on_main, tmp_path,
     _git(repo, "worktree", "add", "-q", "--detach", str(repo.parent / "wt-det"))
     detached = repo.parent / "wt-det"
     _assert_outcome(repo, template.format(wt=wt, plain=plain, detached=detached), BLOCK)
+
+
+# Quoted text of a non-git text consumer is not a push, even when the quoted
+# text holds a command separator behind the words.
+QUOTED_TEXT_BENIGN = [
+    'gh issue create -R X --label bug --title t --body "run git push origin main here"',
+    'gh issue comment 5 --body "run git push origin main && more text"',
+    'gh issue create --title t --body "run git push origin main; more text"',
+    'gh issue create --title t --body "run git push origin main | more text"',
+    'gh issue create --title t --body "line one\nrun git push origin main\nline three"',
+    'gh issue create --title t --body "see: && git push origin main and more"',
+    'gh issue comment 5 --body "see; git push origin main and more"',
+    'gh issue create --title t --body "see | git push origin main and more"',
+    'gh issue create --title t --body "line one\ngit push origin main\nline three"',
+    'echo "git push; foo"',
+    'echo "a && git push origin main b"',
+    "printf '%s\\n' \"git push origin main && x\"",
+    'printf "git push | x"',
+]
+
+
+@pytest.mark.parametrize("command", QUOTED_TEXT_BENIGN)
+def test_quoted_text_of_text_consumer_is_not_a_push(multi_repo, command):
+    _assert_outcome(multi_repo, command, NONE)
+
+
+@pytest.mark.parametrize("command", [
+    "git push origin main",
+    "echo x && git push origin main",
+    'git push "origin" main',
+    "git push origin HEAD:main",
+    "git push --all",
+    'git push -o "a;b" origin HEAD:main',
+    'git push origin "HEAD:main"',
+    'bash -c "git push origin main"',
+    'git push origin main && gh issue create --body "x"',
+])
+def test_quoted_text_fix_keeps_real_pushes_blocked(multi_repo, command):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, command, BLOCK)

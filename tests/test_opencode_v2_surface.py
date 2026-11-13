@@ -5501,8 +5501,9 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # #1190 T21 (2026-11-10): re-frozen after the intentional topology wording/version rebaseline (orchestrator 8.12.0, G1/G4); no other fixture tree changed.
 # #1180/#1000 (2026-11-12): ac01-baseline re-pinned (24 hashes: rule pointer inlining + spec-plan-workflow bullet); compact-golden re-pinned (agents-managed.md a2a pointer removed); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # #1210 (2026-11-13): ac01-baseline re-pinned (dod-push-check 2.5.2 + branch-guard rule line; 11 hashes).
+# (2026-11-13): ac01-baseline re-pinned (dod-push-check 2.5.3 quoted-text handling + branch-guard rule wording; 10 hashes).
 _FIXTURE_TREES = {
-    "ac01-baseline": "3adb0497af5488b382b5bc4d82943b118308b8ecaaa9e4872641c9698719ef56",
+    "ac01-baseline": "58dc48656ab15f1b10b3a4671156c9db6d9470e5320d17cd809ceb04a52688f5",
     "slimming-golden": "20a43e78730a04e7879f0ad5dcd60d19979abb7d3aafb6c51d95aaa47ba6ae46",
     "compact-golden": "3463b046b3ceaa17e61d7f51eb3163b2afeac52cd9fd13d16caff0bb512d8504",
 }

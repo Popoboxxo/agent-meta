@@ -21,4 +21,5 @@ Erkennung per Tokenizer, kein Shell-Parser — Indirektion (`eval`, `$(...)`, `x
 Nicht erkannt (#551/#592/#809): `eval "git commit ..."`, direkte Schreibzugriffe auf `.git/`, andere Git-Tools (`hub`, `gh repo ...`), `$(...)`/Backticks als Indirektion.
 Das Destructive-Gate (#809) sieht nur direkte `rm`-Aufrufe (kein `find -delete`, `xargs rm`, Variablen-Pfade, Pfad-Traversal).
 Der DoD-Push-Check (#1210) nimmt den Branch aus dem effektiven Verzeichnis des Pushs (`-C`-Kette bzw. führendes `cd`, sonst Hook-cwd; Worktrees zählen). Nur ein FÜHRENDES `cd` wird aufgelöst; nicht auflösbare Ziele, `pushd`/`popd`, `--git-dir`/`--work-tree` und `GIT_DIR` bleiben fail-closed.
+Gequoteter Text von Nicht-Git-Textkonsumenten (`gh ... --body "...git push..."`, `echo`, `printf`) gilt nicht als Push; Indirektion über `bash -c`/`eval`/`xargs` und `gh alias --shell` bleibt fail-closed bzw. bekannte Grenze.
 Einstufung: Convention boundary (Akzident-Netz, kein Ersatz für Backups); Security-Eigenschaften nur für das Destructive-Gate und den DoD-Push-Check (fail-closed ohne `python3`, #595).
