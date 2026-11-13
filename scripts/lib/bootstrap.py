@@ -216,7 +216,7 @@ class BootstrapEngine:
 
         if new_content == existing:
             if log:
-                log.skip(str(target_path.relative_to(project_root)), "bootstrap instructions unchanged")
+                log.note_unchanged(str(target_path.relative_to(project_root)))
             return {"status": "skipped", "mechanism": "api-based", "reason": "bootstrap instructions unchanged"}
 
         if hard_cap_guard is not None:
@@ -255,10 +255,7 @@ class BootstrapEngine:
             # Logging UPDATE there reports false drift in --check, so the
             # equality check from above must run again on the final content.
             if log:
-                log.skip(
-                    str(target_path.relative_to(project_root)),
-                    "bootstrap instructions unchanged",
-                )
+                log.note_unchanged(str(target_path.relative_to(project_root)))
             return {
                 "status": "skipped",
                 "mechanism": "api-based",

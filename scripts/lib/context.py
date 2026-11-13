@@ -309,7 +309,7 @@ def _regenerate_static_context(
     norm_existing = _normalize_static_sig(existing_sig)
 
     if norm_existing == norm_new:
-        log.skip(rel_label, "static part unchanged")
+        log.note_unchanged(rel_label)
         _record_static_hash(project_root, rel_label, norm_new, dry_run)
         return
 
@@ -777,7 +777,7 @@ def _update_managed_html_block(
         if not dry_run:
             target_path.write_text(new_content, encoding="utf-8")
     else:
-        log.skip(rel, "managed block unchanged")
+        log.note_unchanged(rel)
 
 
 def _insert_managed_block_above_foreign_content(existing: str, new_managed: str) -> str:
@@ -1100,7 +1100,7 @@ def _sync_opencode_context(
                 if not dry_run:
                     target_path.write_text(new_content, encoding="utf-8")
             else:
-                log.skip(context_file, "managed block unchanged")
+                log.note_unchanged(context_file)
         elif not new_managed.strip():
             log.warning(
                 f"{context_file}: exists but has no agent-meta marker, and the "
@@ -1337,7 +1337,7 @@ def _sync_continue_context(
                 if not dry_run:
                     ctx_path.write_text(updated, encoding="utf-8")
             else:
-                log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
+                log.note_unchanged(str(ctx_path.relative_to(project_root)))
 
     settings_file = pc.get("settings_file")
     if settings_file:
@@ -2072,7 +2072,7 @@ def _update_continue_config_managed_block(
             if not dry_run:
                 settings_path.write_text(updated, encoding="utf-8")
         else:
-            log.skip(rel, "managed comment block unchanged")
+            log.note_unchanged(rel)
     else:
         # Prepend block before first non-comment line
         updated = new_block + "\n" + existing

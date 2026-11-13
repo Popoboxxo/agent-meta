@@ -31,14 +31,15 @@ def test_branch_guard_keeps_section_and_809():
 def test_dangling_doc_pointer_check(tmp_path):
     (tmp_path / "AGENTS.md").write_text("see `docs/nicht-vorhanden.md`\n", encoding="utf-8")
     found = dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
-    assert len(found) == 1 and found[0].severity is Severity.WARNING
+    assert len(found) == 1 and found[0].severity is Severity.ERROR
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/nicht-vorhanden.md").write_text("x", encoding="utf-8")
     assert dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None) == []
 
 
 def test_severity_registered_and_no_docs_url_variable():
-    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.WARNING
+    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
+    assert cb.EMITTED_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
     assert "DOCS_URL" not in (REPO_ROOT / "scripts/lib/variables.py").read_text(encoding="utf-8")
 
 
@@ -65,3 +66,76 @@ def test_generic_rules_have_no_provider_specific_pointers():
             if re.search(pat, text):
                 hits.append((path.name, pat))
     assert hits == []
+
+
+def test_dangling_doc_pointer_makes_check_exit_1(tmp_path):
+    """#1180 AK3 end-to-end: a dangling backticked docs/*.md pointer fails real `--check`."""
+    import shutil
+    import subprocess
+
+    fixture = REPO_ROOT / "tests/fixtures/active-set/p10/.meta-config/project.yaml"
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    shutil.copy(fixture, project / ".meta-config" / "project.yaml")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    cfg = str(project / ".meta-config" / "project.yaml")
+
+    def run(flag):
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts/sync.py"), "--config", cfg, flag],
+            cwd=project, capture_output=True, text=True, timeout=300)
+
+    assert run("--init").returncode == 0
+    clean = run("--check")
+    assert clean.returncode == 0, clean.stdout[-800:] + clean.stderr[-800:]
+
+    # Appended below the managed block: user-owned text, so no drift masks the cause.
+    ctx = project / "CLAUDE.md"
+    ctx.write_text(ctx.read_text(encoding="utf-8") + "\nsee `docs/nicht-vorhanden.md`\n",
+                   encoding="utf-8")
+    dangling = run("--check")
+    out = dangling.stdout + dangling.stderr
+    assert dangling.returncode == 1, out[-800:]
+    assert "context.dangling-doc-pointer" in out, out[-800:]
+
+
+def _init_p10(tmp_path, with_req):
+    import shutil
+    import subprocess
+
+    fixture = REPO_ROOT / "tests/fixtures/active-set/p10/.meta-config/project.yaml"
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    shutil.copy(fixture, project / ".meta-config" / "project.yaml")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    if with_req:
+        (project / "docs").mkdir()
+        (project / "docs/REQUIREMENTS.md").write_text("# Requirements\n", encoding="utf-8")
+    cfg = str(project / ".meta-config" / "project.yaml")
+
+    def run(flag):
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts/sync.py"), "--config", cfg, flag],
+            cwd=project, capture_output=True, text=True, timeout=300)
+
+    assert run("--init").returncode == 0
+    return project, run
+
+
+def _generated_text(project):
+    files = [project / "CLAUDE.md", *(project / ".claude/rules").glob("*.md")]
+    return "\n".join(f.read_text(encoding="utf-8") for f in files if f.exists())
+
+
+def test_requirements_pointer_only_when_file_exists(tmp_path):
+    """#1180: docs/REQUIREMENTS.md pointer is generated only if the file exists."""
+    project, run = _init_p10(tmp_path / "without", with_req=False)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "context.dangling-doc-pointer" not in out.stdout + out.stderr
+    assert "docs/REQUIREMENTS.md" not in _generated_text(project)
+
+    project, run = _init_p10(tmp_path / "with", with_req=True)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "docs/REQUIREMENTS.md" in _generated_text(project)

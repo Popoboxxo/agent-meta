@@ -129,3 +129,51 @@ def test_start_fails_when_user_temp_points_into_project_root(project):
     assert result.returncode == 1, out
     assert "inside the project root" in out, out
     assert not (project / _PID_FILE).exists()
+
+
+# --------------------------------------------------------------------------- #
+# AK3 (#1189): a genuinely dead child must never count as running             #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or not os.path.exists("/proc/self/stat"),
+    reason="needs POSIX and /proc",
+)
+def test_real_child_exit_is_not_running_even_unreaped():
+    import importlib.util
+    import time
+
+    spec = importlib.util.spec_from_file_location("admin_server_smoke", _SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    child = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(3)"])
+    try:
+        # Wait until dead-but-unreaped (zombie); do NOT poll()/wait() the child.
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if Path(f"/proc/{child.pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "Z":
+                break
+            time.sleep(0.02)
+        assert mod._is_pid_running(child.pid) is False  # zombie
+        child.wait()
+        assert mod._is_pid_running(child.pid) is False  # reaped
+    finally:
+        child.kill() if child.poll() is None else None
+        child.wait()
+
+
+def test_crashing_child_reports_failure_and_leaves_no_pid_file(project):
+    # Real crash path: child aborts at config load (user TMPDIR inside root).
+    bad = project / "inroot-temp"
+    bad.mkdir()
+    port = _free_port()
+    try:
+        result = _cli(project, "start", port, temp=bad)
+    finally:
+        _cli(project, "stop", port)
+    out = result.stdout + result.stderr
+    assert result.returncode == 1, out
+    assert "started (PID" not in out, out
+    assert not (project / _PID_FILE).exists()

@@ -9,6 +9,10 @@ pipeline_stages:
 > Klasse: **L** (Refactoring, 3750 Zeilen, 47 Import-Stellen in 33 Dateien unter `scripts/`+`tests/`). Roadmap-Phase **C**, Welle 2, **zuletzt in C**.
 > Roadmap: `docs/superpowers/plans/2026-11-10-backlog-roadmap.md` (Entscheidung 6, Risiken-Zeile "#1086i").
 
+## Änderungsprotokoll
+
+Stand 2026-11-13: **Nichts umgesetzt.** Status bleibt **DRAFT**, Task 0 (Spec `docs/specs/2026-11-11-context-split-1086i-spec.md`) liegt nicht freigegeben vor. Verifiziert: `scripts/lib/context_sync/` existiert nicht, `scripts/lib/context.py` hat 3838 Zeilen (Plan-Ist-Stand: 3750 auf 9aa0e0c0; gewachsen durch #1225/#1227, Neu-Messung nach Task 0 Step 2 weiter Pflicht). #1225/#1227/#1230 änderten `context.py` inhaltlich, nicht strukturell. #1086 Teil i bleibt OFFEN: offen, nicht in diesem PR.
+
 **Goal:** `scripts/lib/context.py` (3750 Zeilen auf 9aa0e0c0, Konvention <= 600 laut Issue #1086 (i)) in ein Paket aus Modulen <= 600 Zeilen zerlegen, ohne Verhaltens- und Render-Aenderung. Die Importoberflaeche `lib.context.<name>` bleibt waehrend der ganzen Migration erhalten und wird erst am Ende auf den tatsaechlichen Bedarf reduziert.
 **Architecture:** Strangler. Neues Paket `scripts/lib/context_sync/`; je Task wird eine Funktionsgruppe wortgleich verschoben, `context.py` re-exportiert sie. Charakterisierung vorab (Fassaden-Oberflaeche, Funktionskoerper-AST-Hashes, ac01-Render-Hash-Manifest). Keine Funktion wird umgeschrieben, nur Importzeilen aendern sich. Nach jedem Task laeuft die volle Suite gruen.
 **Tech Stack:** Python 3.9+ (stdlib, PyYAML-Ausnahme), pytest, `ast` fuer die Koerper-Hashes.

@@ -568,7 +568,7 @@ def test_single_agents_md_managed_block_write_per_sync_run(tmp_path, loaded_conf
 
     def _managed_skips(log: SyncLog) -> list:
         return [
-            s for s in log.skipped if "AGENTS.md" in s and "managed block" in s
+            s for s in log.unchanged if "AGENTS.md" in s
         ]
 
     def _sync(provider: str, dry_run: bool) -> SyncLog:

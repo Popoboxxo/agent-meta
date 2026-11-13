@@ -17,6 +17,26 @@ trace:
 > Abhängigkeiten (Roadmap §3): Welle 1 hängt von Phase A (CI grün) ab. B läuft vor C (Dateien `sync_pipeline.py`/`context.py` werden von B **nicht** berührt, siehe Abweichungen), vor G (#1170 vor #854) und vor E/F (`admin-ui.html`, `admin-server.py`).
 > Branch-Vorschlag: `fix/phase-b-small-bugs`. Ein Phasen-PR, Squash-Merge nach grüner CI, kein Admin-Bypass.
 
+## Änderungsprotokoll
+
+Stand 2026-11-13, gegen `origin/main b36184b5` im Worktree geprüft. Status bleibt **DRAFT** (keine neue Freigabe).
+
+| PR | Zustand | Tasks / Issues | Beleg (Code im Worktree) |
+|---|---|---|---|
+| #1224 | MERGED 2026-11-12 | 1 (#1139), 2 (#1170), 3 (#1194), 4 (#1205), 5 (#1213), 6 (#1214), 7 (#1207), 8 (#1197 nur Ratchet), 9 (#1174), 10 (#1173 Diff-Guard), 11 (#1206), 12 (#898), 13 (#317) | `tests/test_cli_smoke_multi_provider.py:21,51,74` (`SLOW_TIMEOUT`); `_map_claude_tools_to_gemini_tools` aus `scripts/lib/provider_transform.py` entfernt (`tests/test_dead_gemini_tool_map_removed.py`); `scripts/lib/auto_commit.py:167` (Schema-Pfad); `scripts/lib/consistency/spec_plan.py:535` (`spec_plan_no_tasks_detected`), `:51` (`_SPEC_RE` `-spec.md`); `tests/test_spec_767_anchors.py`; `tests/test_project_context_placeholder_ratchet.py:13` (`_KNOWN_DUPLICATES`); `knowledge/wiki/concepts/core-principle-pal-variables.md:80`; `scripts/admin-server.py:4195-4200` (`ALLOW_LOSSY_KEY`); `docs/ui/admin-ui.html:7800` (#1206 Clone), `:1094` (`__allow_lossy__`); `config/pricing-overlay.yaml:64` (`claude-sonnet-5-5`); `tests/test_viz_subserver_live.py:84` |
+| #1228 | MERGED 2026-11-13 | Follow-up zu #1139, #898, #317 (#1155 F4/F8 nur Nachweis) | `tests/test_cli_smoke_multi_provider.py:51` (Skip bei `TimeoutExpired`, Fixture-Split); `docs/ui/admin-ui.html:1935` (`"fable"`); `scripts/admin-server.py:3759,3788,3814` (`except FileNotFoundError` in `do_POST`, 404 statt 500) |
+| #1221 | MERGED 2026-11-12 | kein Task | Freshness-Tooling `scripts/check_plan_refs.py` |
+
+Abweichung: #1173 Akzeptanzkriterium "Kommentare bleiben erhalten" ist laut PR #1224 **nicht** erfüllt (Entscheidung 22: Diff-Guard mit `__allow_lossy__`-Bestätigung, Kommentare gehen bei akzeptiertem Lossy-Save weiter verloren).
+
+Offen (nicht abgehakt, Grund):
+- #1139 AK3 (grün auf belasteter Maschine): unbewiesen, Issue OPEN.
+- #898 (OPEN): kein Live-Browser-Lauf, models.dev-Live-Daten ungeprüft; nur statische Tests.
+- #317 (OPEN): Chromium-iframe-Test skippt ohne playwright/chromium, CI-Verfügbarkeit ungeprüft.
+- #1173 (OPEN): Kommentar-Erhalt nicht umgesetzt (s.o.).
+- #1197 (OPEN): nur Ratchet-Test, der eigentliche Fix liegt bei #1187-T9, offen, nicht in diesem PR.
+- Issues #1194, #1205, #1206, #1207, #1213, #1214, #1170, #1174 sind laut `gh` CLOSED; Task-Checkboxen sind wegen Squash-Commits (Step-Schnitt weicht ab) nicht einzeln gesetzt.
+
 **Goal:** 13 kleine, voneinander unabhängige Defekte (Sync-Pfad, Validator, Spec/Plan-Gate, Admin-UI, Tests, Doku) beheben, je Issue ein TDD-Task und ein Commit; keine Feature-Erweiterung.
 **Architecture:** Jede Änderung ist eine lokale Ursachenbehebung in genau der Datei, die der Code-Befund (in W gelesen) nennt. Keine neuen Module außer reinen Testdateien. Keine Provider-Namensverzweigung; Provider-Unterschiede bleiben Config-Keys.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), pytest, Markdown/YAML, eine Single-File-HTML-UI (`docs/ui/admin-ui.html`).
