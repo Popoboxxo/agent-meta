@@ -29,5 +29,4 @@ verlangt (`dod.root-cause-required`); die Rule wird nur dann ausgeliefert (Rule-
 - Liegt der Ursachen-Beleg nicht vor, startet der Fix nicht.
 - Ist die Ursache nicht abschließend bestimmbar, wird der Versuch als Vorversuch
   dokumentiert und der Fix bleibt offen — es wird nicht geraten.
-- Das Gate ist eine **Convention boundary**, keine Security boundary (Terminologie:
-  `branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
+- Das Gate ist eine **Convention boundary**, keine Security boundary (Convention boundary = fail-closed nur gegen akzidentellen Missbrauch, Security boundary = auch gegen deliberate Umgehung).
