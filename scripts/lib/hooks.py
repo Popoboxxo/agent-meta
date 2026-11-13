@@ -258,7 +258,7 @@ def _update_settings_hooks(
     # Only report an action when the file content would actually change, so
     # dry-run counts (used by --check) reflect real pending changes.
     if is_unchanged(settings_path, new_content):
-        log.skip(settings_rel, "hooks registration unchanged")
+        log.note_unchanged(settings_rel)
         return
 
     if is_absent_gitignored_target(settings_path, dry_run):
@@ -408,7 +408,7 @@ def _update_antigravity_hooks_json(
         return  # no effective change
 
     if is_unchanged(config_path, new_content):
-        log.skip(config_path_rel, "hooks registration unchanged")
+        log.note_unchanged(config_path_rel)
         return
 
     if is_absent_gitignored_target(config_path, dry_run):

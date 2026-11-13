@@ -75,3 +75,18 @@ def test_1086e_soft_cap_names_shared_context_file(tmp_path):
     findings = cb.check_over_soft_cap(tmp_path, ["Gemini", "Opencode"], caps, None)
     assert len(findings) == 1
     assert "shared with: Opencode" in findings[0].message
+
+
+def test_1086c_no_raw_skip_unchanged_sites():
+    """Guard: no-op targets must use log.note_unchanged, not log.skip(..., '...unchanged')."""
+    import ast
+
+    offenders = []
+    for py in sorted((_ROOT / "scripts").rglob("*.py")):
+        for node in ast.walk(ast.parse(py.read_text(encoding="utf-8"))):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "skip" and len(node.args) >= 2
+                    and isinstance(node.args[1], ast.Constant)
+                    and "unchanged" in str(node.args[1].value)):
+                offenders.append(f"{py.relative_to(_ROOT)}:{node.lineno}")
+    assert not offenders, offenders
