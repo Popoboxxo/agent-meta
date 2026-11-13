@@ -30,6 +30,9 @@ _PID_FILE = Path(".meta-viz") / ".admin-server-pid"
 _VALID_CONFIG = (
     "project:\n  name: smoke\n  prefix: sm\n"
     "repo_containment:\n  tmp-sink:\n    enabled: true\n    path: .tmp\n"
+    "    system-temp-exception:\n      enabled: true\n"
+    "      pytest-basetemp: true\n      toolchain-caches: false\n"
+    "      reason: smoke default\n"
 )
 
 
@@ -68,10 +71,10 @@ def project():
         shutil.rmtree(root, ignore_errors=True)
 
 
-def _cli(root: Path, command: str, port: int) -> subprocess.CompletedProcess:
+def _cli(root: Path, command: str, port: int, temp: Path | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ)
     for key in ("TMPDIR", "TEMP", "TMP"):
-        env[key] = os.path.realpath(root / ".tmp")
+        env[key] = os.path.realpath(temp or root / ".tmp")
     return subprocess.run(
         [sys.executable, str(_SCRIPT), command, "--root", str(root),
          "--host", "127.0.0.1", "--port", str(port), "--no-viz"],
@@ -109,4 +112,20 @@ def test_start_with_broken_config_exits_one_without_traceback(project):
     assert result.returncode == 1, out
     assert "tmp-sink pin unavailable" in out, out
     assert "Traceback" not in out, out
+    assert not (project / _PID_FILE).exists()
+
+
+def test_start_fails_when_user_temp_points_into_project_root(project):
+    # AK5: the system-temp-exception check must still fire for a truly broken
+    # setup (user TMPDIR inside the root but not the framework sink).
+    bad = project / "inroot-temp"
+    bad.mkdir()
+    port = _free_port()
+    try:
+        result = _cli(project, "start", port, temp=bad)
+    finally:
+        _cli(project, "stop", port)
+    out = result.stdout + result.stderr
+    assert result.returncode == 1, out
+    assert "inside the project root" in out, out
     assert not (project / _PID_FILE).exists()
