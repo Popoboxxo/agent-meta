@@ -1430,7 +1430,7 @@ def sync_pipeline_detail_files(
         if write_checked(target_path, content, log, f"pipelines/{name}", dry_run=dry_run):
             log.action("WRITE", rel_out, f"pipeline-details/{name}")
         else:
-            log.skip(rel_out, "unchanged")
+            log.note_unchanged(rel_out)
 
     cleanup_stale_managed_files(
         target_dir, project_root, previously_managed, now_managed, log, dry_run,

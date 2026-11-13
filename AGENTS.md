@@ -107,7 +107,7 @@ Alle Agenten müssen direkt im Projektverzeichnis arbeiten (Isolation deaktivier
 # Repo-Containment („Gefängnis-Modus")
 
 Repo-Containment ist AKTIV: Schreibzugriffe sind auf die Projekt-Wurzel beschränkt; einziger sanktionierter Ausnahmebereich ist `.tmp/`.
-Durchsetzung: PreToolUse-Hook = **Convention boundary** (keine Security Boundary, nur gegen akzidentellen Missbrauch; Definition: `.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
+Durchsetzung: PreToolUse-Hook = **Convention boundary** (keine Security Boundary, nur gegen akzidentellen Missbrauch; Convention boundary = fail-closed nur gegen akzidentellen Missbrauch, Security boundary = auch gegen deliberate Umgehung).
 Kerngrenzen: Indirektion (`eval`, `bash -c`, `xargs`, Interpreter, Variablen-Ziele) und exotische Redirections/`cd`-Ketten umgehen den Tokenizer; Symlink-/TOCTOU-Escape ist nur per `realpath` gemildert; MCP-/Nicht-Tool-Schreibpfade und Selbst-Deaktivierung des Guards durch den Agenten sind nicht abgedeckt; hook-lose Provider erhalten nur die Prompt-Konvention.
 
 
@@ -133,6 +133,9 @@ Kerngrenzen: Indirektion (`eval`, `bash -c`, `xargs`, Interpreter, Variablen-Zie
 | mcp-playwright | Playwright-MCP-Browser-Tools |
 | mcp-viz-logger | viz-logger Event-Logging |
 | tool-graphify | Architektur-/Datei-Fragen mit graphify |
+| se-cascade-adr-standard | ADRs in aktiver SE-Kaskade |
+| se-cascade-artifact-taxonomy | SE-Artefakte, Ablageorte, Namensregeln |
+| se-cascade-review-lifecycle | Reviews in aktiver SE-Kaskade |
 
 Harte MCP-Tool-Verbote: siehe `mcp-guardrails.md` (always-on).
 

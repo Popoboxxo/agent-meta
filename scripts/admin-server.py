@@ -3811,6 +3811,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "payload_too_large", "detail": str(exc)}, status=413)
         except ValueError as exc:
             self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
+        except FileNotFoundError as exc:
+            self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return

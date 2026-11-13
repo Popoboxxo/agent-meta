@@ -60,3 +60,65 @@ def test_with_skills_channel_names_skills_in_one_pointer_line(tmp_path, monkeypa
     stems = [s.strip() for s in lines[0].split(":", 1)[1].split(",")]
     assert stems == sorted(stems) and stems
     assert not any(f"rule {s}" in w for s in stems for w in warns)
+
+
+def test_warning_wording_no_channel(tmp_path, monkeypatch):
+    _b, no_chan = _render(tmp_path, monkeypatch, channels=["embedded"])
+    assert no_chan and all(w.endswith("without a skills channel") for w in no_chan)
+
+
+def test_warning_wording_channel_present_but_no_skill(tmp_path, monkeypatch):
+    _b, with_chan = _render(tmp_path, monkeypatch)
+    assert with_chan
+    assert all("skills channel" not in w and w.endswith("and no skill exists for it") for w in with_chan)
+
+
+def _full_vs_compact(tmp_path, monkeypatch):
+    """(rules absent from compact, pointer stems, warnings) judged by each rule's H1 line."""
+    from lib.rules import collect_rule_sources
+
+    full, _w = _render_profile(tmp_path, monkeypatch, "full")
+    compact, warns = _render_profile(tmp_path, monkeypatch, "compact")
+    config = _fixture_config(profile="full", preset="default")
+    missing = []
+    for src, out in collect_rule_sources(ROOT, config.get("platforms", []), config=config):
+        h1 = next((ln for ln in src.read_text(encoding="utf-8").splitlines() if ln.startswith("# ")), None)
+        if h1 and h1 in full and h1 not in compact:
+            missing.append(Path(out).stem)
+    ptr = [ln for ln in compact.splitlines() if ln.startswith("Weitere Regeln als Skills:")]
+    pointed = {s.strip() for s in ptr[0].split(":", 1)[1].split(",")} if ptr else set()
+    return missing, pointed, warns
+
+
+def _render_profile(tmp_path, monkeypatch, profile):
+    config = _fixture_config(profile=profile, preset="default")
+    variables, _w = build_variables(config, ROOT, tmp_path)
+    log = SyncLog()
+    block = _build_managed_block(
+        ROOT, config, variables, log, provider=_PROVIDER,
+        provider_config=load_providers_config(ROOT), project_root=tmp_path,
+        active_set=frozenset(),
+    )
+    return block, [w for w in log.warnings if "context.rule-compacted-away" in w]
+
+
+def test_every_rule_missing_in_compact_is_pointed_or_warned_once(tmp_path, monkeypatch):
+    # AC-1183-1
+    missing, pointed, warns = _full_vs_compact(tmp_path, monkeypatch)
+    assert missing
+    for stem in missing:
+        n = sum(f"rule '{stem}' " in w for w in warns)
+        assert (stem in pointed) != (n == 1), (stem, stem in pointed, n)
+        assert n <= 1
+
+
+def test_no_reference_skill_without_pointer(tmp_path, monkeypatch):
+    # AC-1183-2: every skill the writer would emit is named in the pointer line.
+    from lib.context import compact_reference_skill_rules
+
+    _m, pointed, _w = _full_vs_compact(tmp_path, monkeypatch)
+    config = _fixture_config(profile="compact", preset="default")
+    variables, _w = build_variables(config, ROOT, tmp_path)
+    written = {s for s, *_ in compact_reference_skill_rules(
+        ROOT, config, variables, SyncLog(), [_PROVIDER])}
+    assert written and written <= pointed

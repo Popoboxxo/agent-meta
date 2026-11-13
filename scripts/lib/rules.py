@@ -785,7 +785,7 @@ def sync_rules(
         if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
             log.action("COPY", rel_out, src_label)
         else:
-            log.skip(rel_out, "unchanged")
+            log.note_unchanged(rel_out)
 
     # Remove stale managed rules no longer in current sources.
     # speech-mode.md is owned by sync_speech_mode (speech/ layer), not the rules/
@@ -867,7 +867,7 @@ def sync_speech_mode(
     if write_checked(target_path, source_content, log, f"speech/{mode}.md", dry_run=dry_run):
         log.action("COPY", rel_out, f"speech/{mode}.md")
     else:
-        log.skip(rel_out, "unchanged")
+        log.note_unchanged(rel_out)
 
     if not dry_run:
         currently_managed: list[str] = []

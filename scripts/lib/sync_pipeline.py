@@ -283,7 +283,7 @@ def _sync_stage_tmp_sink(
     if gitignore.path is not None:
         rel = _rel_display(gitignore.path, root)
         if not gitignore.changed:
-            log.skip(rel, "unchanged")
+            log.note_unchanged(rel)
         elif dry_run:
             log.note("repo-containment", f"DRY-RUN: would write self-ignoring {rel}")
         else:

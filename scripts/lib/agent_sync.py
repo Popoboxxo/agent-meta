@@ -1202,7 +1202,7 @@ def _write_agent_file(
         # not drift (#752). write_checked already returned False for this case.
         log.skip(rel_out, 'absent (target root gitignored)')
     else:
-        log.skip(rel_out, 'unchanged')
+        log.note_unchanged(rel_out)
 
 _MANAGED_INDEX_FILENAME = '.agent-meta-managed'
 

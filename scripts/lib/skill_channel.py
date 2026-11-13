@@ -113,7 +113,7 @@ def write_skill_channel_rule(
     if write_checked(skill_target_path, skill_content, log, src_label, dry_run=dry_run):
         log.action("WRITE", rel_out, src_label)
     else:
-        log.skip(rel_out, "unchanged")
+        log.note_unchanged(rel_out)
 
 
 def cleanup_stale_skill_channel_rules(

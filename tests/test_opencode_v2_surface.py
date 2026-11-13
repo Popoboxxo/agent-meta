@@ -5502,7 +5502,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # #1180/#1000 (2026-11-12): ac01-baseline re-pinned (24 hashes: rule pointer inlining + spec-plan-workflow bullet); compact-golden re-pinned (agents-managed.md a2a pointer removed); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # #1210 (2026-11-13): ac01-baseline re-pinned (dod-push-check 2.5.2 + branch-guard rule line; 11 hashes).
 _FIXTURE_TREES = {
-    "ac01-baseline": "98f50965f0c394ebeaee8c855a56b03f3812e982603bdc36a61a46a15c4b1d34",
+    "ac01-baseline": "3adb0497af5488b382b5bc4d82943b118308b8ecaaa9e4872641c9698719ef56",
     "slimming-golden": "20a43e78730a04e7879f0ad5dcd60d19979abb7d3aafb6c51d95aaa47ba6ae46",
     "compact-golden": "3463b046b3ceaa17e61d7f51eb3163b2afeac52cd9fd13d16caff0bb512d8504",
 }

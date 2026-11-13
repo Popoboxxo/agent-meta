@@ -142,7 +142,7 @@ def test_sync_external_skills_is_idempotent(tmp_path, monkeypatch):
         "unchanged skill must log no actions (got: "
         f"{[a for a in second.actions if 'WRITE' in a or 'COPY' in a]})"
     )
-    assert any("unchanged" in s for s in second.skipped), second.skipped
+    assert bool(second.unchanged), second.skipped
 
 
 def test_sync_external_skills_logs_change_when_content_changes(tmp_path, monkeypatch):

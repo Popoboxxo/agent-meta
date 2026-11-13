@@ -143,7 +143,7 @@ def render_injection_drift_artifacts(
         if write_checked(target_path, content, log, "external-tools-drift", dry_run=dry_run):
             log.action("WRITE", rel_out, "external-tools-drift")
         else:
-            log.skip(rel_out, "unchanged")
+            log.note_unchanged(rel_out)
 
 
 # ---------------------------------------------------------------------------
