@@ -740,7 +740,7 @@ def test_a5_expanded_refs_from_feature(multi_repo, command, expected):
 # A4: another repository (-C/--git-dir/--work-tree/GIT_DIR) cannot be judged
 # by the cwd repo's HEAD.
 @pytest.mark.parametrize("command,expected", [
-    # #1210: a literal -C into a repo on a feature branch is judged by that HEAD
+    # worktree_branch: a literal -C into a repo on a feature branch is judged by that HEAD
     ("git -C . push", GATE),
     ("git -C . push origin", GATE),
     ("git -C . push origin HEAD", GATE),
@@ -1194,7 +1194,7 @@ def test_951_dash_c_other_repo_is_judged_as_foreign(tmp_path):
     (repo / ".meta-config").mkdir()
     (repo / ".meta-config" / "project.yaml").write_text(
         'variables:\n  TEST_COMMAND: "true"\n', encoding="utf-8")
-    # #1210: ../other resolves (on main) and is judged by ITS HEAD
+    # worktree_branch: ../other resolves (on main) and is judged by ITS HEAD
     for command in ("git -C ../other push",
                     "git -C ../other push origin",
                     "git -C ../other push origin HEAD"):
@@ -1206,7 +1206,7 @@ def test_951_dash_c_other_repo_is_judged_as_foreign(tmp_path):
     result = _run_hook(repo, "git -C ../other push origin HEAD:main")
     assert result.returncode == 2, result.stderr
     assert "protected branch" in result.stderr
-    # #1210: ../other sits on main, so even an explicit safe ref is judged by
+    # worktree_branch: ../other sits on main, so even an explicit safe ref is judged by
     # that HEAD (same as a plain push while on main); an unresolvable target
     # keeps the old "explicit safe ref is allowed" outcome.
     result = _run_hook(repo, "git -C ../other push origin feat/x")
@@ -1681,7 +1681,7 @@ def test_heredoc_eval_indirection_behaviour_unchanged(repo_on_feature_branch):
     assert result.returncode == 0, result.stderr
 
 
-# --- issue #1210: the branch comes from the push's EFFECTIVE directory ------
+# --- worktree_branch: the branch comes from the push's EFFECTIVE directory ------
 #
 # `git -C <wt> push` / `cd <wt> && git push` must be judged by the worktree's
 # HEAD, not by the hook process cwd (main checkout). Unresolvable targets
@@ -1724,7 +1724,7 @@ def main_checkout_on_feature(multi_repo):
     # cwd repo is on main: a plain push still blocks there
     ("git push", BLOCK),
 ])
-def test_1210_worktree_on_feature_main_checkout_on_main(main_checkout_on_main, template, expected):
+def test_worktree_branch_worktree_on_feature_main_checkout_on_main(main_checkout_on_main, template, expected):
     repo, wt = main_checkout_on_main
     _assert_outcome(repo, template.format(wt=wt), expected)
 
@@ -1737,12 +1737,12 @@ def test_1210_worktree_on_feature_main_checkout_on_main(main_checkout_on_main, t
     "git -C {wt} push origin HEAD:main",
     "cd {wt} && git push origin main",
 ])
-def test_1210_worktree_on_main_main_checkout_on_feature_blocks(main_checkout_on_feature, template):
+def test_worktree_branch_worktree_on_main_main_checkout_on_feature_blocks(main_checkout_on_feature, template):
     repo, wt = main_checkout_on_feature
     _assert_outcome(repo, template.format(wt=wt), BLOCK)
 
 
-def test_1210_worktree_on_main_blocks_with_branch_message(main_checkout_on_feature):
+def test_worktree_branch_worktree_on_main_blocks_with_branch_message(main_checkout_on_feature):
     repo, wt = main_checkout_on_feature
     result = _run_hook(repo, f"git -C {wt} push")
     assert result.returncode == 2
@@ -1766,7 +1766,7 @@ def test_1210_worktree_on_main_blocks_with_branch_message(main_checkout_on_featu
     "git --git-dir={wt}/.git push",
     "GIT_DIR={wt}/.git git push",
 ])
-def test_1210_unresolvable_target_stays_blocked(main_checkout_on_main, tmp_path, template):
+def test_worktree_branch_unresolvable_target_stays_blocked(main_checkout_on_main, tmp_path, template):
     repo, wt = main_checkout_on_main
     plain = repo.parent / "plain"
     plain.mkdir()

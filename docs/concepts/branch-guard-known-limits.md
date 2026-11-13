@@ -35,6 +35,6 @@ Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen üb
 
 Bewusster Trade-off, kein Bug (siehe Kommentar-Header in `.claude/hooks/orchestrator-guard.sh`) — nur relevant für Nutzer, die sich vollständig auf den Schutz statt auf die Konvention verlassen.
 
-Der DoD-Push-Check (#1210) nimmt den Branch aus dem effektiven Verzeichnis des Pushs (`-C`-Kette bzw. führendes `cd`, sonst Hook-cwd; Worktrees zählen). Nur ein FÜHRENDES `cd` wird aufgelöst; nicht auflösbare Ziele, `pushd`/`popd`, `--git-dir`/`--work-tree` und `GIT_DIR` bleiben fail-closed.
+Der DoD-Push-Check (Worktree-Branch-Erkennung) nimmt den Branch aus dem effektiven Verzeichnis des Pushs (`-C`-Kette bzw. führendes `cd`, sonst Hook-cwd; Worktrees zählen). Nur ein FÜHRENDES `cd` wird aufgelöst; nicht auflösbare Ziele, `pushd`/`popd`, `--git-dir`/`--work-tree` und `GIT_DIR` bleiben fail-closed.
 
 Gequoteter Text von Nicht-Git-Textkonsumenten (`gh ... --body "...git push..."`, `echo`, `printf`) gilt nicht als Push, auch wenn der Text Trenner (`&&`, `;`, `|`, Zeilenumbruch) vor den Worten enthält. Indirektion über `bash -c`, `eval`, `xargs` bleibt fail-closed bzw. unerkannt; ein per `gh alias set --shell` angelegter Alias kann einen Push ausführen (bekannte Grenze, siehe `NON_EXEC` im Hook).
