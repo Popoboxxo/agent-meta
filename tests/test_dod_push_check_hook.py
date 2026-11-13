@@ -740,9 +740,10 @@ def test_a5_expanded_refs_from_feature(multi_repo, command, expected):
 # A4: another repository (-C/--git-dir/--work-tree/GIT_DIR) cannot be judged
 # by the cwd repo's HEAD.
 @pytest.mark.parametrize("command,expected", [
-    ("git -C . push", BLOCK),
-    ("git -C . push origin", BLOCK),
-    ("git -C . push origin HEAD", BLOCK),
+    # #1210: a literal -C into a repo on a feature branch is judged by that HEAD
+    ("git -C . push", GATE),
+    ("git -C . push origin", GATE),
+    ("git -C . push origin HEAD", GATE),
     ("git --git-dir=.git push", BLOCK),
     ("git --git-dir .git push origin", BLOCK),
     ("git --work-tree . push origin HEAD", BLOCK),
@@ -1193,17 +1194,24 @@ def test_951_dash_c_other_repo_is_judged_as_foreign(tmp_path):
     (repo / ".meta-config").mkdir()
     (repo / ".meta-config" / "project.yaml").write_text(
         'variables:\n  TEST_COMMAND: "true"\n', encoding="utf-8")
+    # #1210: ../other resolves (on main) and is judged by ITS HEAD
     for command in ("git -C ../other push",
                     "git -C ../other push origin",
                     "git -C ../other push origin HEAD"):
         result = _run_hook(repo, command)
         assert result.returncode == 2, (command, result.stderr)
-        assert "another repository" in result.stderr
+        assert ("you are on 'main'" in result.stderr
+                or "destination 'main'" in result.stderr), result.stderr
     # an explicit protected destination is still caught by the refspec check
     result = _run_hook(repo, "git -C ../other push origin HEAD:main")
     assert result.returncode == 2, result.stderr
     assert "protected branch" in result.stderr
+    # #1210: ../other sits on main, so even an explicit safe ref is judged by
+    # that HEAD (same as a plain push while on main); an unresolvable target
+    # keeps the old "explicit safe ref is allowed" outcome.
     result = _run_hook(repo, "git -C ../other push origin feat/x")
+    assert result.returncode == 2 and "you are on 'main'" in result.stderr, result.stderr
+    result = _run_hook(repo, "git -C ../missing push origin feat/x")
     assert result.returncode == 0, result.stderr
     assert "DoD-Check passed" in result.stdout
 
@@ -1671,3 +1679,98 @@ def test_heredoc_eval_indirection_behaviour_unchanged(repo_on_feature_branch):
     # convention boundary: variable indirection is not resolved (documented gap)
     result = _run_hook(repo_on_feature_branch, "c='git push origin main'; eval \"$c\"")
     assert result.returncode == 0, result.stderr
+
+
+# --- issue #1210: the branch comes from the push's EFFECTIVE directory ------
+#
+# `git -C <wt> push` / `cd <wt> && git push` must be judged by the worktree's
+# HEAD, not by the hook process cwd (main checkout). Unresolvable targets
+# stay fail closed.
+
+def _worktree(repo: Path, name: str, branch: str, create: bool) -> Path:
+    wt = repo.parent / name
+    args = ["worktree", "add", "-q", str(wt)] + (["-b", branch] if create else [branch])
+    _git(repo, *args)
+    return wt
+
+
+@pytest.fixture
+def main_checkout_on_main(multi_repo):
+    """Main checkout on main, worktree on feature branch fix/x."""
+    _checkout(multi_repo, "main")
+    return multi_repo, _worktree(multi_repo, "wt", "fix/x", create=True)
+
+
+@pytest.fixture
+def main_checkout_on_feature(multi_repo):
+    """Main checkout on feat/x, worktree on main."""
+    return multi_repo, _worktree(multi_repo, "wt", "main", create=False)
+
+
+@pytest.mark.parametrize("template,expected", [
+    ("git -C {wt} push -u origin fix/x", GATE),
+    ("git -C {wt} push origin HEAD", GATE),
+    ("git -C {wt} push", GATE),
+    ("cd {wt} && git push -u origin fix/x", GATE),
+    ("cd {wt} && git push", GATE),
+    ("cd {wt}; git push origin HEAD", GATE),
+    ("git -C {wt}/.. -C wt push", GATE),  # relative -C resolves against the previous one
+    ("git -C /nonexistent -C {wt} push", GATE),  # last -C wins
+    # explicit protected refspecs block from anywhere
+    ("git push origin HEAD:main", BLOCK),
+    ("git push origin main", BLOCK),
+    ("git -C {wt} push origin HEAD:main", BLOCK),
+    ("cd {wt} && git push origin main", BLOCK),
+    # cwd repo is on main: a plain push still blocks there
+    ("git push", BLOCK),
+])
+def test_1210_worktree_on_feature_main_checkout_on_main(main_checkout_on_main, template, expected):
+    repo, wt = main_checkout_on_main
+    _assert_outcome(repo, template.format(wt=wt), expected)
+
+
+@pytest.mark.parametrize("template", [
+    "git -C {wt} push",
+    "git -C {wt} push origin HEAD",
+    "cd {wt} && git push",
+    "cd {wt} && git push origin HEAD",
+    "git -C {wt} push origin HEAD:main",
+    "cd {wt} && git push origin main",
+])
+def test_1210_worktree_on_main_main_checkout_on_feature_blocks(main_checkout_on_feature, template):
+    repo, wt = main_checkout_on_feature
+    _assert_outcome(repo, template.format(wt=wt), BLOCK)
+
+
+def test_1210_worktree_on_main_blocks_with_branch_message(main_checkout_on_feature):
+    repo, wt = main_checkout_on_feature
+    result = _run_hook(repo, f"git -C {wt} push")
+    assert result.returncode == 2
+    assert "on 'main'" in result.stderr
+
+
+@pytest.mark.parametrize("template", [
+    "git -C {wt}/$(echo x) push",            # computed path
+    "git -C {wt}/* push",                    # glob
+    "git -C ~nobody push",                   # tilde
+    "git -C {wt}/missing push",              # nonexistent path
+    "git -C {plain} push",                   # not a git repo
+    "git -C {detached} push",                # detached worktree HEAD
+    "cd {wt}/missing && git push",
+    "cd {plain} && git push",
+    "cd {detached} && git push",
+    "cd $(echo {wt}) && git push",
+    "pushd {wt}; git push",
+    "cd {wt} && cd .. && git push",           # more than one cd
+    "git push; cd {wt}; git push",            # cd not leading
+    "git --git-dir={wt}/.git push",
+    "GIT_DIR={wt}/.git git push",
+])
+def test_1210_unresolvable_target_stays_blocked(main_checkout_on_main, tmp_path, template):
+    repo, wt = main_checkout_on_main
+    plain = repo.parent / "plain"
+    plain.mkdir()
+    detached = _worktree(repo, "wt-detached", "main", create=False) if False else None
+    _git(repo, "worktree", "add", "-q", "--detach", str(repo.parent / "wt-det"))
+    detached = repo.parent / "wt-det"
+    _assert_outcome(repo, template.format(wt=wt, plain=plain, detached=detached), BLOCK)
