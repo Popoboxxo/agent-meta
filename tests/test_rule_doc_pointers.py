@@ -52,3 +52,16 @@ def test_lazy_table_lists_all_se_cascade_skills():
     for stem in ("se-cascade-adr-standard", "se-cascade-artifact-taxonomy",
                  "se-cascade-review-lifecycle"):
         assert f"| {stem} |" in text
+
+
+def test_generic_rules_have_no_provider_specific_pointers():
+    # #1180: whole class; branch-guard.md itself is the anchor's home, so skip it.
+    hits = []
+    for path in (REPO_ROOT / "rules" / "1-generic").rglob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        if path.name == "branch-guard.md":
+            continue
+        for pat in (r"\.claude/rules/", r"branch-guard\.md#"):
+            if re.search(pat, text):
+                hits.append((path.name, pat))
+    assert hits == []

@@ -54,8 +54,7 @@ Die Dateizahl bleibt als zusätzliches Signal erhalten.
 ## Approval-Gate (Convention boundary)
 
 Das Approval-Gate ist eine **Convention boundary** gegen akzidentellen Missbrauch,
-keine Security boundary (Terminologie:
-`.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
+keine Security boundary (Convention boundary = fail-closed nur gegen akzidentellen Missbrauch, Security boundary = auch gegen deliberate Umgehung).
 
 - Vollständig greift der Gate nur über die Pipeline-Route (`requires_approval`-Stage).
 - Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — der Orchestrator klassifiziert sie regelbasiert vor dem Dispatch: S-Klasse ohne Artefakt direkt, M/L/XL erst nach freigegebener Spec/Plan (`Status: APPROVED`).

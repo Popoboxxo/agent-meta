@@ -23,15 +23,18 @@ def test_reachable_matrix():
     assert not rule_reachable_in_compact("x", native_rules=False, **kw)
 
 
-def _render(tmp_path, monkeypatch, channels=None):
-    if channels is not None:
+def _render(tmp_path, monkeypatch, channels=None, soft_cap=None):
+    if channels is not None or soft_cap is not None:
         import lib.providers as providers
 
         real = providers.load_provider_capabilities
 
         def _caps(root):
             caps = {n: dict(e or {}) for n, e in real(root).items()}
-            caps[_PROVIDER]["rules_read_channels"] = channels
+            if channels is not None:
+                caps[_PROVIDER]["rules_read_channels"] = channels
+            if soft_cap is not None:
+                caps[_PROVIDER]["context_soft_cap_chars"] = soft_cap
             return caps
 
         monkeypatch.setattr(providers, "load_provider_capabilities", _caps)
@@ -122,3 +125,18 @@ def test_no_reference_skill_without_pointer(tmp_path, monkeypatch):
     written = {s for s, *_ in compact_reference_skill_rules(
         ROOT, config, variables, SyncLog(), [_PROVIDER])}
     assert written and written <= pointed
+
+
+def test_soft_cap_overflow_warns_once_and_removes_no_rule(tmp_path, monkeypatch):
+    # AC-1183-5: exceeding the soft cap only warns; the render is not trimmed to fit.
+    from lib.consistency import context_budget as cb
+
+    base_block, base_warns = _render(tmp_path, monkeypatch)
+    cap = len(base_block) - 1
+    block, warns = _render(tmp_path, monkeypatch, soft_cap=cap)
+    assert (block, warns) == (base_block, base_warns)
+
+    (tmp_path / "AGENTS.md").write_text(block, encoding="utf-8")
+    caps = {_PROVIDER: {"context_file": "AGENTS.md", "context_soft_cap_chars": cap}}
+    findings = cb.check_over_soft_cap(tmp_path, [_PROVIDER], caps, None)
+    assert [f.check for f in findings] == ["context.over-soft-cap"]

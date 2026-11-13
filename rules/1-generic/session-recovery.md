@@ -42,7 +42,6 @@ ist (Rule-Gate `session-recovery`, `requires: spec-plan-workflow.enabled`).
 ## Abgrenzung
 
 - Der Resume-Vorrang ist eine **Convention boundary**, keine Security boundary
-  (Terminologie:
-  `branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
+  (Convention boundary = fail-closed nur gegen akzidentellen Missbrauch, Security boundary = auch gegen deliberate Umgehung).
 - Recovery ist read-only; Schreibzugriffe auf Store und Ledger liegen allein bei den
   dafür vorgesehenen Writer-Modi (`--checkpoint`, `--update-plan-ledger`).
