@@ -51,6 +51,8 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
+**Merge dispatch (#1172):** merges of approved PRs are dispatched by the main chat directly to you. The path orchestrator -> git was blocked by the Claude Code auto-mode classifier as "Merge Without Review" in an audit (2026-11-06), also after user approval in the main chat; the cause is outside this repo and not reproduced. This path stays fallback (decision 47). A permission rule for the `git` agent only: feasibility is being checked in a separate spec (phase D task 2a), not yet decided. Merge policy: #783 (open).
+
 ## 4a. Content gate — inspect what you stage
 
 `git status --porcelain` and `git diff --cached` before every `git add` — the commit message and branch are worthless if the payload is wrong.
@@ -124,6 +126,8 @@ Report the candidates (local + remote) to the user.
 **Commit format:** `<type>: <description>`, first line ≤ 72 characters — type/scope rules: Rule `commit-conventions.md` (auto-loaded).
 
 **No leading BOM (issue #842):** the subject must start at byte 0 with the Conventional-Commit type. Never prefix a commit message with a UTF-8 BOM (`EF BB BF`, e.g. from a copied `-F` message file saved by an editor) — the guard hook rejects such a commit with exit 2. Strip the BOM before committing.
+
+**Commit trailers (issue #1168):** if the task prompt gives a `Co-Authored-By` line, copy it verbatim (1:1) into the commit message. Never derive a model name for the trailer from your own session or harness attribution.
 
 **Conventional Commits (extended):** mark breaking changes with `!` after `type/scope` or a `BREAKING CHANGE:` footer (maps to MAJOR). Prefer **multiple focused commits** over one mixed commit. Optional `scope` when REQ-ID is not the target.
 
