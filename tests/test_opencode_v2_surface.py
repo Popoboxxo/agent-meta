@@ -5507,7 +5507,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # re-pinned (git agent render of every provider); `slimming-golden` re-pinned (`git.md`
 # version pin + section 0); `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "f5b063a6b4ecd3e3b10a16413914ba0b58e38a3971ecd42c9aae0ea3f88953b0",
+    "ac01-baseline": "2e7ef6537e82ce20e2076b45c7be74610bdd970f90f269bc3e8ecbe49318352c",
     "slimming-golden": "0798a9fc50a8027ca273956e18e4522924d8f3a0cf5d424d69b45ffbf3e50f36",
     "compact-golden": "ab9dc4ea09dd647eeadbef3b54dc0e08a57250c5c0167abb7e1d5cf23accff17",
 }
