@@ -7,7 +7,9 @@ from typing import Mapping, Sequence
 
 from . import context_budget as cb
 
-_DOC_POINTER_RE = re.compile(r"`(docs/[^`\s]+\.md)`")
+# Backticked `docs/x.md` or relative link ](docs/x.md[#frag][ "title"]) / ](./docs/x.md); URLs/anchors never match.
+_DOC_POINTER_RE = re.compile(
+    r"`(docs/[^`\s]+\.md)`|\]\((?:\./)?(docs/[^)\s#]+\.md)(?:#[^)\s]*)?(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
 
 
 def check_dangling_doc_pointer(
@@ -16,7 +18,7 @@ def check_dangling_doc_pointer(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """ERROR per backticked ``docs/...md`` path in a generated artifact that does not exist under *project_root*."""
+    """ERROR per backticked or relative-linked ``docs/...md`` path in a generated artifact that does not exist under *project_root*."""
     root = Path(project_root)
     findings, seen = [], set()
     for provider in active_providers:
@@ -25,7 +27,7 @@ def check_dangling_doc_pointer(
             if text is None:
                 continue
             rel = cb._rel(artifact, root)
-            for doc in sorted(set(_DOC_POINTER_RE.findall(text))):
+            for doc in sorted({a or b for a, b in _DOC_POINTER_RE.findall(text)}):
                 if (rel, doc) in seen or (root / doc).is_file():
                     continue
                 seen.add((rel, doc))

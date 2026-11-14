@@ -37,6 +37,18 @@ Offen (nicht abgehakt, Grund):
 - #1197 (OPEN): nur Ratchet-Test, der eigentliche Fix liegt bei #1187-T9, offen, nicht in diesem PR.
 - Issues #1194, #1205, #1206, #1207, #1213, #1214, #1170, #1174 sind laut `gh` CLOSED; Task-Checkboxen sind wegen Squash-Commits (Step-Schnitt weicht ab) nicht einzeln gesetzt.
 
+**Stand nach #1231, #1233, #1234 (gemergt auf origin/main, Stand 2026-11-14):**
+- `adf26776` #1231 `chore(deps): bump the actions-deps group with 2 updates` (nur Workflows, kein Task dieser Phase).
+- `b15cd01e` #1233 `fix: phase A-C remaining gaps` (Squash; enthält die zuvor als "nicht gemergt" geführten Commits zu #1180 AK3 (Doc-Pointer-Check), #1189 AK3 und #1086(c)).
+- `efca4b42` #1234 `fix: document git agent sentinel role and guard tests` (kein Task dieser Phase).
+
+**PR `fix/phase-abc-rest-2` ("fix: phase A-C remaining gaps (2)", refs #1180, #1189; noch nicht gemergt):**
+- #1180 AK1: neuer Test scannt `rules/2-platform` auf Doc-Pointer (7 Pointer, 4 verschiedene Ziele, alle vorhanden; Auslieferung `scripts/lib/rules.py:225-233`).
+- #1180 AK3: Markdown-Link-Pointer in `check_dangling_doc_pointer` (`scripts/lib/consistency/doc_pointers.py`), Test `test_dangling_markdown_link_pointer`.
+- #1189: Smoke-Test mit Viz+MCP `tests/test_admin_server_lifecycle_smoke.py::test_start_status_stop_with_viz_and_mcp`.
+- #1180 Zusatzpunkt `use-lazy-rules.md` mcp-*-Zeilen: im Prinzip echt dangling (Skills werden nur je aktivem Server erzeugt, `scripts/lib/mcp.py:326-338`), hier **nicht** umgesetzt; abgedeckt durch #1186 / Phase E (`docs/superpowers/plans/2026-11-11-phase-e-artifact-locations.md`).
+- Weiterhin offen (nicht in diesem PR, nicht als erledigt zu werten): #1139 AK3, #898 (Haiku-ID), #1173, #1197.
+
 **Goal:** 13 kleine, voneinander unabhängige Defekte (Sync-Pfad, Validator, Spec/Plan-Gate, Admin-UI, Tests, Doku) beheben, je Issue ein TDD-Task und ein Commit; keine Feature-Erweiterung.
 **Architecture:** Jede Änderung ist eine lokale Ursachenbehebung in genau der Datei, die der Code-Befund (in W gelesen) nennt. Keine neuen Module außer reinen Testdateien. Keine Provider-Namensverzweigung; Provider-Unterschiede bleiben Config-Keys.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), pytest, Markdown/YAML, eine Single-File-HTML-UI (`docs/ui/admin-ui.html`).

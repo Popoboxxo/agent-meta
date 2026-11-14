@@ -15,6 +15,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from tests.timeouts import SYNC_VALIDATE_TIMEOUT  # noqa: E402
 
 _SCRIPT = REPO_ROOT / "scripts" / "admin-server.py"
 _PID_FILE = Path(".meta-viz") / ".admin-server-pid"
+_MCP_PID_FILE = Path(".meta-viz") / ".mcp-server-pid"
 _VALID_CONFIG = (
     "project:\n  name: smoke\n  prefix: sm\n"
     "repo_containment:\n  tmp-sink:\n    enabled: true\n    path: .tmp\n"
@@ -71,13 +73,15 @@ def project():
         shutil.rmtree(root, ignore_errors=True)
 
 
-def _cli(root: Path, command: str, port: int, temp: Path | None = None) -> subprocess.CompletedProcess:
+def _cli(
+    root: Path, command: str, port: int, temp: Path | None = None, viz: bool = False,
+) -> subprocess.CompletedProcess:
     env = dict(os.environ)
     for key in ("TMPDIR", "TEMP", "TMP"):
         env[key] = os.path.realpath(temp or root / ".tmp")
     return subprocess.run(
         [sys.executable, str(_SCRIPT), command, "--root", str(root),
-         "--host", "127.0.0.1", "--port", str(port), "--no-viz"],
+         "--host", "127.0.0.1", "--port", str(port), *([] if viz else ["--no-viz"])],
         cwd=str(REPO_ROOT), env=env, capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=SYNC_VALIDATE_TIMEOUT,
     )
@@ -177,3 +181,61 @@ def test_crashing_child_reports_failure_and_leaves_no_pid_file(project):
     assert result.returncode == 1, out
     assert "started (PID" not in out, out
     assert not (project / _PID_FILE).exists()
+
+
+# --------------------------------------------------------------------------- #
+# #1189 follow-up: full lifecycle WITH Viz dashboard + MCP server              #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals/process model")
+def test_start_status_stop_with_viz_and_mcp(project):
+    viz_port, mcp_port = _free_port(), _free_port()
+    # Viz/MCP ports come from project.yaml (no CLI flag); pin them to free ports.
+    cfg = project / ".meta-config" / "project.yaml"
+    cfg.write_text(
+        cfg.read_text(encoding="utf-8")
+        + f"viz:\n  server:\n    port: {viz_port}\n  mcp:\n    port: {mcp_port}\n",
+        encoding="utf-8",
+    )
+    # Submodule layout: resolve_asset() finds viz-report.py/viz-logger.py here.
+    (project / ".agent-meta").symlink_to(REPO_ROOT, target_is_directory=True)
+    port = _free_port()
+    pids = {
+        "viz": project / ".meta-viz" / ".server-pid",
+        "mcp": project / _MCP_PID_FILE,
+    }
+    pid_values = []
+    try:
+        started = _cli(project, "start", port, viz=True)
+        out = started.stdout + started.stderr
+        assert started.returncode == 0, out
+        assert "Traceback" not in out, out
+        # The admin socket is bound before start_all() runs, so `start` can return
+        # while Viz/MCP are still in their liveness grace window: poll for them.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and not all(pf.exists() for pf in pids.values()):
+            time.sleep(0.2)
+        time.sleep(2)  # past VIZ_START_GRACE so a crashing child is gone
+        logs = "".join(
+            f"\n--- {f.name}\n{f.read_text(encoding='utf-8', errors='replace')}"
+            for f in sorted((project / ".meta-viz").glob("*.log"))
+        )
+        for pf in pids.values():
+            assert pf.exists(), out + logs
+
+        status = _cli(project, "status", port, viz=True).stdout
+        assert f"Admin UI      (port {port}): RUNNING" in status, status
+        assert f"Viz dashboard (port {viz_port}): RUNNING" in status, status
+        assert f"MCP server    (port {mcp_port}): RUNNING" in status, status
+        pid_values = [int(pf.read_text(encoding="utf-8")) for pf in pids.values()]
+    finally:
+        stopped = _cli(project, "stop", port, viz=True)
+    assert stopped.returncode == 0, stopped.stdout + stopped.stderr
+    for pf in (project / _PID_FILE, *pids.values()):
+        assert not pf.exists(), pf
+    for pid in pid_values:
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+    after = _cli(project, "status", port, viz=True).stdout
+    assert after.count("STOPPED") == 3, after
