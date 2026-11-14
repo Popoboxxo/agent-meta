@@ -3,7 +3,7 @@ pipeline_stages:
   implement: 3
 status: DRAFT
 date: 2026-11-11
-base-commit: 9aa0e0c0
+base-commit: b36184b5
 roadmap: docs/superpowers/plans/2026-11-10-backlog-roadmap.md
 phase: D
 issues: [1181, 1210, 1217, 1172, 1176, 1168, 1169, 1141]
@@ -13,7 +13,7 @@ branch: feat/phase-d-guards-hooks
 # Phase D: Guards, Hooks, Commit-Authority Implementation Plan
 
 > Status: DRAFT
-> Base: `origin/main 9aa0e0c0` (Anker am 2026-11-11 gegen diesen Stand nachgemessen) | Roadmap Phase D (Welle 3) | Issues #1181, #1210, #1217, #1172, #1176, #1168, #1169, #1141
+> Base: `origin/main b36184b5` (Anker am 2026-11-11 gegen `9aa0e0c0` nachgemessen; Stichprobe am 2026-11-13 gegen `b36184b5`, siehe Änderungsprotokoll) | Roadmap Phase D (Welle 3) | Issues #1181, #1210, #1217, #1172, #1176, #1168, #1169, #1141
 
 **Goal:** Die acht Phase-D-Issues so schneiden, dass jede Guard-/Hook-Änderung hinter einer freigegebenen Spec oder einer bereits freigegebenen Spec+Plan-Kombination läuft, Doku-Issues direkt umgesetzt werden und die Hook-Datei `orchestrator-guard-impl.sh` nie von zwei Tasks parallel angefasst wird. #1141 (Klasse M) ist der letzte Teil der Phase-D-PR nach #1181 (Entscheidung 35) und läuft hinter einem Spec-Gate.
 **Architecture:** Drei Ströme (plus Nachläufer D für #1141). (A) #1181 wird nicht neu geplant: Ausführung des APPROVED Plans `docs/plans/2026-11-09-commit-authority-grant-plan.md` (16 Tasks) als Block. (B) Doku-/Template-Issues #1172, #1176, #1168 (S) in disjunkten Dateien. (C) Hook-Arbeit #1169 (M, Refactor), #1210 (L, Security-Spec) und #1217 (M, Spec) strikt sequentiell auf `hooks/1-generic/orchestrator-guard-impl.sh` und `hooks/1-generic/lib/hook_common.sh`.
@@ -466,12 +466,12 @@ Nicht durch Entscheidungen 1-38 gedeckt. Nicht entschieden, nicht geraten. Die f
 - issue: 1187
 - issue: 1218
 - issue: 1141
-- origin/main `9aa0e0c0` (Stand nach PR #1218)
+- origin/main `b36184b5` (Basis seit 2026-11-13; vorher `9aa0e0c0`, Stand nach PR #1218)
 
 ## Nicht verifiziert
 
 - Nichts ausgeführt: weder Tests noch Benchmark noch `--validate`. Alle erwarteten Ergebnisse sind Planannahmen.
-- Nachgemessen (Review 2026-11-11, read-only gegen `9aa0e0c0`): Guard-Anker (`:45`, `:214-218`, `:231`, `:239`, `:245`, `:255`, `:262-269`, `:326`, `:333`, `:384`, `:418-481`, `:496-500`, `:895`, `:1262`, `:1330`, `:1383-1392`, `:1419`, `:1527-1547`), `hook_common.sh` (`:3-5`, `:63-110`, `:128-131`, `:169`, `:264`), `config.py` (`:111`, `:256-318`, `:636-714`), Schema (`:12`, `:2854`), Testnamen und -zeilen in `tests/test_orchestrator_guard_hook.py` und `tests/test_orchestrator_worker_report_contract.py:85-99`, `scripts/lib/hooks.py:554-561`, #1181-Plan `:17`, `:60`, `:77-79`, `:279-314`, `:1139`, `:1200`.
+- Nachgemessen (Review 2026-11-11, read-only gegen `9aa0e0c0`; Stand 2026-11-13 Basis `b36184b5`, nicht vollständig neu gemessen, nur Stichprobe laut Änderungsprotokoll): Guard-Anker (`:45`, `:214-218`, `:231`, `:239`, `:245`, `:255`, `:262-269`, `:326`, `:333`, `:384`, `:418-481`, `:496-500`, `:895`, `:1262`, `:1330`, `:1383-1392`, `:1419`, `:1527-1547`), `hook_common.sh` (`:3-5`, `:63-110`, `:128-131`, `:169`, `:264`), `config.py` (`:111`, `:256-318`, `:636-714`), Schema (`:12`, `:2854`), Testnamen und -zeilen in `tests/test_orchestrator_guard_hook.py` und `tests/test_orchestrator_worker_report_contract.py:85-99`, `scripts/lib/hooks.py:554-561`, #1181-Plan `:17`, `:60`, `:77-79`, `:279-314`, `:1139`, `:1200`.
 - Spawn-Zahl 9 nur statisch aus dem Quelltext gezählt, nicht zur Laufzeit gemessen (Task 6). Ziel "<= 5" ist ein Planwert.
 - Ob der Referenzplan #1181 inhaltlich (T5/T8/T16) nach #1190 (Orchestrator-Topologie, PR #1215/#1216) noch passt: nicht geprüft; nur die AC-1-Basis `aaed14c2` ist als gebrochen belegt (siehe Reihenfolge und Abhängigkeiten).
 - Hook-API für `ask` bei Claude Code: nicht verifiziert (Task 1a). Im Repo keine Claude-Belege, `review-policy-gate.sh` existiert nicht.
@@ -489,5 +489,30 @@ Nicht durch Entscheidungen 1-38 gedeckt. Nicht entschieden, nicht geraten. Die f
 - Keine Platzhalter-Texte; offene Punkte stehen unter Offene Entscheidungen und Nicht verifiziert.
 - Entscheidungen eingearbeitet: 1 (Task 1a vor Spec), 12 (`!`-Befehle), 19 (Reihenfolge), 17 (ein PR, ein Commit je Task), 25 (#1168), 28 (#1169), 34 (D-neu-3, D-neu-4), 35 (#1141, Task 11-12), 38a (#1210, D-neu-4 nur bei negativer Evidenz), 38e (keine Closing-Keywords), 47 (#1172, Task 2a/2b), 48 (#1141 `--audit-config`), 52 (max. 2 PRs je Phase). Status bleibt DRAFT bis User-Freigabe der Specs (Task 0, 1, 2a, 5, 11). Offene Punkte stehen unter "Offene Entscheidungen (neu, ungeklaert)" (Punkte 2-4; 1 und 5 beantwortet).
 - #1141-Befunde: `_comment` ist im Schema vorhanden (`:12`); Top-Level-`mcp` hat keinen Leser (nur `viz.mcp`, `.meta-config/project.yaml:332`); Aufnahme laut Entscheidung 35 fest, Typ über Spec-Gate Task 11.
-- Frische-Check: Stand `9aa0e0c0`; Anker nach Merge von C/E/F erneut messen (siehe Reihenfolge und Abhängigkeiten).
+- Frische-Check: Basis `b36184b5` (Anker nur per Stichprobe gegen diesen Stand geprüft, Liste im Änderungsprotokoll; `config.py`-Anker im Plantext noch auf `9aa0e0c0`-Zählung); Anker nach Merge von C/E/F erneut messen (siehe Reihenfolge und Abhängigkeiten).
 - Ratchet `_KNOWN_DUPLICATES` (Plan B Task 8): betrifft `ui-ux-designer.md`, `bug-feature-analyzer.md`, `knowledge-curator.md`, `knowledge-migrator.md`; keine davon wird in Phase D oder im #1181-Plan geändert, `orchestrator.md`/`git.md` haben je 1 `{{PROJECT_CONTEXT}}`. Keine Berührung.
+
+## Änderungsprotokoll
+
+### 2026-11-13
+
+**(a) Basis-Update `9aa0e0c0` -> `b36184b5` und Anker-Check.**
+- `python3 scripts/check_plan_refs.py --plans <Plan> --ref HEAD --no-issues`: 6 ERROR, 46 WARN. Die ERROR/WARN sind erwartbar: geplante, noch nicht angelegte Dateien/Symbole (u. a. `scripts/bench_hooks.py`, `tests/test_config_unknown_keys.py`, `hook_json_get_many`, Task-0/1/2a/5-Specs/-Analyse, die auf HEAD noch untracked sind). Anker-Drift nur in `config.py` (siehe unten).
+- `git diff 9aa0e0c0 HEAD`: `hooks/1-generic/orchestrator-guard-impl.sh` und `hooks/1-generic/lib/hook_common.sh` unverändert (0 Zeilen). Guard-Anker (`:239`, `:269`, `:326`, `:418-481`, `:1383-1392`, `:1527-1547`) und `hook_common.sh` (`:63`, `:128`, `:264`) sind damit stabil. Schema-Anker `:2854` (`"additionalProperties": true`) unverändert, Schema nicht geändert.
+- `scripts/lib/config.py` verschoben um +2 (Import-Änderungen `:9`-`:10`, `:92-94`): `_validate_config` `:636` -> `:638`; `_schema_top_level_props` `:256` -> `:258`; `_non_object_top_level_keys` `:266` -> `:268`; `_object_top_level_keys` `:302` -> `:304`. Die Bereiche `:256-318` und `:636-714` im Plantext sind entsprechend um +2 zu lesen (nicht umgeschrieben). Weitere config.py-Änderung bei `:934-949` (`_validate_repo_containment`), ohne Plan-Relevanz.
+- Nicht neu gemessen: übrige `config.py`-Anker (`:111`, `:676-685`, `:703-708`), `hooks.py:554-561`, Testzeilen, #1181-Plan-Anker.
+
+**(b) Abgeschlossene Hook-Fixes außerhalb Phase D.** `git log -8 -- hooks/`: #1229 (`c1d70a8a`, Push-Guard löst den Branch aus dem eigenen Worktree des Pushs auf), #1232 (`b36184b5`, gequoteter Text von Nicht-Git-Befehlen wird im Push-Guard ignoriert) sowie #1226-Nachläufer (`9f03cec3`, Heredoc-Text; "neue Issue-Nummer folgt"). Berührt wurde nur `hooks/1-generic/dod-push-check.sh` (165 Zeilen Delta seit `9aa0e0c0`) plus `scripts/lib/config.py`; `orchestrator-guard-impl.sh` und `hook_common.sh` NICHT berührt, die Anker von Task 7/8/9 bleiben gültig.
+
+**(c) Neue Reibung (b).** Der Auto-Mode-Classifier lehnt sporadisch auch read-only Git (`git status`) des `git`-Agenten des Orchestrators mit `[Undermining Oversight]` ab -> Eingabe für Task 2a (`docs/specs/2026-11-11-git-agent-merge-permission-spec.md`). Außerdem erzeugt das Git-Agent-Template den Sentinel `#agent-meta:agent=git` selbst (`agents/1-generic/git.md:31`, `:42`, `:98`, `:159`); der Classifier hat einen Befehl mit diesem Sentinel abgelehnt -> Eingabe für Task 0 (#1210).
+
+**(d) `git checkout -- <file>`.** Für den `git`-Agenten des Orchestrators hart über das Mutations-Gate blockiert (nicht über das Destructive-Gate, laut `docs/specs/2026-11-11-guard-destructive-ask-spec.md`; Kontext #516) -> offene Frage für Task 1 (#1217).
+
+**(e) Befund.** `agents/1-generic/git.md:28` behauptet, kein Provider leite die Agent-ID im PreToolUse-Payload weiter; das widerspricht dem Capability-Flag `hook-agent-id` (`config/ai-providers.yaml:64`). Siehe #1210-Spec AC-12.
+
+**(f) PR-1-Inhalt und Umsetzungsstand.** PR 1 umfasst: Task 1a (Analyse), Task 2, 3, 4 (Doku/Templates), vier Spec-DRAFTs (Task 0, 1, 2a, 5) und dieses Plan-Update. Block A, Tasks 6-9, 2b, 11, 12 bleiben gesperrt für den Folge-PR. Checkboxen unverändert.
+- Task 1a: `docs/analysis/2026-11-11-hook-api-ask-permission.md` — umgesetzt, uncommitted/ausstehend Commit durch Nutzer.
+- Task 2: `agents/1-generic/orchestrator.md`, `rules/1-generic/use-orchestrator.md`, `tests/test_merge_pattern_docs.py`; mit-geänderte generierte Dateien: `AGENTS.md`, `tests/fixtures/compact-golden/orchestrator.md`, `tests/fixtures/slimming-golden/git.md`, `tests/fixtures/slimming-golden/orchestrator.md`, `.meta-config/generated-file-hashes.json` — umgesetzt, uncommitted/ausstehend Commit durch Nutzer. Der Task-2-Text verweist auf die Task-2a-Spec nur ohne Pfad, weil `tests/test_rule_doc_pointers.py` Doku-Verweise auf nicht existierende Dateien ablehnt; die Spec existiert jetzt, der Pfad kann später ergänzt werden.
+- Task 3: `tests/test_orchestrator_worker_report_contract.py` (+ Orchestrator-Template) — umgesetzt, uncommitted/ausstehend Commit durch Nutzer.
+- Task 4: `agents/1-generic/git.md`, `tests/test_git_template_commit_trailer_rule.py` — umgesetzt, uncommitted/ausstehend Commit durch Nutzer.
+- Spec-DRAFTs: `docs/specs/2026-11-11-guard-role-attribution-spec.md` (Task 0), `docs/specs/2026-11-11-guard-destructive-ask-spec.md` (Task 1), `docs/specs/2026-11-11-git-agent-merge-permission-spec.md` (Task 2a), `docs/specs/2026-11-11-hook-single-parse-spec.md` (Task 5) — umgesetzt, uncommitted/ausstehend Commit durch Nutzer.
