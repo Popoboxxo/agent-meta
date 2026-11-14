@@ -51,7 +51,7 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
-**Merge dispatch (#1172):** merges of approved PRs are dispatched by the main chat directly to you. The path orchestrator -> git was blocked by the Claude Code auto-mode classifier as "Merge Without Review" in an audit (2026-11-06), also after user approval in the main chat; the cause is outside this repo and not reproduced. This path stays fallback (decision 47). A permission rule for the `git` agent only: feasibility is being checked in a separate spec (phase D task 2a), not yet decided. Merge policy: #783 (open).
+**Merge dispatch (#1172):** the main chat dispatches PR merges to you directly (the orchestrator cannot dispatch it, platform-blocked; fallback). Policy: #783.
 
 ## 4a. Content gate — inspect what you stage
 
