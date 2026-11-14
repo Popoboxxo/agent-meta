@@ -34,6 +34,18 @@ Offen (nicht abgehakt, Grund):
 - Nicht verifiziert: Vollsuite, `tests/browser`, Windows, Python-3.9-Lauf; #1189-Commitschnitt weicht vom Plan ab (gruppierte Commits).
 - Task-Checkboxen sind wegen gruppierter/Squash-Commits nicht einzeln gesetzt; maßgeblich ist diese Tabelle. #1155, #1085, #1195, #1182, #1183, #1000 sind laut `gh` CLOSED.
 
+**Stand nach #1231, #1233, #1234 (gemergt auf origin/main, Stand 2026-11-14):**
+- `adf26776` #1231 `chore(deps): bump the actions-deps group with 2 updates` (nur Workflows, kein Task dieser Phase).
+- `b15cd01e` #1233 `fix: phase A-C remaining gaps` (Squash; enthält die zuvor als "nicht gemergt" geführten Commits zu #1180 AK3 (Doc-Pointer-Check), #1189 AK3 und #1086(c)).
+- `efca4b42` #1234 `fix: document git agent sentinel role and guard tests` (kein Task dieser Phase).
+
+**PR `fix/phase-abc-rest-2` ("fix: phase A-C remaining gaps (2)", refs #1180, #1189; noch nicht gemergt):**
+- #1180 AK1: neuer Test scannt `rules/2-platform` auf Doc-Pointer (7 Pointer, 4 verschiedene Ziele, alle vorhanden; Auslieferung `scripts/lib/rules.py:225-233`).
+- #1180 AK3: Markdown-Link-Pointer in `check_dangling_doc_pointer` (`scripts/lib/consistency/doc_pointers.py`), Test `test_dangling_markdown_link_pointer`.
+- #1189: Smoke-Test mit Viz+MCP `tests/test_admin_server_lifecycle_smoke.py::test_start_status_stop_with_viz_and_mcp`.
+- #1180 Zusatzpunkt `use-lazy-rules.md` mcp-*-Zeilen: im Prinzip echt dangling (Skills werden nur je aktivem Server erzeugt, `scripts/lib/mcp.py:326-338`), hier **nicht** umgesetzt; abgedeckt durch #1186 / Phase E (`docs/superpowers/plans/2026-11-11-phase-e-artifact-locations.md`).
+- Weiterhin offen (nicht in diesem PR, nicht als erledigt zu werten): #1208, #1086 f/i/h, #1142 Punkt 3, #1141.
+
 **Goal:** Sync/Config-Fehlerklassen "still akzeptiert / still falsch / exit 0" schließen, ohne Plain-Sync-Exit-Codes zu ändern (Entscheidungen 3, 4, 6, 8 sind bindend; 5 betrifft #1141 und wirkt nach Entscheidung 35 nicht mehr in diesem Plan).
 **Architecture:** Eine Phase-PR (Branch `fix/phase-c-sync-config`, Vorschlag, von `origin/main`, ein Commit je Task; Entscheidung 17), höchstens ein Nachfolge-PR derselben Phase für zum Schnittzeitpunkt gesperrte Tasks (Entscheidung 52), plus der eigene Nachfolge-PR für #1086i nach dem letzten Phase-C-PR (Entscheidungen 18, 56; siehe Abschnitt "PR-Schnitt"). Fixes bleiben in den bestehenden Modulen (`sync_pipeline.py`, `cli_commands.py`, `config.py`, `log.py`, `context.py`, `generated_file_drift.py`, `progress_paths.py`); keine neue Provider-Verzweigung, Unterschiede nur über Config-Keys.
 **Tech Stack:** Python 3.9+ (stdlib, PyYAML-Ausnahme), pytest, JSON-Schema (`config/project-config.schema.json`), GitHub Actions.
