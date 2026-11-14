@@ -7,9 +7,9 @@ from typing import Mapping, Sequence
 
 from . import context_budget as cb
 
-# Backticked `docs/x.md` or relative link ](docs/x.md[#frag]) / ](./docs/x.md); URLs/anchors never match.
+# Backticked `docs/x.md` or relative link ](docs/x.md[#frag][ "title"]) / ](./docs/x.md); URLs/anchors never match.
 _DOC_POINTER_RE = re.compile(
-    r"`(docs/[^`\s]+\.md)`|\]\((?:\./)?(docs/[^)\s#]+\.md)(?:#[^)\s]*)?\)")
+    r"`(docs/[^`\s]+\.md)`|\]\((?:\./)?(docs/[^)\s#]+\.md)(?:#[^)\s]*)?(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
 
 
 def check_dangling_doc_pointer(

@@ -205,6 +205,7 @@ def test_start_status_stop_with_viz_and_mcp(project):
         "viz": project / ".meta-viz" / ".server-pid",
         "mcp": project / _MCP_PID_FILE,
     }
+    pid_values = []
     try:
         started = _cli(project, "start", port, viz=True)
         out = started.stdout + started.stderr

@@ -10,14 +10,21 @@ from lib.consistency import context_budget as cb
 from lib.consistency import doc_pointers as dp
 from lib.consistency.report import Severity
 
-_RE = re.compile(r"`(docs/[^`\s]+\.md)`")
+
+
+def _pointers(path):
+    # Same detection as the check; findall yields (backtick, link) group tuples.
+    text = path.read_text(encoding="utf-8")
+    return [a or b for a, b in dp._DOC_POINTER_RE.findall(text)]
+
+
 CAPS = {"P": {"context_file": "AGENTS.md"}}
 
 
 def test_no_unresolvable_relative_doc_pointers():
     hits = []
     for path in (REPO_ROOT / "rules" / "1-generic").rglob("*.md"):
-        for doc in _RE.findall(path.read_text(encoding="utf-8")):
+        for doc in _pointers(path):
             if doc != "docs/REQUIREMENTS.md":
                 hits.append((path.name, doc))
     assert hits == []
@@ -27,11 +34,13 @@ def test_no_unresolvable_doc_pointers_in_platform_rules():
     # rules/2-platform/<platform>-*.md reach only projects with that platform (rules.py
     # collect: platform_dir.glob(f"{platform}-*.md")); agent-meta-* only the agent-meta repo,
     # where docs/ exists -> every pointer must resolve in this repo.
-    missing = []
+    missing, checked = [], 0
     for path in (REPO_ROOT / "rules" / "2-platform").rglob("*.md"):
-        for doc in _RE.findall(path.read_text(encoding="utf-8")):
+        for doc in _pointers(path):
+            checked += 1
             if not (REPO_ROOT / doc).is_file():
                 missing.append((path.name, doc))
+    assert checked > 0, "scan found no pointers: regex or rules dead"
     assert missing == []
 
 
@@ -40,9 +49,11 @@ def test_dangling_markdown_link_pointer(tmp_path):
         (tmp_path / "AGENTS.md").write_text(body, encoding="utf-8")
         return dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
 
-    for body in ("[x](docs/a.md)", "[x](./docs/a.md)", "[x](docs/a.md#sec)"):
+    for body in ("[x](docs/a.md)", "[x](./docs/a.md)", "[x](docs/a.md#sec)",
+                 '[x](docs/a.md "t")', "[x](docs/a.md 't')", '[x](docs/a.md#s "t")'):
         assert len(found(body)) == 1, body
-    for body in ("[x](https://e.com/docs/a.md)", "[x](#docs)", "[x](docs/a.txt)"):
+    for body in ("[x](https://e.com/docs/a.md)", "[x](#docs)", "[x](docs/a.txt)",
+                 '[x](../docs/a.md "t")', '[x](/docs/a.md "t")', "[x](../docs/a.md)"):
         assert found(body) == [], body
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/a.md").write_text("x", encoding="utf-8")
