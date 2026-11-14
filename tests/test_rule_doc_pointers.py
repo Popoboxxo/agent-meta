@@ -10,17 +10,54 @@ from lib.consistency import context_budget as cb
 from lib.consistency import doc_pointers as dp
 from lib.consistency.report import Severity
 
-_RE = re.compile(r"`(docs/[^`\s]+\.md)`")
+
+
+def _pointers(path):
+    # Same detection as the check; findall yields (backtick, link) group tuples.
+    text = path.read_text(encoding="utf-8")
+    return [a or b for a, b in dp._DOC_POINTER_RE.findall(text)]
+
+
 CAPS = {"P": {"context_file": "AGENTS.md"}}
 
 
 def test_no_unresolvable_relative_doc_pointers():
     hits = []
     for path in (REPO_ROOT / "rules" / "1-generic").rglob("*.md"):
-        for doc in _RE.findall(path.read_text(encoding="utf-8")):
+        for doc in _pointers(path):
             if doc != "docs/REQUIREMENTS.md":
                 hits.append((path.name, doc))
     assert hits == []
+
+
+def test_no_unresolvable_doc_pointers_in_platform_rules():
+    # rules/2-platform/<platform>-*.md reach only projects with that platform (rules.py
+    # collect: platform_dir.glob(f"{platform}-*.md")); agent-meta-* only the agent-meta repo,
+    # where docs/ exists -> every pointer must resolve in this repo.
+    missing, checked = [], 0
+    for path in (REPO_ROOT / "rules" / "2-platform").rglob("*.md"):
+        for doc in _pointers(path):
+            checked += 1
+            if not (REPO_ROOT / doc).is_file():
+                missing.append((path.name, doc))
+    assert checked > 0, "scan found no pointers: regex or rules dead"
+    assert missing == []
+
+
+def test_dangling_markdown_link_pointer(tmp_path):
+    def found(body):
+        (tmp_path / "AGENTS.md").write_text(body, encoding="utf-8")
+        return dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
+
+    for body in ("[x](docs/a.md)", "[x](./docs/a.md)", "[x](docs/a.md#sec)",
+                 '[x](docs/a.md "t")', "[x](docs/a.md 't')", '[x](docs/a.md#s "t")'):
+        assert len(found(body)) == 1, body
+    for body in ("[x](https://e.com/docs/a.md)", "[x](#docs)", "[x](docs/a.txt)",
+                 '[x](../docs/a.md "t")', '[x](/docs/a.md "t")', "[x](../docs/a.md)"):
+        assert found(body) == [], body
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/a.md").write_text("x", encoding="utf-8")
+    assert found("[x](docs/a.md#sec) [y](./docs/a.md)") == []
 
 
 def test_branch_guard_keeps_section_and_809():
@@ -31,14 +68,15 @@ def test_branch_guard_keeps_section_and_809():
 def test_dangling_doc_pointer_check(tmp_path):
     (tmp_path / "AGENTS.md").write_text("see `docs/nicht-vorhanden.md`\n", encoding="utf-8")
     found = dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
-    assert len(found) == 1 and found[0].severity is Severity.WARNING
+    assert len(found) == 1 and found[0].severity is Severity.ERROR
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/nicht-vorhanden.md").write_text("x", encoding="utf-8")
     assert dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None) == []
 
 
 def test_severity_registered_and_no_docs_url_variable():
-    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.WARNING
+    assert cb.SPEC_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
+    assert cb.EMITTED_SEVERITY["context.dangling-doc-pointer"] is Severity.ERROR
     assert "DOCS_URL" not in (REPO_ROOT / "scripts/lib/variables.py").read_text(encoding="utf-8")
 
 
@@ -65,3 +103,76 @@ def test_generic_rules_have_no_provider_specific_pointers():
             if re.search(pat, text):
                 hits.append((path.name, pat))
     assert hits == []
+
+
+def test_dangling_doc_pointer_makes_check_exit_1(tmp_path):
+    """#1180 AK3 end-to-end: a dangling backticked docs/*.md pointer fails real `--check`."""
+    import shutil
+    import subprocess
+
+    fixture = REPO_ROOT / "tests/fixtures/active-set/p10/.meta-config/project.yaml"
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    shutil.copy(fixture, project / ".meta-config" / "project.yaml")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    cfg = str(project / ".meta-config" / "project.yaml")
+
+    def run(flag):
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts/sync.py"), "--config", cfg, flag],
+            cwd=project, capture_output=True, text=True, timeout=300)
+
+    assert run("--init").returncode == 0
+    clean = run("--check")
+    assert clean.returncode == 0, clean.stdout[-800:] + clean.stderr[-800:]
+
+    # Appended below the managed block: user-owned text, so no drift masks the cause.
+    ctx = project / "CLAUDE.md"
+    ctx.write_text(ctx.read_text(encoding="utf-8") + "\nsee `docs/nicht-vorhanden.md`\n",
+                   encoding="utf-8")
+    dangling = run("--check")
+    out = dangling.stdout + dangling.stderr
+    assert dangling.returncode == 1, out[-800:]
+    assert "context.dangling-doc-pointer" in out, out[-800:]
+
+
+def _init_p10(tmp_path, with_req):
+    import shutil
+    import subprocess
+
+    fixture = REPO_ROOT / "tests/fixtures/active-set/p10/.meta-config/project.yaml"
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    shutil.copy(fixture, project / ".meta-config" / "project.yaml")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    if with_req:
+        (project / "docs").mkdir()
+        (project / "docs/REQUIREMENTS.md").write_text("# Requirements\n", encoding="utf-8")
+    cfg = str(project / ".meta-config" / "project.yaml")
+
+    def run(flag):
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts/sync.py"), "--config", cfg, flag],
+            cwd=project, capture_output=True, text=True, timeout=300)
+
+    assert run("--init").returncode == 0
+    return project, run
+
+
+def _generated_text(project):
+    files = [project / "CLAUDE.md", *(project / ".claude/rules").glob("*.md")]
+    return "\n".join(f.read_text(encoding="utf-8") for f in files if f.exists())
+
+
+def test_requirements_pointer_only_when_file_exists(tmp_path):
+    """#1180: docs/REQUIREMENTS.md pointer is generated only if the file exists."""
+    project, run = _init_p10(tmp_path / "without", with_req=False)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "context.dangling-doc-pointer" not in out.stdout + out.stderr
+    assert "docs/REQUIREMENTS.md" not in _generated_text(project)
+
+    project, run = _init_p10(tmp_path / "with", with_req=True)
+    out = run("--check")
+    assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
+    assert "docs/REQUIREMENTS.md" in _generated_text(project)

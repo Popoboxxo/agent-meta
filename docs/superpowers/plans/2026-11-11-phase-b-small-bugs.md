@@ -17,6 +17,38 @@ trace:
 > Abhängigkeiten (Roadmap §3): Welle 1 hängt von Phase A (CI grün) ab. B läuft vor C (Dateien `sync_pipeline.py`/`context.py` werden von B **nicht** berührt, siehe Abweichungen), vor G (#1170 vor #854) und vor E/F (`admin-ui.html`, `admin-server.py`).
 > Branch-Vorschlag: `fix/phase-b-small-bugs`. Ein Phasen-PR, Squash-Merge nach grüner CI, kein Admin-Bypass.
 
+## Änderungsprotokoll
+
+Stand 2026-11-13, gegen `origin/main b36184b5` im Worktree geprüft. Status bleibt **DRAFT** (keine neue Freigabe).
+
+| PR | Zustand | Tasks / Issues | Beleg (Code im Worktree) |
+|---|---|---|---|
+| #1224 | MERGED 2026-11-12 | 1 (#1139), 2 (#1170), 3 (#1194), 4 (#1205), 5 (#1213), 6 (#1214), 7 (#1207), 8 (#1197 nur Ratchet), 9 (#1174), 10 (#1173 Diff-Guard), 11 (#1206), 12 (#898), 13 (#317) | `tests/test_cli_smoke_multi_provider.py:21,51,74` (`SLOW_TIMEOUT`); `_map_claude_tools_to_gemini_tools` aus `scripts/lib/provider_transform.py` entfernt (`tests/test_dead_gemini_tool_map_removed.py`); `scripts/lib/auto_commit.py:167` (Schema-Pfad); `scripts/lib/consistency/spec_plan.py:535` (`spec_plan_no_tasks_detected`), `:51` (`_SPEC_RE` `-spec.md`); `tests/test_spec_767_anchors.py`; `tests/test_project_context_placeholder_ratchet.py:13` (`_KNOWN_DUPLICATES`); `knowledge/wiki/concepts/core-principle-pal-variables.md:80`; `scripts/admin-server.py:4195-4200` (`ALLOW_LOSSY_KEY`); `docs/ui/admin-ui.html:7800` (#1206 Clone), `:1094` (`__allow_lossy__`); `config/pricing-overlay.yaml:64` (`claude-sonnet-5-5`); `tests/test_viz_subserver_live.py:84` |
+| #1228 | MERGED 2026-11-13 | Follow-up zu #1139, #898, #317 (#1155 F4/F8 nur Nachweis) | `tests/test_cli_smoke_multi_provider.py:51` (Skip bei `TimeoutExpired`, Fixture-Split); `docs/ui/admin-ui.html:1935` (`"fable"`); `scripts/admin-server.py:3759,3788,3814` (`except FileNotFoundError` in `do_POST`, 404 statt 500) |
+| #1221 | MERGED 2026-11-12 | kein Task | Freshness-Tooling `scripts/check_plan_refs.py` |
+
+Abweichung: #1173 Akzeptanzkriterium "Kommentare bleiben erhalten" ist laut PR #1224 **nicht** erfüllt (Entscheidung 22: Diff-Guard mit `__allow_lossy__`-Bestätigung, Kommentare gehen bei akzeptiertem Lossy-Save weiter verloren).
+
+Offen (nicht abgehakt, Grund):
+- #1139 AK3 (grün auf belasteter Maschine): unbewiesen, Issue OPEN.
+- #898 (OPEN): kein Live-Browser-Lauf, models.dev-Live-Daten ungeprüft; nur statische Tests.
+- #317 (OPEN): Chromium-iframe-Test skippt ohne playwright/chromium, CI-Verfügbarkeit ungeprüft.
+- #1173 (OPEN): Kommentar-Erhalt nicht umgesetzt (s.o.).
+- #1197 (OPEN): nur Ratchet-Test, der eigentliche Fix liegt bei #1187-T9, offen, nicht in diesem PR.
+- Issues #1194, #1205, #1206, #1207, #1213, #1214, #1170, #1174 sind laut `gh` CLOSED; Task-Checkboxen sind wegen Squash-Commits (Step-Schnitt weicht ab) nicht einzeln gesetzt.
+
+**Stand nach #1231, #1233, #1234 (gemergt auf origin/main, Stand 2026-11-14):**
+- `adf26776` #1231 `chore(deps): bump the actions-deps group with 2 updates` (nur Workflows, kein Task dieser Phase).
+- `b15cd01e` #1233 `fix: phase A-C remaining gaps` (Squash; enthält die zuvor als "nicht gemergt" geführten Commits zu #1180 AK3 (Doc-Pointer-Check), #1189 AK3 und #1086(c)).
+- `efca4b42` #1234 `fix: document git agent sentinel role and guard tests` (kein Task dieser Phase).
+
+**PR `fix/phase-abc-rest-2` ("fix: phase A-C remaining gaps (2)", refs #1180, #1189; noch nicht gemergt):**
+- #1180 AK1: neuer Test scannt `rules/2-platform` auf Doc-Pointer (7 Pointer, 4 verschiedene Ziele, alle vorhanden; Auslieferung `scripts/lib/rules.py:225-233`).
+- #1180 AK3: Markdown-Link-Pointer in `check_dangling_doc_pointer` (`scripts/lib/consistency/doc_pointers.py`), Test `test_dangling_markdown_link_pointer`.
+- #1189: Smoke-Test mit Viz+MCP `tests/test_admin_server_lifecycle_smoke.py::test_start_status_stop_with_viz_and_mcp`.
+- #1180 Zusatzpunkt `use-lazy-rules.md` mcp-*-Zeilen: im Prinzip echt dangling (Skills werden nur je aktivem Server erzeugt, `scripts/lib/mcp.py:326-338`), hier **nicht** umgesetzt; abgedeckt durch #1186 / Phase E (`docs/superpowers/plans/2026-11-11-phase-e-artifact-locations.md`).
+- Weiterhin offen (nicht in diesem PR, nicht als erledigt zu werten): #1139 AK3, #898 (Haiku-ID), #1173, #1197.
+
 **Goal:** 13 kleine, voneinander unabhängige Defekte (Sync-Pfad, Validator, Spec/Plan-Gate, Admin-UI, Tests, Doku) beheben, je Issue ein TDD-Task und ein Commit; keine Feature-Erweiterung.
 **Architecture:** Jede Änderung ist eine lokale Ursachenbehebung in genau der Datei, die der Code-Befund (in W gelesen) nennt. Keine neuen Module außer reinen Testdateien. Keine Provider-Namensverzweigung; Provider-Unterschiede bleiben Config-Keys.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), pytest, Markdown/YAML, eine Single-File-HTML-UI (`docs/ui/admin-ui.html`).

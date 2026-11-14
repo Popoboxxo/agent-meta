@@ -7,6 +7,45 @@
 > Abhängigkeiten (Roadmap §3): Welle 2, hängt ab von Phase B (gleiche Dateien `context.py`, `sync_pipeline.py`); #1000 braucht freigegebene Mini-Spec; parallel zu Phase E nur bei disjunkter `Files:`-Liste — **nicht disjunkt** (beide ändern `scripts/lib/sync_pipeline.py`; E zusätzlich `config.py`/`admin-server.py`, die Task 14 berührt; Phase-E-Plan :64 legt "E sequentiell nach C" fest), also C vor E; `#1086i` (`context.py`-Split) hat einen eigenen Plan und wird als eigener Nachfolge-PR **nach dem letzten** Phase-C-PR gemergt (Entscheidung 18, präzisiert durch 56: ist nach 52 ein Nachfolge-PR der Phase nötig, kommt #1086i erst danach).
 > Tasks: 16 (Task 0, 0b, 1, 3-15; Task 2 entfernt). Phase-PR plus höchstens ein Nachfolge-PR für gesperrte/spec-gesteuerte Tasks (Entscheidung 52), ein Commit je Task (Entscheidung 17); Task 14 = 16 Commits, je #1189-Plan-Task einer (Entscheidung 36).
 
+## Änderungsprotokoll
+
+Stand 2026-11-13, gegen `origin/main b36184b5` im Worktree geprüft. Status bleibt **DRAFT** (die Specs `docs/specs/2026-11-11-phase-c-sync-config-spec.md` und `...-1000-checkpoint-tracking-spec.md` tragen `Status: APPROVED (User, 2026-11-12)`; dieser Plan selbst nicht).
+
+| PR | Zustand | Tasks / Issues | Beleg (Code im Worktree) |
+|---|---|---|---|
+| #1225 | MERGED 2026-11-12 | 0/0b (Specs), 1 (#1142 ohne Punkt 3), 3 (#1085c), 4 (#1085b/F5), 5 (#1155 F10), 6 (#1195), 7 (#1182), 8 (#1183), 9 (#1180, Erstfassung), 10 (#1208 nur Guard-Test), 11 (#1086 a-e teils), 12 (#1086 g/h), 13 (#1000), 14 (#1189) | `scripts/sync.py:341` (`--fail-on-p0`), `:479` (`--prune-sync-backups`); `scripts/lib/sync_pipeline.py:972` (`SYNC_BACKUP_MAX_TOTAL_PER_DIR`); `scripts/lib/context.py:2426` (`context.rule-compacted-away`); `scripts/lib/context_profile.py:224` (`mode-override`); `scripts/lib/consistency/context_budget.py:62` (`context.dangling-doc-pointer`), `consistency/doc_pointers.py`; `scripts/lib/consistency/checkpoint_tracking.py:21,30`; `scripts/topology-probe.py:233` (`encoding`); `scripts/admin-server.py:601-620` (`_is_pid_running`/`_is_zombie`); `scripts/lib/log.py:83` (`note_unchanged`), `:198` (`WARNINGS: N (see above)`) |
+| #1227 | MERGED 2026-11-13 | Follow-ups #1085a (Doku), #1180 (b), #1183, #1182 (E2E-Tests), #1189 (Lifecycle-Smoke), #1086c (nur `hooks.py:593` über #1225; auf origin/main verbleiben 23 rohe `log.skip(..., "...unchanged")`-Zeilen plus 1 mehrzeilige Stelle, Umstellung aller 24 Sites liegt unmerged in `fix/phase-abc-rest` `d6ba322e`) | `docs/guides/features/hooks.md`; `tests/test_rule_doc_pointers.py`; `tests/test_admin_server_lifecycle_smoke.py`; `scripts/lib/log.py:83` |
+| #1230 | MERGED 2026-11-13 | Follow-up #1180, #1189 AK5, #1183 AK4 (Test), #1085c (kein Change) | `rules/1-generic/spec-plan-workflow.md:54-57`, `root-cause-gate.md:29-32`, `session-recovery.md:42-45` (jeweils Abschnitt "Approval-Gate" / "Fail-closed" / "Abgrenzung" mit dem Satz "Convention boundary = fail-closed nur gegen akzidentellen Missbrauch ...", Stand origin/main); `tests/test_compact_rule_fallback.py` (`test_soft_cap_overflow_warns_once_and_removes_no_rule`); `scripts/lib/gitignore.py:513` |
+| #1221 | MERGED | kein Task | `scripts/check_plan_refs.py` |
+| #1226, #1229, #1232 | MERGED | Hook `dod-push-check.sh` (Phase-D-Thema), nicht Phase C | nur Querverweis |
+
+**Committet in `fix/phase-abc-rest` (nicht gemergt, noch kein PR; Plan-Doc-Commit `33ef1dcf`, weitere Review-Fixes folgen in weiterem Commit auf demselben Branch):**
+- #1180 AK3 (`e90541a3`): Doc-Pointer-Check jetzt ERROR (`scripts/lib/consistency/context_budget.py`, `doc_pointers.py`).
+- #1189 AK3 (`ae5796b2`): Crash-/Zombie-Tests in `tests/test_admin_server_lifecycle_smoke.py` (`test_real_child_exit_is_not_running_even_unreaped`, `test_crashing_child_reports_failure_and_leaves_no_pid_file`).
+- #1086(c) (`d6ba322e`): 24 `log.skip(..., "...unchanged")`-Sites auf `log.note_unchanged` umgestellt. Beleg: `git diff origin/main..HEAD -- scripts/lib | grep -c '^-.*log\.skip('` = 24 entfernte Aufrufe (23 einzeilig mit `unchanged`, 1 mehrzeilig in `bootstrap.py`, dessen `unchanged` auf Folgezeile steht) und `grep -c '^+.*note_unchanged('` = 24 neue Aufrufe; `git grep -n 'skip(' origin/main -- scripts | grep -c unchanged` = 23 einzeilige Treffer auf origin/main. Guard-Test `tests/test_sync_log_output.py::test_1086c_no_raw_skip_unchanged_sites`.
+
+Offen (nicht abgehakt, Grund):
+- #1086 OPEN: Teil f zurückgestellt (Entscheidung 34), Teil i eigener Plan, Teil g nur dokumentiert.
+- #1142 OPEN: Punkt 3 (`N error(s)`-Zeile in `--validate`-Summary) nicht umgesetzt.
+- #1141: nach Phase D verschoben (Entscheidung 35), offen.
+- #1208 OPEN: nicht reproduziert (PR #1225), nur Guard-Test; nicht als gelöst zu werten.
+- #1180 OPEN, #1189 OPEN: Abschluss erst mit dem PR zu `fix/phase-abc-rest`.
+- #1183 AK4 (Soft-Cap): nur Regressionstest, Cap-Überschreitung AGENTS.md (~16873 > 12000) bleibt.
+- Nicht verifiziert: Vollsuite, `tests/browser`, Windows, Python-3.9-Lauf; #1189-Commitschnitt weicht vom Plan ab (gruppierte Commits).
+- Task-Checkboxen sind wegen gruppierter/Squash-Commits nicht einzeln gesetzt; maßgeblich ist diese Tabelle. #1155, #1085, #1195, #1182, #1183, #1000 sind laut `gh` CLOSED.
+
+**Stand nach #1231, #1233, #1234 (gemergt auf origin/main, Stand 2026-11-14):**
+- `adf26776` #1231 `chore(deps): bump the actions-deps group with 2 updates` (nur Workflows, kein Task dieser Phase).
+- `b15cd01e` #1233 `fix: phase A-C remaining gaps` (Squash; enthält die zuvor als "nicht gemergt" geführten Commits zu #1180 AK3 (Doc-Pointer-Check), #1189 AK3 und #1086(c)).
+- `efca4b42` #1234 `fix: document git agent sentinel role and guard tests` (kein Task dieser Phase).
+
+**PR `fix/phase-abc-rest-2` ("fix: phase A-C remaining gaps (2)", refs #1180, #1189; noch nicht gemergt):**
+- #1180 AK1: neuer Test scannt `rules/2-platform` auf Doc-Pointer (7 Pointer, 4 verschiedene Ziele, alle vorhanden; Auslieferung `scripts/lib/rules.py:225-233`).
+- #1180 AK3: Markdown-Link-Pointer in `check_dangling_doc_pointer` (`scripts/lib/consistency/doc_pointers.py`), Test `test_dangling_markdown_link_pointer`.
+- #1189: Smoke-Test mit Viz+MCP `tests/test_admin_server_lifecycle_smoke.py::test_start_status_stop_with_viz_and_mcp`.
+- #1180 Zusatzpunkt `use-lazy-rules.md` mcp-*-Zeilen: im Prinzip echt dangling (Skills werden nur je aktivem Server erzeugt, `scripts/lib/mcp.py:326-338`), hier **nicht** umgesetzt; abgedeckt durch #1186 / Phase E (`docs/superpowers/plans/2026-11-11-phase-e-artifact-locations.md`).
+- Weiterhin offen (nicht in diesem PR, nicht als erledigt zu werten): #1208, #1086 f/i/h, #1142 Punkt 3, #1141.
+
 **Goal:** Sync/Config-Fehlerklassen "still akzeptiert / still falsch / exit 0" schließen, ohne Plain-Sync-Exit-Codes zu ändern (Entscheidungen 3, 4, 6, 8 sind bindend; 5 betrifft #1141 und wirkt nach Entscheidung 35 nicht mehr in diesem Plan).
 **Architecture:** Eine Phase-PR (Branch `fix/phase-c-sync-config`, Vorschlag, von `origin/main`, ein Commit je Task; Entscheidung 17), höchstens ein Nachfolge-PR derselben Phase für zum Schnittzeitpunkt gesperrte Tasks (Entscheidung 52), plus der eigene Nachfolge-PR für #1086i nach dem letzten Phase-C-PR (Entscheidungen 18, 56; siehe Abschnitt "PR-Schnitt"). Fixes bleiben in den bestehenden Modulen (`sync_pipeline.py`, `cli_commands.py`, `config.py`, `log.py`, `context.py`, `generated_file_drift.py`, `progress_paths.py`); keine neue Provider-Verzweigung, Unterschiede nur über Config-Keys.
 **Tech Stack:** Python 3.9+ (stdlib, PyYAML-Ausnahme), pytest, JSON-Schema (`config/project-config.schema.json`), GitHub Actions.

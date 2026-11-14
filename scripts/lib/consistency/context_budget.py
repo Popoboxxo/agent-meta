@@ -59,7 +59,7 @@ SPEC_SEVERITY = {
     "context-profile.marker-in-rule": Severity.ERROR,
     "context.declared-surface-empty": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
     "context.legacy-artifact-present": Severity.WARNING,
-    "context.dangling-doc-pointer": Severity.WARNING,
+    "context.dangling-doc-pointer": Severity.ERROR,
 }
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
@@ -71,7 +71,7 @@ PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # MCP without active servers -- are not reported), so no global exemption is needed.
 PHASE1_PROMOTED = frozenset({
     "context.dangling-pointer", "context.rule-unreachable",
-    "context-profile.marker-in-rule",
+    "context-profile.marker-in-rule", "context.dangling-doc-pointer",
 })
 EMITTED_SEVERITY = {
     check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)

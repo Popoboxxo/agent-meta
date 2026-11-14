@@ -6,7 +6,7 @@
 > Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
-> `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
+> eigene Doku-Dateien (z.B. ARCHITECTURE.md, API.md) auslagern und manuell verlinken.
 > Agent-spezifisches Wissen → `.claude/3-project/<rolle>-ext.md` (Extension).
 >
 > **CLAUDE.md Hierarchie (Claude Code lädt in dieser Reihenfolge):**

@@ -2823,6 +2823,11 @@ def build_variables(
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
+    # #1180: generated docs may point at docs/REQUIREMENTS.md only if it exists.
+    variables["REQUIREMENTS_DOC_REF"] = (
+        " (`docs/REQUIREMENTS.md`)"
+        if ((project_root or agent_meta_root) / "docs" / "REQUIREMENTS.md").is_file() else ""
+    )
     effective = _build_pipeline_variables(
         variables, unmapped, config, agent_meta_root, dod_resolved, active_set)
     # IC-18 no. 12: the one `effective` pipelines dict; the agent renderer

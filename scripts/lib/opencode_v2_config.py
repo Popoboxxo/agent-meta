@@ -830,9 +830,9 @@ def sync_opencode_v2_managed_keys(
         if written:
             log.action("WRITE", committed, "opencode-v2 managed keys")
         else:
-            log.skip(committed, "opencode-v2 managed keys unchanged")
+            log.note_unchanged(committed)
     else:
-        log.skip(committed, "opencode-v2 managed keys unchanged")
+        log.note_unchanged(committed)
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_KEYS_KEY)
@@ -1005,9 +1005,9 @@ def sync_opencode_mcp_managed(
         if written:
             log.action("WRITE", committed, "opencode-v2 mcp servers")
         else:
-            log.skip(committed, "opencode-v2 mcp servers unchanged")
+            log.note_unchanged(committed)
     else:
-        log.skip(committed, "opencode-v2 mcp servers unchanged")
+        log.note_unchanged(committed)
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_MCP_KEY)
@@ -1098,7 +1098,7 @@ def rollback_opencode_mcp(
         if written:
             log.action("WRITE", committed, "opencode-v2 mcp rollback")
         else:
-            log.skip(committed, "opencode-v2 mcp rollback unchanged")
+            log.note_unchanged(committed)
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_MCP_KEY)
@@ -1371,9 +1371,9 @@ def sync_opencode_cli_file(
         if written:
             log.action("WRITE", rel_label, "opencode-v2 cli")
         else:
-            log.skip(rel_label, "opencode-v2 cli unchanged")
+            log.note_unchanged(rel_label)
     else:
-        log.skip(rel_label, "opencode-v2 cli unchanged")
+        log.note_unchanged(rel_label)
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_CLI_KEY)

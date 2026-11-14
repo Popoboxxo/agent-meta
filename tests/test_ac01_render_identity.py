@@ -1017,6 +1017,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (3 Claude + 3 Continue + 3 Copilot rule files + ``AGENTS.md`` of the six AGENTS.md providers); #1000 added one
   ``spec-plan-workflow`` bullet that is inlined into the orchestrator artifact (9 providers). Re-written via
   ``--write``; the ``topology-golden``/``active-set-prose`` a2a fixtures lost the same pointer text.
+- #1180 REQUIREMENTS_DOC_REF gate (2026-11-13): **14 of 1096 hashes moved; 0 added/removed**. The gate changes
+  ``CLAUDE.md`` (Claude) / ``AGENTS.md`` (Codex, Gemini, KimiCode, Mammouth, Opencode, ZCode) of the scratch
+  projects and, as a consequence, their ``.meta-config/context-hashes.json`` (7 + 7). Re-written via ``--write``.
+- git agent sentinel doc (2026-11-13): template-git 2.1.3 -> 2.1.4; only the section-0 identity text changed
+  (agent_id vs. role, mutation gate always blocks, sentinel bypasses no protection). Only git artifacts
+  of all providers and the matching AGENTS-free managed-file hashes move; re-written via ``--write``;
+  ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

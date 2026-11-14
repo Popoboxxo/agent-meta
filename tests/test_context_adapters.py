@@ -367,7 +367,7 @@ def test_per_provider_render_idempotent(tmp_path, loaded_config):
     assert snapshots[0] == snapshots[1]
     rewrites = [a for a in second_log.actions if "CLAUDE.md" in a and "managed block" in a]
     assert not rewrites, f"second run must not rewrite the adapter: {rewrites}"
-    assert any("CLAUDE.md" in s and "managed block" in s for s in second_log.skipped)
+    assert any("CLAUDE.md" in s for s in second_log.unchanged)
 
 
 def test_adapters_recorded_in_index_and_context_hashes(tmp_path, loaded_config):

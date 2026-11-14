@@ -39,7 +39,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Git / platform
     "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_REMOTE_URL_SET", "GIT_MAIN_BRANCH",
     # Requirements
-    "REQ_CATEGORIES", "REQ_CATEGORIES_LIST",
+    "REQ_CATEGORIES", "REQ_CATEGORIES_LIST", "REQUIREMENTS_DOC_REF",
     # Knowledge Domain
     "KNOWLEDGE_DOMAIN",
     # Code quality
