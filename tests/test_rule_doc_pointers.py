@@ -23,6 +23,32 @@ def test_no_unresolvable_relative_doc_pointers():
     assert hits == []
 
 
+def test_no_unresolvable_doc_pointers_in_platform_rules():
+    # rules/2-platform/<platform>-*.md reach only projects with that platform (rules.py
+    # collect: platform_dir.glob(f"{platform}-*.md")); agent-meta-* only the agent-meta repo,
+    # where docs/ exists -> every pointer must resolve in this repo.
+    missing = []
+    for path in (REPO_ROOT / "rules" / "2-platform").rglob("*.md"):
+        for doc in _RE.findall(path.read_text(encoding="utf-8")):
+            if not (REPO_ROOT / doc).is_file():
+                missing.append((path.name, doc))
+    assert missing == []
+
+
+def test_dangling_markdown_link_pointer(tmp_path):
+    def found(body):
+        (tmp_path / "AGENTS.md").write_text(body, encoding="utf-8")
+        return dp.check_dangling_doc_pointer(tmp_path, ["P"], CAPS, None)
+
+    for body in ("[x](docs/a.md)", "[x](./docs/a.md)", "[x](docs/a.md#sec)"):
+        assert len(found(body)) == 1, body
+    for body in ("[x](https://e.com/docs/a.md)", "[x](#docs)", "[x](docs/a.txt)"):
+        assert found(body) == [], body
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/a.md").write_text("x", encoding="utf-8")
+    assert found("[x](docs/a.md#sec) [y](./docs/a.md)") == []
+
+
 def test_branch_guard_keeps_section_and_809():
     text = (REPO_ROOT / "rules/1-generic/branch-guard.md").read_text(encoding="utf-8")
     assert "## Bekannte Grenzen" in text and "#809" in text
