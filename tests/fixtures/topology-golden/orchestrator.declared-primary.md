@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.12.0
+version: 8.12.2
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -13,7 +13,7 @@ tools:
 - Write
 - SendMessage
 - TaskStop
-generated-from: 1-generic/orchestrator.md@8.12.0
+generated-from: 1-generic/orchestrator.md@8.12.2
 model: claude-sonnet-5-5
 permissionMode: plan
 ---
@@ -356,9 +356,11 @@ der gesamten Pipeline/Session.
 
 **Tier-A chat push (live-progress-channel design, 2026-09-10):** on this hook-capable provider, additionally call `SendMessage(to:"main", content:<the status table above>)` once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
 
+**Merge (#1172):** main chat -> `git` directly; #783.
+
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling. A background worker is stopped with `TaskStop` where your tool list grants it — never leave it running unattended.
+**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout `TaskStop` it (where granted): `status: timeout` / `STATUS: failed`, §10.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.

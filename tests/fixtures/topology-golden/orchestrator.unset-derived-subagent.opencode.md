@@ -359,9 +359,11 @@ der gesamten Pipeline/Session.
 
 
 
+**Merge (#1172):** main chat -> `git` directly; #783.
+
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling. A background worker is stopped with `TaskStop` where your tool list grants it — never leave it running unattended.
+**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout `TaskStop` it (where granted): `status: timeout` / `STATUS: failed`, §10.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.

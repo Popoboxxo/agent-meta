@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.1.4"
+version: "2.1.5"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -60,6 +60,8 @@ Depending on the instruction:
 | **Create branch** | `git checkout -b feat/<name>` |
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
+
+**Merge dispatch (#1172):** the main chat dispatches PR merges to you directly (the orchestrator cannot dispatch it, platform-blocked; fallback). Policy: #783.
 
 ## 4a. Content gate — inspect what you stage
 
@@ -134,6 +136,8 @@ Report the candidates (local + remote) to the user.
 **Commit format:** {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}, first line ≤ 72 characters — type/scope rules: Rule `commit-conventions.md` (auto-loaded).
 
 **No leading BOM (issue #842):** the subject must start at byte 0 with the Conventional-Commit type. Never prefix a commit message with a UTF-8 BOM (`EF BB BF`, e.g. from a copied `-F` message file saved by an editor) — the guard hook rejects such a commit with exit 2. Strip the BOM before committing.
+
+**Commit trailers (issue #1168):** if the task prompt gives a `Co-Authored-By` line, copy it verbatim (1:1) into the commit message. Never derive a model name for the trailer from your own session or harness attribution.
 
 **Conventional Commits (extended):** mark breaking changes with `!` after `type/scope` or a `BREAKING CHANGE:` footer (maps to MAJOR). Prefer **multiple focused commits** over one mixed commit. Optional `scope` when REQ-ID is not the target.
 

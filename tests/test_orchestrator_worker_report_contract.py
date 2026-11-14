@@ -93,6 +93,16 @@ def test_worker_control_text_names_send_message_and_task_stop(source):
     assert "`TaskStop`" in sec7
 
 
+@pytest.mark.parametrize("source", sorted(_SOURCES))
+def test_orchestrator_documents_single_async_wait_strategy(source):
+    sec7 = _section(_SOURCES[source](), "## 7. BARRIER protocol", "## 8.")
+    assert sec7.count("Wait strategy") == 1, sec7
+    para = next(p for p in sec7.split("\n\n") if "Wait strategy" in p)
+    assert "`TaskStop`" in para and "STATUS: failed" in para and "timeout" in para
+    assert "end your turn" in para and "run_in_background" in para
+    assert "Monitor" not in sec7
+
+
 def test_rendered_claude_orchestrator_has_control_tools():
     text = _claude_render()
     fm = yaml.safe_load(text.split("---", 2)[1])

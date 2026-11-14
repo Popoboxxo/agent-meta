@@ -89,6 +89,9 @@ Git Mutationen (commit, push, add etc){{#if ROLE_GIT_ACTIVE}} -> `git` Agent{{el
 {{#if AUTO_COMMIT_ENABLED}}
 Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. {{#if ORCH_MODE_STRICT}}Strict-Mode: der Main Chat führt kein Bash aus, auch kein read-only Git (status, log) — Git-Lesezugriffe über einen Subagenten.{{else}}Read-only (status, log) im Main Chat ok.{{/if}}
 {{/if}}
+{{#if ROLE_GIT_ACTIVE}}
+**Merge-Muster (#1172):** Main Chat dispatcht Merges direkt an `git` (Fallback; #783).
+{{/if}}
 Worker-Subagenten ohne `git`-Sentinel können auch `git init`, schreibendes `git config` und `git stash` nicht ausführen (Orchestrator-Guard-Mutationsliste).
 {{#if ORCH_MODE_MAIN_CHAT}}Ausnahme auf User-Wunsch erlaubt.{{/if}}
 
