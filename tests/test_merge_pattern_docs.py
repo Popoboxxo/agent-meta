@@ -24,7 +24,9 @@ def test_merge_pattern_in_three_templates(rel: str) -> None:
     assert "#783" in text
 
 
-def test_merge_pattern_in_rendered_rule_once() -> None:
-    rendered = (REPO_ROOT / ".claude" / "rules" / "use-orchestrator.md").read_text(encoding="utf-8")
-    assert rendered.count("#1172") == 1
-    assert rendered.count("#783") == 1
+def test_merge_pattern_in_rule_source_once_and_gated() -> None:
+    # Reads the tracked source (rendered .claude/ output is untracked, absent in CI).
+    text = (REPO_ROOT / "rules/1-generic/use-orchestrator.md").read_text(encoding="utf-8")
+    assert text.count("#1172") == 1
+    assert text.count("#783") == 1
+    assert "{{#if ROLE_GIT_ACTIVE}}\n**Merge-Muster (#1172):**" in text
