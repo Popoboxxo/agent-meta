@@ -104,7 +104,7 @@ def test_git_agent_shows_url_when_set(tmp_path):
 
 def test_template_line_is_the_gated_form():
     text = (_REPO_ROOT / "agents" / "1-generic" / "git.md").read_text(encoding="utf-8")
-    assert _LINE in text and 'version: "2.1.3"' in text
+    assert _LINE in text and 'version: "2.1.4"' in text
 
 
 def test_git_agent_keeps_blank_line_after_platform(tmp_path):

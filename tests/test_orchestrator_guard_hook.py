@@ -291,6 +291,39 @@ def test_strict_mode_dispatched_subagent_with_git_sentinel_can_mutate():
     assert result.returncode == 0
 
 
+def _subagent_push_payload(tmp_path, command: str) -> dict:
+    """Synthetic subagent Bash payload in a non-strict scratch project (nothing runs)."""
+    project = tmp_path / "p"
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        "orchestrator:\n  enabled: true\n  strict: false\n", encoding="utf-8")
+    return {"tool_name": "Bash", "cwd": project.as_posix(), "agent_id": "subagent-123",
+            "tool_input": {"command": command}}
+
+
+@pytest.mark.parametrize("command", [
+    "git push -u origin x",                      # (a) plain push
+    "git -C {repo} push -u origin x",            # (b) -C form
+    "cd {repo} && git push -u origin x",         # (d) cd chain
+])
+def test_subagent_without_git_sentinel_cannot_push(command, tmp_path):
+    """The mutation gate blocks a subagent push without the `git` sentinel,
+    independent of strict mode (agent_id is not the role)."""
+    hook = _rendered_guard(tmp_path, "true")
+    payload = _subagent_push_payload(tmp_path, command.format(repo=(tmp_path / "p").as_posix()))
+    result = _run_rendered(hook, payload)
+    assert result.returncode == 2, result.stderr
+    assert "Direct git mutations are forbidden for this subagent" in result.stderr
+
+
+def test_subagent_with_git_sentinel_can_push(tmp_path):
+    """(c) the sentinel as first line declares the `git` role -> not blocked."""
+    hook = _rendered_guard(tmp_path, "true")
+    payload = _subagent_push_payload(tmp_path, "#agent-meta:agent=git\ngit push -u origin x")
+    result = _run_rendered(hook, payload)
+    assert result.returncode == 0, result.stderr
+
+
 def test_strict_mode_survives_backslash_cwd():
     # Regression for the Windows path-interpolation bug: a cwd containing
     # backslashes must not silently disable strict-mode detection.
