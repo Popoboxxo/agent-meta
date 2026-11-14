@@ -10,6 +10,7 @@ MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
 
 ## Git Delegation
 Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. Strict-Mode: der Main Chat führt kein Bash aus, auch kein read-only Git (status, log) — Git-Lesezugriffe über einen Subagenten.
+**Merge-Muster (#1172):** Merges freigegebener PRs dispatcht der Main Chat direkt an den `git`-Agenten. Der Weg orchestrator -> git wurde in einem Audit (2026-11-06) vom Claude-Code-Auto-Mode-Classifier als „Merge Without Review" blockiert, auch nach User-Freigabe im Main Chat; die Ursache liegt außerhalb dieses Repos und ist nicht reproduziert. Dieser Pfad bleibt Fallback (Entscheidung 47). Eine Permission-Regel nur für den `git`-Agenten: Machbarkeit wird in einer separaten Spec geprüft (Phase D Task 2a), noch nicht entschieden. Merge-Policy: #783 (offen).
 Worker-Subagenten ohne `git`-Sentinel können auch `git init`, schreibendes `git config` und `git stash` nicht ausführen (Orchestrator-Guard-Mutationsliste).
 
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.

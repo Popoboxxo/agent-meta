@@ -352,9 +352,13 @@ der gesamten Pipeline/Session.
 
 **Tier-A chat push (live-progress-channel design, 2026-09-10):** on this hook-capable provider, additionally call `SendMessage(to:"main", content:<the status table above>)` once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
 
+**Merge dispatch (#1172):** merges of approved PRs are dispatched by the main chat directly to the `git` agent. The path orchestrator -> git was blocked by the Claude Code auto-mode classifier as "Merge Without Review" in an audit (2026-11-06), also after user approval in the main chat; the cause is outside this repo and not reproduced. This path stays fallback (decision 47). A permission rule for the `git` agent only: feasibility is being checked in a separate spec (phase D task 2a), not yet decided. Merge policy: #783 (open).
+
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
 **Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling. A background worker is stopped with `TaskStop` where your tool list grants it — never leave it running unattended.
+
+**Wait strategy (#1176):** dispatch blocking by default (`run_in_background: false`) so the result arrives inside your own turn; for a `run_in_background: true` worker, collect its completion notification or task output (continue it with `SendMessage` where granted) before you hand back — never end your turn while a `run_in_background` worker is still pending, because the harness then forces an early `SubagentHandback` and the result is lost. On timeout (no report within the task's time budget) stop the worker with `TaskStop` and record it as `status: timeout` / `STATUS: failed` per step 6, then handle it via §10.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
