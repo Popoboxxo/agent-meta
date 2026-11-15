@@ -122,7 +122,6 @@ agent-meta/
 ├── scripts/
 │   ├── sync.py              ← Agent-Generator
 │   ├── viz-logger.py         ← MCP-Server & CLI-Fallback für Event-Logging
-│   ├── viz-logger-mcp.mjs    ← HTTP/SSE MCP-Transport für OpenCode (Windows)
 │   ├── viz-report.py         ← Session-Report-Generator (Terminal/HTML/JSON)
 │   └── lib/
 │       ├── delegation_syntax.py  ← PAL: DelegationSyntaxEngine
@@ -271,7 +270,7 @@ Agent Prompt (kurze Instruktion, ~10 Zeilen)
      HTTP/SSE Transport    CLI Fallback
      (OpenCode Windows)    (python viz-logger.py --event …)
           ↓                   ↓
-     viz-logger-mcp.mjs    viz-logger.py
+     viz-logger.py
           ↓                   ↓
      Cross-Process File Lock (.lock + Exponential Backoff)
           ↓
@@ -285,7 +284,6 @@ Agent Prompt (kurze Instruktion, ~10 Zeilen)
 | Komponente | Zweck |
 |-----------|-------|
 | `scripts/viz-logger.py` | MCP-Server + CLI-Fallback. Primär via MCP-Tool `log_viz_event`, fallback via `python viz-logger.py --event ...`. Cross-Process File-Locking mit 10-fachem Retry. |
-| `scripts/viz-logger-mcp.mjs` | HTTP/SSE MCP-Transport für OpenCode auf Windows. Löst stdio-Kompatibilitätsproblem. |
 | `scripts/lib/viz.py` | `inject_viz_prompt_block()`: Injiziert nur noch kompakte Instruktionen (~10 Zeilen) in Agent-Templates. Prompt-Größe um ~60% reduziert. |
 | `scripts/viz-report.py` | Session-Report-Generator mit Terminal-/HTML-/JSON-Ausgabe. Inaktivitäts-Watcher für automatischen Server-Shutdown. |
 | `docs/live-dashboard.html` | Interaktives Browser-Dashboard mit Cytoscape-Graph, Gantt-Timeline und Sequence-Diagram. |
