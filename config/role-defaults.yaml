@@ -1718,6 +1718,7 @@ roles:
       LLM-Kali...
   explorer:
     model: fast
+    report_write_only: true
     memory: ''
     workflow_tier: optional
     description: Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche

@@ -5509,8 +5509,8 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # git trailer contract (git agent template, commit trailers): `ac01-baseline` re-pinned (git entries in hashes.json) and `slimming-golden` re-pinned (`git.md`); `compact-golden` unchanged.
 # explorer 1.5.0 (Write for reports): ac01-baseline re-pinned (explorer entries in hashes.json); slimming-golden re-pinned (explorer.md patched per line); compact-golden unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "5bd4b2bf659ad5ab490261c86b3ae0cef9a4855eb30ba67f56496ef42fa4e9ce",
-    "slimming-golden": "098daeaa30b4c9335e03c62bb307e9234de054a80fb722681188adebbb2b04b2",
+    "ac01-baseline": "166ae3038bb49e8be91b94f43122a3719c29edd4d56deece165765119696d1d0",
+    "slimming-golden": "d72cf5b24cb76bcd42bc4b0dcab7e0818adde37bcbb38801220420fb477e5465",
     "compact-golden": "53b717c519ab309326eebb046c4364073be5de36c3aa1e15cec649ba02f5edbc",
 }
 

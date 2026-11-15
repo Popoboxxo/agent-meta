@@ -17,6 +17,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .auto_commit import is_report_write_only
 from .config_audit_apply import apply_audit  # noqa: F401 -- re-exported, see below
 from .config_audit_providers import find_missing_providers
 from .config_audit_types import AuditIssue, AuditReport  # noqa: F401 -- re-exported for API compat
@@ -154,7 +155,7 @@ def _find_unpaired_closing_tags(path: Path) -> list[str]:
     return sorted(name for name, count in closes.items() if count > opens.get(name, 0))
 
 
-def _find_tool_privilege_mismatch(path: Path) -> str | None:
+def _find_tool_privilege_mismatch(path: Path, agent_meta_root: Path) -> str | None:
     """Return a mismatch message when a role declares itself read-only but
     carries a write-capable tool (``Write``/``Edit``).
 
@@ -174,6 +175,9 @@ def _find_tool_privilege_mismatch(path: Path) -> str | None:
     if not isinstance(tools, list):
         return None
     offending = sorted(_WRITE_TOOLS.intersection(tools))
+    # Narrow, data-driven exemption: `report_write_only` roles (role-defaults).
+    if offending and is_report_write_only(path.stem, agent_meta_root):
+        return None
     if not offending:
         return None
     return (
@@ -456,7 +460,7 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
     # read-only must not silently gain Write/Edit access via a copy-pasted
     # tools list (issue #575).
     for template in _collect_template_files(agent_meta_root):
-        message = _find_tool_privilege_mismatch(template)
+        message = _find_tool_privilege_mismatch(template, agent_meta_root)
         if message:
             report.add(
                 category="tool_privilege_mismatch",
