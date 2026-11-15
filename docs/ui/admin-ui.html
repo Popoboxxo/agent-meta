@@ -1648,6 +1648,7 @@ function buildSidebar() {
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
         { route: "/project/auto-commit",          label: "Auto-Commit",          icon: "⏱" },
+        { route: "/project/commit",                label: "Commit Trailers",      icon: "✎" },
         { route: "/project/release-checklist",     label: "Release Checklist",    icon: "☑" },
 
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
@@ -7817,6 +7818,53 @@ async function viewProjectAutoCommit() {
   return wrap;
 }
 
+/* --------------------------- Commit Trailers --------------------------- */
+async function viewProjectCommit() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Commit Trailers"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Git trailers appended to every commit message made by agents (commit.trailers). " +
+    "One trailer per line in the form “Token: value”, e.g. Co-Authored-By: Name <mail@example.com>.",
+  ]));
+  const data = await loadProject();
+  const cm = (data.commit && typeof data.commit === "object") ? clone(data.commit) : {};
+  const status = el("p", {
+    id: "commit-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const area = el("textarea", { id: "commit-trailers", rows: 6, spellcheck: "false" });
+  area.value = (Array.isArray(cm.trailers) ? cm.trailers : []).join("\n");
+  const panel = el("div", { class: "panel" });
+  panel.appendChild(el("h2", {}, ["Trailers"]));
+  panel.appendChild(a11yField({
+    id: "commit-trailers", label: "Trailers",
+    help: "One “Token: value” per line; duplicates are rejected. Never put secrets here.",
+    control: area,
+  }));
+  wrap.appendChild(panel);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const lines = area.value.split("\n").map(l => l.trim()).filter(l => l);
+      const bad = lines.find(l => !/^[A-Za-z][A-Za-z0-9-]*: \S.*$/.test(l));
+      if (bad !== undefined) {
+        const msg = `Invalid trailer “${bad}” — expected “Token: value”.`;
+        toast(msg, "error");
+        status.textContent = msg;
+        status.style.color = "var(--accent-red)";
+        area.focus();
+        return;
+      }
+      const out = clone(cm);
+      out.trailers = lines;
+      try { await saveProjectSection("commit", out, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
 /* --------------------------- Release Checklist --------------------------- */
 async function viewProjectReleaseChecklist() {
   const wrap = el("div");
@@ -11314,6 +11362,7 @@ async function init() {
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
   router.register("/project/auto-commit",          viewProjectAutoCommit);
+  router.register("/project/commit",               viewProjectCommit);
   router.register("/project/release-checklist",    viewProjectReleaseChecklist);
 
   router.register("/project/viz-admin",       viewProjectVizAdmin);
@@ -11431,6 +11480,7 @@ init();
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",
+    "project/commit": "project_instance-commit",
     "project/release-checklist": "project_instance-release_checklist",
     "project/test-environments": "project_instance-test_environments",
 

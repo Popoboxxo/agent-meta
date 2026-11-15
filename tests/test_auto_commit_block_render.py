@@ -188,3 +188,80 @@ def test_unknown_or_none_authority_fails_closed_to_none():
 
 def test_default_authority_parameter_stays_direct():
     assert "Commit directly as soon as ANY" in render_auto_commit_block(_AUTO)
+
+
+# --- commit.trailers contract (git-trailer-contract) ---------------------
+_TRAILERS = ["Co-Authored-By: Dev <dev@example.com>", "Reviewed-by: Ann <ann@example.com>"]
+_NOTRAILER_REFERENCE = {
+    'direct': (
+        '**Commit authority (issue #694):** this project has `auto_commit.mode: auto` enabled for your role.\n'
+        'Commit directly as soon as ANY of the following is true: task-boundary (a subtask is complete AND its tests are green).\n'
+        "Before committing, run the project's secret scan against your staged changes; a finding blocks the commit -- report it and ask for manual intervention instead of committing anyway.\n"
+        'Prefix the Bash command with `#agent-meta:agent=<your-role-name>` as its first line before `git add`/`git commit` -- required for the guard hook to authorize the commit on hook-capable providers, harmless elsewhere.\n'
+        'Ensure the commit message has no leading UTF-8 BOM — the subject must start at byte 0 with the Conventional-Commit type (issue #842); the guard hook rejects a BOM-prefixed commit.\n'
+        "This commit authority never extends to pushing, tagging, or branch management -- those remain exclusively the `git` role's job."
+    ),
+    'delegate': (
+        '**Commit authority (issue #694):** this project has `auto_commit.mode: auto` enabled for your role.\n'
+        'At each configured trigger boundary -- as soon as ANY of the following is true: task-boundary (a subtask is complete AND its tests are green) -- do NOT run `git` yourself. Instead delegate the commit to the `git` agent, handing it the changed files and a ready-to-use Conventional-Commits message.\n'
+        "Before delegating the commit, run the project's secret scan against the staged changes; a finding blocks the commit -- report it and ask for manual intervention instead of delegating anyway.\n"
+        'Ensure the commit message has no leading UTF-8 BOM — the subject must start at byte 0 with the Conventional-Commit type (issue #842); the guard hook rejects a BOM-prefixed commit.\n'
+        "This commit authority never extends to pushing, tagging, or branch management -- those remain exclusively the `git` role's job."
+    ),
+    'notify': (
+        '**Commit authority (issue #694):** this project has `auto_commit.mode: auto` enabled for your role.\n'
+        'Include the changed files and a ready-to-use Conventional-Commits message in your result/report at each configured trigger boundary -- as soon as ANY of the following is true: task-boundary (a subtask is complete AND its tests are green). Do NOT run `git` yourself; the caller/orchestrator applies the commit.\n'
+        "Before the reported message is committed, the caller/orchestrator must run the project's secret scan against the reported files; a finding blocks the commit -- report it and ask for manual intervention.\n"
+        'Ensure the commit message has no leading UTF-8 BOM — the subject must start at byte 0 with the Conventional-Commit type (issue #842); the guard hook rejects a BOM-prefixed commit.\n'
+        "This commit authority never extends to pushing, tagging, or branch management -- those remain exclusively the `git` role's job."
+    ),
+    'suggest': (
+        '**Commit authority (issue #694):** this project has `auto_commit.mode: suggest` enabled for your role.\n'
+        'When a configured trigger condition is met, propose a ready-to-use commit message in your own final report -- do NOT run `git commit` yourself, and do not stop and wait for confirmation before continuing your work. The user or orchestrator decides when to act on your suggestion.\n'
+        'Ensure the commit message has no leading UTF-8 BOM — the subject must start at byte 0 with the Conventional-Commit type (issue #842); the guard hook rejects a BOM-prefixed commit.\n'
+        "This commit authority never extends to pushing, tagging, or branch management -- those remain exclusively the `git` role's job."
+    ),
+}
+_REF_AUTO = {"mode": "auto", "triggers": ["task-boundary"], "file_count_threshold": 5, "secret_scan": True}
+_BOM_START = "Ensure the commit message has no leading UTF-8 BOM"
+
+
+def _with_trailers(resolved):
+    return {**resolved, "commit_trailers": list(_TRAILERS)}
+
+
+def test_default_block_byte_identical_without_trailers():
+    for a in _AUTHORITIES:
+        assert render_auto_commit_block(_REF_AUTO, a) == _NOTRAILER_REFERENCE[a]
+        assert render_auto_commit_block({**_REF_AUTO, "commit_trailers": []}, a) == _NOTRAILER_REFERENCE[a]
+        assert render_auto_commit_block({**_REF_AUTO, "commit_trailers": "x"}, a) == _NOTRAILER_REFERENCE[a]
+    assert render_auto_commit_block({"mode": "suggest"}, "direct") == _NOTRAILER_REFERENCE["suggest"]
+
+
+def test_trailers_rendered_once_before_bom_for_each_authority():
+    expect = {"direct": "End your own commit message", "delegate": "brief you hand to the `git` agent",
+              "notify": "end of the ready-to-use commit message in your report"}
+    for a, phrase in expect.items():
+        text = render_auto_commit_block(_with_trailers(_AUTO), a)
+        assert phrase in text
+        for t in _TRAILERS:
+            assert text.count(t) == 1
+        assert text.index(_TRAILERS[-1]) < text.index(_BOM_START)
+    assert "do NOT run `git`" in render_auto_commit_block(_with_trailers(_AUTO), "delegate")
+    assert "End your own" not in render_auto_commit_block(_with_trailers(_AUTO), "delegate")
+
+
+def test_suggest_and_custom_with_trailers():
+    for a in ("direct", "delegate", "notify"):
+        text = render_auto_commit_block(_with_trailers({"mode": "suggest"}), a)
+        assert "message you propose" in text and text.count(_TRAILERS[0]) == 1
+    custom = _with_trailers({"mode": "custom", "custom_script": "s.sh"})
+    assert render_auto_commit_block(custom, "direct").count(_TRAILERS[0]) == 1
+
+
+def test_no_trailer_line_when_disabled_or_misconfigured():
+    for resolved, a in (({"mode": "off"}, "direct"), (_AUTO, "none"),
+                        ({"mode": "custom", "custom_script": None}, "direct")):
+        resolved = _with_trailers(resolved)
+        assert _TRAILERS[0] not in render_auto_commit_block(resolved, a)
+    assert render_auto_commit_block(_with_trailers({"mode": "off"}), "direct") == ""

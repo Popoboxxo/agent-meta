@@ -3590,3 +3590,40 @@ def test_admin_server_boot_under_pin_yields_version(tmp_path, monkeypatch):
     with mock.patch.object(admin_server.VizManager, "_start", return_value=True) as start:
         server.viz_manager.start_all()
     assert start.called
+
+
+class TestCommitSectionGuard(TestWriteProjectSectionFeatureBSections):
+    """``commit`` (trailer contract): valid -> written, invalid -> ValueError, no write."""
+
+    def test_commit_whitelisted(self) -> None:
+        self.assertIn("commit", admin_server.PROJECT_WRITABLE_SECTIONS)
+
+    def test_valid_commit_written(self) -> None:
+        data = {"trailers": ["Co-Authored-By: A <a@b.c>"]}
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"section": "commit", "data": data}
+            handler._write_project_section()
+            self.assertEqual(handler.config_manager.read("project")["commit"], data)
+
+    def test_invalid_commit_rejected_without_write(self) -> None:
+        bad = [{"trailers": ["no colon"]}, {"trailers": "x"}, {"bogus": 1}]
+        for data in bad:
+            with self.subTest(data=data), tempfile.TemporaryDirectory() as tmp:
+                handler = self._make_handler(Path(tmp))
+                handler._read_body = lambda data=data: {"section": "commit", "data": data}
+                with self.assertRaises(ValueError):
+                    handler._write_project_section()
+                self.assertNotIn("commit", handler.config_manager.read("project"))
+
+    def test_full_put_guarded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"commit": {"trailers": ["bad"]}}
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project")
+            self.assertNotIn("commit", handler.config_manager.read("project"))
+            handler._read_body = lambda: {"commit": {"trailers": ["Signed-off-by: X"]}}
+            handler._route_put_config("project")
+            self.assertEqual(handler.config_manager.read("project")["commit"],
+                             {"trailers": ["Signed-off-by: X"]})

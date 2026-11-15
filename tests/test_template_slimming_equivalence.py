@@ -228,6 +228,13 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   ``tests/fixtures/topology-golden/orchestrator.unset-derived-subagent.*``.
   ``_GOLDEN_ROLE_COUNT``, the normalization table and every other golden are
   unchanged.
+* Git trailer contract (``git`` 2.1.5 -> 2.2.0): the ``Commit trailers`` rule is
+  extended with the precedence brief > project config (``commit.trailers``) >
+  harness attribution; the ``COMMIT_TRAILERS_SET`` block renders nothing by
+  default. The ``git`` golden was patched per hunk (the two frontmatter pins, the
+  extended rule paragraph). The other 57 goldens,
+  ``_GOLDEN_ROLE_COUNT`` (58) and ``compact-golden`` are unchanged. Diff manifest
+  section 27.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

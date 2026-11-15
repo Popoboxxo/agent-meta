@@ -27,6 +27,8 @@
     "auto_commit.secret_scan",
     "auto_commit.triggers",
     "cascades",
+    "commit",
+    "commit.trailers",
     "context-profile",
     "context_file",
     "context_file.auto_generate",
@@ -333,5 +335,6 @@
     "viz.server",
     "viz.server.port",
     "viz.server.timeout_sec"
-  ]
+  ],
+  "_comment_ext": "commit, commit.trailers added by the git trailer contract (#1168), not topology"
 }

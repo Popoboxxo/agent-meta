@@ -144,6 +144,8 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     # No project config in standalone mode, so there is no remote URL either —
     # the parenthesised "(<url>)" clause in git.md stays closed.
     "GIT_REMOTE_URL_SET": "false",
+    "COMMIT_TRAILERS": "",
+    "COMMIT_TRAILERS_SET": "false",
     # Test-environment targets are project config only: standalone has none,
     # so the gate stays closed and TEST_ENVIRONMENT_BLOCK is empty in
     # _ORCHESTRATION_FALLBACKS.

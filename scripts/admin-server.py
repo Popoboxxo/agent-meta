@@ -257,6 +257,8 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     # Feature: release checklist (Admin UI). Guarded by
     # _guard_release_checklist_write so a bad payload never reaches disk.
     "release-checklist",
+    # Commit-trailer contract (E-19): guarded by _guard_commit_write.
+    "commit",
     # Written internally by the fixed-section endpoints
     # (_write_submodule_protection).
     "submodule-protection",
@@ -4244,6 +4246,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 # RF5: the full-document save must not smuggle in a
                 # test-environments/environments combination that would abort
                 # the next sync — check the merge result before writing.
+                if "commit" in body:
+                    self._guard_commit_write(self._deep_merge(existing, body))
                 if "test-environments" in body or "environments" in body:
                     self._guard_test_environments_config(
                         self._deep_merge(existing, body))
@@ -5548,9 +5552,18 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._guard_context_profile_write(section, data)
         self._guard_test_environments_write(section, data, existing)
         data = self._guard_release_checklist_write(section, data)
+        self._guard_commit_write({section: data})
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write(
             "project", existing, allow_lossy=allow_lossy))
+
+    def _guard_commit_write(self, cfg: Any) -> None:
+        """Reject an invalid ``commit`` block (HTTP 400) before any disk write."""
+        from lib.commit_trailers import commit_violations  # noqa: PLC0415
+
+        errors = commit_violations(cfg)
+        if errors:
+            raise ValueError("invalid 'commit': " + "; ".join(errors))
 
     def _guard_release_checklist_write(self, section: str, data: Any) -> Any:
         """Normalise/validate a ``release-checklist`` write before it is stored.

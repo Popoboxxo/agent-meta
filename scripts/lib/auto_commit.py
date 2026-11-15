@@ -43,6 +43,38 @@ _SENTINEL_PREFIX_LINE = (
     "to authorize the commit on hook-capable providers, harmless elsewhere."
 )
 
+_TRAILER_LINES = {
+    "direct": (
+        "End your own commit message with these trailer lines, copied "
+        "verbatim, each exactly once:"
+    ),
+    "delegate": (
+        "Put these trailer lines verbatim into the brief you hand to the "
+        "`git` agent (it copies a brief trailer 1:1, each exactly once):"
+    ),
+    "notify": (
+        "Include these trailer lines verbatim at the end of the ready-to-use "
+        "commit message in your report:"
+    ),
+    "suggest": (
+        "Include these trailer lines verbatim at the end of the commit "
+        "message you propose:"
+    ),
+}
+
+
+def _trailer_line(resolved: dict, authority: str) -> str:
+    """Trailer instruction for the block; "" without valid commit.trailers."""
+    trailers = resolved.get("commit_trailers")
+    key = "suggest" if resolved.get("mode") == "suggest" else authority
+    if not isinstance(trailers, list) or key not in _TRAILER_LINES:
+        return ""
+    items = [t for t in trailers if isinstance(t, str) and t]
+    if not items:
+        return ""
+    return _TRAILER_LINES[key] + "\n" + "\n".join("    " + t for t in items)
+
+
 _BOM_LINE = (
     "Ensure the commit message has no leading UTF-8 BOM — the subject must "
     "start at byte 0 with the Conventional-Commit type (issue #842); the "
@@ -472,6 +504,9 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
             if secret_scan:
                 lines.append(notify_scan_line)
 
+    trailer = _trailer_line(resolved, authority)
+    if trailer:
+        lines.append(trailer)
     lines.append(_BOM_LINE)
     lines.append(_PUSH_BOUNDARY_LINE)
     return "\n".join(lines)
