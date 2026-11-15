@@ -1718,10 +1718,11 @@ roles:
       LLM-Kali...
   explorer:
     model: fast
+    report_write_only: true
     memory: ''
     workflow_tier: optional
-    description: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
-      und Symbol-Suche.
+    description: Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche
+      (read-only für Code, Write nur für Berichte).
     routing:
       addressability: keyword
       parallel: true
@@ -1742,8 +1743,8 @@ roles:
       - developer
       - ideation
       - code-reviewer
-    short_desc: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
-      und Symb...
+    short_desc: Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche
+      (read-o...
   claude-expert:
     model: powerful
     memory: project

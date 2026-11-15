@@ -12,7 +12,10 @@ that mirror what a role can actually do with the files it changes:
                 the commit to the `git` agent
     notify   -- {Edit,Write}, no Bash, not spawn-capable: never runs git;
                 reports changed files + a ready-to-use message upstream
-    none     -- otherwise (read-only role): empty block
+    none     -- otherwise (read-only role): empty block; also a role that
+                declares `report_write_only: true` in config/role-defaults.yaml
+                and holds Write only (no Edit, no Bash) -- it writes new report
+                files, never commits
 
 `eligible_roles` (the guard-hook allowlist) stays DIRECT-ONLY: only roles that
 can run Bash themselves may ever hold the hook sentinel.
@@ -157,6 +160,23 @@ def _can_spawn(tools: set[str]) -> bool:
     return "*" in tools or bool(_SPAWN_TOOLS & tools)
 
 
+def is_report_write_only(
+    role: str, agent_meta_root: Path, platform: str | None = None
+) -> bool:
+    """True for a narrow `report_write_only` role: flag set AND Write-only tools.
+
+    The role-defaults flag is the opt-in; the tools check keeps it honest (a role
+    that also gains Edit or Bash silently loses the exemption).
+    """
+    from .roles import load_roles_config  # lazy: avoid a load-time import cycle
+
+    entry = load_roles_config(agent_meta_root).get("roles", {}).get(role) or {}
+    if entry.get("report_write_only") is not True:
+        return False
+    tools = _role_tools(role, agent_meta_root, platform)
+    return "Write" in tools and not ({"Edit", "Bash"} & tools)
+
+
 def role_commit_authority(
     role: str, agent_meta_root: Path, platform: str | None = None
 ) -> str:
@@ -167,7 +187,7 @@ def role_commit_authority(
     but not consulted (base contract only).
     """
     tools = _role_tools(role, agent_meta_root, platform)
-    if not (_ELIGIBLE_TOOLS & tools):
+    if not (_ELIGIBLE_TOOLS & tools) or is_report_write_only(role, agent_meta_root, platform):
         return AUTHORITY_NONE
     if "Bash" in tools:
         return AUTHORITY_DIRECT
