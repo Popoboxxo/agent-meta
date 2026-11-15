@@ -2237,5 +2237,5 @@ Rangfolge Brief > Projekt-Config (`commit.trailers`) > Harness-Attribution (Trai
 ohne ermittelbaren Trailer keine Zeile). Der `COMMIT_TRAILERS_SET`-Block rendert im Default nichts.
 
 **Geändert (1 Fixture):** `git.md` — Frontmatter-`version:`/`generated-from:`-Pin, der erweiterte
-Regelabsatz und eine entfallene Leerzeile. Die übrigen 57 Goldens bleiben unverändert;
+Regelabsatz. Die übrigen 57 Goldens bleiben unverändert;
 `_GOLDEN_ROLE_COUNT` bleibt 58. AC-01-Manifest per `--write` neu erzeugt.

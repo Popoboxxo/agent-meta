@@ -5508,8 +5508,8 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # version pin + section 0); `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 # git trailer contract (git agent template, commit trailers): `ac01-baseline` re-pinned (git entries in hashes.json) and `slimming-golden` re-pinned (`git.md`); `compact-golden` unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "6e4061ca8a111b83eca8d8cdefa6d3b01a2082b6f6cde20f4a00550a506e1b99",
-    "slimming-golden": "d06de856b49052dfc666e0f60baac90dc07793bf8f9744ae0af7726f0bf610fe",
+    "ac01-baseline": "adbe84c299c27c250c305a17a0a2ab3323b1c2cd3beb180090a330c38c14eb0f",
+    "slimming-golden": "5d077905bd7f647d2cc2f824e960690af8d6027ab0053a620a53af5a921113b3",
     "compact-golden": "53b717c519ab309326eebb046c4364073be5de36c3aa1e15cec649ba02f5edbc",
 }
 

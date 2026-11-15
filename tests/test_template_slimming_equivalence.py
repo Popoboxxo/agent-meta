@@ -232,7 +232,7 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   extended with the precedence brief > project config (``commit.trailers``) >
   harness attribution; the ``COMMIT_TRAILERS_SET`` block renders nothing by
   default. The ``git`` golden was patched per hunk (the two frontmatter pins, the
-  extended rule paragraph, one dropped blank line). The other 57 goldens,
+  extended rule paragraph). The other 57 goldens,
   ``_GOLDEN_ROLE_COUNT`` (58) and ``compact-golden`` are unchanged. Diff manifest
   section 27.
 
