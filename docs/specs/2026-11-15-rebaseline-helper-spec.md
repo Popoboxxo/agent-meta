@@ -9,6 +9,18 @@
 - Kein L: kein neues öffentliches Config-Schema, kein neuer Admin-Schreibpfad.
 - Python 3.9-kompatibel (`typing.List`/`Optional`, kein `X | Y`, kein `match`), nur Stdlib (PyYAML-Ausnahme nur, wenn ein bestehendes Modul sie schon nutzt), provider-agnostisch.
 
+## Entscheidungen
+
+Nutzerentscheidungen zu den Fragen der Vorversion (Status der Spec bleibt DRAFT):
+
+1. Befehlsform: eigenes `scripts/rebaseline.py` plus `scripts/lib/rebaseline.py`; KEIN `sync.py`-Flag.
+2. Reason-Log: `.meta-config/rebaseline-log.jsonl` (getrackt, nicht unter `tests/fixtures/`).
+3. `_FIXTURE_TREES`-Zeile wird automatisch zeilengenau gepatcht und steht in der Gate-Allowlist.
+4. `topology-golden`-a2a-Fixtures werden per Render aktualisiert (Aktion `auto`); `schema-property-paths.json` bleibt `report-only`.
+5. `--base` Default `origin/main`; ohne Remote Fallback auf lokales `main` mit Warnung.
+6. Preflight: nur die Rebaseline-Artefakte müssen sauber sein; Quell-Änderungen dürfen uncommittet sein.
+7. Reihenfolge: Implementierung des Helpers erst NACH P3 (#1246, Determinismus); Roadmap-Reihenfolge P3 -> P4.
+
 ## Problem
 
 - Jede Template-/Render-Änderung braucht heute eine manuelle Rebaseline aus bis zu 9 Pin-Klassen (Tabelle in „Ist-Zustand“). Die Reihenfolge steht nirgends als Mechanismus, nur als Prozess-Docstring (`tests/test_ac01_render_identity.py:20-23`) und als Task-Prosa in Plänen.
@@ -29,7 +41,7 @@
 ## Nicht-Ziele
 
 - Keine Render-Determinismus-Arbeit (Issue #1237 Empfehlung 2, Umgebungs-/Datums-/Pfadwerte aus gehashten Artefakten): Roadmap P3 (#1246) davor; hier nur Abgrenzung.
-- Kein automatisches Regenerieren von `slimming-golden`/`compact-golden`/`topology-golden`: diese Fixtures werden per Hand-Patch gepflegt (Logs `tests/test_ac01_render_identity.py`, `tests/test_template_slimming_equivalence.py:180-236`); der Helper prüft sie und meldet Betroffenheit, schreibt sie nicht.
+- Kein automatisches Regenerieren von `slimming-golden`/`compact-golden`/`topology-golden`: diese Fixtures werden per Hand-Patch gepflegt (Ausnahme: die a2a-Fixtures in `topology-golden`, siehe Entscheidung 4) (Logs `tests/test_ac01_render_identity.py`, `tests/test_template_slimming_equivalence.py:180-236`); der Helper prüft sie und meldet Betroffenheit, schreibt sie nicht (außer den a2a-Fixtures in `topology-golden`).
 - Keine automatische Änderung der Ceiling-Tabellen (nur Druck des Blocks; Mensch verifiziert, #1115 „human step is verification only“).
 - Keine Lockerung von `TOLERANCE_MAX_BYTES` (`tests/test_context_budgets.py:48`) oder irgendeiner Ceiling.
 - Keine Konsolidierung der fünf Drift-Mechanismen zu einem (Issue-Kontext) und kein neues Hash-Format.
@@ -46,7 +58,7 @@ Pin-Klassen (jede ist ein Rebaseline-Ziel):
 | AC-T4 | Fixture-Baum-Digests `_FIXTURE_TREES` | `tests/test_opencode_v2_surface.py:5511-5515`, Digest-Funktion `:5518`, Test `:5530-5549` | nein (Literal von Hand) |
 | SG | `tests/fixtures/slimming-golden/<rolle>.md` | `tests/test_template_slimming_equivalence.py:269` (`_GOLDEN_DIR`), Rollenzahl `:5` | nein (Hand-Patch) |
 | CG | `tests/fixtures/compact-golden/{orchestrator,agents-managed}.md` | `tests/test_orchestrator_compact_sections.py:78`, `tests/test_gate_card_compact.py:93` | nein (Hand-Patch) |
-| TG | `tests/fixtures/topology-golden/*` inkl. `schema-property-paths.json` | `tests/test_ac01_render_identity.py:1287-1289`, `tests/test_orchestrator_topology_docs.py:1274` | teils (a2a-Fixtures per Render), Schema-Pfade nein |
+| TG | `tests/fixtures/topology-golden/*` inkl. `schema-property-paths.json` | `tests/test_ac01_render_identity.py:1287-1289`, `tests/test_orchestrator_topology_docs.py:1274` | a2a-Fixtures ja (Render, `auto`), `schema-property-paths.json` nein (`report-only`) |
 | H1 | `.meta-config/generated-file-hashes.json` | `scripts/lib/generated_file_drift.py:45`, `_save_hashes` `:68` | ja, durch `sync.py` |
 | H2 | `.meta-config/context-hashes.json` | `scripts/lib/context.py:43`, `:69` | ja, durch `sync.py` |
 | SA | `standalone/agents/*.md`, `standalone/README.md` | `scripts/lib/standalone.py:534`, `:560`; Drift `:575-582`; CLI `scripts/lib/cli_commands.py:590-611` (`--render-standalone [--check] [--dry-run]`) | ja |
@@ -80,10 +92,10 @@ python3 scripts/rebaseline.py --reason TEXT [--expect GLOB]... [--expect-key GLO
 - `--reason TEXT`: Pflicht im Schreibmodus (min. 10 Zeichen, nicht leer); im `--check-only`-Modus optional.
 - `--expect GLOB` (wiederholbar): zusätzlich erlaubte repo-relative Pfade (POSIX, `fnmatch`).
 - `--expect-key GLOB` (wiederholbar): erlaubte Schlüssel in `hashes.json` bzw. `generated-file-hashes.json`/`context-hashes.json` (Format `<Provider>/<relpath>`, bzw. relpath).
-- `--base REF` (Default `origin/main`): Basis für die abgeleitete Erwartung (Abschnitt Diff-Gate).
+- `--base REF` (Default `origin/main`; ohne erreichbaren Remote Fallback auf lokales `main` mit Warnung im Report): Basis für die abgeleitete Erwartung (Abschnitt Diff-Gate).
 - `--check-only`/`--dry-run`: Synonyme; kein Schreibzugriff auf das Repo (Scratch-Verzeichnis unter `tempfile` ist erlaubt).
-- `--steps LIST`: kommagetrennte Teilmenge aus `ac01,standalone,sync,digests,ceilings` (Default alle, Reihenfolge bleibt fest).
-- `--skip-verify`: überspringt Schritt 8 (gezielte Pin-Tests); nur Entwickler-Diagnose, im Log vermerkt.
+- `--steps LIST`: kommagetrennte Teilmenge aus `ac01,standalone,sync,topology,digests,ceilings` (Default alle, Reihenfolge bleibt fest).
+- `--skip-verify`: überspringt Schritt 9 (gezielte Pin-Tests); nur Entwickler-Diagnose, im Log vermerkt.
 - `--json`: Report zusätzlich maschinenlesbar auf stdout.
 
 ### C3 — Exit-Codes
@@ -130,18 +142,19 @@ Ablauf und Reihenfolge:
 
 Schreibmodus (feste Reihenfolge; jeder Schritt hat ein eigenes Gate):
 
-0. Preflight: `--reason` gültig; `ROOT`/Config gelöst; `git status --porcelain` enthält keine Änderungen an Rebaseline-Artefakten (Quell-Änderungen an Templates/Rules/Config sind erlaubt und erwartet, sie definieren den Scope); Snapshot der zu schreibenden Artefakte in ein Scratch-Verzeichnis (für Rollback).
+0. Preflight: `--reason` gültig; `ROOT`/Config gelöst; `git status --porcelain` enthält keine Änderungen an Rebaseline-Artefakten (Entscheidung 6; Quell-Änderungen an Templates/Rules/Config dürfen uncommittet sein, sie definieren den Scope); Snapshot der zu schreibenden Artefakte in ein Scratch-Verzeichnis (für Rollback).
 1. PRE-Report: alle Pin-Detektoren laufen auf dem Ausgangsstand (ohne Schreiben); der Report nennt je Klasse „betroffen“ oder „ok“.
 2. `ac01`: Matrix-Render in Scratch (`render_matrix_hashes`), Vergleich mit Manifest; Schreiben nur der abweichenden Schlüssel in `tests/fixtures/ac01-baseline/hashes.json` (Format `json.dumps(indent=1, sort_keys=True) + "\n"` wie `:1513-1517`). Gate pro Schlüssel.
 3. `standalone`: `scripts/sync.py --render-standalone --config <CFG>`; Gate auf `standalone/**`.
 4. `sync`: `scripts/sync.py --config <CFG>`; erzeugt `.meta-config/generated-file-hashes.json`, `context-hashes.json` und weitere abhängige Dateien; Gate auf die Menge geänderter getrackter Dateien.
-5. `digests`: Fixture-Baum-Digests neu berechnen; weicht ein Digest von `_FIXTURE_TREES` ab UND hat sich der zugehörige Baum in diesem Lauf oder im Arbeitsbaum gegenüber `--base` geändert, wird das Literal in `tests/test_opencode_v2_surface.py` zeilengenau ersetzt (Gate: nur diese Zeile). Ändert sich ein Baum ohne erwarteten Pfad → Gate-Verletzung.
-6. `ceilings`: `measure_artifacts` (wie `scripts/measure_context.py`) auf dem frisch gesyncten Stand; Vergleich mit `_ceiling(_IST_FULL)`/`_ceiling(_IST_COMPACT)`; nur bei Überschreitung wird der exakte Re-Pin-Block (Provider/Artefakt, alter Ist, gemessener Ist) gedruckt. Keine Dateiänderung.
-7. Zweiter Check-only-Durchlauf aller Schritte (Idempotenz-Beweis); Rest-Drift → Exit 4 mit Liste.
-8. Verifikation: gezielte `pytest -q`-Aufrufe der Pin-Testdateien aus der Registry (kein Voll-Lauf); rot → Exit 5.
-9. Log-Eintrag (C6) nur wenn `changed_files` nicht leer.
+5. `topology`: a2a-Fixtures in `tests/fixtures/topology-golden/` per Render aktualisieren (`render_topology_rule`, `tests/test_ac01_render_identity.py:1335`); Gate auf genau diese Dateien (Entscheidung 4).
+6. `digests`: Fixture-Baum-Digests neu berechnen; weicht ein Digest von `_FIXTURE_TREES` ab UND hat sich der zugehörige Baum in diesem Lauf oder im Arbeitsbaum gegenüber `--base` geändert, wird das Literal in `tests/test_opencode_v2_surface.py` automatisch zeilengenau ersetzt (Entscheidung 3; Gate: nur diese Zeile). Ändert sich ein Baum ohne erwarteten Pfad → Gate-Verletzung.
+7. `ceilings`: `measure_artifacts` (wie `scripts/measure_context.py`) auf dem frisch gesyncten Stand; Vergleich mit `_ceiling(_IST_FULL)`/`_ceiling(_IST_COMPACT)`; nur bei Überschreitung wird der exakte Re-Pin-Block (Provider/Artefakt, alter Ist, gemessener Ist) gedruckt. Keine Dateiänderung.
+8. Zweiter Check-only-Durchlauf aller Schritte (Idempotenz-Beweis); Rest-Drift → Exit 4 mit Liste.
+9. Verifikation: gezielte `pytest -q`-Aufrufe der Pin-Testdateien aus der Registry (kein Voll-Lauf); rot → Exit 5.
+10. Log-Eintrag (C6) nur wenn `changed_files` nicht leer.
 
-Check-only: Schritte 1–2–3–4–5–6 rechnen in Scratch bzw. mit `--dry-run`; Exit 1 bei jeder Drift, sonst 0. Schritt 9 entfällt.
+Check-only: Schritte 1 bis 7 rechnen in Scratch bzw. mit `--dry-run`; Exit 1 bei jeder Drift, sonst 0. Schritt 10 entfällt.
 
 Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm berührten Dateien wieder her (kein `git checkout`, kein `git stash`).
 
@@ -149,16 +162,16 @@ Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm
 
 - Definition: Nach jedem Schreibschritt wird die Menge geänderter getrackter Dateien (`git diff --name-only` gegen den Preflight-Stand) und, für JSON-Hash-Dateien, die Menge geänderter Schlüssel gebildet. Jede Datei/jeder Schlüssel außerhalb der Erwartungsmenge → Exit 3, Rollback, Ausgabe der Differenz.
 - Erwartungsmenge = Vereinigung aus:
-  1. Klassen-Allowlist (Daten im Modul): `tests/fixtures/ac01-baseline/hashes.json`, `.meta-config/generated-file-hashes.json`, `.meta-config/context-hashes.json`, `standalone/**`, `tests/test_opencode_v2_surface.py` (nur die `_FIXTURE_TREES`-Zeilen), `.meta-config/rebaseline-log.jsonl`.
+  1. Klassen-Allowlist (Daten im Modul): `tests/fixtures/ac01-baseline/hashes.json`, `.meta-config/generated-file-hashes.json`, `.meta-config/context-hashes.json`, `standalone/**`, `tests/test_opencode_v2_surface.py` (nur die `_FIXTURE_TREES`-Zeilen), `tests/fixtures/topology-golden/a2a-delegation-gates.role-*.md`, `.meta-config/rebaseline-log.jsonl`.
   2. Abgeleitete Schlüsselerwartung: aus `git diff --name-only <base>...HEAD` plus Arbeitsbaum werden die geänderten Quellen (`agents/**`, `rules/**`, `hooks/**`, `templates/**`, `config/**`, `scripts/lib/**`) auf Rollen-/Rule-/Hook-Stems abgebildet; erlaubt sind `hashes.json`-Schlüssel, deren relpath einen dieser Stems enthält (Muster `<Provider>/**/<stem>*`). Quellen ohne Stem-Abbildung (z. B. `config/**`, `scripts/lib/**`) erlauben KEINE Schlüssel automatisch → der Aufrufer muss `--expect-key` angeben (fail-closed).
   3. Explizite `--expect`/`--expect-key`-Globs.
 - Das Gate ist eine Convention boundary gegen akzidentelle Fehlschreibungen, keine Security boundary.
-- Geänderte Dateien der Hand-gepflegten Goldens (SG/CG/TG, Ceilings) sind NICHT in der Erwartungsmenge; der Helper schreibt sie nicht, ihr Arbeitsbaum-Stand ist Eingabe (Preflight-Snapshot) und wird nicht als Verletzung gewertet.
+- Die a2a-Fixtures `tests/fixtures/topology-golden/a2a-delegation-gates.role-{inactive,active}.md` sind Teil der Klassen-Allowlist (Schritt `topology`). Geänderte Dateien der Hand-gepflegten Goldens (SG/CG, `schema-property-paths.json`, Ceilings) sind NICHT in der Erwartungsmenge; der Helper schreibt sie nicht, ihr Arbeitsbaum-Stand ist Eingabe (Preflight-Snapshot) und wird nicht als Verletzung gewertet.
 
 ## Pin-/Golden-Impact-Report (vorab / nachher)
 
-- Vorab (Schritt 1) und nachher (Schritt 7/8) je Pin-Klasse aus C5: `ok`, `betroffen (n Einträge)` oder `n/a` (Klasse nicht erreichbar, z. B. fehlendes Fixture); bei Goldens die Liste der betroffenen Rollen/Dateien.
-- „Betroffen“ heißt: Detektor wäre rot. Der Report ordnet jeder Klasse die zuständige Aktion zu (`auto` = Helper schreibt, `report-only` = Mensch patcht: Golden-Datei, Ceiling-Block, Schema-Pfad-Fixture).
+- Vorab (Schritt 1) und nachher (Schritt 8/9) je Pin-Klasse aus C5: `ok`, `betroffen (n Einträge)` oder `n/a` (Klasse nicht erreichbar, z. B. fehlendes Fixture); bei Goldens die Liste der betroffenen Rollen/Dateien.
+- „Betroffen“ heißt: Detektor wäre rot. Der Report ordnet jeder Klasse die zuständige Aktion zu (`auto` = Helper schreibt, `report-only` = Mensch patcht: slimming-/compact-Golden-Datei, Ceiling-Block, Schema-Pfad-Fixture).
 - Nach dem Lauf darf keine Klasse `betroffen` mit Aktion `auto` bleiben; `report-only`-Reste sind erlaubt und werden als `OFFEN` gelistet (Exit 5 nur bei roter Verifikation, siehe AC 13).
 - Besonders gelistet, weil in Sessions vergessen: `compact-golden/agents-managed.md`, `topology-golden/schema-property-paths.json`, Ceilings `_IST_FULL`/`_IST_COMPACT`, AC-T4-Digests.
 
@@ -172,8 +185,8 @@ Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm
 6. Unerwartete Datei- oder Schlüsseländerung (Test mit künstlich zusätzlicher Drift) → Exit 3, alle berührten Dateien byte-identisch zurückgesetzt.
 7. Aufruf aus fremdem `cwd` (z. B. Hauptcheckout bei Worktree-Helper) wirkt ausschließlich auf den Root des Helper-Orts; jeder `sync.py`-Subprozess enthält `--config <ROOT>/.meta-config/project.yaml` und `cwd=<ROOT>` (Test mit gemocktem Subprozess-Runner).
 8. Fehlt `.meta-config/project.yaml` → Exit 2, kein Wizard-Start.
-9. Die Schrittreihenfolge ist exakt `ac01, standalone, sync, digests, ceilings` (Test über aufgezeichnete Aufrufreihenfolge).
-10. Preflight bricht mit Exit 2 ab, wenn Rebaseline-Artefakte im Arbeitsbaum bereits unstaged verändert sind.
+9. Die Schrittreihenfolge ist exakt `ac01, standalone, sync, topology, digests, ceilings` (Test über aufgezeichnete Aufrufreihenfolge).
+10. Preflight bricht mit Exit 2 ab, wenn Rebaseline-Artefakte im Arbeitsbaum bereits verändert sind; uncommittete Quell-Änderungen (Templates/Rules/Config) blockieren NICHT.
 11. Das Log `.meta-config/rebaseline-log.jsonl` erhält pro ändernden Lauf genau eine valide JSON-Zeile mit `reason`; die AC-T4-Digests ändern sich durch den Log-Eintrag nicht (Datei liegt außerhalb `tests/fixtures/`).
 12. Ceiling-Report: bei künstlich überschrittenem Ist druckt der Helper den Re-Pin-Block mit Provider, Artefakt, altem und gemessenem Wert; `TOLERANCE_MAX_BYTES`, `TOLERANCE_MIN_BYTES`, `TOLERANCE_RATIO` und alle Pins sind danach unverändert (Dateihash-Test).
 13. Nach erfolgreichem Lauf sind die gezielten Pin-Tests (`test_ac01_render_identity`, `test_opencode_v2_surface::test_ac_t4_fixtures_unchanged`, `test_template_slimming_equivalence`, `test_gate_card_compact`, `test_orchestrator_compact_sections`, `test_orchestrator_topology_docs`, `test_context_budgets`) grün oder als `OFFEN` mit Aktion genannt; rote Verifikation → Exit 5.
@@ -181,16 +194,13 @@ Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm
 15. Bei Subprozess-Fehler (simuliert) → Exit 4 und Rollback.
 16. `scripts/lib/rebaseline.py` ≤ 600 Zeilen, nur Stdlib, kein `print()`, kein Provider-Literal (`tests/test_provider_agnostic_dispatch.py`); Python 3.9-kompatibel.
 17. Der `conventions`-Skill (Quelle) und `howto/` enthalten einen Verweis auf den Befehl; `docs/` nennt Flags und Exit-Codes (#1115 AC 2).
+18. `--base` ohne Remote `origin`: Fallback auf lokales `main`, Warnung im Report, Exit-Code unverändert (Test mit gemocktem Git-Runner).
+19. `topology`-Schritt aktualisiert die a2a-Fixtures per Render; Drift dort wird vorab als `betroffen` gemeldet und danach als `ok`; `schema-property-paths.json` bleibt `report-only`.
+20. Die `_FIXTURE_TREES`-Zeile wird zeilengenau gepatcht (alle anderen Zeilen der Datei byte-identisch); der Eintrag ist in der Gate-Allowlist.
 
 ## Offene Fragen
 
-1. Befehlsform: eigenes `scripts/rebaseline.py` (Spec-Vorschlag, hält `sync.py` schlank) oder Flag `sync.py --rebaseline` wie im Issue-Wortlaut?
-2. Log-Ort: `.meta-config/rebaseline-log.jsonl` (Vorschlag, getrackt) oder `docs/`-Markdown-Log? Zu beachten: nicht unter `tests/fixtures/` wegen AC-T4.
-3. Soll der Helper `_FIXTURE_TREES` automatisch zeilengenau patchen (Spec-Vorschlag) oder nur den neuen Digest drucken?
-4. Soll der Helper zusätzlich versuchen, `topology-golden`-a2a-Fixtures per Render zu aktualisieren, oder bleibt TG komplett report-only?
-5. Standardmäßige `--base`: `origin/main` (Vorschlag) oder `main`; wie verhalten wir uns ohne Remote (offline)?
-6. Preflight-Strenge: Arbeitsbaum-Artefakte sauber (Vorschlag) oder zusätzlich „Quell-Änderungen bereits committet“ (strenger, entspricht „`--write` nur auf sauberem Stand“, `tests/test_ac01_render_identity.py:20-22`)?
-7. Reihenfolge-Abhängigkeit zu P3 (#1246, Determinismus): Helper davor mit bekannter Pseudo-Drift-Toleranz oder erst nach P3 (Roadmap: P3 → P4)?
+Keine; die sieben Fragen der Vorversion sind im Abschnitt Entscheidungen beantwortet.
 
 ## Risiken
 
@@ -200,6 +210,7 @@ Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm
 - Rollback-Snapshot deckt nur vom Helper berührte Pfade; parallel editierende Prozesse sind nicht abgesichert.
 - Umgebungsabhängigkeit des Renders (Tmp-Sink, Datum) kann den Idempotenzlauf stören, solange P3 offen ist (`scripts/lib/sync_pipeline.py:236-291`).
 - Hand-gepflegte Goldens bleiben ein menschlicher Schritt; der Helper reduziert Vergessen, eliminiert die Arbeit nicht.
+- Reihenfolge: Die Implementierung startet erst nach P3 (#1246); bis dahin ist nur Spec/Plan DRAFT (Entscheidung 7). Der Idempotenzlauf ist vorher nicht belastbar.
 - Roadmap-Folge: nachfolgende Rebaseline-PRs (P6, P8, P12, P17, P19, P26, P29, P30) hängen vom Helper ab (Roadmap-Zeilen 94 und 89); ein verspäteter Helper blockiert die Welle.
 
 ## Trace-Anker

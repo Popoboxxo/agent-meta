@@ -11,7 +11,7 @@ branch: feat/rebaseline-helper
 
 # Rebaseline-Helper Implementation Plan
 
-> Status: geplant — Spec DRAFT; Umsetzung erst nach Freigabe (APPROVED, E-10) und Klärung der offenen Fragen 1-7 der Spec.
+> Status: geplant — Spec DRAFT; Umsetzung erst nach Freigabe (APPROVED, E-10) UND nach P3 (#1246, Determinismus); Entscheidungen 1-7 der Spec sind getroffen.
 
 **Goal:** Ein Befehl (`scripts/rebaseline.py`) führt AC-01-Manifest, Standalone-Render, `sync.py`, AC-T4-Digests und Ceiling-Messung in fester Reihenfolge aus, erzwingt ein Diff-Gate, schreibt ein Reason-Log und berichtet vorab/nachher die betroffenen Pins (Issue #1237, #1115).
 
@@ -40,22 +40,22 @@ branch: feat/rebaseline-helper
 - Create: `scripts/lib/rebaseline.py` — Gate, Snapshot/Rollback, Schritt-Runner, Report, Log (Tasks 1-6)
 - Create: `scripts/rebaseline.py` — Entrypoint (Task 7)
 - Create: `tests/test_rebaseline_helper.py` — Unit-Tests je Task (Tasks 1-8)
-- Create: `.meta-config/rebaseline-log.jsonl` — erst beim ersten echten Lauf (nicht in diesem PR; Spec Offene Frage 2)
+- Create: `.meta-config/rebaseline-log.jsonl` — erst beim ersten echten Lauf (nicht in diesem PR; Spec Entscheidung 2)
 - Modify: `howto/` (passender Eintrag) und Doku-Verweis im `conventions`-Skill-Quelltext — Task 9
 - Modify: `CHANGELOG.md` — Task 9
 
 ## Tasks
 
-### Task 0: Spec freigeben und committen
+### Task 0: Spec freigeben und committen (Gate: P3 #1246 gemerged, Reihenfolge P3 -> P4)
 **Agent:** documenter
 **Depends on:** keine
 **Files:**
 - Modify: `docs/specs/2026-11-15-rebaseline-helper-spec.md`
 - Modify: `docs/plans/2026-11-15-rebaseline-helper-plan.md`
 
-**Interfaces:** Produces: Spec `Status: APPROVED (User, <Datum>)`, offene Fragen 1-7 beantwortet und in die Spec eingearbeitet; Consumes: Nutzerentscheidung E-10.
+**Interfaces:** Produces: Spec `Status: APPROVED (User, <Datum>)`, Entscheidungen 1-7 stehen bereits in der Spec; Consumes: Nutzerentscheidung E-10.
 **AC:** Gate vor allen Folge-Tasks.
-- [ ] Step 1: Offene Fragen 1-7 einzeln an den Nutzer; Antworten in der Spec festhalten.
+- [ ] Step 1: Prüfen, dass P3 (#1246) gemerged ist; Spec-Freigabe durch den Nutzer einholen.
 - [ ] Step 2: Status auf APPROVED setzen; `python3 scripts/sync.py --validate-spec-plan --config <abs>/.meta-config/project.yaml` grün.
 - [ ] Step 3: Commit `docs: add rebaseline helper spec and plan`.
 
@@ -107,20 +107,20 @@ branch: feat/rebaseline-helper
 
 **Interfaces:** Produces: `PinSpec(klass, paths, detector, action)`, `PINS` (AC, AC-T4, SG, CG, TG, H1, H2, SA, CE), `impact_report(root, runner) -> List[PinStatus]` (`ok|betroffen|n/a`). Consumes: Task 1, Task 3.
 **AC:** 2, 3, 13.
-- [ ] Step 1: Rote Tests: Registry enthält alle 9 Klassen und die Fixtures `compact-golden/agents-managed.md`, `topology-golden/schema-property-paths.json`; gemockter Runner liefert `betroffen` bei rotem Detektor.
+- [ ] Step 1: Rote Tests: Registry enthält alle 9 Klassen (TG: a2a `auto`, Schema-Pfade `report-only`) und die Fixtures `compact-golden/agents-managed.md`, `topology-golden/schema-property-paths.json`; gemockter Runner liefert `betroffen` bei rotem Detektor.
 - [ ] Step 2: Implementierung bis grün; AC-T4-Detektor ruft `_fixture_tree_sha256` aus dem bestehenden Testmodul via `importlib`.
 - [ ] Step 3: Commit `feat: add rebaseline pin registry and impact report`.
 
-### Task 5: Schritte ac01, standalone, sync, digests
+### Task 5: Schritte ac01, standalone, sync, topology, digests
 **Agent:** developer
 **Depends on:** 4
 **Files:**
 - Modify: `scripts/lib/rebaseline.py`
 - Modify: `tests/test_rebaseline_helper.py`
 
-**Interfaces:** Produces: `step_ac01`, `step_standalone`, `step_sync`, `step_digests`, `STEP_ORDER = ("ac01","standalone","sync","digests","ceilings")`; `step_ac01` schreibt nur abweichende Schlüssel im Format `indent=1, sort_keys=True` plus `"\n"`; `step_digests` ersetzt nur die `_FIXTURE_TREES`-Zeile. Consumes: Task 1-4.
-**AC:** 4, 5, 9, 10.
-- [ ] Step 1: Rote Tests: Reihenfolge der aufgezeichneten Runner-Aufrufe, Schlüssel-Patch lässt andere Zeilen unberührt, Preflight bricht bei unsauberen Artefakten, Idempotenz (zweiter Lauf 0 Änderungen) mit gemocktem Render.
+**Interfaces:** Produces: `step_ac01`, `step_standalone`, `step_sync`, `step_topology` (a2a-Fixtures per Render, Aktion auto), `step_digests`, `STEP_ORDER = ("ac01","standalone","sync","topology","digests","ceilings")`; `step_ac01` schreibt nur abweichende Schlüssel im Format `indent=1, sort_keys=True` plus `"\n"`; `step_digests` ersetzt automatisch nur die `_FIXTURE_TREES`-Zeile (in der Gate-Allowlist). Consumes: Task 1-4.
+**AC:** 4, 5, 9, 10, 18, 19, 20.
+- [ ] Step 1: Rote Tests: Reihenfolge der aufgezeichneten Runner-Aufrufe, Schlüssel-Patch lässt andere Zeilen unberührt, Preflight bricht nur bei veränderten Artefakten (uncommittete Quellen erlaubt); `--base`-Fallback auf lokales `main` mit Warnung, Idempotenz (zweiter Lauf 0 Änderungen) mit gemocktem Render.
 - [ ] Step 2: Implementierung bis grün.
 - [ ] Step 3: Commit `feat: add rebaseline write steps`.
 
@@ -182,7 +182,7 @@ branch: feat/rebaseline-helper
 - Modify: keine (reine Ausführung)
 
 **Interfaces:** Produces: Pass/Fail je Kommando; Consumes: Gesamtstand 0-9.
-**AC:** 1-17.
+**AC:** 1-20.
 - [ ] Step 1: `python3 -m pytest tests/test_rebaseline_helper.py tests/test_provider_agnostic_dispatch.py -q`.
 - [ ] Step 2: `python3 scripts/rebaseline.py --check-only` auf sauberem Stand: Exit 0.
 - [ ] Step 3: `python3 scripts/sync.py --validate --config <abs>/.meta-config/project.yaml` und `--validate-spec-plan`.
@@ -201,7 +201,7 @@ Verweise: Entscheidung E-10, Roadmap `docs/plans/2026-11-15-master-roadmap.md` P
 - [ ] Task 2 Snapshot und Rollback
 - [ ] Task 3 Diff-Gate
 - [ ] Task 4 Pin-Registry und Detektoren
-- [ ] Task 5 Schritte ac01, standalone, sync, digests
+- [ ] Task 5 Schritte ac01, standalone, sync, topology, digests
 - [ ] Task 6 Ceiling-Report, Log, Exit-Codes
 - [ ] Task 7 Entrypoint und CLI
 - [ ] Task 8 Strukturtests und Provider-Agnostik
@@ -218,8 +218,8 @@ Verweise: Entscheidung E-10, Roadmap `docs/plans/2026-11-15-master-roadmap.md` P
 
 ## Self-Review
 
-- Jeder Task mappt auf genau eine Rolle; jedes Akzeptanzkriterium der Spec (1-17) ist über Task und AC-Nummer abgedeckt: 1, 2, 3, 7, 8 (Task 7), 4-6 (Task 3, 5), 9-10 (Task 5), 11-12, 14 (Task 6), 13 (Task 4), 15 (Task 2), 16 (Task 8), 17 (Task 9).
+- Jeder Task mappt auf genau eine Rolle; jedes Akzeptanzkriterium der Spec (1-20) ist über Task und AC-Nummer abgedeckt: 1, 2, 3, 7, 8 (Task 7), 4-6 (Task 3, 5), 9-10, 18-20 (Task 5), 11-12, 14 (Task 6), 13 (Task 4), 15 (Task 2), 16 (Task 8), 17 (Task 9).
 - `Files:`/`Interfaces:` vollständig; alle Tasks sequentiell, gemeinsame Dateien (`scripts/lib/rebaseline.py`, `tests/test_rebaseline_helper.py`) werden strikt nacheinander fortgeschrieben.
 - `pipeline_stages` deckt die einzige `plan-driven`-Stage (`implement`) ab.
-- Keine Platzhalter im Plan außer den explizit als offen markierten Spec-Fragen 1-7 (Task 0).
+- Spec-Entscheidungen 1-7 sind in Tasks 1, 3, 4, 5, 6 abgebildet; AC 18-20 in Task 5; P3-Reihenfolge in Task 0.
 - Effort-Schätzung: `effort-estimator` (Textverweis, hier bewusst nicht berechnet).
