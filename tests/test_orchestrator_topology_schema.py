@@ -234,3 +234,13 @@ def test_max_parallel_agents_description_mentions_max_instances():
 def test_orchestrator_root_keeps_additional_properties_true():
     """Task 5 constraint: do not change ``additionalProperties`` on the root."""
     assert _orchestrator_schema()["additionalProperties"] is True
+
+
+def test_handoff_t_size_limit_validates():
+    jsonschema.validate(
+        _config(orchestrator={"handoff": {"t-size-limit": 500}}), _schema()
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _config(orchestrator={"handoff": {"t-size-limit": 0}}), _schema()
+        )

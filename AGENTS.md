@@ -194,7 +194,7 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README |
 | `e2e-tester` | E2E-Tests, visuelle Regression, Accessibility-Audits via Playwright |
 | `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ, LLM-Kali |
-| `explorer` | Read-only Codebase-Recherche, Dependency, Impact-Mapping |
+| `explorer` | Codebase-Recherche, Dependency, Impact-Mapping |
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray |
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I |
 | `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten |

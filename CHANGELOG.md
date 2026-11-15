@@ -2,8 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+- **Schema/docs:** `orchestrator.topology` value `hybrid` is documented as reserved (no effect, resolves to `subagent`); the schema now accepts the optional `orchestrator.handoff.t-size-limit` (integer, default 300, minimum 1) that the runtime already read.
+- **Consistency check `orchestrator-topology.subagent-unsupported`:** new WARNING when an explicitly declared topology lands unchanged on a provider cell without support (Continue + `subagent`): the provider cannot dispatch subagents natively, the orchestrator runs as prose only. Not raised for a derived topology. No render change.
+
 ### Added
 - **`git` 2.2.0 (`commit.trailers`, E-19):** configurable `commit: {trailers: [...]}` in `project.yaml` (each entry one `Token: value` trailer line). Precedence in `git.md`: brief > project config > harness attribution; each trailer line appears exactly once. The same config line feeds the `auto_commit` block of all committing/delegating roles (single source, no template duplication). `--validate` checks the block (malformed trailer = error, missing e-mail in a `Co-Authored-By` = warning); the Admin UI gets a `commit` section (server-side validation, HTTP 400). Migration: without the key behaviour is unchanged. Consumers: run `sync.py` after the upgrade and optionally set `commit: {trailers: [...]}`.
+
+### Changed
+- **`explorer` 1.5.0 (report write):** the role gets `Write`, restricted by prompt constraint to NEW report files under `.tmp/` and `docs/spikes/` (path from the caller's brief, default `.tmp/audit/<topic>-<YYYY-MM-DD>.md`; never existing files, code, config or rules; no `Edit`/`Bash`). New opt-in role-defaults flag `report_write_only: true` (Write without Edit/Bash): commit authority stays `none` (no `AUTO_COMMIT_BLOCK`) and the read-only tool-privilege audit exempts the role. Resolves the spike-mode contradiction ("no write rights" vs. spike doc output). Scenario 79 now uses `effort-estimator` as its read-only `edit: deny` reference role. Migration: run `sync.py`; the explorer artifacts change on all providers.
 
 ### Fixed
 - **viz-logger stdio MCP (Related #1259):** `scripts/viz-logger.py --mcp` now speaks newline-delimited JSON (MCP stdio) instead of `Content-Length` framing, which caused `CONNECT_TIMEOUT` on session start. The unused `scripts/viz-logger-mcp.mjs` was removed (same framing bug; HTTP/SSE remains via `viz-logger.py --http`).

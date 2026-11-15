@@ -141,6 +141,7 @@
     "orchestrator.enabled",
     "orchestrator.handoff",
     "orchestrator.handoff.protocol",
+    "orchestrator.handoff.t-size-limit",
     "orchestrator.max-instances",
     "orchestrator.mode",
     "orchestrator.native-extensions",
