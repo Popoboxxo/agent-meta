@@ -63,6 +63,9 @@ Zelle `UNVERIFIED`, entstammt `effective` ausschließlich `topology_degrade`
 bzw. dem **Fail-safe `subagent`**. Jede tatsächliche Degradierung (deklariert ≠
 effektiv) erzeugt genau eine WARNING `orchestrator-topology.degraded` pro
 Provider und Lauf. Eine unveränderte `no`-Zelle ohne Deklaration warnt nicht.
+Eine *explizit deklarierte* Position, die unverändert auf einer `no`-Zelle landet
+(Continue + `subagent`), erzeugt stattdessen genau eine WARNING
+`orchestrator-topology.subagent-unsupported` (Orchestrator läuft nur als Prosa).
 Ein Mechanismus-Wort (`sequential-text`) wandert nach `degradation_reason` und
 wird nie als Topologie-Wert durchgereicht.
 

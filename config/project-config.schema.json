@@ -2498,7 +2498,7 @@
         },
         "topology": {
           "type": "string",
-          "description": "Orchestrator position, i.e. WHERE the orchestrator lives. 'primary' = the role is the session entry point (one orchestrator, no spawn channel); 'subagent' = the role is never the entry point and the main chat spawns 1..N; 'hybrid' = position-agnostic (either/or, never two simultaneous positions). This is a different axis from orchestrator.mode, which describes HOW STRICTLY the gate is enforced ('strict', 'advisory', 'main-chat'). Optional: omitting the key preserves today's derivation (primary when providers.<P>.primary-role names the role and it is in the active set, otherwise subagent; hybrid is never derived). Not context_file.topology, which describes the file layout.",
+          "description": "Orchestrator position, i.e. WHERE the orchestrator lives. 'primary' = the role is the session entry point (one orchestrator, no spawn channel); 'subagent' = the role is never the entry point and the main chat spawns 1..N; 'hybrid' = reserved (no effect today, resolves to 'subagent'; never two simultaneous positions). This is a different axis from orchestrator.mode, which describes HOW STRICTLY the gate is enforced ('strict', 'advisory', 'main-chat'). Optional: omitting the key preserves today's derivation (primary when providers.<P>.primary-role names the role and it is in the active set, otherwise subagent; hybrid is never derived). Not context_file.topology, which describes the file layout.",
           "enum": [
             "primary",
             "subagent",
@@ -2596,6 +2596,12 @@
               "type": "string",
               "description": "Handoff protocol identifier. Use 'a2a-v1' (default) or 'none'/'false' to disable.",
               "default": "a2a-v1"
+            },
+            "t-size-limit": {
+              "type": "integer",
+              "description": "Maximum characters of the A2A payload.t field. Runtime floor is 1.",
+              "default": 300,
+              "minimum": 1
             }
           },
           "additionalProperties": false
@@ -2632,7 +2638,7 @@
               },
               "topology": {
                 "type": "string",
-                "description": "Orchestrator position for this provider only. Same enum and semantics as orchestrator.topology. Precedence: provider override > orchestrator.topology > derivation. When unset, inherits the project value. No schema default: the fallback is the existing derivation.",
+                "description": "Orchestrator position for this provider only. Same enum and semantics as orchestrator.topology. Note: 'hybrid' is reserved (no effect, resolves to 'subagent'). Precedence: provider override > orchestrator.topology > derivation. When unset, inherits the project value. No schema default: the fallback is the existing derivation.",
                 "enum": [
                   "primary",
                   "subagent",

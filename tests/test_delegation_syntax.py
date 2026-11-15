@@ -197,11 +197,11 @@ def test_batch_payload_entries_are_length_checked():
     assert any("payload[0].t exceeds" in e for e in errors)
 
 
-def test_project_config_schema_handoff_only_declares_protocol():
+def test_project_config_schema_handoff_declares_only_known_keys():
     import json
     schema = json.loads((REPO_ROOT / "config" / "project-config.schema.json").read_text(encoding="utf-8"))
     handoff_props = schema["properties"]["orchestrator"]["properties"]["handoff"]["properties"]
-    assert set(handoff_props) == {"protocol"}
+    assert set(handoff_props) == {"protocol", "t-size-limit"}
 
 
 def test_local_project_yaml_handoff_block_has_no_dead_keys():

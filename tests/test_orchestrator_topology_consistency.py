@@ -42,6 +42,8 @@ _CONFLICT = "orchestrator-topology.default-agent-conflict"
 _SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
 _INSTANCES_CLAMPED = "orchestrator-topology.instances-clamped"
 
+_SUBAGENT_UNSUPPORTED_ID = "orchestrator-topology.subagent-unsupported"
+
 _ACTIVE = SimpleNamespace(
     roles=frozenset({"orchestrator", "developer"}),
     known_roles=frozenset({"orchestrator", "developer"}),
@@ -222,6 +224,58 @@ def test_multiple_check_ids_fire_together_without_duplicates(tmp_path):
 
 
 # --- zero findings without the key -----------------------------------------
+
+
+# --- O5: declared subagent on a provider without subagent support ----------
+
+_SUBAGENT_UNSUPPORTED = {
+    "topology_support": {"primary": False, "subagent": False, "hybrid": False},
+    "topology_degrade": {"primary": "subagent", "subagent": None, "hybrid": "subagent"},
+    "topology_verified_state": {
+        "primary": "UNVERIFIED",
+        "subagent": "UNVERIFIED",
+        "hybrid": "UNVERIFIED",
+    },
+}
+
+
+def test_declared_subagent_on_unsupported_provider_warns_once(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "topology": "subagent"}},
+        caps={"Alpha": dict(_SUBAGENT_UNSUPPORTED)},
+    )
+    hits = _by_check(findings, _SUBAGENT_UNSUPPORTED_ID)
+    assert len(hits) == 1
+    assert hits[0].severity == Severity.WARNING
+    assert "Alpha" in hits[0].message and "prose" in hits[0].message
+
+
+def test_derived_subagent_on_unsupported_provider_does_not_warn(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict"}},
+        caps={"Alpha": dict(_SUBAGENT_UNSUPPORTED)},
+    )
+    assert _by_check(findings, _SUBAGENT_UNSUPPORTED_ID) == []
+
+
+def test_declared_subagent_on_supported_provider_does_not_warn(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "topology": "subagent"}},
+    )
+    assert _by_check(findings, _SUBAGENT_UNSUPPORTED_ID) == []
+
+
+def test_declared_primary_degrading_does_not_double_warn(tmp_path):
+    findings = _check(
+        tmp_path,
+        {"orchestrator": {"mode": "strict", "topology": "primary"}},
+        caps={"Alpha": dict(_SUBAGENT_UNSUPPORTED)},
+    )
+    assert len(_by_check(findings, _DEGRADED)) == 1
+    assert _by_check(findings, _SUBAGENT_UNSUPPORTED_ID) == []
 
 
 def test_repository_without_the_key_produces_zero_findings():
