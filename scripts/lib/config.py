@@ -228,6 +228,7 @@ _VARIABLE_FALLBACKS: dict[str, str] = {
     "CODE_LANGUAGE": "Englisch",
     "PROJECT_GOAL": "",
     "COMMIT_TRAILERS": "",
+    "COMMIT_TRAILERS_SET": "false",
     "PROJECT_LANGUAGES": "",
     "CODE_CONVENTIONS": "",
 }
@@ -1824,6 +1825,8 @@ def _build_core_variables(
     # non-empty explicit variables.COMMIT_TRAILERS wins.
     if not variables.get("COMMIT_TRAILERS"):
         variables["COMMIT_TRAILERS"] = _commit_trailers
+    # <VAR>_SET convention: only "true" activates {{#if COMMIT_TRAILERS_SET}}.
+    variables["COMMIT_TRAILERS_SET"] = "true" if variables["COMMIT_TRAILERS"] else "false"
 
     _auto_commit_cfg = config.get("auto_commit", {}) or {}
     if auto_commit_violations(config):
