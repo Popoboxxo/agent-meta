@@ -1138,3 +1138,15 @@ def test_committed_config_keeps_catalog_command_independent_of_host(monkeypatch,
 
     assert renders[0] == renders[1], "the committed config must not depend on host PATH"
     assert json.loads(renders[0])["mcp"]["viz"]["command"] == ["python3", "viz.py"]
+
+
+def test_explicit_disable_beats_platform_bundle():
+    from scripts.lib.registry_query import resolve_active_mcp_servers
+
+    root = Path(__file__).resolve().parent.parent
+    registry = {"viz-logger": {"enabled-by-default": True}}
+    cfg = {"platforms": ["agent-meta"], "plugins": {"viz-logger": {"enabled": False}}}
+    assert "viz-logger" not in resolve_active_mcp_servers(cfg, root, None, registry=registry)
+    # control: no explicit entry -> bundle default still activates it
+    cfg = {"platforms": ["agent-meta"], "plugins": {}}
+    assert "viz-logger" in resolve_active_mcp_servers(cfg, root, None, registry=registry)
