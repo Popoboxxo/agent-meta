@@ -184,6 +184,12 @@ Repository and branch conventions surfaced in the `git` section of `project.yaml
 <!-- author: Agent Meta Admin -->
 Controls the opt-in tiered commit authority for write-capable agents (issue #694). `off` (default) keeps today's behaviour where only the dedicated `git` role commits. `suggest` has agents propose a commit message in their own report but never run git. `auto` lets agents commit directly when any selected trigger (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`, `custom`) fires — any one is enough (OR). `custom` hands the entire decision to `custom_script` and ignores the built-in triggers. `file_count_threshold` (default 5) is only read for the `file-count-threshold` trigger. `secret_scan` (default true) runs the project's secret scan against the staged diff before any auto/custom commit. A `custom` mode, or `custom` among the triggers, requires `custom_script`.
 
+### Commit Trailers
+<!-- help-id: project_instance-commit -->
+<!-- last-updated: 2026-11-15 -->
+<!-- author: Agent Meta Admin -->
+Edits `commit.trailers` in `project.yaml`: git trailers that agents append to every commit message. One trailer per line in the form `Token: value` (e.g. `Co-Authored-By: Name <mail@example.com>`); duplicates and malformed lines are rejected with HTTP 400 before anything is written. A `Co-Authored-By` trailer without an email address is accepted but warned about at sync time. Never put secrets in trailers — they end up in the git history.
+
 ### Release Checklist
 <!-- help-id: project_instance-release_checklist -->
 <!-- last-updated: 2026-11-01 -->
