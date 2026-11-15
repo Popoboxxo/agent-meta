@@ -23,6 +23,7 @@ Config in .meta-config/project.yaml:
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -341,9 +342,9 @@ def render_html(events: list[dict], live_mode: bool = False) -> str:
         status_icon = _STATUS_ICONS.get(status, "?")
 
         agent_cards.append(f"""
-        <div class="agent-card {status_class}">
-            <div class="agent-name">{status_icon} {name}</div>
-            <div class="agent-status">{status}</div>
+        <div class="agent-card {html.escape(status_class)}">
+            <div class="agent-name">{status_icon} {html.escape(name)}</div>
+            <div class="agent-status">{html.escape(status)}</div>
             <div class="agent-duration">{dur_str}</div>
         </div>
         """)
@@ -353,7 +354,7 @@ def render_html(events: list[dict], live_mode: bool = False) -> str:
     for item in state["timeline"]:
         ts_str = _format_ts(item["ts"])
         icon = item["icon"]
-        msg = item["msg"]
+        msg = html.escape(item["msg"])
         timeline_rows.append(f"<tr><td>{ts_str}</td><td>{icon}</td><td>{msg}</td></tr>")
 
     # Mermaid Gantt
