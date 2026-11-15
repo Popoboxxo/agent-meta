@@ -239,3 +239,25 @@ def test_start_status_stop_with_viz_and_mcp(project):
             os.kill(pid, 0)
     after = _cli(project, "status", port, viz=True).stdout
     assert after.count("STOPPED") == 3, after
+
+
+@pytest.mark.skipif(not Path("/proc/self/cmdline").exists(), reason="needs /proc")
+def test_stop_spares_foreign_pid(tmp_path, capsys):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("admin_server_foreign", _SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    pid_file = tmp_path / ".meta-viz" / "pidfile"
+    pid_file.parent.mkdir()
+    pid_file.write_text(str(child.pid), encoding="utf-8")
+    try:
+        mod.VizManager(tmp_path)._stop(pid_file, "viz")
+        assert child.poll() is None  # foreign process survives
+        assert not pid_file.exists()
+        assert "stale pidfile" in capsys.readouterr().out
+    finally:
+        child.kill()
+        child.wait()
