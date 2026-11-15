@@ -19,6 +19,17 @@ trace:
 > Klasse: **XL / Architectural** (Datenmodell in `role-defaults.yaml` + Schema, Renderer, Admin-UI, Eval, Rebaseline) → **Spec-Pflicht** (§4 ist der Spec-Kern; Umsetzung erst nach `Status: APPROVED`).
 > Abgrenzung: `docs/plans/2026-11-14-agent-improvement-loop-plan.md` = Rewrite aller Rollen-Prompts (Rubrik, Blöcke, Sprache). **Hier**: Routing-Datenmodell, generierte Routing-Artefakte, Konfigurierbarkeit (project.yaml + Admin-UI), Routing-Eval. Schnittmenge = Hebel H1 (route_intent kompakt): wird **hier** spezifiziert, dort nur gemessen (§8).
 
+## Entscheidungsstand 2026-11-15
+
+Quelle: [Master-Roadmap §4](2026-11-15-master-roadmap.md) (Nutzerentscheidungen 2026-11-15). Plan-Status bleibt DRAFT.
+
+- E-07: Taxonomie informativ; Routing-Spec nach Review freigegeben.
+- E-23: kompaktes Zeilenformat als Default, name_index reduziert, Direct-Dispatch generiert, Lazy-Detaildatei, Minor-Bump + CHANGELOG; NICHT das globale Compact-Profil.
+- E-27: Routing-Eval ja (< 1 USD).
+- E-12: Rollenliste ausstehend, vor Routing-PR 2 nötig.
+- E-26: Gemini = nur Gemini CLI.
+- E-28 (Erweiterung): Sprach-Keys dynamisch (Eingabe und Ausgabe).
+
 **Goal:** Eine Routing-Quelle (`role-defaults.yaml` + projektseitige Overrides) erzeugt für jeden Provider die kleinstmögliche, deterministische Routing-Oberfläche, die der Orchestrator zum korrekten Dispatch braucht; Projekte konfigurieren Intents/Trigger/Overrides in `project.yaml` und im Admin-UI mit Live-Preview und Lint; Routing-Güte wird mit einem Eval-Set gemessen.
 **Architecture:** Keine neue Schicht. Datenmodell-Erweiterung in `config/role-defaults.yaml` (`routing.*`), Override-Block `routing-overrides` in `project.yaml` (Schema), ein Resolver in `scripts/lib/delegation_table.py`, zwei Render-Formen in `scripts/lib/agents.py` (kompakte Always-on-Tabelle + Lazy-Detaildatei), Admin-UI-Editor über bestehende `/api/config/project/section`-Route + neuer Read-only-Preview-Endpoint.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), JSON-Schema, Vanilla-JS Admin-UI (`docs/ui/admin-ui.html`), pytest, promptfoo/`run_eval.sh` (Eval).

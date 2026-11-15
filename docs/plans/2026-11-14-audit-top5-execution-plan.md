@@ -16,6 +16,15 @@ branch: keine (read-only Audit; Berichte via docs-Branch `docs/audit-top5-report
 > Eingabe: `docs/analysis/2026-11-14-audit-prioritization.md` (Top-5 `:40-48`, Token `:63-65`), Issue #1276 (Folge-Audit, 5 Punkte), Issues #1237–#1276 (40, alle OPEN, nur Titel gelesen außer #1271/#1276).
 > **(U)** = unverifiziert.
 
+## Entscheidungsstand 2026-11-15
+
+Quelle: [Master-Roadmap §4](2026-11-15-master-roadmap.md) (Nutzerentscheidungen 2026-11-15). Plan-Status bleibt DRAFT.
+
+- E-06: Audit jetzt in W0; pytest-cov nur temporär; Berichte per PR; G1-Voll-Testlauf erst nach Stufe A + Ja des Nutzers.
+- E-27: Kostenpflichtige Läufe nur mit Kosten-Gate (Routing-Eval ja < 1 USD; #969-Baseline erst nach Kostenschätzung + erneutem Ja).
+- E-08: Issue-Hygiene erst nach Beleg-Prüfung (Schließen nur mit Beleg-Kommentar), separater späterer Auftrag.
+- E-19: Trailer-Formulierung folgt dem konfigurierbaren Contract.
+
 **Goal:** Die fünf priorisierten Audits (Test-Suite, Admin-UI-Sicherheit, Admin-UI-Accessibility, Doku-Wahrheitsgehalt, Knowledge-Engine-Lint) plus Vorbedingung (ReqogniLoom-Toolnamen) so ausführen, dass jeder Befund mit Datei:Zeile belegt ist, als Bericht unter `docs/analysis/` liegt und — nach Dedupe — als Issue mit Lösungsvorschlag im Muster #1237–#1276 vorliegt. Umsetzung der Fixes ist NICHT Teil dieses Plans (geht in einen Bugfix-Batch).
 **Architecture:** Jedes Audit = ein Subagent-Lauf mit eigenem Brief, Ausgabe nach .tmp/audit/ (Rohdaten) und `docs/analysis/2026-11-<dd>-audit-<thema>.md` (Bericht); unabhängige Rücklese durch einen zweiten Agenten; Issues erst nach Rücklese. Kosten-Gate vor jedem Lauf, der Rechenzeit verbraucht.
 **Tech Stack:** pytest (`-n 2 --dist loadfile`, `tests/README.md:13-19`), `gh` (`/home/hermes/.local/bin/gh`), graphify (`graphify-out/graph.json`, teils stale), Markdown.

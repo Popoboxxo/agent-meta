@@ -19,6 +19,18 @@ trace:
 > Messdaten nicht eingecheckt, reproduzierbar per `python3 scripts/measure_context.py`. Tokens = Bytes/4 (Proxy, **kein tiktoken**), überall so gekennzeichnet.
 > Klasse: **L** (99 generische + 18 Plattform-Templates, Sync-Code, Tests, Baselines) → Spec-Pflicht, siehe §9.
 
+## Entscheidungsstand 2026-11-15
+
+Quelle: [Master-Roadmap §4](2026-11-15-master-roadmap.md) (Nutzerentscheidungen 2026-11-15). Plan-Status bleibt DRAFT.
+
+- E-13 (Abweichung): DoD-Preset bleibt rapid-prototyping.
+- E-14 (Abweichung): Knowledge Engine bleibt AN.
+- E-15 (Abweichung): keine Rules-Kürzung (max_depth bleibt 10, use-lazy-rules bleibt); globales Compact-Profil wird NICHT aktiviert (E-29).
+- E-12: Rollenliste (58 -> ~30) ausstehend, wartet auf Nutzerfreigabe; Umfang der Schleife hängt davon ab.
+- E-29: Prompt-Sprache Englisch; Issue-Nummern raus; Ziele/Ratsche hart; Claude-Evals nein.
+- E-16: Sprach-Matrix wie empfohlen.
+- E-10: #1237-Helper-Mini-Spec wird zuerst geschrieben.
+
 **Goal:** Alle Agenten von agent-meta nach einer Rubrik vereinheitlichen, korrigieren, sprachlich normieren und den Kontextverbrauch drastisch senken — gemessen, in Batches, mit Verhaltens-Guardrails; Nebeneffekt: kleinere generierte CLAUDE.md/AGENTS.md.
 **Architecture:** Keine neuen Schichten. Hebel in dieser Reihenfolge: (1) Sync-Render (route_intent-JSON, Blöcke, Profile), (2) Template-Rewrite je Rolle nach Rubrik, (3) Lazy-Verlagerung (Skills/Snippets/Extensions), (4) Baselines/Tests. Provider-Unterschiede nur über Capability-Flags.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), Markdown-Templates, pytest, promptfoo (Eval).

@@ -20,6 +20,16 @@ trace:
 > Nicht im Batch (Phasenplan D–I, bereits erledigt, kein Bug): siehe Abschnitt »Kandidatenbewertung«.
 > Merge: ausschließlich der Nutzer. Issue-Schließen: nur nach Merge, je Issue ein Beleg-Kommentar. Keine Closing-Keywords in Commits/PRs.
 
+## Entscheidungsstand 2026-11-15
+
+Quelle: [Master-Roadmap §4](2026-11-15-master-roadmap.md) (Nutzerentscheidungen 2026-11-15). Plan-Status bleibt DRAFT.
+
+- E-02: #1246 Variante B+ (Key temp-root, env-freier Default), wie Empfehlung.
+- E-03: viz-logger-mcp.mjs löschen; #1260 nur über Config (explizites `enabled:false` schlägt Plattform-Bundle).
+- E-09: #1249 Tier-Fold geht nach #1257 (nur Test + ein Doku-Satz); #1261 nur WARN; #1270 30-Tage-Regel ja; .bak wird nicht geprunt.
+- E-04: permissionMode plan -> default jetzt, eigener kleiner PR.
+- E-19 (Abweichung): Trailer-Contract konfigurierbar (Config-Key), Contract in git.md; Git-Agent-PR kommt zuerst, nicht fest im Prompt-Trailer.
+
 **Goal:** Zehn verifizierte Defekte in drei thematisch geschnittenen PRs beheben (Viz/MCP-Laufzeit, Guard/Sync-Robustheit, TMPDIR-Determinismus), je Issue ein TDD-Task, pro PR genau ein Rebaseline-Commit.
 **Architecture:** Lokale Ursachenbehebung in der Datei des Befunds; keine neuen Module außer Testdateien; Provider-Unterschiede nur über Config-Keys/Capability-Flags.
 **Tech Stack:** Python 3.9 (stdlib + PyYAML), Bash-Hooks mit Python-Heredoc, pytest, YAML/JSON-Config.
