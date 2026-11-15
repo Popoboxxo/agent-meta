@@ -75,12 +75,12 @@ Python 3.9-kompatibel (`typing.List`/`Optional`, kein `X | Y`, kein `match`), nu
 - `def render_commit_trailers(cfg: dict) -> str`: gültige Items (Regex wie C1) mit `\n` verbunden; `""` bei fehlendem/`None`/ungültigem Block, Nicht-Liste, leerer Liste; ungültige Items und Duplikate verworfen (Fehler meldet `commit_violations`). Wirft nie.
 - Parameter heißt `cfg` (Gesamt-Projekt-Config; Block `cfg.get("commit")`).
 
-### C3 — Variable `COMMIT_TRAILERS` und `resolved["commit_trailers"]`
+### C3 — Variablen `COMMIT_TRAILERS`, `COMMIT_TRAILERS_SET` und `resolved["commit_trailers"]`
 
 - `scripts/lib/config.py` `_build_core_variables` (neben dem `_git_cfg`-Block und vor dem auto_commit-Block `:1812`):
-  - `variables["COMMIT_TRAILERS"] = render_commit_trailers(config)`; `setdefault`-Semantik wie `GIT_*` (explizites `variables.COMMIT_TRAILERS` gewinnt).
+  - `variables["COMMIT_TRAILERS"] = render_commit_trailers(config)`; `setdefault`-Semantik wie `GIT_*` (explizites `variables.COMMIT_TRAILERS` gewinnt); zusätzlich Flag `variables["COMMIT_TRAILERS_SET"] = "true"|"false"` (`<VAR>_SET`-Konvention: `{{#if}}` wertet nur whitelistete true-Flags).
   - `_auto_commit_resolved["commit_trailers"] = render_commit_trailers(config).split("\n")` bzw. `[]` bei leerem String — in BEIDEN Zweigen (valid/invalid) gesetzt, im invalid-Zweig `[]`.
-- `_VARIABLE_FALLBACKS["COMMIT_TRAILERS"] = ""` (`config.py:223`) sowie Eintrag in `scripts/lib/standalone.py` (Fallback-Dict, Muster `:97`), sonst Unknown-Placeholder-Fehler (`variables.py:200-206`); Eintrag in der Platzhalter-Whitelist `scripts/lib/consistency/placeholders.py` falls Variable dort geführt wird.
+- `_VARIABLE_FALLBACKS["COMMIT_TRAILERS"] = ""` und `_VARIABLE_FALLBACKS["COMMIT_TRAILERS_SET"] = "false"` (`config.py`) sowie beide Einträge im standalone-Fallback-Dict `scripts/lib/standalone.py` (Muster `:97`), sonst Unknown-Placeholder-Fehler (`variables.py:200-206`); beide Einträge in der Platzhalter-Whitelist `scripts/lib/consistency/placeholders.py` (sonst `placeholders.unknown`).
 - Fehlerpfade: kein Wurf; Fehlerausgabe ausschließlich über C2/C4.
 
 ### C4 — Validate-Einhängung
@@ -92,7 +92,7 @@ Python 3.9-kompatibel (`typing.List`/`Optional`, kein `X | Y`, kein `match`), nu
 
 - `agents/1-generic/git.md`, bestehender Absatz `:140` („Commit trailers (issue #1168)“) wird erweitert, kein zweiter Absatz; `version` `2.1.5` → `2.2.0`.
 - Unbedingt: Rangfolge Brief > Projekt-Config `commit.trailers` > Harness-Attribution; Harness nur ohne Brief UND ohne Config; Brief-Trailer verbatim (1:1), genau 1x je Zeile; Brief gewinnt bei Konflikt; nichts ermittelbar → keine Trailer-Zeile (nicht raten). Das Literal `Co-Authored-By` bleibt im Render ohne Key genau 1x im Absatz (`tests/test_git_template_commit_trailer_rule.py`).
-- Bedingt: `{{#if COMMIT_TRAILERS}}` … `{{COMMIT_TRAILERS}}` … `{{/if}}` im selben Absatz, Überschrift „Verbindliche Trailer (Projekt-Config)“, Zeilen unverändert übernehmen.
+- Bedingt: `{{#if COMMIT_TRAILERS_SET}}` … `{{COMMIT_TRAILERS}}` … `{{/if}}` im selben Absatz, Überschrift „Verbindliche Trailer (Projekt-Config)“, Zeilen unverändert übernehmen.
 
 ### C6 — Block-Erweiterung `render_auto_commit_block`
 

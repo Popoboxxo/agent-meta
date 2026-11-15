@@ -51,7 +51,7 @@ branch: feat/git-trailer-contract
 - Modify: `docs/api/admin-ui-reference.md` — Help-Block `project_instance-commit` (Task 7)
 - Create: `tests/test_admin_ui_commit_section.py` — statische Asserts (Task 7)
 - Modify: `CHANGELOG.md` — `### Added` unter Unreleased (Task 8)
-- Modify (nur falls nötig, Beleg im Commit-Body): `scripts/lib/standalone.py`, `scripts/lib/consistency/placeholders.py` (Task 8)
+- Modify: `scripts/lib/consistency/placeholders.py` (Task 8; `COMMIT_TRAILERS`, `COMMIT_TRAILERS_SET` in der Whitelist), `tests/test_commit_trailers_placeholder_whitelist.py` (neu); `scripts/lib/standalone.py` bereits in Task 2 (Fallbacks)
 - Modify: `tests/fixtures/slimming-golden/git.md`, `tests/test_template_slimming_equivalence.py` (Docstring), `tests/fixtures/ac01-baseline/hashes.json`, `standalone/agents/git.md`, `.meta-config/generated-file-hashes.json` (Task 9)
 - Unverändert: `scripts/lib/agent_sync.py`, die 64+1 Rollen-Templates, `rules/1-generic/commit-conventions.md`.
 
@@ -92,7 +92,7 @@ branch: feat/git-trailer-contract
 - Modify: `scripts/lib/config.py`
 - Modify: `tests/test_commit_trailers.py`
 
-**Interfaces:** Produces: Root-Property `commit` (`trailers`: Array, `uniqueItems`, `pattern`, Default `[]`, `additionalProperties: false`), `variables["COMMIT_TRAILERS"]` (`setdefault`), `_VARIABLE_FALLBACKS["COMMIT_TRAILERS"] = ""`, `_auto_commit_resolved["commit_trailers"]` in valid- und invalid-Zweig; Consumes: `render_commit_trailers` (Task 1).
+**Interfaces:** Produces: Root-Property `commit` (`trailers`: Array, `uniqueItems`, `pattern`, Default `[]`, `additionalProperties: false`), `variables["COMMIT_TRAILERS"]` (`setdefault`), Flag `variables["COMMIT_TRAILERS_SET"]`, `_VARIABLE_FALLBACKS["COMMIT_TRAILERS"] = ""` und `["COMMIT_TRAILERS_SET"] = "false"`, `_auto_commit_resolved["commit_trailers"]` in valid- und invalid-Zweig; Consumes: `render_commit_trailers` (Task 1).
 **AC:** 3, 13, 19; C1, C3.
 - [ ] Step 1: Tests ergänzen (rot): Schema-Strukturcheck (Property, `additionalProperties`, `uniqueItems`, `pattern`, Default); `_build_core_variables` mit gültigem Key → `COMMIT_TRAILERS` gesetzt und `_AUTO_COMMIT_RESOLVED["commit_trailers"]` Liste; ohne Key → `""` und `[]`; ungültiger Block → kein `COMMIT_TRAILERS`-Inhalt, `commit_trailers == []`, kein Wurf; explizites `variables.COMMIT_TRAILERS` gewinnt.
 - [ ] Step 2: Schema und `config.py` implementieren (vor dem auto_commit-Block, `:1812`).
@@ -120,7 +120,7 @@ branch: feat/git-trailer-contract
 - Modify: `agents/1-generic/git.md`
 - Modify: `tests/test_git_template_commit_trailer_rule.py`
 
-**Interfaces:** Produces: erweiterter Absatz `:140` (unbedingte Rangfolge, bedingter `{{#if COMMIT_TRAILERS}}`-Teil mit Überschrift „Verbindliche Trailer (Projekt-Config)“) und `version: 2.2.0`; Consumes: Variable `COMMIT_TRAILERS` (Task 2).
+**Interfaces:** Produces: erweiterter Absatz `:140` (unbedingte Rangfolge, bedingter `{{#if COMMIT_TRAILERS_SET}}`-Teil mit Überschrift „Verbindliche Trailer (Projekt-Config)“) und `version: 2.2.0`; Consumes: Variablen `COMMIT_TRAILERS`, `COMMIT_TRAILERS_SET` (Task 2).
 **AC:** 1, 2, 3, 4, 18, 19; C5.
 - [ ] Step 1: Test erweitern (rot): Version `2.2.0`; Rangfolge im Wortlaut; Render ohne Key: `Co-Authored-By` genau 1x im Absatz, `verbatim` im selben Absatz, „Verbindliche Trailer“ fehlt; Render mit `commit.trailers` je aktivem Provider: Zeile genau 1x; Brief-gewinnt- und genau-1x-Regel (Doppel-Trailer-Risiko) im Wortlaut.
 - [ ] Step 2: Absatz in `git.md` erweitern (kein zweiter Absatz, kein zweites `Co-Authored-By`-Literal im unbedingten Teil, kein Provider-/Modellname); Version anheben.
