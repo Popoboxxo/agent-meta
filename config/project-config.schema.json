@@ -1735,6 +1735,22 @@
       },
       "additionalProperties": false
     },
+    "commit": {
+      "type": "object",
+      "description": "Commit conventions. trailers: verbatim trailer lines (Token: value) appended to commit messages by the git agent and committing/delegating roles; precedence brief > this config > harness attribution. Static values only (no session ids).",
+      "properties": {
+        "trailers": {
+          "type": "array",
+          "uniqueItems": true,
+          "default": [],
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]*: \\S.*$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "git": {
       "type": "object",
       "description": "Repository and branch conventions surfaced in the Admin UI 'Git' section. Values are the canonical source for the generated {{GIT_PLATFORM}}/{{GIT_REMOTE_URL}}/{{GIT_MAIN_BRANCH}} variables. Backward compatible: an explicit variables.GIT_* entry in project.yaml still wins over this section. branch-prefixes are stored/displayed but not yet consumed (follow-up: branch-guard wiring, see design doc).",

@@ -1490,6 +1490,16 @@ def _handle_validate(ctx: _SyncContext) -> None:
         log.warning(f"config-audit [ERROR] auto_commit: {_ac_violation}")
         consistency_errors += 1
 
+    # commit.trailers (E-19): format violations are errors, a Co-Authored-By
+    # without email is only a warning.
+    from lib.commit_trailers import commit_violations, commit_warnings
+
+    for _ct_violation in commit_violations(config):
+        log.warning(f"config-audit [ERROR] commit: {_ct_violation}")
+        consistency_errors += 1
+    for _ct_warning in commit_warnings(config):
+        log.warning(f"config-audit [WARN] commit: {_ct_warning}")
+
     # Tool-privilege / role-name mismatch (issue #575): warns only, does not
     # block validation -- a role claiming "read-only" in its persona but
     # carrying Write/Edit is a smell worth a human look, not a hard failure.

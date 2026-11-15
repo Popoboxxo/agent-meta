@@ -227,6 +227,7 @@ _VARIABLE_FALLBACKS: dict[str, str] = {
     "INTERNAL_DOCS_LANGUAGE": "Deutsch",
     "CODE_LANGUAGE": "Englisch",
     "PROJECT_GOAL": "",
+    "COMMIT_TRAILERS": "",
     "PROJECT_LANGUAGES": "",
     "CODE_CONVENTIONS": "",
 }
@@ -1814,6 +1815,15 @@ def _build_core_variables(
         auto_commit_violations,
         render_auto_commit_block,
     )
+    from .commit_trailers import commit_violations, render_commit_trailers
+
+    # commit.trailers (E-19): an invalid block yields no trailers (sync stays
+    # rc=0; `--validate` reports the violations).
+    _commit_trailers = "" if commit_violations(config) else render_commit_trailers(config)
+    # Not setdefault: the "" fallback above already filled the key; only a
+    # non-empty explicit variables.COMMIT_TRAILERS wins.
+    if not variables.get("COMMIT_TRAILERS"):
+        variables["COMMIT_TRAILERS"] = _commit_trailers
 
     _auto_commit_cfg = config.get("auto_commit", {}) or {}
     if auto_commit_violations(config):
@@ -1831,6 +1841,7 @@ def _build_core_variables(
             "custom_script": None,
             "secret_scan": True,
             INVALID_CONFIG_MARKER: True,
+            "commit_trailers": [],
         }
     else:
         _threshold = _auto_commit_cfg.get("file_count_threshold", 5)
@@ -1843,6 +1854,7 @@ def _build_core_variables(
             "file_count_threshold": _threshold,
             "custom_script": _auto_commit_cfg.get("custom_script"),
             "secret_scan": _auto_commit_cfg.get("secret_scan", True),
+            "commit_trailers": _commit_trailers.split("\n") if _commit_trailers else [],
         }
     # ``AUTO_COMMIT_ENABLED`` gates the {{#if}} block. The fail-safe notice
     # must render, so the gate stays "true" even though the effective mode is
