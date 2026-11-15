@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **Schema/docs:** `orchestrator.topology` value `hybrid` is documented as reserved (no effect, resolves to `subagent`); the schema now accepts the optional `orchestrator.handoff.t-size-limit` (integer, default 300, minimum 1) that the runtime already read.
+- **Consistency check `orchestrator-topology.subagent-unsupported`:** new WARNING when an explicitly declared topology lands unchanged on a provider cell without support (Continue + `subagent`): the provider cannot dispatch subagents natively, the orchestrator runs as prose only. Not raised for a derived topology. No render change.
+
 ### Added
 - **`git` 2.2.0 (`commit.trailers`, E-19):** configurable `commit: {trailers: [...]}` in `project.yaml` (each entry one `Token: value` trailer line). Precedence in `git.md`: brief > project config > harness attribution; each trailer line appears exactly once. The same config line feeds the `auto_commit` block of all committing/delegating roles (single source, no template duplication). `--validate` checks the block (malformed trailer = error, missing e-mail in a `Co-Authored-By` = warning); the Admin UI gets a `commit` section (server-side validation, HTTP 400). Migration: without the key behaviour is unchanged. Consumers: run `sync.py` after the upgrade and optionally set `commit: {trailers: [...]}`.
 

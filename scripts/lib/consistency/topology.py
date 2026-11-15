@@ -77,6 +77,7 @@ _PROJECT_CONFIG = ".meta-config/project.yaml"
 
 # Stable check IDs (IC-5).
 CHECK_DEGRADED = "orchestrator-topology.degraded"
+CHECK_SUBAGENT_UNSUPPORTED = "orchestrator-topology.subagent-unsupported"
 CHECK_HYBRID_UNVERIFIED = "orchestrator-topology.hybrid-unverified"
 CHECK_MAIN_CHAT_SUPERSEDES = "orchestrator-topology.main-chat-supersedes"
 CHECK_MAIN_CHAT_DERIVED_PRIMARY = "orchestrator-topology.main-chat-derived-primary"
@@ -415,6 +416,25 @@ def check_orchestrator_topology(
                     "The capability cell cannot support the declared position; "
                     "the sync uses the fail-safe/degrade value. Accept it, or "
                     "upgrade the provider capability with recorded evidence.",
+                )
+
+            support = caps.get("topology_support")
+            if (
+                resolution.declared is not None
+                and resolution.degraded_from is None
+                and isinstance(support, dict)
+                and support.get(resolution.effective) is False
+            ):
+                _append_once(
+                    findings,
+                    seen,
+                    CHECK_SUBAGENT_UNSUPPORTED,
+                    _PROJECT_CONFIG,
+                    f"provider '{provider}' cannot dispatch subagents natively "
+                    f"for the declared topology '{resolution.effective}'; the "
+                    "orchestrator runs as prose only.",
+                    "Accept the prose-only orchestrator, or use a provider "
+                    "whose capability cell supports this position.",
                 )
 
             verified = caps.get("topology_verified_state")
