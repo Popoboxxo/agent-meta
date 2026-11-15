@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-HOOK-SINGLE-PARSE-2026-11-11
 title: Einmal-Parse der Hook-Payload (hook_json_get_many) im Orchestrator-Guard
-status: DRAFT
+status: APPROVED
 issue: "#1169"
 plan: docs/superpowers/plans/2026-11-11-phase-d-guards-hooks.md (Task 5; Folge-Tasks 6 und 7)
 datum: 2026-11-13
@@ -11,8 +11,8 @@ related: Phase H #1161 Punkt 5 (Abstimmung, Entscheidung 28), SPEC-GUARD-ROLE-AT
 
 # Einmal-Parse der Hook-Payload (`hook_json_get_many`) — Spec
 
-> **Status: DRAFT — Entwurf, Freigabe durch Nutzer ausstehend.** Nicht `APPROVED`. Kein Reviewer-Lauf,
-> keine Nutzerfreigabe. Offene Entscheidungen stehen in §11 und werden hier **nicht** entschieden.
+> **Status: APPROVED (User, 2026-11-15)** — Nutzerfreigabe gemäß Entscheidung E-24 in
+> `docs/plans/2026-11-15-master-roadmap.md`. Offene Entscheidungen stehen in §11 und werden hier **nicht** entschieden.
 > Diese Datei enthält Contracts und Akzeptanzkriterien, keine Implementierung.
 > Trace-Anker: `spec-id: SPEC-HOOK-SINGLE-PARSE-2026-11-11`.
 >

@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-GUARD-ROLE-ATTRIBUTION-2026-11-11
 title: Rollenbindung im Orchestrator-Guard über ein Payload-Feld (Sentinel-Fälschbarkeit)
-status: DRAFT
+status: APPROVED
 issue: "#1210"
 plan: docs/superpowers/plans/2026-11-11-phase-d-guards-hooks.md (Task 0)
 datum: 2026-11-13
@@ -11,8 +11,8 @@ related-spec: SPEC-COMMIT-AUTHORITY-GRANT-2026-11-09 (§3.3.1 Punkt 3, D18)
 
 # Rollenbindung im Orchestrator-Guard über ein Payload-Feld — Spec
 
-> **Status: DRAFT — Entwurf, Freigabe durch Nutzer ausstehend.** Nicht `APPROVED`. Kein Reviewer-Lauf,
-> keine Nutzerfreigabe. Offene Entscheidungen stehen in §10 und werden hier **nicht** entschieden.
+> **Status: APPROVED (User, 2026-11-15)** — Nutzerfreigabe gemäß Entscheidung E-24 in
+> `docs/plans/2026-11-15-master-roadmap.md`. Offene Entscheidungen stehen in §10 und werden hier **nicht** entschieden.
 > Diese Datei enthält Contracts und Akzeptanzkriterien, keine Implementierung.
 > Trace-Anker: `spec-id: SPEC-GUARD-ROLE-ATTRIBUTION-2026-11-11`.
 >
