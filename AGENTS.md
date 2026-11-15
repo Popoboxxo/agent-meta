@@ -131,7 +131,6 @@ Kerngrenzen: Indirektion (`eval`, `bash -c`, `xargs`, Interpreter, Variablen-Zie
 | mcp-reqogniloom | ReqogniLoom-MCP-Tools |
 | mcp-honcho | Honcho-MCP-Memory-Tools |
 | mcp-playwright | Playwright-MCP-Browser-Tools |
-| mcp-viz-logger | viz-logger Event-Logging |
 | tool-graphify | Architektur-/Datei-Fragen mit graphify |
 | se-cascade-adr-standard | ADRs in aktiver SE-Kaskade |
 | se-cascade-artifact-taxonomy | SE-Artefakte, Ablageorte, Namensregeln |
