@@ -219,8 +219,11 @@ def test_mcp_artifacts_written_for_opencode(env, tmp_path):
     # SKILL.md files for has_rules:false providers with a skills_dir.
     from lib.mcp import generate_mcp_artifacts
 
+    # Enable viz-logger explicitly: the repo's own project.yaml disables it.
+    config = {**env["config"], "plugins": {
+        **(env["config"].get("plugins") or {}), "viz-logger": {"enabled": True}}}
     generate_mcp_artifacts(
-        REPO_ROOT, tmp_path, env["config"], env["provider_config"], env["log"],
+        REPO_ROOT, tmp_path, config, env["provider_config"], env["log"],
         dry_run=False, provider="Opencode", rules_dir=None,
     )
     for server in ("honcho", "playwright", "reqogniloom", "viz-logger"):

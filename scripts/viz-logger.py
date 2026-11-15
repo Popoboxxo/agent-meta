@@ -283,74 +283,40 @@ TOOLS = [
 
 
 def _send_message(msg: dict):
-    """Send a JSON-RPC message to stdout with Content-Length header."""
-    data = json.dumps(msg, ensure_ascii=False)
-    payload = data.encode("utf-8")
-    header = f"Content-Length: {len(payload)}\r\n\r\n"
-    sys.stdout.buffer.write(header.encode("ascii"))
+    """Send a JSON-RPC message to stdout as one NDJSON line (MCP stdio)."""
+    payload = json.dumps(msg, ensure_ascii=False).encode("utf-8") + b"\n"
     sys.stdout.buffer.write(payload)
     sys.stdout.buffer.flush()
 
 
-def _read_message() -> dict | None:
-    """Read a JSON-RPC message from stdin with Content-Length header.
+_stdin_buf = b""
 
-    Uses os.read() on fd 0 (stdin) directly to bypass Python's
-    TextIOWrapper/BufferedReader layers which cause stdin pipe issues
-    when spawned by Node.js child_process on Windows.
+
+def _read_message() -> dict | None:
+    """Read one newline-delimited JSON-RPC message from stdin (MCP stdio).
+
+    Uses os.read() on fd 0 directly to bypass Python's buffered stdin layers.
+    Blank lines are skipped; EOF or an undecodable line returns None.
     """
     import os
 
-    STDIN_FD = 0
-    HEADER_DELIM = b"\r\n\r\n"
-
-    # --- Read headers byte by byte until \r\n\r\n ---
-    header_bytes = b""
+    global _stdin_buf
     while True:
-        try:
-            ch = os.read(STDIN_FD, 1)
-        except OSError:
-            return None
-        if not ch:
-            return None  # EOF
-        header_bytes += ch
-        if header_bytes.endswith(HEADER_DELIM):
-            break
-
-    header_str = header_bytes.decode("utf-8")
-    headers = {}
-    for line in header_str.split("\r\n"):
-        line = line.strip()
-        if not line:
+        while b"\n" not in _stdin_buf:
+            try:
+                chunk = os.read(0, 65536)
+            except OSError:
+                return None
+            if not chunk:
+                return None  # EOF
+            _stdin_buf += chunk
+        line, _stdin_buf = _stdin_buf.split(b"\n", 1)
+        if not line.strip():
             continue
-        if ":" in line:
-            key, value = line.split(":", 1)
-            headers[key.strip().lower()] = value.strip()
-
-    length_raw = headers.get("content-length")
-    if not length_raw:
-        return None
-
-    try:
-        length = int(length_raw)
-    except ValueError:
-        return None
-
-    # --- Read body with exact byte count ---
-    body_bytes = b""
-    while len(body_bytes) < length:
         try:
-            chunk = os.read(STDIN_FD, length - len(body_bytes))
-        except OSError:
+            return json.loads(line.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return None
-        if not chunk:
-            return None
-        body_bytes += chunk
-
-    try:
-        return json.loads(body_bytes.decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return None
 
 
 def _make_response(request_id, result=None, error=None) -> dict:

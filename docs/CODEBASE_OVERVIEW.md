@@ -1054,11 +1054,10 @@ in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
 
 **Tests:** `tests/test_admin_server.py` (19 neue Regression-Tests: Per-Modell-Präfix-Resolution, Mixed-Convention-Registry-Resolution inkl. Import-E2E, Degrade `modelsdev`→Registry, Import-Overlay-Keys, Disabled-Normalisierung, Negative-Cache/Stale-Stamping/Force-Refresh) · `tests/browser/test_models_page.py` (2 neue Browser-Tests: registry-runnable OpenCode-Kandidaten ohne Anthropic-Leak, Registry-Tabelle rendert trotz modelsdev-Override).
 
-### `scripts/viz-logger.py` & `scripts/viz-logger-mcp.mjs` & `scripts/lib/viz.py`
+### `scripts/viz-logger.py` & `scripts/lib/viz.py`
 
 **Zweck:** Steuerung und Ausführung der Visualisierung von Agenten-Netzwerken.
 - `viz-logger.py`: MCP-Server und CLI-Fallback für agenten-seitiges Event-Logging (`agent_start`, `delegate_out`, `agent_end`). Primärer Weg für MCP-fähige Provider (kein Prompt-Bloat, keine Bestätigungs-Popups). CLI-Modus als Fallback für Provider ohne MCP-Unterstützung.
-- `viz-logger-mcp.mjs`: HTTP/SSE MCP-Transport für OpenCode unter Windows. Löst das Kompatibilitätsproblem mit stdio-basiertem MCP auf dieser Plattform.
 - `lib/viz.py`: Beinhaltet Kernlogiken zur Mindmap/HTML-Generierung (Architektur-Graphen) und zur Injection (`inject_viz_prompt_block`), um die kurzen Logging-Instruktionen (MCP/CLI-Fallback) in die generierten Agenten-Templates zu integrieren. Die Prompt-Blöcke wurden in v0.55.2 um ~60% reduziert durch Auslagerung der Logging-Logik in das MCP-Tool.
 
 **Architektur-Entscheidung (MCP + CLI Fallback):**

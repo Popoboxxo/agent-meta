@@ -146,8 +146,8 @@ def resolve_active_mcp_servers(
     """
     if registry is None:
         registry = load_mcp_registry(agent_meta_root, config, project_root)
+    activation = _activation_from_config(config)
     if config.get("plugins") is not None:
-        activation = _activation_from_config(config)
         ordered = [pid for pid, v in activation.items()
                    if v.get("enabled") and pid in registry]
     else:
@@ -164,6 +164,8 @@ def resolve_active_mcp_servers(
         for server in (data or {}).get("mcp-servers", []):
             if server in active:
                 continue
+            if activation.get(server, {}).get("enabled") is False:
+                continue  # explicit disable beats the platform bundle (#1260)
             if server in explicit:
                 # already in active list (should not happen, but guard anyway)
                 continue

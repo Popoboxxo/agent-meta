@@ -88,6 +88,8 @@ plugins:
     enabled: true
   graphify:
     enabled: true
+  viz-logger:
+    enabled: false
 roles:
 - orchestrator
 - developer

@@ -600,6 +600,15 @@ def _load_admin_ui_config(root: Path) -> dict:
         }
 
 
+def _pid_cmdline(pid: int) -> str | None:
+    """Command line of *pid* via Linux /proc, else None (unknown)."""
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return None
+    return raw.replace(b"\0", b" ").decode("utf-8", "replace")
+
+
 def _is_pid_running(pid: int | None) -> bool:
     if not pid:
         return False
@@ -868,6 +877,15 @@ class VizManager:
         if not pid or not _is_pid_running(pid):
             pid_file.unlink(missing_ok=True)
             return
+        # shortcut: without /proc there is no identity check (behaviour as before);
+        # upgrade when Windows/macOS users report PID reuse.
+        cmdline = _pid_cmdline(pid)
+        if cmdline is not None and not any(
+            name in cmdline for name in ("viz-report.py", "viz-logger.py", "admin-server.py")
+        ):
+            pid_file.unlink(missing_ok=True)
+            print(f"  -  {label}: stale pidfile (PID {pid} is a foreign process), not killing")
+            return
         try:
             if sys.platform == "win32":
                 subprocess.run(
@@ -876,7 +894,9 @@ class VizManager:
                 )
             else:
                 os.kill(pid, 15)
-                time.sleep(1)
+                deadline = time.monotonic() + 5  # SIGKILL grace
+                while _is_pid_running(pid) and time.monotonic() < deadline:
+                    time.sleep(0.1)
                 if _is_pid_running(pid):
                     os.kill(pid, 9)
             print(f"  -  {label} stopped (PID: {pid})")
