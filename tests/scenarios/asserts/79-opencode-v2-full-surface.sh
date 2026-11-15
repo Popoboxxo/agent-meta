@@ -146,7 +146,7 @@ PY
 #     `edit` `*` deny must precede the configured path allows (last match wins),
 #     and a read-only role must keep `edit: deny`.
 ORCH=".opencode/agents/orchestrator.md"
-READONLY_ROLE=".opencode/agents/explorer.md"
+READONLY_ROLE=".opencode/agents/effort-estimator.md"
 [ -f "$ORCH" ] || fail "primary artifact missing: $ORCH"
 [ -f "$READONLY_ROLE" ] || fail "read-only role artifact missing: $READONLY_ROLE"
 python3 - "$ORCH" "$READONLY_ROLE" <<'PY' || fail "gate-lock ordering / read-only edit deny violated"

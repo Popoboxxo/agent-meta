@@ -10,7 +10,7 @@ roles:
 - developer
 # Read-only role: the scenario asserts that its v2 `permissions[]` keeps
 # `edit: deny` (closed-world, no inherited write rights).
-- explorer
+- effort-estimator
 plugins:
   playwright:
     enabled: true
