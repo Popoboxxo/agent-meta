@@ -2,7 +2,7 @@
 
 Hauptindex der Dokumentation unter `docs/`; zugleich Fallback-Index für `spec-plan-workflow` (`.meta-config/project.yaml`, Schlüssel `fallback-index`).
 
-- Stand: 2026-11-15 — 374 Dateien unter `docs/`, davon 365 Markdown-Dateien.
+- Stand: 2026-11-15 — 375 Dateien unter `docs/`, davon 366 Markdown-Dateien.
 - Pflege: neue Datei unter `docs/` -> hier eintragen. Titel, Status und Datum nur aus dem Dateikopf übernehmen; fehlender Status = „—“.
 - Weitere Übersichten: [plans/README.md](plans/README.md), [concepts/archive/README.md](concepts/archive/README.md).
 - `knowledge/wiki/index.md` ist ein separater (Wiki-)Index und hier nicht enthalten.
@@ -60,7 +60,7 @@ Hauptindex der Dokumentation unter `docs/`; zugleich Fallback-Index für `spec-p
 | [analysis/evidence/2026-09-30-runtime-opencode-v2.md](analysis/evidence/2026-09-30-runtime-opencode-v2.md) | Runtime Evidence — Opencode **v2** (installability + schema validation) | — | 2026-09-30 |
 | [analysis/evidence/2026-10-22-opencode-jsonc-loading.md](analysis/evidence/2026-10-22-opencode-jsonc-loading.md) | Evidence — Ladeverhalten 'opencode.json' + 'opencode.jsonc' | — | 2026-10-23 |
 
-## plans (82)
+## plans (83)
 
 ### 2026-09
 
@@ -143,6 +143,7 @@ Hauptindex der Dokumentation unter `docs/`; zugleich Fallback-Index für `spec-p
 | [plans/2026-11-14-audit-top5-execution-plan.md](plans/2026-11-14-audit-top5-execution-plan.md) | Audit Top-5 Abarbeitung — Ausführungsplan | DRAFT | 2026-11-14 |
 | [plans/2026-11-14-bugfix-batch-3-plan.md](plans/2026-11-14-bugfix-batch-3-plan.md) | Bugfix-Batch 3 — Implementation Plan | DRAFT | 2026-11-14 |
 | [plans/2026-11-14-intent-routing-table-plan.md](plans/2026-11-14-intent-routing-table-plan.md) | Intent-Routing-Tabelle — Modernisierung (Konzept + Plan) | DRAFT | 2026-11-14 |
+| [plans/2026-11-15-master-roadmap.md](plans/2026-11-15-master-roadmap.md) | Master-Roadmap — agent-meta (Stand origin/main 6bdc31ec, 2026-11-15) | DRAFT — Roadmap | 2026-11-15 |
 
 ### ohne Datum
 
@@ -243,8 +244,8 @@ Hauptindex der Dokumentation unter `docs/`; zugleich Fallback-Index für `spec-p
 | [specs/2026-11-11-phase-c-sync-config-spec.md](specs/2026-11-11-phase-c-sync-config-spec.md) | Phase C Sync/Config-Robustheit — Spec | APPROVED (User, 2026-11-12) | 2026-11-12 |
 | [specs/2026-11-11-git-agent-merge-permission-spec.md](specs/2026-11-11-git-agent-merge-permission-spec.md) | Machbarkeit einer Permission-Regel nur für den git-Agenten (Merge) | DRAFT | 2026-11-13 |
 | [specs/2026-11-11-guard-destructive-ask-spec.md](specs/2026-11-11-guard-destructive-ask-spec.md) | ask-Approval-Pfad für destruktive Git-Operationen im Orchestrator-Guard | DRAFT | 2026-11-13 |
-| [specs/2026-11-11-guard-role-attribution-spec.md](specs/2026-11-11-guard-role-attribution-spec.md) | Rollenbindung im Orchestrator-Guard über ein Payload-Feld (Sentinel-Fälschbarkeit) | DRAFT | 2026-11-13 |
-| [specs/2026-11-11-hook-single-parse-spec.md](specs/2026-11-11-hook-single-parse-spec.md) | Einmal-Parse der Hook-Payload (hook_json_get_many) im Orchestrator-Guard | DRAFT | 2026-11-13 |
+| [specs/2026-11-11-guard-role-attribution-spec.md](specs/2026-11-11-guard-role-attribution-spec.md) | Rollenbindung im Orchestrator-Guard über ein Payload-Feld (Sentinel-Fälschbarkeit) | APPROVED | 2026-11-13 |
+| [specs/2026-11-11-hook-single-parse-spec.md](specs/2026-11-11-hook-single-parse-spec.md) | Einmal-Parse der Hook-Payload (hook_json_get_many) im Orchestrator-Guard | APPROVED | 2026-11-13 |
 
 ### ohne Datum
 
