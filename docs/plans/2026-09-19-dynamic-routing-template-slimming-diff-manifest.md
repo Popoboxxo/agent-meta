@@ -2229,3 +2229,13 @@ unverändert.
 **Geändert (1 Fixture):** `git.md` — Frontmatter-`version:`/`generated-from:`-Pin und die
 zwei Absätze in Abschnitt 0. Die übrigen 57 Goldens bleiben unverändert;
 `_GOLDEN_ROLE_COUNT` bleibt 58. AC-01-Manifest per `--write` neu erzeugt.
+
+## 27. Re-Baseline der Golden-Baseline für `git` (Git-Trailer-Vertrag)
+
+Die `git`-Vorlage (`2.1.5 → 2.2.0`) erweitert die Regel „Commit trailers (issue #1168)" um die
+Rangfolge Brief > Projekt-Config (`commit.trailers`) > Harness-Attribution (Trailer genau einmal,
+ohne ermittelbaren Trailer keine Zeile). Der `COMMIT_TRAILERS_SET`-Block rendert im Default nichts.
+
+**Geändert (1 Fixture):** `git.md` — Frontmatter-`version:`/`generated-from:`-Pin, der erweiterte
+Regelabsatz und eine entfallene Leerzeile. Die übrigen 57 Goldens bleiben unverändert;
+`_GOLDEN_ROLE_COUNT` bleibt 58. AC-01-Manifest per `--write` neu erzeugt.

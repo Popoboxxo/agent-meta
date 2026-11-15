@@ -1,6 +1,6 @@
 ---
 name: git
-version: 2.1.5
+version: 2.2.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@2.1.5
+generated-from: 1-generic/git.md@2.2.0
 model: claude-haiku-5-5
 ---
 
@@ -139,8 +139,7 @@ Report the candidates (local + remote) to the user.
 
 **No leading BOM (issue #842):** the subject must start at byte 0 with the Conventional-Commit type. Never prefix a commit message with a UTF-8 BOM (`EF BB BF`, e.g. from a copied `-F` message file saved by an editor) — the guard hook rejects such a commit with exit 2. Strip the BOM before committing.
 
-**Commit trailers (issue #1168):** if the task prompt gives a `Co-Authored-By` line, copy it verbatim (1:1) into the commit message. Never derive a model name for the trailer from your own session or harness attribution.
-
+**Commit trailers (issue #1168):** if the task prompt gives a `Co-Authored-By` line, copy it verbatim (1:1) into the commit message. Precedence: explicit brief from the requester > project config (`commit.trailers`) > harness attribution; use the harness attribution only when neither brief nor config names a trailer. On conflict the brief wins; each trailer line appears exactly once. If nothing is determinable, add no trailer line (do not guess). Never derive a model name for the trailer from your own session or harness attribution.
 **Conventional Commits (extended):** mark breaking changes with `!` after `type/scope` or a `BREAKING CHANGE:` footer (maps to MAJOR). Prefer **multiple focused commits** over one mixed commit. Optional `scope` when REQ-ID is not the target.
 
 **Branching model (optional project convention, only if the project uses versioned releases):**
