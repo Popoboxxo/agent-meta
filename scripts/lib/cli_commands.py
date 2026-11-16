@@ -1463,11 +1463,20 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # surfacing covers the remaining case -- out-of-enum values in
     # provider-overrides for providers the sync never resolves. Hard error,
     # like the other consistency checks.
+    from lib.consistency.report import Finding, Severity
+
+    # Issue #1142: config-audit errors become Finding(ERROR) so the
+    # print_report summary says "[FAIL] N error(s)" instead of "[WARN]".
+    _config_rel = Path(config_path).name
+    _config_audit_findings = []
+
+    def _audit_error(kind, message):
+        _config_audit_findings.append(Finding(
+            Severity.ERROR, f"config-audit.{kind}", _config_rel, message))
+
     _invalid_profiles = _validate_audit_report.by_category("context-profile.invalid")
     for _invalid_profile in _invalid_profiles:
-        log.warning(
-            f"config-audit [ERROR] context-profile.invalid: "
-            f"{_invalid_profile.message}")
+        _audit_error("context-profile.invalid", _invalid_profile.message)
     if _invalid_profiles:
         consistency_errors += len(_invalid_profiles)
 
@@ -1477,7 +1486,7 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # validation error, same as the other consistency checks.
     _unpaired_tags = _validate_audit_report.by_category("unpaired_closing_tags")
     for _unpaired in _unpaired_tags:
-        log.warning(f"config-audit [ERROR] unpaired-closing-tag: {_unpaired.message}")
+        _audit_error("unpaired-closing-tag", _unpaired.message)
     if _unpaired_tags:
         consistency_errors += len(_unpaired_tags)
 
@@ -1487,7 +1496,7 @@ def _handle_validate(ctx: _SyncContext) -> None:
     from lib.auto_commit import auto_commit_violations
 
     for _ac_violation in auto_commit_violations(config):
-        log.warning(f"config-audit [ERROR] auto_commit: {_ac_violation}")
+        _audit_error("auto_commit", str(_ac_violation))
         consistency_errors += 1
 
     # commit.trailers (E-19): format violations are errors, a Co-Authored-By
@@ -1495,7 +1504,7 @@ def _handle_validate(ctx: _SyncContext) -> None:
     from lib.commit_trailers import commit_violations, commit_warnings
 
     for _ct_violation in commit_violations(config):
-        log.warning(f"config-audit [ERROR] commit: {_ct_violation}")
+        _audit_error("commit", str(_ct_violation))
         consistency_errors += 1
     for _ct_warning in commit_warnings(config):
         log.warning(f"config-audit [WARN] commit: {_ct_warning}")
@@ -1522,7 +1531,8 @@ def _handle_validate(ctx: _SyncContext) -> None:
     from lib.providers import load_providers_config as _load_pc
 
     _provider_config = _load_pc(agent_meta_root)
-    _strict_findings = check_orchestrator_strict_hook_support(
+    _strict_findings = list(_config_audit_findings)
+    _strict_findings += check_orchestrator_strict_hook_support(
         project_root, config, _provider_config, agent_meta_root)
     _strict_findings += check_repo_containment_support(project_root, config, _provider_config)
     # Deployed-hook version drift (issue #630): warns when a project's
