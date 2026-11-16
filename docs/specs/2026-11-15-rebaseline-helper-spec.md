@@ -1,9 +1,9 @@
 # Rebaseline-Helper — Spec
-> Status: DRAFT (noch nicht freigegeben; Freigabe laut Entscheidung E-10 durch den Nutzer steht aus) — Entscheidungen OF-1/5/6 entschieden (Nutzer, 2026-11-16); Status DRAFT bis Nutzerfreigabe
+> Status: APPROVED (Nutzer, 2026-11-16) — Entscheidungen OF-1/5/6 entschieden (Nutzer, 2026-11-16)
 > Plan: `docs/plans/2026-11-15-rebaseline-helper-plan.md`
 > Datum: 2026-11-15 | Entscheidung: E-10 | Roadmap: `docs/plans/2026-11-15-master-roadmap.md` P4 / PR 1.3 | Issues: #1237, #1115 (Duplikat-Teil)
 > Klasse: M (siehe Abschnitt Klassifikation)
-> Abweichung zu E-10: E-10 sieht `APPROVED (User, 2026-11-15)` vor; die Spec bleibt bewusst DRAFT, weil die Nutzerfreigabe aussteht und weitere Fragen (Abschnitt „Offene Fragen“: OF-2/3/4/7/8/9) offen sind. Ob `--validate-spec-plan` den Status `DRAFT` akzeptiert, ist UNBELEGT (Rule `spec-plan-workflow` und Validator-Code nicht verifiziert; vor Task 0 per Lauf prüfen).
+> Freigabe: E-10 sah `APPROVED (User, 2026-11-15)` vor; die Nutzerfreigabe ist am 2026-11-16 erteilt, Status daher `APPROVED (User, 2026-11-16)` gemäß E-10. Weitere Fragen (Abschnitt „Offene Fragen“: OF-2/3/4/7/8/9) bleiben offen. Ob `--validate-spec-plan` die Status `DRAFT` und `APPROVED` akzeptiert, ist UNBELEGT (OF-8; Rule `spec-plan-workflow` und Validator-Code nicht verifiziert; vor Task 0 per Lauf prüfen).
 > PR-Hinweis: PR-Text referenziert `Refs #1237` (kein Closing-Keyword), da #1237 Empfehlung 2 hier ausdrücklich nicht gelöst wird.
 
 ## Klassifikation
@@ -14,7 +14,7 @@
 
 ## Entscheidungen
 
-Nutzerentscheidungen zu den Fragen der Vorversion (Status der Spec bleibt DRAFT):
+Nutzerentscheidungen zu den Fragen der Vorversion (Status: APPROVED (Nutzer, 2026-11-16)):
 
 1. Befehlsform: eigenes `scripts/rebaseline.py` plus `scripts/lib/rebaseline.py`; KEIN `sync.py`-Flag.
 2. Reason-Log: `.meta-config/rebaseline-log.jsonl` (getrackt, nicht unter `tests/fixtures/`).
@@ -245,7 +245,7 @@ Die sieben Fragen der Vorversion sind im Abschnitt Entscheidungen beantwortet. O
 - Bestehende Sync-Drift (22 Dateien laut #1291-Bericht): muss vor Plan Task 11 Step 2 geklärt sein (Probelauf `sync.py --check` gegen main).
 - #1115: nur der Duplikat-Teil (Ceiling-Re-Pin, Verfahrensverweis) wird hier gelöst; #1237 Empf. 2 bleibt ohne Owner (OF-4).
 - Henne-Ei Skill-Quelle: Quelle des `conventions`-Skills UNBELEGT; ein Edit an einer Template-Quelle bräuchte den Helper selbst (OF-7).
-- Spec-Freigabe (E-10) durch den Nutzer; Status bleibt bis dahin DRAFT.
+- Spec-Freigabe (E-10) durch den Nutzer erteilt am 2026-11-16; Status APPROVED (User, 2026-11-16).
 
 ## Risiken
 
@@ -260,7 +260,7 @@ Die sieben Fragen der Vorversion sind im Abschnitt Entscheidungen beantwortet. O
 - Rollback-Snapshot deckt nur vom Helper berührte Pfade; parallel editierende Prozesse sind nicht abgesichert.
 - Umgebungsabhängigkeit des Renders (Datum, Pfadwerte) kann den Idempotenzlauf stören; #1246 löst nur den Linux-TMPDIR-Basetemp, der Rest hat keinen Owner (OF-4). `sync_pipeline.py:_sync_stage_tmp_sink` ist NICHT die Ursache (provisioniert nur das Sink-Verzeichnis).
 - Hand-gepflegte Goldens bleiben ein menschlicher Schritt; der Helper reduziert Vergessen, eliminiert die Arbeit nicht.
-- Reihenfolge: Die Implementierung startet erst nach P3 (#1246/PR #1291); bis dahin ist nur Spec/Plan DRAFT (Entscheidung 7). Der Idempotenzlauf ist auch danach nur unter Linux und nur für den Basetemp-Anteil belastbar.
+- Reihenfolge: Die Implementierung startet erst nach P3 (#1246/PR #1291); Spec/Plan sind APPROVED (Entscheidung 7 gilt weiter). Der Idempotenzlauf ist auch danach nur unter Linux und nur für den Basetemp-Anteil belastbar.
 - Roadmap-Folge: nachfolgende Rebaseline-PRs (P6, P8, P12, P17, P19, P26, P29, P30) hängen vom Helper ab (Roadmap-Zeilen 94 und 89); ein verspäteter Helper blockiert die Welle.
 
 ## Trace-Anker
