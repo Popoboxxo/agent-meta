@@ -242,6 +242,7 @@
     "repo_containment.tmp-sink.system-temp-exception.enabled",
     "repo_containment.tmp-sink.system-temp-exception.pytest-basetemp",
     "repo_containment.tmp-sink.system-temp-exception.reason",
+    "repo_containment.tmp-sink.system-temp-exception.temp-root",
     "repo_containment.tmp-sink.system-temp-exception.toolchain-caches",
     "roles",
     "runtime-gate",

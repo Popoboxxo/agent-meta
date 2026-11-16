@@ -407,3 +407,4 @@ repo_containment:
       reason: "pytest basetemp must stay outside the repo (ancestor collision, 13 failures 2026-09-20)"
       pytest-basetemp: true
       toolchain-caches: false
+      temp-root: /var/tmp

@@ -10,6 +10,11 @@ providers:
     surface-version: "v1"
     agent-discovery: false
     model-format: "{model}"
+    # Optional capability (#1261): user-level file whose `enabled_key` mapping
+    # lists externally installed plugins; used by the duplicate-plugin WARN.
+    external_plugins_file:
+      path: ~/.claude/settings.json
+      enabled_key: enabledPlugins
     context_file: CLAUDE.md
     context_template: templates/configs/CLAUDE.project-template.md
     has_dedicated_context_file: true

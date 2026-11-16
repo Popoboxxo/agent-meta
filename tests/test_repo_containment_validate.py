@@ -329,6 +329,9 @@ def test_system_temp_exception_requires_reason(tmp_path, capsys):
     ) in capsys.readouterr().err
 
 
+@pytest.mark.skipif(
+    sys.platform.startswith("linux"), reason="Linux root is env-free (#1246)"
+)
 def test_system_temp_exception_rejects_temp_root_inside_project(
     tmp_path, capsys, monkeypatch
 ):
@@ -369,6 +372,9 @@ def test_load_config_under_pin_with_explicit_block_passes(tmp_path, monkeypatch)
     assert config["repo_containment"]["tmp-sink"]["path"] == ".tmp"
 
 
+@pytest.mark.skipif(
+    sys.platform.startswith("linux"), reason="Linux root is env-free (#1246)"
+)
 def test_system_temp_exception_message_contains_stale_pin_repair_hint(
     tmp_path, capsys, monkeypatch
 ):
@@ -384,3 +390,48 @@ def test_system_temp_exception_message_contains_stale_pin_repair_hint(
         "If this is a stale framework pin: open a new shell or re-run "
         "'python scripts/sync.py'."
     ) in err
+
+
+# --- temp-root (#1246) -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "value", ["rel/dir", "", 5, True, 'a"b', "/x\ny", "\\\\host\\share"]
+)
+def test_temp_root_invalid_values_are_rejected(tmp_path, capsys, value):
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            _exception(enabled=True, reason="t", **{"temp-root": value}), tmp_path
+        )
+    assert exc.value.code == 1
+    assert "system-temp-exception.temp-root" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", ["/var/tmp", "C:\\Temp", "\\\\host\\share\\x"])
+def test_temp_root_valid_values_are_accepted(tmp_path, value):
+    _validate(_exception(enabled=True, reason="t", **{"temp-root": value}), tmp_path)
+
+
+def test_temp_root_inside_project_is_rejected(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        _validate(
+            _exception(
+                enabled=True, reason="t", **{"temp-root": str(tmp_path / "t")}
+            ),
+            tmp_path,
+        )
+    err = capsys.readouterr().err
+    assert "inside the project root" in err and "temp-root" in err
+
+
+def test_temp_root_schema_property_has_no_default():
+    import json
+
+    schema = json.loads(
+        (Path(__file__).resolve().parent.parent / "config"
+         / "project-config.schema.json").read_text(encoding="utf-8")
+    )
+    props = schema["properties"]["repo_containment"]["properties"]["tmp-sink"][
+        "properties"]["system-temp-exception"]["properties"]
+    assert props["temp-root"]["type"] == "string"
+    assert "default" not in props["temp-root"]  # fill_defaults must not write it

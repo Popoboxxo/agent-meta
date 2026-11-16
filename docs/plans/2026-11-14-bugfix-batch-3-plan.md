@@ -111,7 +111,7 @@ PR 3 `fix/batch3-tmpdir-determinism`
 - Modify: `tests/test_tmp_sink_system_temp_root.py`, `tests/test_tmp_paths_builder.py`, `tests/test_settings_dirs.py` — TMPDIR-Unabhängigkeit (#1246)
 - Modify: `scripts/lib/mcp.py` oder `scripts/lib/mcp_health.py` — WARN bei doppelter ReqogniLoom-Einbindung (#1261, nur bei E-5 = WARN)
 - Create: `tests/test_mcp_duplicate_plugin_warning.py` (#1261, gated)
-- Rebaseline: nur bei Variante A (`generated-file-hashes.json`; 12 Agent-Dateien + `settings.local.json` wechseln auf `/tmp/<user>/…`)
+- Rebaseline: entfällt in PR 3 (B+ mit `temp-root: /var/tmp`; Prosa-Änderung an `plugin-catalog.yaml:245` ausgelagert in eigenen S-PR). Env-freier Default gilt nur für Linux (feste Liste); macOS/Windows behalten `gettempdir()`.
 
 ## PR 1 — Viz/MCP-Laufzeit (`fix/batch3-viz-mcp`)
 
@@ -184,24 +184,25 @@ Reihenfolge: höchster Nutzen (30-s-Timeout bei jedem Session-Start), kein Guard
 ## PR 3 — TMPDIR-Determinismus (`fix/batch3-tmpdir-determinism`)
 
 ### Task 3.1 — #1246 Reproduktion (S, read-only)
-- `TMPDIR=/var/tmp python3 scripts/sync.py --check` vs. `TMPDIR=/tmp …` auf frischem Branch; Ausgabe nach .tmp/plans/scratch/1246-repro.txt. Erwartung laut Issue: 13 Dateien vs. 0.
-- Ohne Reproduktion: Issue als »nicht reproduzierbar« kommentieren, Tasks 3.2/3.3 entfallen.
+- Reproduktion im Worktree (`.tmp/wt-batch3-pr3`, nicht Hauptcheckout; liegt unter `.tmp/`, nicht `.claude/worktrees`, daher kein Verstoß gegen no-worktree-isolation): `TMPDIR=/var/tmp python3 scripts/sync.py --check --config <worktree>/.meta-config/project.yaml` vs. `TMPDIR=/tmp …` (gleicher Aufruf); Ausgabe nach .tmp/plans/scratch/1246-repro.txt. Erwartung laut Issue: 13 Dateien vs. 0 (siehe Spec, Abschnitt Task-3.1-Reproduktion).
+- Ohne Reproduktion: Issue als »nicht reproduzierbar« kommentieren, Task 3.2 entfällt; Task 3.3 (#1261) ist unabhängig und läuft weiter.
 
-### Task 3.2 — #1246 env-unabhängiger Temp-Root (S bei A, M bei B)
-- Variante A (env-frei): `repo_containment.system_temp_root` nutzt `_candidate_temp_dirs()` **ohne** `TMPDIR/TEMP/TMP` ⇒ Linux `/tmp`. Rendert `/tmp/<user>/pytest-agent-meta` → 12 Agent-Dateien + `settings.local.json` ändern sich → Rebaseline + Harness-Allowlist des Nutzers (`/var/tmp/hermes/pytest-agent-meta`) läuft ins Leere.
-- Variante B (explizit): Schema-Key `tmp-sink.system-temp-exception.temp-root` (absoluter Pfad, optional); `resolve_pytest_basetemp` nimmt ihn vor `system_temp_root`; `.meta-config/project.yaml` setzt `/var/tmp` → Render byte-identisch, kein Rebaseline. Default ohne Key: A (env-frei) **oder** heutiges Verhalten (E-1).
+### Task 3.2 — #1246 env-unabhängiger Temp-Root (M)
+- Umsetzung gemäß SPEC IC-1–IC-3 (B+, Linux env-frei): Schema-Key `temp-root`, `system_temp_root(explicit_root=...)`, `resolve_pytest_basetemp`-Durchreichung; `.meta-config/project.yaml` setzt `/var/tmp` → Render byte-identisch, kein Rebaseline. Bestehende #1189-Tests in `tests/test_tmp_sink_system_temp_root.py` werden gemäß Spec-Abschnitt Tests angepasst (5 Tests skipif/umschreiben).
 - Red: `tests/test_tmp_sink_system_temp_root.py`: Ergebnis identisch für `monkeypatch.setenv("TMPDIR", "/var/tmp")` und `/tmp`; `tests/test_tmp_paths_builder.py`: `temp-root` wird übernommen, relativer Pfad = `TmpSinkError`; `tests/test_settings_dirs.py` `basetemp_dirs` folgt.
-- Nebenwirkung Schema: `fill_defaults()` darf den neuen Key nicht ungefragt in Consumer-`project.yaml` schreiben (Kommentar-Verlust #1074) — Key ohne Default-Wert anlegen.
+- Nebenwirkung Schema: `fill_defaults()` darf den neuen Key nicht ungefragt in Consumer-`project.yaml` schreiben (Kommentar-Verlust #1074) — Key ohne Default-Wert anlegen. Test dafür (AK-6): `fill_defaults`-Stabilität.
+- Zusätzlich: Config-Validierungstest (Typ/leer/absolut, AK-3/AK-6, bestehende `system-temp-exception`-Testdatei), Erweiterung `tests/test_settings_dirs.py` (`basetemp_dirs`), CHANGELOG-Eintrag als Verhaltensänderung Linux (AK-8).
 - Commit: `fix: make pytest basetemp root independent of TMPDIR`
 
 ### Task 3.3 — #1261 Sync-WARN bei doppelter ReqogniLoom-Einbindung (S, gated E-5)
-- Red: `tests/test_mcp_duplicate_plugin_warning.py`: Fixture mit `~/.claude/settings.json` (via `HOME`-Monkeypatch) `enabledPlugins: {"reqogniloom@reqogniloom-marketplace": true}` + Katalog-Server aktiv ⇒ eine WARN mit Handlungsanweisung; ohne Datei ⇒ keine WARN.
-- Green: Check in `scripts/lib/mcp_health.py` (best-effort, read-only), Prosa `plugin-catalog.yaml:273` und `.claude/skills/mcp-reqogniloom/SKILL.md:95` auf den Check verweisen. Kein Provider-Literal; Lesen der Plugin-Datei über ein Capability-Flag `external_plugins_file` in `ai-providers.yaml` (Config-Key, kein `if provider`).
+- Red: `tests/test_mcp_duplicate_plugin_warning.py`: Fixture mit `~/.claude/settings.json` (via `home`-Parameter von `check_external_plugin_duplicates`, `tmp_path` als home, AK-9) `enabledPlugins: {"reqogniloom@reqogniloom-marketplace": true}` + Katalog-Server aktiv ⇒ eine WARN mit Handlungsanweisung; ohne Datei ⇒ keine WARN.
+- Green: Check in `scripts/lib/mcp_health.py` (best-effort, read-only), **ohne Prosa-Änderung** (Verweise in `plugin-catalog.yaml:245` und Skill `mcp-reqogniloom` gehören in einen eigenen S-PR mit Rebaseline, Spec SPEC-temp-root-and-reqogniloom-duplicate IC-6). Kein Provider-Literal; Lesen der Plugin-Datei über ein Capability-Flag `external_plugins_file` in `ai-providers.yaml` (Config-Key, kein `if provider`); `provider_config` (`sync_pipeline.py:313`) wird auf aktive Provider gefiltert als `provider_cfgs` an `check_mcp_health` (Aufruf `:378`) übergeben.
 - Harmonisierung der Env-Namen/Auth (Issue-Vorschlag 2) nicht in diesem Batch (Server-Verhalten unverifiziert).
 - Commit: `fix: warn when reqogniloom is active as plugin and catalog server`
 
-### Task 3.4 — Rebaseline PR 3 (S, nur Variante A)
-- Commit: `chore: record regenerated file hashes after basetemp change`
+### Task 3.4 — Rebaseline PR 3 (ENTFÄLLT für PR 3)
+- Mit B+ (`temp-root: /var/tmp` in `.meta-config/project.yaml`) und ohne agent-hint-Änderung gibt es keinen Rebaseline durch #1246. Der Prosa-/Skill-Verweis (#1261) samt Rebaseline wandert in einen eigenen S-PR (Follow-up, siehe Spec IC-6).
+- (ursprünglich) Commit: `chore: record regenerated file hashes after basetemp change`
 
 ## Testbeleg-Plan
 
@@ -238,7 +239,7 @@ Abschluss je PR: `python3 scripts/sync.py --check`, `python3 scripts/sync.py --v
 - Hook-Änderung (#1258) ⇒ Hash-Drift in Consumer-Repos bis zum nächsten Sync; Version-Bump zwingend, sonst `hook_drift`-Fehlalarm.
 - `log.error` (#1142) ändert Ausgabeformat; nur ein Test referenziert die Zeile — Assert mitziehen.
 - #1270 Alters-Regel kehrt teilweise zu einem Alterskriterium zurück (#1081 hatte Dual-Threshold entfernt); hier nur additiv (macht mehr prunable, blockiert nichts).
-- #1246 Variante A verschiebt den Basetemp des Nutzers nach `/tmp`; Variante B braucht Schema-Key vor #1141 (Phase D) — Key muss dort als bekannt gelten.
+- #1246 (B+): Linux-Consumer ohne `temp-root` bekommen den env-freien Default (Basetemp-Drift beim nächsten Sync); agent-meta pinnt `/var/tmp`. (Hinweis "Schema-Key braucht Kenntnis vor #1141 (Phase D)": UNBELEGT, nicht verifiziert.)
 - #1259 Auto-Detection beider Framings (Issue-Option) entfällt (YAGNI); Clients mit LSP-Framing sind nicht bekannt.
 - `.mcp.json`/`.claude/hooks` sind untracked — Tests dürfen sie nicht lesen (CI-Falle); alle neuen Tests arbeiten auf tmp-Projekten oder `hooks/1-generic/`.
 - Python 3.9: `viz-logger.py:12` hat `from __future__ import annotations` (verifiziert) — neue Annotationen bleiben dadurch 3.9-sicher.
@@ -248,11 +249,11 @@ Abschluss je PR: `python3 scripts/sync.py --check`, `python3 scripts/sync.py --v
 - Je PR eigener Branch; Revert des Squash-Commits + erneutes `python3 scripts/sync.py` (Hashes) genügt.
 - #1260: Entfernen des `plugins.viz-logger`-Eintrags stellt `.mcp.json` wieder her.
 - #1258: Hook-Version zurück auf 1.11.0 + Sync.
-- #1246 B: Key aus `project.yaml` entfernen ⇒ heutiges Verhalten (falls E-1 den Default unverändert lässt).
+- #1246: Ohne Key gilt unter Linux der env-freie Default; Entfernen des Keys aus `project.yaml` ändert daher den Render (Rebaseline nötig). Rollback = Revert des Squash-Commits + Sync.
 
 ## Entscheidungen für den Nutzer
 
-- **E-1 (#1246):** A env-freier Root (`/tmp`) · B expliziter Key `temp-root` + Default heutiges Verhalten · **B+ (Empfehlung):** Key + env-freier Default — deterministisch für alle Consumer, Nutzer-Setup (`/var/tmp`) bleibt via Key, kein Rebaseline.
+- **E-1 (#1246):** A env-freier Root (`/tmp`) · B expliziter Key `temp-root` + Default heutiges Verhalten · **B+ (Empfehlung):** Key + env-freier Default — deterministisch auf Linux (macOS/Windows bleiben env-abhängig, Spec Q2), Nutzer-Setup (`/var/tmp`) bleibt via Key, kein Rebaseline.
 - **E-2 (#1259):** `viz-logger-mcp.mjs` auf NDJSON mitziehen oder löschen — **Empfehlung: löschen**; Referenzen nur in Doku (`ARCHITECTURE.full.md`, `docs/CODEBASE_OVERVIEW.md`, `knowledge/wiki/concepts/architecture.md`), kein Code/Config nutzt die Datei (verifiziert); Doku-Zeilen im selben Commit entfernen.
 - **E-3 (#1260):** Kopplung an `viz.enabled` per generischem Katalog-Key `enabled-when` oder nur `plugins.viz-logger.enabled: false` im Repo — **Empfehlung: nur Config-Eintrag + Bugfix »explizit schlägt Bundle«**; Kopplung erst, wenn Consumer-Repos es brauchen.
 - **E-4 (#1249):** Tier-Fold auf `advisory` jetzt (Context-Rebaseline, berührt #1208-Klasse) oder an #1257 Schritt 4 / Opencode-Enforce verweisen — **Empfehlung: verweisen**, Issue offen lassen mit Teilbeleg.
@@ -282,7 +283,7 @@ Abschluss je PR: `python3 scripts/sync.py --check`, `python3 scripts/sync.py --v
 |---|---|---|---|
 | PR 1 | 1.1 S, 1.2 S, 1.3 S, 1.4 S | S gesamt (~½ Tag Agentenzeit) | zuerst |
 | PR 2 | 2.1 S, 2.2 S, 2.3 S, 2.4 S, 2.5 S, 2.6 S | M gesamt (Hook-Rebaseline) | nach Merge PR 1 |
-| PR 3 | 3.1 S, 3.2 S/M (E-1), 3.3 S (E-5), 3.4 S | S–M | nach Merge PR 2 und Entscheidungen E-1/E-5 |
+| PR 3 | 3.1 S, 3.2 S/M (E-1), 3.3 S (E-5); 3.4 entfällt | S–M | nach Merge PR 2 und Entscheidungen E-1/E-5 |
 
 ## Brief-Vorlage an den `git`-Agenten (je Commit)
 

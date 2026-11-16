@@ -156,6 +156,7 @@ plugins:
       tests, traceability and AI-assisted derivation
     category: requirements
     enabled-by-default: false
+    external-plugin-id-prefix: reqogniloom@
     tools:
       allowed:
       - requirement.get

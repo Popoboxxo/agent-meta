@@ -375,7 +375,10 @@ def _sync_stage_claude_base(
                      ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
     sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
     # #1080/D17: advisory MCP health — one WARN per unstartable active server.
-    check_mcp_health(agent_meta_root, project_root, config, log)
+    active_cfgs = {p: provider_config[p] for p in providers
+                   if p in provider_config and is_provider_active(config, p)}
+    check_mcp_health(agent_meta_root, project_root, config, log,
+                     provider_cfgs=active_cfgs)
     return is_claude, gitignore_cfg, base_gitignore_entries, env_gitignore
 
 

@@ -2815,6 +2815,11 @@
                   "type": "boolean",
                   "default": false,
                   "description": "Opt-in pip/npm cache redirection (PIP_CACHE_DIR, npm_config_cache). Default false; true requires enabled: true (validated in a later task)."
+                },
+                "temp-root": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional absolute platform temp root for the pytest --basetemp (<temp-root>/<user>/pytest-agent-meta). Pins the rendered path independent of TMPDIR/TEMP/TMP. Validated lexically (POSIX or Windows drive/UNC absolute, outside project and tmp-sink). Only effective with enabled: true and pytest-basetemp: true. No default."
                 }
               },
               "additionalProperties": false

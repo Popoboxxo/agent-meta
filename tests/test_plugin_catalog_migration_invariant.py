@@ -30,7 +30,7 @@ _LEGACY_MCP = {
 _LEGACY_TOOLS = yaml.safe_load((_FIX / "external-tools-registry.yaml").read_text(encoding="utf-8"))["external-tools"]
 
 # Keys the catalog adds on top of the legacy schema (ignored by all renderers).
-_ADDED_KEYS = {"kind", "origin-type", "availability-probe", "binary"}
+_ADDED_KEYS = {"kind", "origin-type", "availability-probe", "binary", "external-plugin-id-prefix"}
 
 
 def _catalog():

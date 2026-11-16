@@ -19,11 +19,13 @@ anywhere in this module (provider-agnostic policy).
 """
 from __future__ import annotations
 
+import ntpath
 import os
 import posixpath
 import re
 import shutil
 import stat
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -618,32 +620,89 @@ def _candidate_temp_dirs() -> list:
     return [n for n in names if n]
 
 
-def system_temp_root(
-    project_root: "str | os.PathLike[str]", sink_dir: Optional[Path]
-) -> str:
-    """Return the system temp root *without* the framework pin (IC-1, #1189).
+#: Env-free Linux temp-root candidates (#1246): the first absolute, existing
+#: directory outside the sink and the project wins. ``TMPDIR``/``TEMP``/``TMP``
+#: are deliberately not read there. Module constant so tests can replace it.
+_LINUX_TEMP_ROOTS = ("/tmp", "/var/tmp", "/usr/tmp")
 
-    The ``TMPDIR=<sink>`` pin is a transport detail, never evidence about the
-    platform temp root. Read-only: mutates neither ``os.environ`` nor
-    ``tempfile.tempdir`` (thread-safe). If :func:`tempfile.gettempdir` does not
-    resolve to the sink, it is returned verbatim; otherwise the first stdlib
-    candidate that is an absolute existing dir, not the sink and not inside the
-    project root is returned. Raises ``TmpSinkError`` when none exists.
+_TEMP_ROOT_CODE = "tmp-sink.system-temp-exception"
+
+
+def temp_root_error(
+    value: Any, project_root: "str | os.PathLike[str]",
+    sink_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """Lexical validation of an explicit ``temp-root`` (no filesystem access).
+
+    Absolute means POSIX-absolute or a Windows drive/UNC path (never the
+    host-dependent ``os.path.isabs``); a UNC root without sub-path is invalid.
+    Returns the problem text or ``None``.
     """
-    code = "tmp-sink.system-temp-exception"
-    try:
-        observed = tempfile.gettempdir()
-    except OSError as exc:
-        raise TmpSinkError(code, f"cannot determine the system temp root: {exc}")
+    if not isinstance(value, str) or not value.strip():
+        return "expected a non-empty string"
+    if '"' in value or "\n" in value or "\r" in value:
+        return "must not contain a double quote or line break"
+    drive, tail = ntpath.splitdrive(value)
+    if not (posixpath.isabs(value) or (ntpath.isabs(value) and drive != "")):
+        return f"{value!r} is not an absolute path"
+    if drive[:2] in ("\\\\", "//") and not tail.strip("\\/"):
+        return f"{value!r} is a UNC root without a sub-path"
+    norm = os.path.normcase(os.path.normpath(value))
+    if sink_dir is not None and norm == os.path.normcase(
+        os.path.normpath(os.fspath(sink_dir))
+    ):
+        return f"{value!r} is the tmp-sink"
+    root = os.fspath(project_root)
+    for base in (root, os.path.realpath(root)):
+        base = os.path.normcase(os.path.normpath(os.path.abspath(base)))
+        try:
+            if os.path.commonpath([base, norm]) == base:
+                return f"{value!r} is inside the project root"
+        except ValueError:
+            pass
+    return None
+
+
+def system_temp_root(
+    project_root: "str | os.PathLike[str]", sink_dir: Optional[Path],
+    explicit_root: Optional[str] = None,
+) -> str:
+    """Return the system temp root *without* the framework pin (IC-2, #1246).
+
+    Precedence: (1) ``explicit_root`` (``temp-root`` key), validated lexically,
+    no existence check; (2) Linux: first of ``_LINUX_TEMP_ROOTS`` that is an
+    existing dir outside sink and project (env is not read); (3) macOS/Windows:
+    :func:`tempfile.gettempdir` verbatim (env-dependent), with a stdlib
+    candidate fallback if it resolves to the sink (#1189 pin). Read-only.
+    Raises ``TmpSinkError`` when none qualifies.
+    """
+    if explicit_root is not None:
+        problem = temp_root_error(explicit_root, project_root, sink_dir)
+        if problem:
+            raise TmpSinkError(
+                _TEMP_ROOT_CODE,
+                f"invalid 'system-temp-exception.temp-root': {problem}.",
+            )
+        return explicit_root
 
     def real(path: str) -> str:
         return os.path.normcase(os.path.realpath(path))
 
-    if sink_dir is None or real(observed) != real(os.fspath(sink_dir)):
-        return observed
+    if sys.platform.startswith("linux"):
+        candidates = list(_LINUX_TEMP_ROOTS)
+    else:
+        try:
+            observed = tempfile.gettempdir()
+        except OSError as exc:
+            raise TmpSinkError(
+                _TEMP_ROOT_CODE, f"cannot determine the system temp root: {exc}"
+            )
+        if sink_dir is None or real(observed) != real(os.fspath(sink_dir)):
+            return observed
+        candidates = _candidate_temp_dirs()
     root_real = real(os.fspath(project_root))
-    sink_real = real(os.fspath(sink_dir))
-    for cand in _candidate_temp_dirs():
+    sink_real = real(os.fspath(sink_dir)) if sink_dir is not None else None
+    for cand in candidates:
         if not cand or not os.path.isabs(cand) or not os.path.isdir(cand):
             continue
         cand_real = real(cand)
@@ -656,10 +715,10 @@ def system_temp_root(
             pass
         return cand
     raise TmpSinkError(
-        code,
-        "the platform temp root resolves to the tmp-sink and no alternative "
-        "outside the project root exists; set TMPDIR to a directory outside "
-        "the project.",
+        _TEMP_ROOT_CODE,
+        "the platform temp root is unusable (it is the tmp-sink or inside the "
+        "project root) and no alternative exists; set "
+        "system-temp-exception.temp-root to a directory outside the project.",
     )
 
 

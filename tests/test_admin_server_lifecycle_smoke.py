@@ -87,6 +87,15 @@ def _cli(
     )
 
 
+def _pin_temp_root(root: Path, temp_root: Path) -> None:
+    # Linux ignores TMPDIR (#1246): an in-root root must come from the config key.
+    cfg = root / ".meta-config" / "project.yaml"
+    cfg.write_text(
+        cfg.read_text(encoding="utf-8") + f'      temp-root: "{temp_root}"\n',
+        encoding="utf-8",
+    )
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals/process model")
 def test_start_status_stop_lifecycle(project):
     port = _free_port()
@@ -124,6 +133,7 @@ def test_start_fails_when_user_temp_points_into_project_root(project):
     # setup (user TMPDIR inside the root but not the framework sink).
     bad = project / "inroot-temp"
     bad.mkdir()
+    _pin_temp_root(project, bad)
     port = _free_port()
     try:
         result = _cli(project, "start", port, temp=bad)
@@ -172,6 +182,7 @@ def test_crashing_child_reports_failure_and_leaves_no_pid_file(project):
     # Real crash path: child aborts at config load (user TMPDIR inside root).
     bad = project / "inroot-temp"
     bad.mkdir()
+    _pin_temp_root(project, bad)
     port = _free_port()
     try:
         result = _cli(project, "start", port, temp=bad)

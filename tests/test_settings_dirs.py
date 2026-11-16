@@ -243,3 +243,10 @@ def test_basetemp_dirs_empty_when_sink_used(tmp_path):
         },
     }
     assert basetemp_dirs(tmp_path, cfg) == []
+
+
+def test_basetemp_dirs_follows_explicit_temp_root(tmp_path):
+    cfg = {"repo_containment": {"tmp-sink": {"system-temp-exception": {
+        "enabled": True, "reason": "t", "temp-root": "/opt/custom-root"}}}}
+    out = basetemp_dirs(tmp_path, cfg)
+    assert len(out) == 1 and out[0].startswith("/opt/custom-root")

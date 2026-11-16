@@ -292,7 +292,14 @@ def test_system_temp_exception_matrix(
     tmp_path, capsys, monkeypatch, config, expected, temp_inside_project
 ):
     """AC-15: one test parameter per documented matrix case (four cases)."""
-    if temp_inside_project:
+    if temp_inside_project and sys.platform.startswith("linux"):
+        # Linux root is env-free (#1246): only an explicit temp-root can land
+        # inside the project.
+        config = _exception(
+            enabled=True, reason="unit-test reason",
+            **{"temp-root": str(tmp_path / "t")},
+        )
+    elif temp_inside_project:
         monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
 
     with pytest.raises(SystemExit) as exc:
@@ -323,3 +330,41 @@ def test_system_temp_exception_default_block_is_noop_under_pin(tmp_path, monkeyp
     """U3-16: an absent block is never checked, pin or not."""
     _pin_env(monkeypatch, tmp_path / ".tmp")
     _validate({}, tmp_path)
+
+
+# --- #1246: explicit temp-root -----------------------------------------
+
+
+def _root_cfg(value) -> dict:
+    return {"repo_containment": {"tmp-sink": {"system-temp-exception": {
+        "enabled": True, "reason": "t", "temp-root": value}}}}
+
+
+def test_temp_root_is_used_for_basetemp_regardless_of_tmpdir(tmp_path, monkeypatch):
+    from lib.tmp_paths import resolve_tmp_paths
+
+    for tmpdir in ("/tmp", "/var/tmp"):
+        monkeypatch.setenv("TMPDIR", tmpdir)
+        monkeypatch.setattr(tempfile, "tempdir", None)
+        paths = resolve_tmp_paths(tmp_path, _root_cfg("/opt/custom-root"))
+        assert paths.pytest_basetemp.startswith(
+            os.path.join("/opt/custom-root", "")
+        )
+        assert paths.pytest_basetemp.endswith("pytest-agent-meta")
+
+
+def test_relative_temp_root_raises_tmp_sink_error(tmp_path):
+    from lib.repo_containment import TmpSinkError
+    from lib.tmp_paths import resolve_tmp_paths
+
+    with pytest.raises(TmpSinkError) as exc:
+        resolve_tmp_paths(tmp_path, _root_cfg("rel/root"))
+    assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
+def test_non_string_temp_root_raises_tmp_sink_error(tmp_path):
+    from lib.repo_containment import TmpSinkError
+    from lib.tmp_paths import resolve_tmp_paths
+
+    with pytest.raises(TmpSinkError):
+        resolve_tmp_paths(tmp_path, _root_cfg(5))
