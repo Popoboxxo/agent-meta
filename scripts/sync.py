@@ -649,7 +649,8 @@ def _preview_backups_to_prune(
         _relative_posix(path, project_root)
         for path in select_prunable_sync_backups(
             target_dir, max_per_source,
-            max_total=_PREVIEW_PRUNE_MAX_TOTAL, project_root=project_root)
+            max_total=_PREVIEW_PRUNE_MAX_TOTAL, project_root=project_root,
+            max_age_days=max_age_days)
     )
 
 

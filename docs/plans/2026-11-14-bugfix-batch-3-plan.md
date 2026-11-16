@@ -1,7 +1,7 @@
 ---
 pipeline_stages:
   implement: 1
-status: DRAFT
+status: APPROVED (User, 2026-11-16, via "Ja alle 3 in der Reihenfolge" + "P2 Nachtrag passt"; Nachtrag korrigiert PR 2)
 date: 2026-11-14
 base-commit: 3dc03f95
 branches:
@@ -14,7 +14,7 @@ trace:
 
 # Bugfix-Batch 3 — Implementation Plan
 
-> Status: DRAFT (2026-11-14). Dieser Plan implementiert nichts, committet nichts, ändert keine Issues.
+> Status: APPROVED (User, 2026-11-16, via "Ja alle 3 in der Reihenfolge" + "P2 Nachtrag passt"; Nachtrag korrigiert PR 2). Dieser Plan implementiert nichts, committet nichts, ändert keine Issues.
 > Basis: `origin/main 3dc03f95`. Zeilenanker gelten für diesen Stand und veralten. Vor Ausführung Freshness-Check gegen `origin/main`.
 > Issues im Batch: #1259, #1260, #1271, #1258, #1252, #1142 (P3), #1270, #1249 (Teil), #1246, #1261 (Teil, gated).
 > Nicht im Batch (Phasenplan D–I, bereits erledigt, kein Bug): siehe Abschnitt »Kandidatenbewertung«.

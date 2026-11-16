@@ -360,6 +360,9 @@ ai-providers:
    Tripeln — solange der Einstiegspunkt gültig ist.
 8. **Plugin ist observe-only** — das v2-Gate-Plugin protokolliert nur; es blockiert keine
    Tool-Calls. Die Durchsetzung trägt weiterhin der Permission-Deny. `MODE=enforce` bleibt bis
-   zum bestandenen P6-Test gesperrt.
+   zum bestandenen P6-Test gesperrt. Bei Tier `plugin` plus `topology: subagent` läuft Spec A
+   nicht und es gibt keinen Deny: das Gate ist effektiv advisory; die Warnung
+   `orchestrator-topology.gate-inactive` kommt aus `reconcile_opencode_surface_gate`
+   (`isolation.py`). Der Tier-Fold ist Gegenstand von #1257.
 9. **Legacy-Kompatibilität** — opencode liest auch `CLAUDE.md`; agent-meta erzeugt für Opencode
    dennoch ausschließlich `AGENTS.md`.

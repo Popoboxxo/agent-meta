@@ -358,7 +358,6 @@ Catalogued in [`config/plugin-catalog.yaml`](config/plugin-catalog.yaml). Curren
 | `home-assistant` | MCP server | Read-only Home Assistant data |
 | `influxdb` | MCP server | Time-series queries (writes blocked) |
 | `viz-logger` | MCP server | Agent event logging |
-| `a2a-handoff` | MCP server | A2A handoff validation |
 | `honcho` | MCP server | Persistent memory across sessions |
 | `reqogniloom` | MCP server | Requirements, architecture, tests, traceability |
 | `playwright` | MCP server | Browser automation and accessibility audits |

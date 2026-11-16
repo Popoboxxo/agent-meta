@@ -132,3 +132,15 @@ def test_compose_agent_end_to_end_extends_and_patches(tmp_path):
     assert "version: 1.1.0" in result
     assert "extends:" not in result
     assert "patches:" not in result
+
+
+def test_compose_agent_without_pyyaml_raises(tmp_path, monkeypatch):
+    """Issue #1241: no silent return of the uncomposed override without PyYAML."""
+    import pytest
+
+    from lib import agent_sync
+    from lib.io import SyncError
+
+    monkeypatch.setattr(agent_sync, "_YAML_AVAILABLE", False)
+    with pytest.raises(SyncError, match="PyYAML"):
+        compose_agent(tmp_path / "base.md", "---\nname: x\n---\n", SyncLog())

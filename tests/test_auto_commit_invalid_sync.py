@@ -55,4 +55,6 @@ def test_validate_reports_error_summary(tmp_path):
     _sync(project, "--init")
     result = _sync(project, "--validate")
     assert result.returncode == 1
-    assert "config-audit [ERROR] auto_commit" in result.stdout + result.stderr
+    out = result.stdout + result.stderr
+    assert "config-audit.auto_commit" in out
+    assert "1 error(s)" in out

@@ -134,7 +134,7 @@ def _validate(tmp_path, block):
 
 def test_validate_format_violation_is_error(tmp_path):
     rc, out = _validate(tmp_path, 'commit:\n  trailers: ["kein trailer"]\n')
-    assert rc == 1 and "config-audit [ERROR] commit: commit.trailers[0]" in out
+    assert rc == 1 and "config-audit.commit" in out and "commit.trailers[0]" in out
 
 
 def test_validate_missing_email_is_warning_only(tmp_path):
@@ -148,4 +148,4 @@ def test_validate_missing_email_is_warning_only(tmp_path):
 ])
 def test_validate_duplicates_and_unknown_key_fail(tmp_path, block):
     rc, out = _validate(tmp_path, block)
-    assert rc == 1 and "config-audit [ERROR] commit:" in out
+    assert rc == 1 and "config-audit.commit" in out

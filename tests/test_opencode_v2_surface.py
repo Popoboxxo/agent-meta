@@ -5508,8 +5508,9 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # version pin + section 0); `compact-golden` unchanged. Log: `tests/test_ac01_render_identity.py`.
 # git trailer contract (git agent template, commit trailers): `ac01-baseline` re-pinned (git entries in hashes.json) and `slimming-golden` re-pinned (`git.md`); `compact-golden` unchanged.
 # explorer 1.5.0 (Write for reports): ac01-baseline re-pinned (explorer entries in hashes.json); slimming-golden re-pinned (explorer.md patched per line); compact-golden re-pinned (explorer line in agents-managed.md).
+# orchestrator-guard-impl.sh 1.12.0 (batch3 PR2): ac01-baseline re-pinned (2 hook renders, Claude + Gemini); slimming/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "166ae3038bb49e8be91b94f43122a3719c29edd4d56deece165765119696d1d0",
+    "ac01-baseline": "ea9ea6cbd4849f398ef39b05785f11f1716e19b1334d9af32c3fcfa98b63c41d",
     "slimming-golden": "d72cf5b24cb76bcd42bc4b0dcab7e0818adde37bcbb38801220420fb477e5465",
     "compact-golden": "d02d1de1c592eb5a08466b1471dc8c88859b44fa2e4efdc47a02a5371be225f3",
 }

@@ -430,10 +430,11 @@ def _update_antigravity_hooks_json(
 # Registration writer per hook_protocol (issue #674 Phase 3.1). Keys are
 # `hook_protocol` values from config/ai-providers.yaml — NOT provider names —
 # per the provider-agnostic syncer policy: a new provider speaking an already
-# implemented protocol needs zero Python changes. A missing/unknown protocol
-# falls back to the legacy Claude settings.json writer (which the #630
-# protocol-revocation cleanup path relies on for has_hooks providers without
-# a verified hook_protocol, e.g. Mammouth/Codex).
+# implemented protocol needs zero Python changes. A MISSING protocol falls back
+# to the legacy Claude settings.json writer (which the #630 protocol-revocation
+# cleanup path relies on for has_hooks providers without a verified
+# hook_protocol, e.g. Mammouth/Codex); a set-but-UNKNOWN protocol warns and
+# writes nothing (issue #1252).
 #
 # Known limitation: if an adapter-based hook_protocol (e.g. antigravity-hooks-json)
 # is ever revoked, the fallback cleanup deletes stale files but leaves registration
@@ -679,9 +680,15 @@ def sync_hooks(
     # selected by `hook_protocol` (dispatch table above — never a provider
     # name): the Claude contract registers in settings.json, the Antigravity
     # contract in its hooks.json (issue #674 Phase 3.1).
-    registration_writer = _HOOK_REGISTRATION_WRITERS.get(
-        pc.get("hook_protocol"), _update_settings_hooks
-    )
+    proto = pc.get("hook_protocol")
+    registration_writer = _HOOK_REGISTRATION_WRITERS.get(proto)
+    if registration_writer is None and proto:
+        # Issue #1252: a set-but-unknown protocol must never use the Claude writer.
+        log.warning(f"hooks: unknown hook_protocol {proto!r} for provider "
+                    f"'{provider}' — no registration written")
+        return
+    if registration_writer is None:
+        registration_writer = _update_settings_hooks
     if registration_writer is _update_settings_hooks:
         registration_writer(
             project_root, previously_managed, now_managed, active_entries, log, dry_run,
