@@ -1,5 +1,5 @@
 # Temp-Root-Determinismus und ReqogniLoom-Doppel-Einbindung — Spec
-> Status: DRAFT (noch nicht freigegeben)
+> Status: APPROVED (Nutzer, 2026-11-16)
 > Datum: 2026-11-16 | Plan: `docs/plans/2026-11-14-bugfix-batch-3-plan.md` (PR 3, Tasks 3.1-3.3) | Entscheidungen: E-02 (#1246, Variante B+), E-09 (#1261, nur WARN) | Refs #1246, #1261
 > Klasse: M (Schema-Key, 2 Lib-Module, neuer Check, 5 Testbereiche: 3 erweiterte Testdateien + Config-Validierungstest + 1 neue Testdatei, siehe Abschnitt Tests)
 
