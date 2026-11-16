@@ -93,6 +93,7 @@ from .repo_containment import (
     default_repo_containment_block,
     resolve_sink_absolute,
     system_temp_root,
+    temp_root_error,
     tmp_sink_location_error,
     tmp_sink_path_error,
 )
@@ -928,6 +929,17 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
                 "reason': required when the exception is enabled "
                 "(document why writes leave the repo)."
             )
+        explicit_root = exception.get("temp-root")
+        if explicit_root is not None:
+            problem = temp_root_error(
+                explicit_root, config_path.parent.parent,
+                resolve_sink_absolute(config_path.parent.parent, config),
+            )
+            if problem:
+                _fail(
+                    "invalid 'repo_containment.tmp-sink.system-temp-exception."
+                    f"temp-root': {problem}."
+                )
         sink_enabled = sink.get("enabled", True)
         uses_system_temp = exc_pytest_basetemp and (
             exc_enabled or not sink_enabled
@@ -938,7 +950,8 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             project_root = config_path.parent.parent
             try:
                 temp_root = system_temp_root(
-                    project_root, resolve_sink_absolute(project_root, config)
+                    project_root, resolve_sink_absolute(project_root, config),
+                    explicit_root,
                 )
             except TmpSinkError as exc:
                 _fail(str(exc))

@@ -24,6 +24,16 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import repo_containment as rc  # noqa: E402
 
 
+# Linux resolves the root env-free (#1246); the env/gettempdir cases below
+# describe the macOS/Windows behaviour only.
+_NOT_LINUX = pytest.mark.skipif(
+    sys.platform.startswith("linux"), reason="Linux root is env-free (#1246)"
+)
+_LINUX_ONLY = pytest.mark.skipif(
+    not sys.platform.startswith("linux"), reason="Linux-only (#1246)"
+)
+
+
 def _pin(monkeypatch, sink: Path, keys=("TMPDIR", "TEMP", "TMP")) -> None:
     for key in ("TMPDIR", "TEMP", "TMP"):
         monkeypatch.delenv(key, raising=False)
@@ -45,6 +55,7 @@ def _outside(root: Path, value: str) -> bool:
     return os.path.commonpath([os.path.realpath(root), real]) != os.path.realpath(root)
 
 
+@_NOT_LINUX
 def test_no_sink_returns_gettempdir(layout, monkeypatch):
     root, _ = layout
     monkeypatch.setattr(tempfile, "gettempdir", lambda: "/some/where")
@@ -69,6 +80,7 @@ def test_tmpdir_only_pin_matches_all_keys_pin(layout, monkeypatch):
     assert rc.system_temp_root(root, sink) == all_keys
 
 
+@_NOT_LINUX
 def test_observed_root_not_sink_returns_unchanged(layout, monkeypatch, tmp_path):
     root, sink = layout
     other = tmp_path / "other"
@@ -104,6 +116,7 @@ def test_concurrent_calls_agree(layout, monkeypatch):
     assert len(results) == 8 and len(set(results)) == 1
 
 
+@_NOT_LINUX
 def test_sink_candidate_is_skipped(layout, monkeypatch, tmp_path):
     root, sink = layout
     outside = tmp_path / "outside"
@@ -116,6 +129,7 @@ def test_sink_candidate_is_skipped(layout, monkeypatch, tmp_path):
     assert rc.system_temp_root(root, sink) == str(outside)
 
 
+@_NOT_LINUX
 def test_no_candidate_outside_root_raises(layout, monkeypatch):
     root, sink = layout
     (root / "sub").mkdir()
@@ -129,6 +143,7 @@ def test_no_candidate_outside_root_raises(layout, monkeypatch):
     assert exc.value.code == "tmp-sink.system-temp-exception"
 
 
+@_NOT_LINUX
 def test_normcase_comparison_windows(layout, monkeypatch, tmp_path):
     root, sink = layout
     outside = tmp_path / "outside"
@@ -160,3 +175,70 @@ def test_resolve_sink_absolute_none_on_invalid_path_finding(tmp_path):
     effective = rc.resolve_effective_repo_containment(cfg)
     assert any(f.code == "repo-containment.tmp-sink-path" for f in effective.findings)
     assert rc.resolve_sink_absolute(tmp_path, cfg) is None
+
+
+# --- #1246: env-free Linux root + explicit temp-root ------------------------
+
+
+@_LINUX_ONLY
+def test_linux_root_independent_of_tmpdir(layout, monkeypatch, tmp_path):
+    root, _ = layout
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    monkeypatch.setattr(rc, "_LINUX_TEMP_ROOTS", (str(a), str(b)))
+    results = set()
+    for tmpdir in ("/var/tmp", "/tmp", str(b)):
+        monkeypatch.setenv("TMPDIR", tmpdir)
+        monkeypatch.setattr(tempfile, "tempdir", None)
+        results.add(rc.system_temp_root(root, None))
+    assert results == {str(a)}
+
+
+@_LINUX_ONLY
+def test_linux_roots_skip_sink_and_inside_project(layout, monkeypatch, tmp_path):
+    root, sink = layout
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.setattr(
+        rc, "_LINUX_TEMP_ROOTS",
+        ("relative", str(tmp_path / "missing"), str(sink), str(root), str(outside)),
+    )
+    assert rc.system_temp_root(root, sink) == str(outside)
+
+
+@_LINUX_ONLY
+def test_linux_no_valid_root_raises(layout, monkeypatch):
+    root, sink = layout
+    monkeypatch.setattr(rc, "_LINUX_TEMP_ROOTS", (str(sink),))
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.system_temp_root(root, sink)
+    assert exc.value.code == "tmp-sink.system-temp-exception"
+    assert "temp-root" in exc.value.message
+
+
+def test_explicit_root_returned_without_existence_check(layout, monkeypatch):
+    root, sink = layout
+    monkeypatch.setenv("TMPDIR", "/tmp")
+    got = rc.system_temp_root(root, sink, explicit_root="/nonexistent/abs/root")
+    assert got == "/nonexistent/abs/root"
+
+
+@pytest.mark.parametrize("bad", ["rel/path", "", "\\\\host\\share", 'a"b', "/x\ny"])
+def test_explicit_root_invalid_raises(layout, bad):
+    root, sink = layout
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.system_temp_root(root, sink, explicit_root=bad)
+    assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
+def test_explicit_root_unc_with_subpath_valid(layout):
+    root, sink = layout
+    assert rc.system_temp_root(root, sink, explicit_root="\\\\host\\share\\x")
+
+
+def test_explicit_root_inside_project_or_sink_raises(layout):
+    root, sink = layout
+    for bad in (str(sink), str(root / "sub"), str(root)):
+        with pytest.raises(rc.TmpSinkError):
+            rc.system_temp_root(root, sink, explicit_root=bad)

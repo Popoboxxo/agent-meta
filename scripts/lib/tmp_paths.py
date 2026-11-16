@@ -66,6 +66,7 @@ class SystemTempException:
     reason: str = DEFAULT_SYSTEM_TEMP_EXCEPTION_REASON
     pytest_basetemp: bool = True
     toolchain_cache: bool = False
+    temp_root: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,13 @@ def _resolve_system_temp_exception(config: Optional[dict]) -> SystemTempExceptio
         reason = DEFAULT_SYSTEM_TEMP_EXCEPTION_REASON
     pytest_basetemp = _as_bool(raw_exception.get("pytest-basetemp"), True)
     toolchain_cache = _as_bool(raw_exception.get("toolchain-caches"), False)
+    temp_root = raw_exception.get("temp-root")
+    if temp_root is not None and (not isinstance(temp_root, str) or not temp_root.strip()):
+        raise rc.TmpSinkError(
+            "tmp-sink.system-temp-exception",
+            "invalid 'system-temp-exception.temp-root': expected a non-empty "
+            "string.",
+        )
 
     if pytest_basetemp and not enabled:
         raise rc.TmpSinkError(
@@ -139,6 +147,7 @@ def _resolve_system_temp_exception(config: Optional[dict]) -> SystemTempExceptio
         reason=reason,
         pytest_basetemp=pytest_basetemp,
         toolchain_cache=toolchain_cache,
+        temp_root=temp_root,
     )
 
 
@@ -233,7 +242,8 @@ def resolve_pytest_basetemp(project_root: Path, paths: TmpPaths) -> str:
 
     Precedence per the resolver contract:
 
-    1. system-temp exception active for pytest ⇒ platform temp root;
+    1. system-temp exception active for pytest ⇒ explicit ``temp-root``, else
+       the platform temp root (env-free on Linux, #1246);
     2. otherwise an enabled sink ⇒ ``<absolute>/pytest``;
     3. otherwise (disabled sink) only the exception can supply a location,
        anything else is ``tmp-sink.system-temp-exception`` — a disabled sink
@@ -249,12 +259,16 @@ def resolve_pytest_basetemp(project_root: Path, paths: TmpPaths) -> str:
     # The framework pin (TMPDIR=<sink>) is not the system temp root (#1189).
     sink = paths.absolute if paths.enabled else None
     if exception.enabled and exception.pytest_basetemp:
-        temp_root = rc.system_temp_root(project_root, sink)
+        temp_root = rc.system_temp_root(
+            project_root, sink, exception.temp_root
+        )
         value = _system_temp_basetemp(temp_root)
     elif paths.enabled and paths.absolute is not None:
         value = os.path.join(str(paths.absolute), _PYTEST_SINK_SUBDIR)
     elif exception.pytest_basetemp:
-        temp_root = rc.system_temp_root(project_root, sink)
+        temp_root = rc.system_temp_root(
+            project_root, sink, exception.temp_root
+        )
         value = _system_temp_basetemp(temp_root)
     else:
         raise rc.TmpSinkError(
