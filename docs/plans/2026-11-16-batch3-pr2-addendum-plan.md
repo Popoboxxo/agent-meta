@@ -1,7 +1,7 @@
 ---
 pipeline_stages:
   implement: 1
-status: DRAFT
+status: APPROVED (User, 2026-11-16, "P2 Nachtrag passt")
 date: 2026-11-16
 base-commit: b0e4638f
 branches:
@@ -12,7 +12,7 @@ trace:
 
 # Batch 3 PR 2 (Guard/Sync) — Addendum Implementation Plan
 
-> Status: DRAFT (2026-11-16). Dieser Plan implementiert nichts, committet nichts, ändert keine Issues. Freigabe (`Status: APPROVED`) nur durch den Nutzer.
+> Status: APPROVED (User, 2026-11-16, "P2 Nachtrag passt"). Dieser Plan implementiert nichts, committet nichts, ändert keine Issues. Freigabe (`Status: APPROVED`) nur durch den Nutzer.
 > Basis: `origin/main b0e4638f` (PR 1 gemergt). Zeilenanker gelten für diesen Stand und veralten.
 > Merge: ausschließlich der Nutzer. Keine Closing-Keywords, nur `Refs #N`.
 
