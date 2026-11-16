@@ -1024,6 +1024,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (agent_id vs. role, mutation gate always blocks, sentinel bypasses no protection). Only git artifacts
   of all providers and the matching AGENTS-free managed-file hashes move; re-written via ``--write``;
   ``AC01_EXCEPTIONS`` is NOT extended.
+- Batch3 PR2 (``orchestrator-guard-impl.sh`` 1.11.0 -> 1.12.0, 2026-11-16): exactly 2 of 1096 hashes moved
+  (``Claude/.claude/hooks/orchestrator-guard-impl.sh``, ``Gemini/.agents/hooks/orchestrator-guard-impl.sh``);
+  re-written via ``--write`` with a diff gate (only those two lines changed). AC-T4 digest
+  ``166ae303…`` -> ``ea9ea6cb…``; slimming/compact-golden unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
