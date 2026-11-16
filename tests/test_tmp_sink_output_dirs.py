@@ -364,10 +364,17 @@ def test_env_pin_block_refuses_missing_directory(tmp_path):
     assert "python scripts/sync.py" in result.stderr
 
 
+def _set_temp_root(monkeypatch, path) -> None:
+    """Make *path* the platform temp root on every OS (Linux is env-free, #1246)."""
+    Path(path).mkdir(parents=True, exist_ok=True)  # Linux requires an existing dir
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(path))
+    monkeypatch.setattr(rc, "_LINUX_TEMP_ROOTS", (str(path),))
+
+
 def test_pytest_basetemp_uses_system_temp_when_exception_active(tmp_path, monkeypatch):
     """IC-04: active exception ⇒ platform temp root, no ``/tmp`` literal."""
     system_temp = _system_temp_outside_project(tmp_path)
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(system_temp))
+    _set_temp_root(monkeypatch, system_temp)
 
     paths = resolve_tmp_paths(tmp_path, _exception_cfg())
 
@@ -390,7 +397,7 @@ def test_pytest_basetemp_rejects_temp_root_inside_project(tmp_path, monkeypatch)
     """AC-15 edge: a temp root inside the project makes the exception useless."""
     inside = tmp_path / "system-temp"
     inside.mkdir()
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(inside))
+    _set_temp_root(monkeypatch, inside)
 
     with pytest.raises(rc.TmpSinkError) as exc:
         resolve_tmp_paths(tmp_path, _exception_cfg())
@@ -440,6 +447,9 @@ def test_pytest_basetemp_custom_tmpdir_is_masked_by_pin(tmp_path, monkeypatch):
     assert not got.startswith(str(custom))
 
 
+@pytest.mark.skipif(
+    sys.platform.startswith("linux"), reason="Linux root is env-free (#1246)"
+)
 def test_pytest_basetemp_disabled_sink_with_tmpdir_in_sink_raises(tmp_path, monkeypatch):
     """U2-12: without an active sink there is no pin to discount."""
     _pin_env(monkeypatch, tmp_path / ".tmp")
@@ -452,7 +462,7 @@ def test_pytest_basetemp_rejects_sink_subdirectory_as_temp_root(tmp_path, monkey
     """U2-13 / D3: a sub-directory of the sink is not the pin itself."""
     sub = tmp_path / ".tmp" / "sub"
     sub.mkdir(parents=True)
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(sub))
+    _set_temp_root(monkeypatch, sub)
     with pytest.raises(rc.TmpSinkError) as exc:
         resolve_tmp_paths(tmp_path, _exception_cfg())
     assert exc.value.code == "tmp-sink.system-temp-exception"
@@ -588,9 +598,11 @@ def test_disabled_sink_without_pytest_exception_has_no_basetemp(tmp_path):
 # Suite commands rendered literal-free (Task 3: AC-13, AC-34)
 # ---------------------------------------------------------------------------
 
-def _repo_variables() -> dict:
+def _repo_variables(drop_temp_root: bool = False) -> dict:
     """Render the variables of this repository's real project config."""
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
+    if drop_temp_root:  # the pinned temp-root would mask the patched root
+        config["repo_containment"]["tmp-sink"]["system-temp-exception"].pop("temp-root")
     variables, _warnings = build_variables(config, REPO_ROOT, REPO_ROOT)
     return variables
 
@@ -626,12 +638,15 @@ def test_test_commands_have_no_system_temp_literal():
         assert args[0] == f"--basetemp={basetemp}", key
 
 
-def test_basetemp_with_spaces_is_single_argument(tmp_path, monkeypatch):
+def test_basetemp_with_spaces_is_single_argument(request, monkeypatch):
     """AC-34: a system temp root containing a space stays one argument."""
-    spaced_root = tmp_path.parent / "system temp root"
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(spaced_root))
+    # Outside the repo even when pytest's basetemp lives inside it (that would
+    # trip the "temp root inside project root" guard against the real repo).
+    spaced_root = Path(tempfile.mkdtemp(prefix="system temp root "))
+    request.addfinalizer(lambda: shutil.rmtree(spaced_root, ignore_errors=True))
+    _set_temp_root(monkeypatch, spaced_root)
 
-    variables = _repo_variables()
+    variables = _repo_variables(drop_temp_root=True)
     basetemp = variables["PYTEST_BASETEMP"]
     assert " " in basetemp
     assert basetemp.startswith(str(spaced_root))
