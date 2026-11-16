@@ -97,6 +97,22 @@ def _bind_project_root(hook_project_root):
     _PROJECT_ROOT = None
 
 
+@pytest.fixture(autouse=True)
+def _neutral_tmp_project(tmp_path):
+    """Give every ``tmp_path`` its own non-strict project.yaml.
+
+    The hook walks up from cwd to the nearest ``.meta-config/``; with a
+    basetemp under the repo's ``.tmp/`` that would be the repo's strict one
+    (all tests rc=2). Tests that need strict or other config overwrite this
+    file explicitly (``_strict_project``).
+    """
+    cfg = tmp_path / ".meta-config" / "project.yaml"
+    if not cfg.exists():
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text("orchestrator:\n  strict: false\n", encoding="utf-8")
+    yield
+
+
 def _clean_env() -> dict:
     # SR-B-11: the hook prefers $CLAUDE_PROJECT_DIR over the payload cwd. A
     # value inherited from a surrounding Claude Code session would silently
@@ -1612,7 +1628,9 @@ def test_strict_mode_found_via_claude_project_dir(tmp_path):
 def test_unusable_claude_project_dir_falls_back_to_walk_up(tmp_path, bogus):
     proj = _strict_tree(tmp_path)
     if bogus == "<no-meta>":
-        bogus = str(tmp_path)  # exists, but has no .meta-config/
+        empty = tmp_path / "no-meta"  # exists, but has no .meta-config/
+        empty.mkdir()
+        bogus = str(empty)
     result = _run_with(_MAIN_THREAD_WRITE, proj / "sub", {"CLAUDE_PROJECT_DIR": bogus})
     assert result.returncode == 2, f"stderr={result.stderr!r}"
 
@@ -2192,6 +2210,11 @@ def test_submodule_meta_config_is_skipped_when_an_enclosing_project_exists(tmp_p
 
 def test_submodule_meta_config_is_the_fallback_when_nothing_encloses_it(tmp_path):
     """(l) a session opened only inside the submodule still resolves to it."""
+    if any((d / ".meta-config").is_dir() for d in tmp_path.parents):
+        pytest.skip("tmp_path lies inside a project (e.g. basetemp under repo .tmp/): "
+                    "an enclosing .meta-config legitimately wins")
+    (tmp_path / ".meta-config" / "project.yaml").unlink()  # drop the neutral fixture file
+    (tmp_path / ".meta-config").rmdir()
     sub = _meta_project(tmp_path / ".agent-meta", "orchestrator:\n  mode: strict\n")
     result = _run_with(_MAIN_THREAD_WRITE, sub)
     assert result.returncode == 2, result.stderr
