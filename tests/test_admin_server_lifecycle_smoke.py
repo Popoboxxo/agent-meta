@@ -67,7 +67,7 @@ def project():
         pid_file = root / _PID_FILE
         if pid_file.exists():
             try:
-                os.kill(int(pid_file.read_text(encoding="utf-8").strip()), signal.SIGKILL)
+                os.kill(int(pid_file.read_text(encoding="utf-8").split()[0]), signal.SIGKILL)
             except (OSError, ValueError):
                 pass
         shutil.rmtree(root, ignore_errors=True)
@@ -239,7 +239,7 @@ def test_start_status_stop_with_viz_and_mcp(project):
         assert f"Admin UI      (port {port}): RUNNING" in status, status
         assert f"Viz dashboard (port {viz_port}): RUNNING" in status, status
         assert f"MCP server    (port {mcp_port}): RUNNING" in status, status
-        pid_values = [int(pf.read_text(encoding="utf-8")) for pf in pids.values()]
+        pid_values = [int(pf.read_text(encoding="utf-8").split()[0]) for pf in pids.values()]
     finally:
         stopped = _cli(project, "stop", port, viz=True)
     assert stopped.returncode == 0, stopped.stdout + stopped.stderr

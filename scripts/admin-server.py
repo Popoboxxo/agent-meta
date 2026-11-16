@@ -609,6 +609,41 @@ def _pid_cmdline(pid: int) -> str | None:
     return raw.replace(b"\0", b" ").decode("utf-8", "replace")
 
 
+def _pid_starttime(pid: int) -> str | None:
+    """Start time (clock ticks, /proc/<pid>/stat field 22) or None (unknown)."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    # comm (field 2) is parenthesised and may hold spaces/")": split after the last ")".
+    fields = stat.rpartition(")")[2].split()
+    return fields[19] if len(fields) > 19 else None  # field 22 = index 19 after comm
+
+
+def _write_pid(pid_file: Path, pid: int) -> None:
+    """Write "<pid> <starttime>" (starttime only when /proc yields it)."""
+    start = _pid_starttime(pid)
+    pid_file.write_text(f"{pid} {start}" if start else str(pid), encoding="utf-8")
+
+
+def _pid_identity_ok(pid: int, pid_file: Path, names: tuple) -> bool:
+    """False if *pid* is provably not the process recorded in *pid_file*.
+
+    Checks the recorded start time (new-format pidfiles only) and the cmdline
+    against *names*. Unknown (no /proc, old pidfile) counts as ok.
+    """
+    try:
+        tokens = pid_file.read_text(encoding="utf-8").split()
+    except OSError:
+        tokens = []
+    if len(tokens) > 1:
+        now = _pid_starttime(pid)
+        if now is not None and now != tokens[1]:
+            return False
+    cmdline = _pid_cmdline(pid)
+    return cmdline is None or any(name in cmdline for name in names)
+
+
 def _is_pid_running(pid: int | None) -> bool:
     if not pid:
         return False
@@ -779,10 +814,13 @@ def _wait_for_admin(
 def _read_pid(pid_file: Path) -> int | None:
     if pid_file.exists():
         try:
-            return int(pid_file.read_text(encoding="utf-8").strip())
-        except (ValueError, OSError):
+            return int(pid_file.read_text(encoding="utf-8").split()[0])
+        except (ValueError, IndexError, OSError):
             pass
     return None
+
+
+_VIZ_PROC_NAMES = ("viz-report.py", "viz-logger.py", "admin-server.py")
 
 
 class VizManager:
@@ -856,7 +894,7 @@ class VizManager:
                     env=child_env,
                 )
 
-        pid_file.write_text(str(proc.pid), encoding="utf-8")
+        _write_pid(pid_file, proc.pid)
         # A healthy child never exits, so success is only provable by the
         # child still being alive after the grace window (poll, not kill(0)).
         deadline = time.monotonic() + VIZ_START_GRACE
@@ -877,12 +915,10 @@ class VizManager:
         if not pid or not _is_pid_running(pid):
             pid_file.unlink(missing_ok=True)
             return
-        # shortcut: without /proc there is no identity check (behaviour as before);
+        # shortcut: without /proc (or with an old pidfile lacking the start time)
+        # there is no identity check for that part (behaviour as before);
         # upgrade when Windows/macOS users report PID reuse.
-        cmdline = _pid_cmdline(pid)
-        if cmdline is not None and not any(
-            name in cmdline for name in ("viz-report.py", "viz-logger.py", "admin-server.py")
-        ):
+        if not _pid_identity_ok(pid, pid_file, _VIZ_PROC_NAMES):
             pid_file.unlink(missing_ok=True)
             print(f"  -  {label}: stale pidfile (PID {pid} is a foreign process), not killing")
             return
@@ -898,6 +934,10 @@ class VizManager:
                 while _is_pid_running(pid) and time.monotonic() < deadline:
                     time.sleep(0.1)
                 if _is_pid_running(pid):
+                    # Re-identify right before SIGKILL (PID reuse during the grace window).
+                    if not _pid_identity_ok(pid, pid_file, _VIZ_PROC_NAMES):
+                        print(f"  -  {label}: PID {pid} changed identity, not killing")
+                        return
                     os.kill(pid, 9)
             print(f"  -  {label} stopped (PID: {pid})")
         except Exception as exc:  # noqa: BLE001
@@ -6347,7 +6387,7 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
             )
 
     # Written at once so status/stop/second start work during verification.
-    pid_file.write_text(str(proc.pid), encoding="utf-8")
+    _write_pid(pid_file, proc.pid)
 
     # Same token sources/priority as the child (AdminServer.__init__): the
     # child reads admin-ui.token-file itself, so resolve it here too.
@@ -6383,7 +6423,10 @@ def _admin_stop(args: argparse.Namespace) -> None:
     root = Path(args.root).resolve()
     pid_file = root / ADMIN_PID_FILE
     pid = _read_pid(pid_file)
-    if pid and _is_pid_running(pid):
+    # shortcut: no /proc / old pidfile -> that identity part is skipped (as before).
+    if pid and _is_pid_running(pid) and not _pid_identity_ok(pid, pid_file, _VIZ_PROC_NAMES):
+        print(f"  -  Admin UI: stale pidfile (PID {pid} is a foreign process), not killing")
+    elif pid and _is_pid_running(pid):
         try:
             if sys.platform == "win32":
                 subprocess.run(
@@ -6394,6 +6437,11 @@ def _admin_stop(args: argparse.Namespace) -> None:
                 os.kill(pid, 15)
                 time.sleep(1)
                 if _is_pid_running(pid):
+                    if not _pid_identity_ok(pid, pid_file, _VIZ_PROC_NAMES):
+                        print(f"  -  Admin UI: PID {pid} changed identity, not killing")
+                        pid_file.unlink(missing_ok=True)
+                        VizManager(root).stop_all()
+                        return
                     os.kill(pid, 9)
             print(f"  -  Admin UI stopped (PID: {pid})")
         except Exception as exc:  # noqa: BLE001
