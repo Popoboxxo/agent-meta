@@ -3360,6 +3360,8 @@ def start_env(monkeypatch, tmp_path):
     """Spawn faked: Popen yields a ``_SpawnProc`` and never runs a child."""
     monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
     monkeypatch.setattr(admin_server, "_probe_port_bindable", lambda h, p: (True, ""))
+    # Host-independent: without this stub _write_pid reads the real /proc/4242/stat.
+    monkeypatch.setattr(admin_server, "_pid_starttime", lambda p: None)
     state = {"proc": _SpawnProc(pid=4242), "popen_calls": 0}
 
     def fake_popen(cmd, **kw):
@@ -3487,6 +3489,14 @@ def test_admin_start_token_configured_from_token_file(monkeypatch, tmp_path, sta
     assert got["token_configured"] is False
 
 
+def test_admin_start_pidfile_has_pid_and_starttime(monkeypatch, tmp_path, start_env):
+    _capture_wait(monkeypatch)
+    monkeypatch.setattr(admin_server, "_pid_starttime", lambda pid: "987654")
+    admin_server._admin_start_detached(_start_args(tmp_path))
+    assert start_env["pid_file"].read_text(encoding="utf-8") == "4242 987654"
+    assert admin_server._read_pid(start_env["pid_file"]) == 4242
+
+
 def test_restart_dead_child_exits_1(monkeypatch, tmp_path, start_env):
     # alive pid (kill(pid, 0) succeeds) but poll() reports the exit
     start_env["proc"] = _SpawnProc(pid=os.getpid(), exit_after_polls=0, code=3)
@@ -3537,7 +3547,7 @@ def test_viz_manager_start_dead_child_returns_false_and_cleans_pid(
 def test_viz_manager_start_alive_child_returns_true(tmp_path, monkeypatch):
     monkeypatch.setattr(admin_server, "VIZ_START_GRACE", 0.1)
     ok, pid_file, _ = _viz_start(tmp_path, monkeypatch, _SpawnProc(pid=os.getpid()))
-    assert ok is True and pid_file.read_text(encoding="utf-8") == str(os.getpid())
+    assert ok is True and pid_file.read_text(encoding="utf-8").split()[0] == str(os.getpid())
 
 
 def test_viz_manager_start_pin_error_returns_false_without_spawn(
@@ -3627,3 +3637,100 @@ class TestCommitSectionGuard(TestWriteProjectSectionFeatureBSections):
             handler._route_put_config("project")
             self.assertEqual(handler.config_manager.read("project")["commit"],
                              {"trailers": ["Signed-off-by: X"]})
+
+
+# --- #1289: pidfile start time + re-identity before SIGKILL ------------------
+
+def _fake_stat(start="987654", comm="(a b) c)"):
+    return f"123 {comm} S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 {start} 23 24"
+
+
+def test_pid_starttime_parses_comm_with_spaces_and_parens(monkeypatch):
+    monkeypatch.setattr(Path, "read_text", lambda self, **kw: _fake_stat())
+    assert admin_server._pid_starttime(123) == "987654"
+
+
+def test_pid_starttime_none_without_proc():
+    assert admin_server._pid_starttime(2 ** 30) is None
+
+
+def test_read_pid_old_and_new_format(tmp_path):
+    f = tmp_path / "pid"
+    f.write_text("4242", encoding="utf-8")
+    assert admin_server._read_pid(f) == 4242
+    f.write_text("4242 987654", encoding="utf-8")
+    assert admin_server._read_pid(f) == 4242
+    f.write_text("", encoding="utf-8")
+    assert admin_server._read_pid(f) is None
+
+
+def test_write_pid_format(monkeypatch, tmp_path):
+    f = tmp_path / "pid"
+    monkeypatch.setattr(admin_server, "_pid_starttime", lambda pid: "55")
+    admin_server._write_pid(f, 7)
+    assert f.read_text(encoding="utf-8") == "7 55"
+    monkeypatch.setattr(admin_server, "_pid_starttime", lambda pid: None)
+    admin_server._write_pid(f, 7)
+    assert f.read_text(encoding="utf-8") == "7"
+
+
+def _stop_env(monkeypatch, tmp_path, content, starts, cmdline="python admin-server.py"):
+    """starts: iterator of successive _pid_starttime results; returns kill log."""
+    f = tmp_path / ".meta-viz" / ".admin-server-pid"
+    f.parent.mkdir(parents=True)
+    f.write_text(content, encoding="utf-8")
+    kills = []
+    monkeypatch.setattr(admin_server.os, "kill", lambda p, s: kills.append(s))
+    monkeypatch.setattr(admin_server, "_is_pid_running", lambda p: True)
+    monkeypatch.setattr(admin_server, "_pid_cmdline", lambda p: cmdline)
+    monkeypatch.setattr(admin_server, "_pid_starttime", lambda p: next(starts))
+    monkeypatch.setattr(admin_server.time, "sleep", lambda s: None)
+    monkeypatch.setattr(admin_server.time, "monotonic", iter(range(0, 1000, 3)).__next__)
+    monkeypatch.setattr(admin_server.VizManager, "stop_all", lambda self: None)
+    return f, kills
+
+
+def _admin_stop(tmp_path):
+    admin_server._admin_stop(mock.Mock(root=str(tmp_path)))
+
+
+def test_admin_stop_starttime_mismatch_no_kill(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter(["999"] * 5))
+    _admin_stop(tmp_path)
+    assert kills == [] and not f.exists()
+
+
+def test_admin_stop_second_check_blocks_sigkill(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter(["100", "999"]))
+    _admin_stop(tmp_path)
+    assert kills == [15] and not f.exists()
+
+
+def test_admin_stop_match_sigkills_survivor(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter(["100", "100"]))
+    _admin_stop(tmp_path)
+    assert kills == [15, 9]
+
+
+def test_admin_stop_old_pidfile_and_no_proc_fallback(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242", iter([None] * 5), cmdline=None)
+    _admin_stop(tmp_path)
+    assert kills == [15, 9]
+
+
+def test_viz_stop_starttime_mismatch_no_kill(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter(["999"] * 5))
+    admin_server.VizManager(tmp_path)._stop(f, "Viz")
+    assert kills == [] and not f.exists()
+
+
+def test_viz_stop_second_check_blocks_sigkill(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter(["100", "999"]))
+    admin_server.VizManager(tmp_path)._stop(f, "Viz")
+    assert kills == [15] and not f.exists()
+
+
+def test_viz_stop_no_proc_fallback_kills(monkeypatch, tmp_path):
+    f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter([None] * 5), cmdline=None)
+    admin_server.VizManager(tmp_path)._stop(f, "Viz")
+    assert kills == [15, 9]
