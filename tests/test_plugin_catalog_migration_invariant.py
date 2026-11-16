@@ -18,7 +18,15 @@ from lib.mcp import _generate_rule_content  # noqa: E402
 from lib.plugins import load_plugin_catalog, plugins_of_kind  # noqa: E402
 
 _FIX = REPO_ROOT / "tests" / "fixtures" / "legacy-registries"
-_LEGACY_MCP = yaml.safe_load((_FIX / "mcp-registry.yaml").read_text(encoding="utf-8"))["mcp-servers"]
+# Entries retired from the catalog after the migration (#1266: its process
+# flag `--mode` never existed); the frozen fixture keeps them as legacy evidence.
+_RETIRED = {"a2a-handoff"}
+_LEGACY_MCP = {
+    name: definition
+    for name, definition in yaml.safe_load(
+        (_FIX / "mcp-registry.yaml").read_text(encoding="utf-8"))["mcp-servers"].items()
+    if name not in _RETIRED
+}
 _LEGACY_TOOLS = yaml.safe_load((_FIX / "external-tools-registry.yaml").read_text(encoding="utf-8"))["external-tools"]
 
 # Keys the catalog adds on top of the legacy schema (ignored by all renderers).

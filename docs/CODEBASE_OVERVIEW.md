@@ -1082,7 +1082,7 @@ in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
 - **Home Assistant:** Smart Home Integration (Read-only).
 - **InfluxDB:** Zeitreihendaten-Analyse (Read-only via Flux).
 - **Playwright:** E2E-Tests und Browser-Automatisierung.
-- Weitere System-MCPs wie `viz-logger` und `a2a-handoff`.
+- Weitere System-MCPs wie `viz-logger`.
 
 ### `scripts/lib/pipelines.py`
 
@@ -1658,7 +1658,6 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `agents/1-generic/feature.md` | A2A-Handoff-Integration | ✓ Phase 3 |
 | `agents/1-generic/developer.md` | A2A-Envelope-Consumer | ✓ Phase 3 |
 | `agents/1-generic/se-*.md` | Envelope-basierte Handoffs in SE-Kaskade (6 Agenten) | ✓ Phase 3 |
-| `config/plugin-catalog.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
 | `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
 
 ### 11.9 Roadmap
