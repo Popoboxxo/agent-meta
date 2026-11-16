@@ -209,6 +209,8 @@ Die Commit-Berechtigung (`auto_commit`, Issue #694) wird aus dem `tools:`-Frontm
 | `notify` | Edit/Write, kein Bash, kein Spawn-Tool | meldet geänderte Dateien + fertige Conventional-Commit-Message an den Aufrufer |
 | `none` | sonst | rendert nichts |
 
+**Ungültige `auto_commit`-Konfiguration (Issue #1142):** Verlässliches CI-Gate ist ausschließlich `python3 scripts/sync.py --validate` — der Befund zählt dort als ERROR (`config-audit.auto_commit`, Exit 1). Ein Plain-Sync bleibt bewusst fail-soft (Exit 0), warnt, schreibt `.meta-config/auto-commit-allowlist.json` nicht neu und lässt eine vorhandene Datei unverändert.
+
 Die Entscheidung folgt der Logik in `role_commit_authority()` (`scripts/lib/auto_commit.py`). `*` im `tools:`-Frontmatter zählt als Spawn-Tool:
 
 ```mermaid

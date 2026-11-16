@@ -1,7 +1,7 @@
 ---
 pipeline_stages:
   implement: 1
-status: geplant
+status: teilweise umgesetzt (PR #1282)
 date: 2026-11-15
 spec: docs/specs/2026-11-15-git-trailer-contract-spec.md
 spec-status: APPROVED
@@ -11,7 +11,7 @@ branch: feat/git-trailer-contract
 
 # Git-Trailer-Vertrag Implementation Plan
 
-> Status: geplant — Spec APPROVED (User, 2026-11-15)
+> Status: teilweise umgesetzt (PR #1282, Commit 2fdf2817) — Spec APPROVED (User, 2026-11-15); Task 10 (Gesamtverifikation) nicht belegt
 
 **Goal:** Commit-Trailer per Projekt-Config `commit.trailers` konfigurierbar machen (E-19). Rangfolge Brief > Config > Harness. Eine gemeinsame Quelle speist `git.md` (Variable `COMMIT_TRAILERS`) und den `AUTO_COMMIT_BLOCK` aller committenden/delegierenden Rollen. Admin-Sektion `commit` im selben PR.
 
@@ -226,17 +226,19 @@ Verweise: Entscheidung E-19, Roadmap `docs/plans/2026-11-15-master-roadmap.md` P
 
 ## Umsetzungsstand
 
-- [ ] Task 0 Spec und Plan committen
-- [ ] Task 1 commit_trailers.py und Tests
-- [ ] Task 2 Schema und config.py
-- [ ] Task 3 --validate-Einhängung
-- [ ] Task 4 git.md 2.2.0
-- [ ] Task 5 auto_commit.py Trailer-Zeile
-- [ ] Task 6 Admin-Backend
-- [ ] Task 7 Admin-UI und Help-Doku
-- [ ] Task 8 CHANGELOG und Whitelist-Prüfung
-- [ ] Task 9 Rebaseline-Commit
-- [ ] Task 10 Verifikation
+Abgleich 2026-11-16 gegen `origin/main` (8ecb1441): Artefakte der Tasks 0 bis 9 sind im Merge PR #1282 (Commit 2fdf2817) nachweisbar. Task 10 ist eine reine Testausführung ohne Artefakt und damit nicht belegt.
+
+- [x] Task 0 Spec und Plan committen (PR #1282, 2fdf2817; Commit 4030eefb)
+- [x] Task 1 commit_trailers.py und Tests (PR #1282, 2fdf2817)
+- [x] Task 2 Schema und config.py (PR #1282, 2fdf2817)
+- [x] Task 3 --validate-Einhängung (PR #1282, 2fdf2817; `cli_commands.py:1504-1509`)
+- [x] Task 4 git.md 2.2.0 (PR #1282, 2fdf2817)
+- [x] Task 5 auto_commit.py Trailer-Zeile (PR #1282, 2fdf2817; `_trailer_line`)
+- [x] Task 6 Admin-Backend (PR #1282, 2fdf2817; `_guard_commit_write`)
+- [x] Task 7 Admin-UI und Help-Doku (PR #1282, 2fdf2817)
+- [x] Task 8 CHANGELOG und Whitelist-Prüfung (PR #1282, 2fdf2817)
+- [x] Task 9 Rebaseline-Commit (PR #1282, 2fdf2817; Golden, `hashes.json`, `standalone/agents/git.md`, `generated-file-hashes.json` geändert)
+- [ ] Task 10 Verifikation: nicht belegt/offen (kein Artefakt; Ausführungsnachweis nicht im Repo)
 
 ## Risiken
 
