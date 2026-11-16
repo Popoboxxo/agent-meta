@@ -357,6 +357,14 @@ MUTATION_CASES = [
     ("gh issue create --title x --body \"mentions git push and git commit\"", False),
     ("git checkout -- some/path", True),  # discards working-tree changes -- a real mutation
     ("git stash list", False),
+    # issue #1258: read-only list-mode flags take a positional arg
+    ("git branch -a --contains abc123", False),
+    ("git branch --merged main", False),
+    ("git branch --list 'feat/*'", False),
+    ("git branch --points-at HEAD", False),
+    ("git branch --contains=abc", False),
+    ("git log --oneline | head -3; for b in a b; do git cat-file -t $b; done", False),
+    ("git branch -a -D old", True),
     # issue #508: statements() didn't split on newlines, so a multi-line
     # read-only command with no &&/;/| between the lines got flattened by
     # shlex.split() into one token stream -- the second line's tokens
@@ -397,7 +405,9 @@ def test_git_mutation_block_reason_goes_to_stderr(tmp_path):
 def test_git_mutation_regex_precision(command, expect_blocked, tmp_path):
     # Use a cwd with no .meta-config/project.yaml so the hook falls through
     # to the non-strict git-mutation branch under test, independent of this
-    # repo's own strict-mode setting.
+    # repo's own strict-mode setting. An own non-strict project.yaml keeps
+    # this independent of the repo's strict one when tmp_path lies under .tmp/.
+    _strict_project(tmp_path, "orchestrator:\n  strict: false\n")
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": command},
