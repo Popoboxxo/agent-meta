@@ -963,9 +963,9 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
-# OQ-2 (revised #1081): bounded backup retention, count-only. The newest
-# `SYNC_BACKUP_MAX_PER_SOURCE` backups of a source survive; the age value is
-# still passed through for API stability but no longer drives pruning.
+# OQ-2 (#1081, #1270): bounded backup retention. A backup is pruned when
+# `SYNC_BACKUP_MAX_PER_SOURCE` newer ones of its source exist OR when it is
+# older than `SYNC_BACKUP_MAX_AGE_DAYS` (count OR age).
 SYNC_BACKUP_MAX_AGE_DAYS = 30
 SYNC_BACKUP_MAX_PER_SOURCE = 3
 # #1195: per-directory cap; the newest backup of every source is never pruned.
@@ -991,8 +991,10 @@ def _managed_dirs_for_prune(
     directory that was fully emptied by cleanup (all roles removed) is still
     enumerated, which a managed-file-derived listing would miss.
     """
-    dirs: list[Path] = []
-    seen: set[Path] = set()
+    # The project root itself carries root-level backups (e.g. CLAUDE.md); only
+    # direct children named `*.sync-backup-<ts>` are ever candidates (#1270).
+    dirs: list[Path] = [project_root]
+    seen: set[Path] = {project_root}
     for provider, pc in provider_config.items():
         if not is_provider_active(config, provider):
             continue

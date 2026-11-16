@@ -18,7 +18,8 @@ from lib.generated_file_drift import (  # noqa: E402
 )
 from lib.log import SyncLog  # noqa: E402
 
-_BASE = datetime(2026, 1, 1, 0, 0, 0)
+# Relative to now: fixed dates would age past the 30-day prune rule (#1270).
+_BASE = datetime.now().replace(microsecond=0) - timedelta(days=5)
 
 
 def _git_init(root: Path, ignore: bool = True) -> None:
@@ -77,7 +78,9 @@ def test_more_sources_than_cap_keeps_all_newest(tmp_path):
     assert not set(got) & _newest_per_source(stamps)
 
 
-def test_total_cap_never_selects_unignored_or_without_git(tmp_path):
+def test_total_cap_never_selects_unignored_or_without_git(tmp_path, monkeypatch):
+    # Keep git from discovering an enclosing repo (basetemp under repo .tmp/).
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     _git_init(tmp_path, ignore=False)  # repo, but nothing ignored
     _make_backups(tmp_path / "agents", 12, 3)
     assert select_prunable_sync_backups(
@@ -182,3 +185,23 @@ def test_cli_prune_dry_run_lists_and_cli_prunes_with_parity(tmp_path):
     assert real.returncode == 0, real.stdout + real.stderr
     assert len(list(agents.glob("*.sync-backup-*"))) == 30
     assert not [e for e in expected if (tmp_path / e).exists()]
+
+
+def test_managed_dirs_for_prune_includes_project_root(tmp_path):
+    """#1270: root-level backups (e.g. CLAUDE.md.sync-backup-*) must be pruned too."""
+    from lib.sync_pipeline import _managed_dirs_for_prune
+
+    assert tmp_path in _managed_dirs_for_prune(tmp_path, {}, {})
+
+
+def test_age_rule_prunes_lone_old_backup_only(tmp_path):
+    """#1270 (E-09): newer>=keep OR older than max_age_days."""
+    def stamp(days):
+        return (datetime.now() - timedelta(days=days)).strftime("%Y%m%d-%H%M%S")
+
+    old = tmp_path / f"old.md.sync-backup-{stamp(31)}"
+    young = tmp_path / f"young.md.sync-backup-{stamp(29)}"
+    for path in (old, young):
+        path.write_text("x", encoding="utf-8")
+    assert select_prunable_sync_backups(tmp_path, 3, max_age_days=30) == [old]
+    assert select_prunable_sync_backups(tmp_path, 3) == []  # default: count-only

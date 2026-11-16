@@ -28,7 +28,7 @@ import fnmatch
 import glob
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -154,14 +154,16 @@ def select_prunable_sync_backups(
     log: Optional[SyncLog] = None,
     max_total: Optional[int] = None,
     project_root: Optional[Path] = None,
+    max_age_days: Optional[int] = None,
 ) -> list[Path]:
     """Pure selection of the ``*.sync-backup-*`` siblings a prune would delete.
 
     Only direct children of *target_dir* are considered, and only names that
     match ``_is_sync_backup_name`` with a parsable ``YYYYmmdd-HHMMSS`` suffix.
-    Retention is count-only: a backup is selected when at least
-    *max_per_source* newer backups of the same source exist, so the newest
-    backup of every source always survives.
+    A backup is selected when at least *max_per_source* newer backups of the
+    same source exist, or (issue #1270, only when *max_age_days* is given) when
+    it is older than *max_age_days* -- so a lone stale backup is pruned too,
+    while a younger newest backup of every source always survives.
 
     Shared by :func:`prune_sync_backups` (which deletes the result) and the
     CLI ``--cleanup-preview`` (which only reports it) so the two can never
@@ -198,13 +200,15 @@ def select_prunable_sync_backups(
 
     # A zero/negative cap must never delete the newest backup of a source.
     keep = max(max_per_source, 1)
+    cutoff = (datetime.now() - timedelta(days=max_age_days)
+              if max_age_days is not None else None)
     prunable: list[Path] = []
     for path, source, stamp in backups:
         newer = sum(
             1 for _other, other_source, other_stamp in backups
             if other_source == source and other_stamp > stamp
         )
-        if newer >= keep:
+        if newer >= keep or (cutoff is not None and stamp < cutoff):
             prunable.append(path)
 
     if max_total is None or project_root is None:
@@ -246,16 +250,13 @@ def prune_sync_backups(
 
     Only direct children of *target_dir* are considered, and only names that
     match ``_is_sync_backup_name`` with a parsable ``YYYYmmdd-HHMMSS`` suffix
-    (per the ``backup_drifted_files`` convention). Retention is **count-only**
-    (issue #1081): a backup is pruned when at least *max_per_source* newer
-    backups of the same source exist. The newest backup of a source therefore
-    survives unconditionally, as do non-backup names and unparsable-timestamp
-    names.
-
-    *max_age_days* is kept for API stability but ignored -- the dual-threshold
-    (age AND count) policy let 409 backups accumulate because files younger
-    than the age threshold were never pruned. Recommended default policy
-    (OQ-2): ``max_per_source=3``; callers pass the values explicitly.
+    (per the ``backup_drifted_files`` convention). A backup is pruned when at
+    least *max_per_source* newer backups of the same source exist (issue #1081,
+    count rule) OR when it is older than *max_age_days* (issue #1270, E-09 --
+    the OR keeps the dual-threshold accumulation of #1081 from returning while
+    still removing stale lone backups). Non-backup names and
+    unparsable-timestamp names survive. Recommended default policy (OQ-2):
+    ``max_per_source=3``, ``max_age_days=30``; callers pass the values explicitly.
 
     No-op in ``dry_run`` (returns ``[]``, no filesystem mutation). Fail-soft: a
     per-file ``OSError`` is logged at debug level and iteration continues.
@@ -267,6 +268,7 @@ def prune_sync_backups(
     pruned: list[str] = []
     for path in select_prunable_sync_backups(
         target_dir, max_per_source, log, max_total=max_total, project_root=project_root,
+        max_age_days=max_age_days,
     ):
         try:
             path.unlink()

@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -70,8 +71,7 @@ _NON_EXTERNAL_MARKER = (
     "body\n"
 )
 
-# One source with five old backups: the oldest is prunable (age > 30 days AND
-# more than 3 newer siblings), the second-oldest has exactly 3 newer ones.
+# One source with five ancient backups: all prunable (older than 30 days).
 _BACKUP_NAMES = [
     "old.md.sync-backup-20200101-000000",
     "old.md.sync-backup-20200102-000000",
@@ -151,10 +151,9 @@ def test_preview_emits_single_json_object(tmp_path):
     assert stale["adopted"] is False
 
     # IC-05/N-01 gap: the preview recomputes the would-be prune set purely.
-    # Issue #1081: retention is count-only -- only the 3 newest survive.
+    # Issue #1270: count OR age (30 d) -- all five 2020 backups are stale.
     assert claude["backups_to_prune"] == [
-        ".claude/agents/old.md.sync-backup-20200101-000000",
-        ".claude/agents/old.md.sync-backup-20200102-000000",
+        f".claude/agents/{name}" for name in _BACKUP_NAMES
     ]
 
 
@@ -199,6 +198,12 @@ def test_preview_exit_code_zero_for_nonempty_stale(tmp_path):
     assert _claude_payload(payload)["stale"]
 
 
+def _recent(seconds: int) -> str:
+    """Stamp one day ago (+seconds): relative, so it never ages past the 30-day rule."""
+    base = datetime.now().replace(microsecond=0) - timedelta(days=1)
+    return (base + timedelta(seconds=seconds)).strftime("%Y%m%d-%H%M%S")
+
+
 def test_preview_prune_set_matches_real_prune_set(tmp_path):
     """Advisory #1123: the read-only preview and the real pruner share one
     pure selector, so their candidate sets can never silently diverge."""
@@ -211,9 +216,9 @@ def test_preview_prune_set_matches_real_prune_set(tmp_path):
         target = root / ".claude" / "agents"
         target.mkdir(parents=True)
         for i in range(7):
-            (target / f"a.md.sync-backup-20261031-0100{i:02d}").write_text(
+            (target / f"a.md.sync-backup-{_recent(i)}").write_text(
                 "x", encoding="utf-8")
-        (target / "b.md.sync-backup-20261031-010000").write_text(
+        (target / f"b.md.sync-backup-{_recent(0)}").write_text(
             "x", encoding="utf-8")
 
     preview = sync._preview_backups_to_prune(

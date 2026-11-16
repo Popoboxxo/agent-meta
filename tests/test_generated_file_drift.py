@@ -715,8 +715,13 @@ def test_prune_keeps_three_newest_regardless_of_age(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     target_dir = project_root / ".claude" / "agents"
     target_dir.mkdir(parents=True, exist_ok=True)
-    for i in range(10):
-        (target_dir / f"a.md.sync-backup-20261031-0100{i:02d}").write_text("x", encoding="utf-8")
+    base = datetime.now().replace(microsecond=0) - timedelta(days=1)
+    names = [
+        f"a.md.sync-backup-{(base + timedelta(seconds=i)).strftime('%Y%m%d-%H%M%S')}"
+        for i in range(10)
+    ]
+    for name in names:
+        (target_dir / name).write_text("x", encoding="utf-8")
 
     pruned = prune_sync_backups(
         target_dir, project_root, SyncLog(), dry_run=False,
@@ -724,27 +729,29 @@ def test_prune_keeps_three_newest_regardless_of_age(tmp_path: Path) -> None:
     )
 
     left = sorted(p.name for p in target_dir.iterdir())
-    assert left == [f"a.md.sync-backup-20261031-0100{i:02d}" for i in (7, 8, 9)]
-    assert {Path(p).name for p in pruned} == {
-        f"a.md.sync-backup-20261031-0100{i:02d}" for i in (0, 1, 2, 3, 4, 5, 6)
-    }
+    assert left == names[7:]
+    assert {Path(p).name for p in pruned} == set(names[:7])
 
 
-def test_prune_single_old_backup_survives(tmp_path: Path) -> None:
-    """Issue #1081: age is ignored -- a lone, ancient backup is never pruned."""
+def test_prune_single_old_backup_pruned_by_age(tmp_path: Path) -> None:
+    """Issue #1270 (E-09): a lone backup older than max_age_days is pruned;
+    a younger lone backup survives."""
     from scripts.lib.log import SyncLog
     project_root = tmp_path / "project"
     target_dir = project_root / ".claude" / "agents"
     target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "a.md.sync-backup-20260101-000000").write_text("x", encoding="utf-8")
+    old = f"a.md.sync-backup-{_stamp(31)}"
+    young = f"b.md.sync-backup-{_stamp(29)}"
+    for name in (old, young):
+        (target_dir / name).write_text("x", encoding="utf-8")
 
     pruned = prune_sync_backups(
         target_dir, project_root, SyncLog(), dry_run=False,
         max_age_days=30, max_per_source=3,
     )
 
-    assert pruned == []
-    assert [p.name for p in target_dir.iterdir()] == ["a.md.sync-backup-20260101-000000"]
+    assert [Path(p).name for p in pruned] == [old]
+    assert [p.name for p in target_dir.iterdir()] == [young]
 
 
 def test_prune_ignores_non_backup_names(tmp_path: Path) -> None:
@@ -791,12 +798,12 @@ def test_prune_skips_unparsable_timestamp(tmp_path: Path) -> None:
 
 
 def test_prune_default_policy_three_and_thirty(tmp_path: Path) -> None:
-    """OQ-2/#1081: with max_per_source=3 exactly the 3 newest survive; the
-    age argument stays in the API but no longer drives pruning."""
+    """OQ-2/#1081/#1270: backups beyond the 3 newest OR older than 30 days
+    are pruned; only a young backup within the 3 newest survives."""
     from scripts.lib.log import SyncLog
     project_root = tmp_path / "project"
     target_dir = project_root / ".claude" / "agents"
-    stamps = {days: _stamp(days) for days in (100, 90, 80, 70, 60, 50, 1)}
+    stamps = {days: _stamp(days) for days in (100, 90, 80, 70, 60, 50, 3, 2, 1)}
     for stamp in stamps.values():
         _write_backup(project_root, ".claude/agents/a.md", stamp)
 
@@ -806,17 +813,10 @@ def test_prune_default_policy_three_and_thirty(tmp_path: Path) -> None:
     )
 
     assert {Path(p).name for p in pruned} == {
-        f"a.md.sync-backup-{stamps[100]}",
-        f"a.md.sync-backup-{stamps[90]}",
-        f"a.md.sync-backup-{stamps[80]}",
-        f"a.md.sync-backup-{stamps[70]}",
+        f"a.md.sync-backup-{stamps[d]}" for d in (100, 90, 80, 70, 60, 50)
     }
     remaining = {p.name for p in target_dir.iterdir()}
-    assert remaining == {
-        f"a.md.sync-backup-{stamps[60]}",
-        f"a.md.sync-backup-{stamps[50]}",
-        f"a.md.sync-backup-{stamps[1]}",
-    }
+    assert remaining == {f"a.md.sync-backup-{stamps[d]}" for d in (3, 2, 1)}
 
 
 def test_prune_fail_soft_when_dir_missing(tmp_path: Path) -> None:
