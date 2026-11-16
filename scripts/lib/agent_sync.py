@@ -32,7 +32,7 @@ from .frontmatter import (
     extract_frontmatter_field,
     target_filename,
 )
-from .io import is_absent_gitignored_target, safe_path, write_checked
+from .io import SyncError, is_absent_gitignored_target, safe_path, write_checked
 from .log import SyncLog
 from .providers import (
     _surface_version_warnings,
@@ -430,11 +430,10 @@ def compose_agent(
     Returns the composed document ready for variable substitution.
     """
     if not _YAML_AVAILABLE:
-        log.warning(
-            "PyYAML not available — composition skipped. "
+        raise SyncError(
+            "PyYAML is required to compose agents (extends/patches). "
             "Install it with: pip install pyyaml"
         )
-        return override_content
 
     if not base_path.exists():
         log.warning(f"Composition: base template not found: {base_path}")
