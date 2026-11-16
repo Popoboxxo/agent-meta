@@ -4,14 +4,14 @@ pipeline_stages:
 status: geplant
 date: 2026-11-15
 spec: docs/specs/2026-11-15-rebaseline-helper-spec.md
-spec-status: DRAFT
+spec-status: APPROVED (User, 2026-11-16)
 klasse: M
 branch: feat/rebaseline-helper
 ---
 
 # Rebaseline-Helper Implementation Plan
 
-> Status: geplant — Spec DRAFT; Umsetzung erst nach Freigabe (APPROVED, E-10) UND nach P3 (#1246, Linux-Basetemp-Stabilität; kein allgemeiner Render-Determinismus, Spec OF-4); Entscheidungen 1-7 der Spec sind getroffen.
+> Status: geplant — Spec APPROVED (User, 2026-11-16, E-10); Umsetzung erst nach P3 (#1246, Linux-Basetemp-Stabilität; kein allgemeiner Render-Determinismus, Spec OF-4); Entscheidungen 1-7 der Spec sind getroffen.
 
 **Goal:** Ein Befehl (`scripts/rebaseline.py`) führt AC-01-Manifest, Standalone-Render, `sync.py`, topology-a2a-Fixtures, AC-T4-Digests und Ceiling-Messung in fester Reihenfolge aus, erzwingt ein Diff-Gate, schreibt ein Reason-Log und berichtet vorab/nachher die betroffenen Pins (Issue #1237, #1115).
 
@@ -50,14 +50,14 @@ branch: feat/rebaseline-helper
 ## Tasks
 
 ### Task 0: Spec freigeben und committen (Gate: P3 #1246 gemerged, Reihenfolge P3 -> P4)
-> Gate-Stand: P3 = PR #1291 ist OFFEN (gestapelt auf #1290, nicht gemergt) → Task 0 blockiert. #1291 ändert `tests/fixtures/topology-golden/schema-property-paths.json` (reine Pfadliste, hash-neutral laut Analyse); Roadmap P3 „RB keiner“ bleibt konsistent. Zusätzlich: Spec-Status DRAFT, OF-1/5/6 sind entschieden (Nutzer, 2026-11-16); verbleibend offen: OF-8 (vor Task 0), OF-9 (vor Task 11), OF-2/3/4/7 nicht blockierend; Akzeptanz von `DRAFT` durch `--validate-spec-plan` ist UNBELEGT.
+> Gate-Stand: P3 = PR #1291 ist GEMERGT (Merge-Commit 84e849ed) → Gate P3 erfüllt. Spec-Gate erfüllt: Spec APPROVED (User, 2026-11-16). #1291 ändert `tests/fixtures/topology-golden/schema-property-paths.json` (reine Pfadliste, hash-neutral laut Analyse); Roadmap P3 „RB keiner“ bleibt konsistent. Zusätzlich: OF-1/5/6 sind entschieden (Nutzer, 2026-11-16); verbleibend offen: OF-8 (vor Task 0; Akzeptanz von `DRAFT`/`APPROVED` durch `--validate-spec-plan` ist UNBELEGT), OF-9 (vor Task 11), OF-2/3/4/7 nicht blockierend.
 **Agent:** documenter
 **Depends on:** keine
 **Files:**
 - Modify: `docs/specs/2026-11-15-rebaseline-helper-spec.md`
 - Modify: `docs/plans/2026-11-15-rebaseline-helper-plan.md`
 
-**Interfaces:** Produces: Spec `Status: APPROVED (User, <Datum>)`, Entscheidungen 1-7 stehen bereits in der Spec; Consumes: Nutzerentscheidung E-10.
+**Interfaces:** Produces: Spec `Status: APPROVED (User, 2026-11-16)`, Entscheidungen 1-7 stehen bereits in der Spec; Consumes: Nutzerentscheidung E-10.
 **AC:** Gate vor allen Folge-Tasks.
 - [ ] Step 1: Prüfen, dass P3 (#1246) gemerged ist; Spec-Freigabe durch den Nutzer einholen.
 - [ ] Step 2: Status auf APPROVED setzen; `python3 scripts/sync.py --validate-spec-plan --config <abs>/.meta-config/project.yaml` grün.
@@ -229,7 +229,7 @@ Verweise: Entscheidung E-10, Roadmap `docs/plans/2026-11-15-master-roadmap.md` P
 
 ## Risiken
 
-- Spec ist DRAFT; Task 0 ist hartes Gate, kein Code davor.
+- Spec ist APPROVED (User, 2026-11-16); Task 0 bleibt Gate (OF-8 vor Task 0 offen; P3/#1291 gemergt), kein Code davor.
 - Skill-Verweis (Task 10) kann eine Template-Änderung mit Rebaseline sein; sonst entsteht die Henne-Ei-Situation, den Helper vor seiner Fertigstellung zu brauchen.
 - `importlib`-Kopplung an `tests/test_ac01_render_identity.py` (Modul-Seiteneffekte); Fallback: Funktionen nach `scripts/lib/` extrahieren.
 - Matrix-Render ist langsam; Render-Ergebnis zwischen Schritt 2 und Idempotenzlauf wiederverwenden.

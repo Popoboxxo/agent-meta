@@ -32,7 +32,7 @@ Legende: Art = B Bugfix · C Config · T Template/Render · D Doku · A Audit ·
 | P1 | Batch-3 PR 1 Viz/MCP (fix/batch3-viz-mcp) | bugfix-batch-3 PR 1 | #1259 #1260 #1271 (+mjs löschen) | B | nein | H (.mcp.json) | S | bereit; *E-03: mjs löschen, #1260 nur per Config (explizites enabled:false schlägt Plattform-Bundle)* |
 | P2 | Batch-3 PR 2 Guard/Sync (fix/batch3-guard-sync) | bugfix-batch-3 PR 2 | #1258 #1252 #1142 #1270 #1249 (Teil) #1241 #1266 | B/S | nein (Hook-Skripte) | H (Hook-Hash) | M | bereit; *E-09: #1249 Tier-Fold = nur Test + ein Doku-Satz (verweist auf #1257), #1270 30-Tage-Regel ja, .bak nicht prunen* |
 | P3 | Batch-3 PR 3 TMPDIR (fix/batch3-tmpdir-determinism) | bugfix-batch-3 PR 3 | #1246 #1261 | B/C | nein | keiner bei B+ | S–M | *E-02: Variante B+ (Key temp-root + env-freier Default); E-09: #1261 nur WARN* |
-| P4 | #1237 Rebaseline-Helper (+#1115) | Settings-Audit A.7/B.3; Loop-Plan; Phase H Task 6 | #1237 #1115 | S/Tests | nein | keiner (Tooling) | M | *E-10: Mini-Spec ist noch zu SCHREIBEN; Status dann APPROVED (User, 2026-11-15)* |
+| P4 | #1237 Rebaseline-Helper (+#1115) | Settings-Audit A.7/B.3; Loop-Plan; Phase H Task 6 | #1237 #1115 | S/Tests | nein | keiner (Tooling) | M | *E-10: Mini-Spec ist noch zu SCHREIBEN; Status dann APPROVED (User, 2026-11-16)* |
 | P5 | Config-Hygiene PR-A | Settings-Audit A.7 #1–3 | (neu) #1263 #946-Tabelle | C | nein | nur H (Hash) | S | *E-11: Plugins honcho + reqogniloom aus; #946-Tabelle dem Nutzer vorlegen. Rules-Golden entfällt (Vorbehalt in §3.8)* |
 | P6 | Roster PR-B | Settings-Audit A.7 #4 | #1244 (Roster-Teil) | C | ja (Roster, Enum) | AC, G (3 Provider), B, H, Allowlist | M | *E-12: Prinzip 58 → ~30 ja, Rollenliste ausstehend (separater Auftrag). Entfallen: DoD-Preset (E-13), Knowledge-Engine-Abschaltung (E-14), Rules-Kürzung (E-15)* |
 | P7 | Release-Checklist PR-C | Settings-Audit A.7 #10 | — | C | nein (release-Render) | H, ggf. G | S | nachrangig; läuft in 2.2 mit |
@@ -167,7 +167,7 @@ Merge-Reihenfolge innerhalb W0 beliebig, außer 0.2 vor 0.3 (beide Hash-Datei �
 |---|---|---|---|---|---|
 | 1.1 | fix/batch3-guard-sync | #1258, #1252, #1142, #1270 (Root-Dir + 30-Tage-Regel), #1249 (nur Test + ein Doku-Satz), #1241, #1266 | #1258 #1252 #1142 #1270 #1249 #1241 #1266 | Hook-Hash (1 Commit) | E-09 |
 | 1.2 | fix/batch3-tmpdir-determinism | #1246 Variante B+ (Key temp-root + env-freier Default), #1261 nur WARN | #1246 #1261 | keiner bei B+ | E-02, E-09 |
-| 1.3 | feat/rebaseline-helper | #1237: ein Befehl für Hashes/AC-01/Goldens/Ceilings (+#1115) | #1237 #1115 | keiner (Tooling) | Mini-Spec ist zu schreiben; dann Status „APPROVED (User, 2026-11-15) laut E-10“ |
+| 1.3 | feat/rebaseline-helper | #1237: ein Befehl für Hashes/AC-01/Goldens/Ceilings (+#1115) | #1237 #1115 | keiner (Tooling) | Mini-Spec ist zu schreiben; dann Status „APPROVED (User, 2026-11-16) laut E-10“ |
 | 1.4 | chore/config-hygiene | Plugins honcho + reqogniloom aus (E-11), tote Konfig, .continue/, `.bak`, `--prune-sync-backups` (.bak nicht prunen), `.tmp` räumen, #1263 MCP-Deny | #1263 #946-Tabelle | nur H (Hash). **Vorbehalt:** ändert sich das mcp-guardrails-Render auch bei ausgeschalteten Plugins, ist doch ein Rules-Golden nötig — in 1.4 prüfen | #946-Tabelle dem Nutzer vorlegen; keine Löschbefehle ohne Freigabe |
 
 ### 3.3 Welle 2 — Render-Bündel A (stark verschlankt)
@@ -275,7 +275,7 @@ Empf. = Empfehlung des Reviews. „Wie Empf.“ = Nutzer folgt der Empfehlung; �
 | E-07 | Intent-Taxonomie / Routing-Spec | Taxonomie informativ; Routing-Spec nach Review freigegeben | wie Empf. |
 | E-08 | Issue-Hygiene §6 | Ausführung NACH Beleg-Prüfung (schließen nur mit Beleg-Kommentar; zusammenlegen/parken per Kommentar); separater späterer Auftrag | präzisiert |
 | E-09 | #1249/#1261/#1270/.bak | #1249 Tier-Fold → #1257 (nur Test + ein Doku-Satz); #1261 nur WARN; #1270 30-Tage-Regel ja; .bak nicht prunen | wie Empf. |
-| E-10 | #1237 Mini-Spec | Freigabe APPROVED für beschriebenen Umfang (Rebaseline-Helper + #1115) erteilt; Spec selbst noch zu SCHREIBEN → Vermerk „Spec schreiben, dann Status APPROVED (User, 2026-11-15) laut E-10“ | wie Empf., Spec noch ausstehend |
+| E-10 | #1237 Mini-Spec | Freigabe APPROVED für beschriebenen Umfang (Rebaseline-Helper + #1115) erteilt; Spec selbst noch zu SCHREIBEN → Vermerk „Spec schreiben, dann Status APPROVED (User, 2026-11-16) laut E-10“ | wie Empf., Spec noch ausstehend |
 | E-11 | Plugins / #946 | honcho + reqogniloom in diesem Repo aus; #946-Tabelle dem Nutzer vorlegen (keine Löschbefehle ohne Freigabe) | wie Empf. |
 | E-12 | Rollen 58 → ~30 | Prinzip ja; konkrete Rollenliste zuerst dem Nutzer zur Freigabe (separater Auftrag); im Plan: „Liste ausstehend“ | wie Empf. im Prinzip |
 | E-13 | DoD-Preset | **Nein: bleibt rapid-prototyping** | **Abweichung** (Review: ja, Wechsel) |
@@ -306,7 +306,7 @@ Zusammenfassung der Abweichungen: E-13, E-14, E-15 (drei Einsparungen entfallen)
 2. #946-Entscheidungstabelle dem Nutzer vorlegen (E-11); keine Löschbefehle ohne Freigabe.
 3. Issue-Hygiene §6 ausführen (E-08), erst nach Beleg-Prüfung; separater Auftrag.
 4. 16 neue Issues aus dem Review (Titelliste unten) anlegen — Anlage weiterhin OHNE Nutzerfreigabe, wartet auf diese.
-5. #1237-Mini-Spec schreiben; danach Status APPROVED (User, 2026-11-15) laut E-10.
+5. #1237-Mini-Spec schreiben; danach Status APPROVED (User, 2026-11-16) laut E-10.
 6. Spec-Freigaben zum Wellenstart (E-22: Kinder-Addendum F, #1209, #1141; E-31: Phase G/I-Specs und Konzepte).
 7. #1217 und #1172 bleiben DRAFT (#1217 nach Task 1a, #1172 nach Machbarkeit).
 8. Nutzer-Aktion: #1187 wieder öffnen bei Phase-E-Start (E-20).
