@@ -4,12 +4,14 @@ its own hooks_dir/settings_file, not silently fall back to Claude's paths.
 Run: python -m pytest tests/test_provider_hooks_config.py -v
 """
 
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 _PROVIDERS_CONFIG = _REPO_ROOT / "config" / "ai-providers.yaml"
 
 
@@ -210,3 +212,37 @@ def test_codex_cross_tool_skills_dir_is_codex_only():
     claimants = [p for p, pcfg in providers.items()
                  if pcfg.get("skills_dir") == ".agents/skills"]
     assert claimants == ["Codex"]
+
+
+def test_hook_registration_writers_match_supported_protocols():
+    """Issue #1252: writer table and SUPPORTED_HOOK_PROTOCOLS must not drift."""
+    from lib import hooks, providers
+
+    assert set(hooks._HOOK_REGISTRATION_WRITERS) == providers.SUPPORTED_HOOK_PROTOCOLS
+
+
+def test_unknown_hook_protocol_warns_and_writes_nothing(tmp_path, monkeypatch):
+    """Issue #1252: a set-but-unknown protocol must not use the Claude writer."""
+    from lib import providers
+    from lib.hooks import sync_hooks
+    from lib.log import SyncLog
+
+    monkeypatch.setattr(
+        providers, "SUPPORTED_HOOK_PROTOCOLS",
+        set(providers.SUPPORTED_HOOK_PROTOCOLS) | {"fake-proto"})
+    root = tmp_path / "meta"
+    (root / "hooks" / "1-generic").mkdir(parents=True)
+    (root / "hooks" / "1-generic" / "demo.sh").write_text(
+        "#!/bin/bash\n# version: 1.0.0\nexit 0\n", encoding="utf-8")
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    log = SyncLog()
+    sync_hooks(
+        root, proj, {"platforms": [], "hooks": {}}, log, dry_run=False,
+        provider="Fake",
+        provider_config={"Fake": {
+            "has_hooks": True, "hook_protocol": "fake-proto",
+            "hooks_dir": ".fake/hooks", "settings_file": ".fake/settings.json"}},
+    )
+    assert not (proj / ".fake" / "settings.json").exists()
+    assert any("unknown hook_protocol 'fake-proto'" in w for w in log.warnings)
