@@ -23,14 +23,6 @@
           "X-User-ID": "{env:MCP_REQOGNILOOM_USER_ID}",
           "X-Workspace-ID": "{env:MCP_REQOGNILOOM_WORKSPACE_ID}"
         }
-      },
-      "viz-logger": {
-        "type": "local",
-        "command": [
-          "python3",
-          "scripts/viz-logger.py",
-          "--mcp"
-        ]
       }
     }
   },
