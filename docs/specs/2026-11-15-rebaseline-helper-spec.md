@@ -1,9 +1,9 @@
 # Rebaseline-Helper — Spec
-> Status: DRAFT (noch nicht freigegeben; Freigabe laut Entscheidung E-10 durch den Nutzer steht aus)
+> Status: DRAFT (noch nicht freigegeben; Freigabe laut Entscheidung E-10 durch den Nutzer steht aus) — Entscheidungen OF-1/5/6 entschieden (Nutzer, 2026-11-16); Status DRAFT bis Nutzerfreigabe
 > Plan: `docs/plans/2026-11-15-rebaseline-helper-plan.md`
 > Datum: 2026-11-15 | Entscheidung: E-10 | Roadmap: `docs/plans/2026-11-15-master-roadmap.md` P4 / PR 1.3 | Issues: #1237, #1115 (Duplikat-Teil)
 > Klasse: M (siehe Abschnitt Klassifikation)
-> Abweichung zu E-10: E-10 sieht `APPROVED (User, 2026-11-15)` vor; die Spec bleibt bewusst DRAFT, weil offene Nutzerentscheidungen (Abschnitt „Offene Fragen“) vor der Freigabe zu klären sind. Ob `--validate-spec-plan` den Status `DRAFT` akzeptiert, ist UNBELEGT (Rule `spec-plan-workflow` und Validator-Code nicht verifiziert; vor Task 0 per Lauf prüfen).
+> Abweichung zu E-10: E-10 sieht `APPROVED (User, 2026-11-15)` vor; die Spec bleibt bewusst DRAFT, weil die Nutzerfreigabe aussteht und weitere Fragen (Abschnitt „Offene Fragen“: OF-2/3/4/7/8/9) offen sind. Ob `--validate-spec-plan` den Status `DRAFT` akzeptiert, ist UNBELEGT (Rule `spec-plan-workflow` und Validator-Code nicht verifiziert; vor Task 0 per Lauf prüfen).
 > PR-Hinweis: PR-Text referenziert `Refs #1237` (kein Closing-Keyword), da #1237 Empfehlung 2 hier ausdrücklich nicht gelöst wird.
 
 ## Klassifikation
@@ -109,7 +109,7 @@ python3 scripts/rebaseline.py --reason TEXT [--expect GLOB]... [--expect-key GLO
 - `--expect GLOB` (wiederholbar): zusätzlich erlaubte repo-relative Pfade (POSIX, `fnmatch`).
 - `--expect-key GLOB` (wiederholbar): erlaubte Schlüssel in `hashes.json` bzw. `generated-file-hashes.json`/`context-hashes.json` (Format `<Provider>/<relpath>`, bzw. relpath).
 - `--base REF` (Default `origin/main`; ohne erreichbaren Remote Fallback auf lokales `main` mit Warnung im Report): Basis für die abgeleitete Erwartung (Abschnitt Diff-Gate).
-- `--check-only`/`--dry-run`: Synonyme; kein Schreibzugriff auf das Repo außer dem Scratch-Sink. Scratch-/Rollback-Verzeichnisse liegen NICHT unter `tempfile`/Systemtemp, sondern im Tmp-Sink über `resolve_tmp_paths` (`.tmp/`, Repo-Containment; Vorbild `tests/test_context_budgets.py` importiert `resolve_tmp_paths`). Ist der Sink deaktiviert → Exit 2 (OF-6). Nutzung von `tempfile.TemporaryDirectory` im `--write`-Block des Testmoduls ist kein Vorbild.
+- `--check-only`/`--dry-run`: Synonyme; kein Schreibzugriff auf das Repo außer dem Scratch-Sink. Scratch-/Rollback-Verzeichnisse liegen NICHT unter `tempfile`/Systemtemp, sondern im Tmp-Sink über `resolve_tmp_paths` (`.tmp/`, Repo-Containment; Vorbild `tests/test_context_budgets.py` importiert `resolve_tmp_paths`). Ist der Sink deaktiviert → Exit 2 (ENTSCHIEDEN, OF-6). Nutzung von `tempfile.TemporaryDirectory` im `--write`-Block des Testmoduls ist kein Vorbild.
 - `--steps LIST`: kommagetrennte Teilmenge aus `ac01,standalone,sync,topology,digests,ceilings` (Default alle, Reihenfolge bleibt fest).
 - `--skip-verify`: überspringt Schritt 9 (gezielte Pin-Tests); nur Entwickler-Diagnose, im Log vermerkt.
 - `--json`: Report zusätzlich maschinenlesbar auf stdout.
@@ -124,7 +124,7 @@ python3 scripts/rebaseline.py --reason TEXT [--expect GLOB]... [--expect-key GLO
 | 3 | Diff-Gate verletzt (unerwartete Datei/Schlüssel); Schreibänderungen zurückgerollt |
 | 4 | Teilschritt-Subprozess fehlgeschlagen (Exit ≠ 0 von `--render-standalone`/`sync.py`/Render); zurückgerollt |
 | 5 | Nach-Verifikation rot (gezielte Pin-Tests); Änderungen bleiben (Report nennt rote Pins), Log-Eintrag mit `verify: failed` |
-| 6 | Rest-Drift im zweiten Check-only-Durchlauf (Idempotenz verletzt); Änderungen bleiben, Report listet Rest-Drift (Zeile `RESIDUAL`). Verifikation (Schritt 9) und Log (Schritt 10) laufen trotzdem; Log-Feld `idempotency: failed`. Priorität bei mehreren Fehlern: 5 vor 6. VORLÄUFIG (Empfehlung, Nutzerentscheidung offen: OF-1) |
+| 6 | Rest-Drift im zweiten Check-only-Durchlauf (Idempotenz verletzt); Änderungen bleiben, Report listet Rest-Drift (Zeile `RESIDUAL`). Verifikation (Schritt 9) und Log (Schritt 10) laufen trotzdem; Log-Feld `idempotency: failed`. Priorität bei mehreren Fehlern: 5 vor 6. ENTSCHIEDEN (Nutzer, 2026-11-16, OF-1) |
 
 ### C4 — Report-Format (stdout, Deutsch/Englisch-neutral, ASCII)
 
@@ -168,9 +168,9 @@ Schreibmodus (feste Reihenfolge; jeder Schritt hat ein eigenes Gate):
 3. `standalone`: `scripts/sync.py --render-standalone --config <CFG>`; Gate auf `standalone/**`.
 4. `sync`: `scripts/sync.py --config <CFG>`; erzeugt `.meta-config/generated-file-hashes.json`, `context-hashes.json` und die gerenderten Agent-/Kontext-Ausgaben (vollständige Liste der Schreibziele UNBELEGT, OF-9); schreibt zudem getrackte Kontext-Dateien (`CLAUDE.md`, `AGENTS.md`) und, bei `cwd == Root`, die Schema-Enums (`update_roles_enum`/`update_providers_enum`, `scripts/lib/cli_commands.py:637-639`, per Read verifiziert; da der Helper mit `cwd=ROOT` läuft, trifft das zu; Zieldateien liegen in den Schema-Modulen, nicht in `cli_commands.py`). Gate auf die Menge geänderter getrackter Dateien als Differenz zur Preflight-Dirty-Menge.
 5. `topology`: a2a-Fixtures in `tests/fixtures/topology-golden/` per Render aktualisieren (`render_topology_rule`, `tests/test_ac01_render_identity.py`); Gate auf genau diese Dateien (Entscheidung 4).
-6. `digests`: Fixture-Baum-Digests neu berechnen; weicht ein Digest von `_FIXTURE_TREES` ab UND hat sich der zugehörige Baum in diesem Lauf oder im Arbeitsbaum gegenüber `--base` geändert, wird das Literal in `tests/test_opencode_v2_surface.py` automatisch zeilengenau ersetzt (Entscheidung 3; Gate: nur diese Zeile). Ändert sich ein Baum ohne erwarteten Pfad → Gate-Verletzung. Die Kommentarzeilen über `_FIXTURE_TREES` (Log, ~:5495-5511) werden NIE angefasst (Entscheidung: Verzicht, siehe OF-5); gepatcht wird nur der Digest-Literalwert in der betroffenen Dictionary-Zeile.
+6. `digests`: Fixture-Baum-Digests neu berechnen; weicht ein Digest von `_FIXTURE_TREES` ab UND hat sich der zugehörige Baum in diesem Lauf oder im Arbeitsbaum gegenüber `--base` geändert, wird das Literal in `tests/test_opencode_v2_surface.py` automatisch zeilengenau ersetzt (Entscheidung 3; Gate: nur diese Zeile). Ändert sich ein Baum ohne erwarteten Pfad → Gate-Verletzung. Die Kommentarzeilen über `_FIXTURE_TREES` (Log, ~:5495-5511) werden NIE angefasst (ENTSCHIEDEN, Nutzer 2026-11-16: Verzicht, OF-5); gepatcht wird nur der Digest-Literalwert in der betroffenen Dictionary-Zeile.
 7. `ceilings`: `measure_artifacts` (`scripts/lib/context_report.py`) misst an ZWEI getrennten Messbasen, beide NICHT am self-gesyncten Repo: `_IST_FULL` an den Matrix-Projekten von `_make_project` (Fixture `measured` in `tests/test_context_budgets.py`) — der full-Render aus Schritt 2 wird geteilt; `_IST_COMPACT` an einem eigenen Render über `context_report.render_into_work_dir(..., profile="compact")` (Messbasis des Testmoduls, Kommentar zu `_IST_COMPACT`). Vergleich mit `_ceiling(_IST_FULL)`/`_ceiling(_IST_COMPACT)`; nur bei Überschreitung wird der exakte Re-Pin-Block (Provider/Artefakt, alter Ist, gemessener Ist) gedruckt. Keine Dateiänderung. Die Messung von `scripts/measure_context.py` am Repo ist damit NICHT die Messbasis der Pins.
-8. Zweiter Check-only-Durchlauf aller Schritte (Idempotenz-Beweis); Rest-Drift wird als `RESIDUAL` gelistet und der Exit-Code 6 vorgemerkt; die Schritte 9 und 10 laufen trotzdem (VORLÄUFIG, OF-1; frühere Fassung Exit 4 kollidierte mit C3 „4 = Subprozess-Fehler mit Rollback“).
+8. Zweiter Check-only-Durchlauf aller Schritte (Idempotenz-Beweis); Rest-Drift wird als `RESIDUAL` gelistet und der Exit-Code 6 vorgemerkt; die Schritte 9 und 10 laufen trotzdem (ENTSCHIEDEN, OF-1; Reihenfolge 5 vor 6; frühere Fassung Exit 4 kollidierte mit C3 „4 = Subprozess-Fehler mit Rollback“).
 9. Verifikation: gezielte `pytest -q`-Aufrufe der Pin-Testdateien aus der Registry (kein Voll-Lauf); rot → Exit 5 (Priorität 5 vor 6).
 10. Log-Eintrag (C6) nur wenn `changed_files` nicht leer; bei Rest-Drift mit Feld `idempotency: failed`.
 
@@ -217,23 +217,23 @@ Rollback: bei Exit 3/4 stellt der Helper aus dem Preflight-Snapshot alle von ihm
 18. `--base` ohne Remote `origin`: Fallback auf lokales `main`, Warnung im Report, Exit-Code unverändert (Test mit gemocktem Git-Runner).
 19. `topology`-Schritt aktualisiert die a2a-Fixtures per Render; Drift dort wird vorab als `betroffen` gemeldet und danach als `ok`; `schema-property-paths.json` bleibt `report-only`.
 20. Die `_FIXTURE_TREES`-Zeile wird zeilengenau gepatcht: ausschließlich der Digest-Literalwert der betroffenen Dictionary-Zeile ändert sich; alle anderen Zeilen der Datei, einschließlich der Log-Kommentarzeilen über `_FIXTURE_TREES`, bleiben byte-identisch (Verzicht auf Log-Kommentar, OF-5); der Eintrag ist in der Gate-Allowlist.
-21. Rest-Drift im zweiten Check-only-Durchlauf (Idempotenz-Test mit gemocktem, instabilem Render) → Exit 6 (vorläufig, OF-1), Änderungen bleiben, Report listet die Rest-Drift (`RESIDUAL`, `idempotent=drift`); Verifikation und Log laufen trotzdem, Log-Feld `idempotency: failed`; bei gleichzeitig roter Verifikation gilt Exit 5. Mapping: C3 (Exit 6), Datenfluss Schritte 8-10.
+21. Rest-Drift im zweiten Check-only-Durchlauf (Idempotenz-Test mit gemocktem, instabilem Render) → Exit 6 (entschieden, OF-1), Änderungen bleiben, Report listet die Rest-Drift (`RESIDUAL`, `idempotent=drift`); Verifikation und Log laufen trotzdem, Log-Feld `idempotency: failed`; bei gleichzeitig roter Verifikation gilt Exit 5. Mapping: C3 (Exit 6), Datenfluss Schritte 8-10.
 22. Subprozess-/Gesamtpipeline-Reihenfolge: Preflight → Schritte → Rollback bei Exit 3/4 → Idempotenzlauf → Verifikation → Log (Test mit gemocktem Runner; Verifikations-Exit 5 über `--skip-verify`-Gegenprobe).
 
 ## Offene Fragen
 
-Die sieben Fragen der Vorversion sind im Abschnitt Entscheidungen beantwortet. Neu offen (Nutzerentscheidung) mit Empfehlung:
+Die sieben Fragen der Vorversion sind im Abschnitt Entscheidungen beantwortet. OF-1, OF-5, OF-6 sind entschieden (Nutzer, 2026-11-16) und blockieren die Freigabe nicht mehr. Verbleibend offen: OF-2/3/4/7 (nicht blockierend), OF-8 (vor Plan Task 0), OF-9 (vor Plan Task 11).
 
 ### Offene Fragen (Nutzerentscheidung) mit Empfehlung
 
 | ID | Frage | Optionen | Empfehlung | Auswirkung |
 |---|---|---|---|---|
-| OF-1 | Exit-Code bei Rest-Drift (Datenfluss Schritt 8) | (a) Exit 6 neu; (b) Exit 5 mit Verifikation zusammenlegen; (c) Exit 4 (kollidiert mit Rollback-Semantik) | (a) Exit 6, Änderungen bleiben | C3-Tabelle, AC 21, Plan Task 6/Pipeline; (c) widerspricht C3 |
+| OF-1 | Exit-Code bei Rest-Drift (Datenfluss Schritt 8) | (a) Exit 6 neu; (b) Exit 5 mit Verifikation zusammenlegen; (c) Exit 4 (kollidiert mit Rollback-Semantik) | **ENTSCHIEDEN (Nutzer, 2026-11-16): (a) Exit 6, Änderungen bleiben** | C3-Tabelle (Exit 0-6), AC 21, Plan Task 6/7; Verify (9) und Log (10) laufen trotzdem, Priorität 5 vor 6, Log `idempotency: failed` |
 | OF-2 | Befehlsform: eigenes Script vs. `sync.py --rebaseline` (Issue-Wortlaut) | (a) `scripts/rebaseline.py`; (b) `sync.py`-Flag | (a) (Entscheidung 1 bleibt), Abweichung im Issue kommentieren | Keine `sync.py`-Änderung; Issue #1237 nennt (b) |
 | OF-3 | Funktionsquelle: `importlib` aus Testmodulen vs. Extraktion nach `scripts/lib/` | (a) importlib; (b) Extraktion | (a) für diesen PR; (b) als Folge, falls Modul-Seiteneffekte/Größe (`test_opencode_v2_surface.py` >5500 Zeilen) stören | Kopplung der Tests an den Helper; PyYAML transitiv (ADR 0001) |
 | OF-4 | Owner für #1237 Empf. 2 (Determinismus aus gehashten Artefakten) | (a) neues Folge-Issue; (b) in #1246 erweitern; (c) bewusst offen lassen | (a) Folge-Issue, im PR `Refs #1237` | Idempotenz plattformabhängig bis dahin; Roadmap-Ergänzung |
-| OF-5 | Log-Kommentarzeile über `_FIXTURE_TREES` | (a) Verzicht (nur Digest-Literal patchen; maschinenlesbarer Log in `.meta-config/rebaseline-log.jsonl`); (b) Ausnahme: Helper hängt Kommentarzeile an | (a) | AC 20 bleibt „alle anderen Zeilen byte-identisch“; (b) müsste Gate und AC 20 lockern |
-| OF-6 | Scratch-Pfad bei deaktiviertem Tmp-Sink | (a) Exit 2 mit Hinweis; (b) Fallback Systemtemp (Containment-Ausnahme, schwächer) | (a) | Helper unter `.tmp/`-pflichtigen Setups nur mit aktivem Sink lauffähig |
+| OF-5 | Log-Kommentarzeile über `_FIXTURE_TREES` | (a) Verzicht (nur Digest-Literal patchen; maschinenlesbarer Log in `.meta-config/rebaseline-log.jsonl`); (b) Ausnahme: Helper hängt Kommentarzeile an | **ENTSCHIEDEN (Nutzer, 2026-11-16): (a) Verzicht** | AC 20 bleibt „alle anderen Zeilen byte-identisch“; Datenfluss Schritt 6 patcht nur das Digest-Literal; Log nur in `.meta-config/rebaseline-log.jsonl` |
+| OF-6 | Scratch-Pfad bei deaktiviertem Tmp-Sink | (a) Exit 2 mit Hinweis; (b) Fallback Systemtemp (Containment-Ausnahme, schwächer) | **ENTSCHIEDEN (Nutzer, 2026-11-16): (a) Exit 2 mit Hinweis** | C2/C3: Helper nur mit aktivem Tmp-Sink lauffähig; kein Systemtemp-Fallback |
 | OF-7 | Skill-Verweis (`conventions`) bei Template-Quelle | (a) Verweis nur in `howto/`/Docs; (b) Skill-Quelle editieren + Rebaseline mit dem Helper (Henne-Ei) | (a) bis Skill-Quelle verifiziert | AC 17, Plan Task 10 |
 | OF-8 | `--validate-spec-plan` und Status `DRAFT` | Per Lauf prüfen (UNBELEGT) | Vor Task 0 testen | Task 0 Step 2 |
 | OF-9 | Schreibziele von `sync.py` (Schema-Enum-Pfade, weitere getrackte Ausgaben) für die Gate-Allowlist | (a) Probelauf `sync.py --config` auf Scratch-Kopie und `git status` auswerten; (b) Schema-Module per Read durchgehen | (a) vor Task 11 | Gate-Allowlist (Diff-Gate 1.), AC 4/6 |

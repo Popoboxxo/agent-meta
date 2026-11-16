@@ -50,7 +50,7 @@ branch: feat/rebaseline-helper
 ## Tasks
 
 ### Task 0: Spec freigeben und committen (Gate: P3 #1246 gemerged, Reihenfolge P3 -> P4)
-> Gate-Stand: P3 = PR #1291 ist OFFEN (gestapelt auf #1290, nicht gemergt) → Task 0 blockiert. #1291 ändert `tests/fixtures/topology-golden/schema-property-paths.json` (reine Pfadliste, hash-neutral laut Analyse); Roadmap P3 „RB keiner“ bleibt konsistent. Zusätzlich: Spec-Status DRAFT, Offene Fragen OF-1..OF-9 vorab entscheiden; Akzeptanz von `DRAFT` durch `--validate-spec-plan` ist UNBELEGT.
+> Gate-Stand: P3 = PR #1291 ist OFFEN (gestapelt auf #1290, nicht gemergt) → Task 0 blockiert. #1291 ändert `tests/fixtures/topology-golden/schema-property-paths.json` (reine Pfadliste, hash-neutral laut Analyse); Roadmap P3 „RB keiner“ bleibt konsistent. Zusätzlich: Spec-Status DRAFT, OF-1/5/6 sind entschieden (Nutzer, 2026-11-16); verbleibend offen: OF-8 (vor Task 0), OF-9 (vor Task 11), OF-2/3/4/7 nicht blockierend; Akzeptanz von `DRAFT` durch `--validate-spec-plan` ist UNBELEGT.
 **Agent:** documenter
 **Depends on:** keine
 **Files:**
@@ -135,7 +135,7 @@ branch: feat/rebaseline-helper
 - Modify: `scripts/lib/rebaseline.py`
 - Modify: `tests/test_rebaseline_helper.py`
 
-**Interfaces:** Produces: `ceiling_repin_block(report, ist_full, ist_compact) -> str` (nur Ausgabe, keine Dateiänderung), `append_log(root, entry)` (nur bei Änderungen), `EXIT_*`-Konstanten (0-6; 6 = Rest-Drift, vorläufig, Spec OF-1). Consumes: Task 5, `scripts/lib/context_report.py:130` (`measure_artifacts`).
+**Interfaces:** Produces: `ceiling_repin_block(report, ist_full, ist_compact) -> str` (nur Ausgabe, keine Dateiänderung), `append_log(root, entry)` (nur bei Änderungen), `EXIT_*`-Konstanten (0-6; 6 = Rest-Drift, entschieden, Spec OF-1). Consumes: Task 5, `scripts/lib/context_report.py:130` (`measure_artifacts`).
 **AC:** 11, 12, 14.
 - [ ] Step 1: Rote Tests: Block nennt Provider/Artefakt/alt/neu; Toleranz-Datei hashgleich; Log-Zeile valide und nur bei Änderung; `--json`-Felder.
 - [ ] Step 2: Implementierung bis grün.
@@ -148,7 +148,7 @@ branch: feat/rebaseline-helper
 - Modify: `scripts/lib/rebaseline.py` (bei > 600 Zeilen: `scripts/lib/rebaseline_pipeline.py`)
 - Modify: `tests/test_rebaseline_helper.py`
 
-**Interfaces:** Produces: `run_pipeline(root, options, runner=subprocess.run) -> PipelineResult` (Preflight inkl. Dirty-Baseline → Schritte in `STEP_ORDER` → Rollback bei Exit 3/4 → zweiter Check-only-Durchlauf (Idempotenz, Rest-Drift → Exit 6, vorläufig, Spec OF-1) → `verify(root, runner)` (gezielte `pytest -q`-Aufrufe aus der Registry, rot → Exit 5; `--skip-verify` übersprungen) → Log nur bei Änderungen), `verify(root, runner) -> List[PinStatus]`, Step-Runner mit Subprozess-Fehlerbehandlung (Exit ≠ 0 → Exit 4 + Rollback). Scratch/Snapshot im Tmp-Sink (`resolve_tmp_paths`), nicht Systemtemp. Consumes: Task 1-6.
+**Interfaces:** Produces: `run_pipeline(root, options, runner=subprocess.run) -> PipelineResult` (Preflight inkl. Dirty-Baseline → Schritte in `STEP_ORDER` → Rollback bei Exit 3/4 → zweiter Check-only-Durchlauf (Idempotenz, Rest-Drift → Exit 6, entschieden, Spec OF-1) → `verify(root, runner)` (gezielte `pytest -q`-Aufrufe aus der Registry, rot → Exit 5; `--skip-verify` übersprungen) → Log nur bei Änderungen), `verify(root, runner) -> List[PinStatus]`, Step-Runner mit Subprozess-Fehlerbehandlung (Exit ≠ 0 → Exit 4 + Rollback). Scratch/Snapshot im Tmp-Sink (`resolve_tmp_paths`), nicht Systemtemp. Consumes: Task 1-6.
 **AC:** 5, 13, 15, 21, 22.
 - [ ] Step 1: Rote Tests mit gemocktem Runner: Preflight (AC 10: dateiweise, `test_opencode_v2_surface.py` zeilenweise nur für `_FIXTURE_TREES`; Quell-/Hand-Golden-Dirty blockiert nicht); Reihenfolge Preflight→Schritte→Idempotenzlauf→Verify→Log; Rest-Drift → Exit 6 mit weiterlaufendem Verify/Log (`idempotency: failed`); Subprozess-Fehler → Exit 4 + Rollback; Gate-Verletzung → Exit 3 + Rollback; instabiler Render im zweiten Durchlauf → Exit 6; roter Pin-Test → Exit 5 mit Log `verify: failed`; Check-only schreibt nichts.
 - [ ] Step 2: Implementierung bis grün.
@@ -242,5 +242,5 @@ Verweise: Entscheidung E-10, Roadmap `docs/plans/2026-11-15-master-roadmap.md` P
 - Jeder Task mappt auf genau eine Rolle; jedes Akzeptanzkriterium der Spec (1-22) ist über Task und AC-Nummer abgedeckt: 7, 8 (Task 1), 1, 2, 3 (Task 8; 8 zusätzlich Task 1), 4 (Task 3, 5), 5 (Task 5, 7), 6 (Task 2, 3), 9-10, 18-20 (Task 5), 11-12, 14 (Task 6), 13 (Task 4, 7), 15 (Task 2, 7), 21-22 (Task 7), 16 (Task 9), 17 (Task 10).- `Files:`/`Interfaces:` vollständig; alle Tasks sequentiell, gemeinsame Dateien (`scripts/lib/rebaseline.py`, `tests/test_rebaseline_helper.py`) werden strikt nacheinander fortgeschrieben.
 - `pipeline_stages` deckt die einzige `plan-driven`-Stage (`implement`) ab.
 - Spec-Entscheidungen 1-7 sind in Tasks 1, 3, 4, 5, 6, 7 abgebildet; AC 18-20 in Task 5; P3-Reihenfolge in Task 0.
-- Offene Spec-Fragen OF-1..OF-8 (Spec, Abschnitt „Offene Fragen“) sind vor Task 0 durch den Nutzer zu entscheiden; Plan folgt den Empfehlungen vorläufig (Exit 6, importlib, Verzicht auf Log-Kommentar, Tmp-Sink-Scratch).
+- OF-1/5/6 entschieden (Nutzer, 2026-11-16): Exit 6 bei Rest-Drift, Verzicht auf Log-Kommentar, Scratch bei deaktiviertem Sink → Exit 2. Verbleibend offen: OF-2/3/4/7 (nicht blockierend; Plan folgt vorläufig den Empfehlungen: importlib, eigenes Script), OF-8 vor Task 0, OF-9 vor Task 11.
 - Effort-Schätzung: `effort-estimator` (Textverweis, hier bewusst nicht berechnet).
