@@ -47,6 +47,12 @@ mcp-servers:
 
 Oder über den Slash-Befehl (sofern unterstützt): `/add-mcp-server reqogniloom`
 
+> **Hinweis: Doppel-Einbindung (Plugin und Katalog-Server)**
+>
+> Wird ReqogniLoom sowohl als Claude-Plugin (`reqogniloom@...` in `enabledPlugins` der `~/.claude/settings.json`) als auch als Projekt-MCP-Server aus dem Katalog eingebunden, existiert der Server doppelt. `sync.py` warnt dann mit `mcp.duplicate-plugin` (gelesen wird nur die User-Ebene `~/.claude/settings.json`; eine projekt- oder lokale Plugin-Aktivierung wird nicht erkannt).
+> Die Variablenpaare unterscheiden sich: Plugin `REQOGNILOOM_MCP_URL` (Variable für den API-Schlüssel nicht im Repo belegt), Katalog-Server `MCP_REQOGNILOOM_URL` / `MCP_REQOGNILOOM_API_KEY` (plus `..._PROJECT_ID`, `..._USER_ID`, `..._WORKSPACE_ID`).
+> Empfehlung: nur eine der beiden Einbindungen aktivieren — entweder das Plugin deaktivieren oder den Katalog-Server per `enabled: false` unter `plugins:` in `project.yaml` abschalten.
+
 ## 4. sync.py ausführen
 
 ```bash
