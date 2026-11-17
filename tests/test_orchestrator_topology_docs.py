@@ -1151,6 +1151,13 @@ _TOPOLOGY_GOLDEN = _REPO_ROOT / "tests" / "fixtures" / "topology-golden"
 _PROJECT_SCHEMA = _REPO_ROOT / "config" / "project-config.schema.json"
 _SCHEMA_BASELINE_COMMIT = "a41745e"
 
+# AC-26 freezes the schema property tree so the ORCHESTRATOR TOPOLOGY gate
+# cannot silently add properties. Issue #1187 (project-context injection) is a
+# SEPARATE config wave, not part of the topology gate: its dedicated section is
+# therefore legitimate and explicitly allowlisted here. Only that section is
+# exempt; any other newly added property is still reported as AC-26 drift.
+_AC26_ALLOWED_NEW_PROPERTY_PREFIXES = ("project-context-injection",)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_orchestrator_topology_effective_flags import (  # noqa: E402
     _UNSET,
@@ -1263,11 +1270,41 @@ def test_declared_subagent_render_matches_new_golden(tmp_path):
     )
 
 
+def _schema_property_paths(node: dict, prefix: str = "") -> set[str]:
+    """Collect every property path in a JSON-Schema node tree."""
+    found: set[str] = set()
+    if not isinstance(node, dict):
+        return found
+    for name, child in (node.get("properties") or {}).items():
+        path = f"{prefix}.{name}" if prefix else name
+        found.add(path)
+        found |= _schema_property_paths(child, path)
+    if isinstance(node.get("items"), dict):
+        found |= _schema_property_paths(node["items"], f"{prefix}[]")
+    return found
+
+
+def _ac26_unexpected_paths(current_paths: set[str], frozen_paths: set[str]) -> set[str]:
+    """Newly added property paths that are not legitimately from #1187.
+
+    Paths under ``_AC26_ALLOWED_NEW_PROPERTY_PREFIXES`` belong to a separate
+    config wave (project-context injection), not the topology gate, so they are
+    exempt. Everything else that is newly added is AC-26 drift.
+    """
+    return {
+        path
+        for path in current_paths - frozen_paths
+        if not path.startswith(_AC26_ALLOWED_NEW_PROPERTY_PREFIXES)
+    }
+
+
 def test_schema_has_no_new_properties():
     """AC-26: the topology gate adds no schema property.
 
     Property PATHS are frozen from the pre-implementation commit; titles,
-    descriptions and enum values may change, the property tree may not.
+    descriptions and enum values may change, the property tree may not. The
+    dedicated ``project-context-injection.*`` section (#1187) belongs to a
+    separate config wave and is explicitly allowed.
     """
     import json
 
@@ -1276,27 +1313,47 @@ def test_schema_has_no_new_properties():
     baseline = json.loads(fixture_path.read_text(encoding="utf-8"))
     assert baseline["commit"] == _SCHEMA_BASELINE_COMMIT
 
-    def property_paths(node: dict, prefix: str = "") -> set[str]:
-        found: set[str] = set()
-        if not isinstance(node, dict):
-            return found
-        for name, child in (node.get("properties") or {}).items():
-            path = f"{prefix}.{name}" if prefix else name
-            found.add(path)
-            found |= property_paths(child, path)
-        if isinstance(node.get("items"), dict):
-            found |= property_paths(node["items"], f"{prefix}[]")
-        return found
-
     current = json.loads(_PROJECT_SCHEMA.read_text(encoding="utf-8"))
-    current_paths = property_paths(current)
+    current_paths = _schema_property_paths(current)
     frozen_paths = set(baseline["paths"])
 
-    assert current_paths - frozen_paths == set(), (
+    unexpected = _ac26_unexpected_paths(current_paths, frozen_paths)
+    assert unexpected == set(), (
         "the implementation added schema properties (AC-26): "
-        f"{sorted(current_paths - frozen_paths)}"
+        f"{sorted(unexpected)}"
     )
     assert frozen_paths - current_paths == set(), (
         "the implementation removed schema properties (AC-26): "
         f"{sorted(frozen_paths - current_paths)}"
+    )
+
+
+def test_schema_guard_still_catches_topology_gate_drift():
+    """AC-26 negative proof: new topology-gate properties are NOT allowlisted.
+
+    The #1187 exemption must cover only the project-context-injection section.
+    A hypothetical new property under the ORCHESTRATOR TOPOLOGY gate must still
+    be reported as drift, i.e. the guard stays red for real topology drift.
+    """
+    frozen_paths = {"orchestrator", "orchestrator.topology", "orchestrator.mode"}
+
+    # The legitimate #1187 section is excluded from the drift set.
+    legitimate_1187 = {
+        "project-context-injection",
+        "project-context-injection.mode",
+        "project-context-injection.whitelist",
+    }
+    assert _ac26_unexpected_paths(frozen_paths | legitimate_1187, frozen_paths) == set()
+
+    # A new nested topology-gate property is still caught.
+    nested_drift = frozen_paths | {"orchestrator.topology.some-new-key"}
+    assert _ac26_unexpected_paths(nested_drift, frozen_paths) == {
+        "orchestrator.topology.some-new-key"
+    }
+
+    # The suggested standalone topology-gate property is still caught.
+    standalone_drift = frozen_paths | {"orchestrator-topology.some-new-key"}
+    unexpected = _ac26_unexpected_paths(standalone_drift, frozen_paths)
+    assert unexpected == {"orchestrator-topology.some-new-key"}, (
+        "the AC-26 allowlist must not exempt topology-gate property drift"
     )
