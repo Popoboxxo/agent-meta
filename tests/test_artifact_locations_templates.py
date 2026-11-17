@@ -488,3 +488,116 @@ def test_provider_context_count_does_not_grow():
     assert "{{ARTIFACT_" in rule_text
     for pinned in ("70/98", "line 70", "line 98"):
         assert pinned not in rule_text
+
+
+# ---------------------------------------------------------------------------
+# T20 — manager role, taxonomy rule, config examples, changelog
+# ---------------------------------------------------------------------------
+
+MANAGER_ROLE = GENERIC / "agent-meta-manager.md"
+TAXONOMY_RULE = ROOT / "rules" / "1-generic" / "se-cascade-artifact-taxonomy.md"
+ADR_STANDARD = ROOT / "rules" / "1-generic" / "se-cascade-adr-standard.md"
+PRESETS_YAML = ROOT / "config" / "artifact-locations-presets.yaml"
+CHANGELOG = ROOT / "CHANGELOG.md"
+
+# The two *full* project.yaml examples (docs/guides/... is an orchestrator
+# partial example and is deliberately not owned by T20).
+EXAMPLE_FILES = (
+    ROOT / "templates" / "configs" / "project.yaml.example",
+    ROOT / "howto" / "configs" / "project.yaml.example",
+)
+
+ARTIFACT_BLOCK_BEGIN = "# --- artifact-locations (Issue #1186) BEGIN ---"
+ARTIFACT_BLOCK_END = "# --- artifact-locations (Issue #1186) END ---"
+
+
+def _artifact_example_block(path: Path) -> str:
+    """Return the marker-delimited artifact-locations example block verbatim."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start = next(
+        (i for i, line in enumerate(lines) if ARTIFACT_BLOCK_BEGIN in line), None
+    )
+    end = next(
+        (i for i, line in enumerate(lines) if ARTIFACT_BLOCK_END in line), None
+    )
+    assert start is not None, f"missing BEGIN marker in {path}"
+    assert end is not None and end > start, f"missing END marker in {path}"
+    return "\n".join(lines[start : end + 1])
+
+
+def test_manager_references_status_artifacts():
+    """AC-14: the manager points at the machine-readable artifact status report."""
+    text = MANAGER_ROLE.read_text(encoding="utf-8")
+    assert "sync.py --status-artifacts --json" in text
+
+
+def test_taxonomy_uses_se_root_variable():
+    """D4: taxonomy resolves SE root via the matrix; docs/se/** is legacy only."""
+    text = TAXONOMY_RULE.read_text(encoding="utf-8")
+    assert "{{ARTIFACT_SE_ROOT}}" in text
+    assert "Konzept-Default: `docs/se`" not in text
+    # No bare `docs/se` literal; the sole allowed form is the legacy glob.
+    assert not re.findall(r"docs/se(?![/*\w])", text), "bare docs/se literal left"
+    legacy_lines = [line for line in text.splitlines() if "docs/se/**" in line]
+    assert legacy_lines, "docs/se/** must be named as legacy storage"
+    assert any(re.search(r"legacy", line, re.IGNORECASE) for line in legacy_lines)
+
+
+def test_adr_rule_naming_matches_matrix_default():
+    """D3: the read-only ADR rule and the matrix default describe one form."""
+    adr_lines = ADR_STANDARD.read_text(encoding="utf-8").splitlines()
+    assert "ADR-NNN_kurztitel.md" in adr_lines[9]  # line 10
+    assert "NNN" in adr_lines[10] and "3-stellig" in adr_lines[10]
+    canonical = "ADR-{nnn}_{slug}.md"
+    assert (
+        canonical.replace("{nnn}", "NNN").replace("{slug}", "kurztitel")
+        == "ADR-NNN_kurztitel.md"
+    )
+    assert 'naming: "ADR-{nnn}_{slug}.md"' in PRESETS_YAML.read_text(encoding="utf-8")
+
+
+def test_example_config_has_artifact_block():
+    """Both full examples carry a complete artifact-locations block."""
+    for path in EXAMPLE_FILES:
+        block = _artifact_example_block(path)
+        for key in ("artifact-locations:", "enabled:", "preset:", "classes:",
+                    "scratch:", "legacy:", "unmanaged:"):
+            assert key in block, f"{key!r} missing in {path}"
+        # D1: scratch.path is explicit inside the block.
+        scratch_at = block.index("scratch:")
+        assert re.search(r"path:\s*[\"']?\.tmp", block[scratch_at:])
+
+
+def test_example_configs_stay_in_sync():
+    """The artifact-locations block is byte-identical in both full examples."""
+    blocks = [_artifact_example_block(path) for path in EXAMPLE_FILES]
+    assert blocks[0] == blocks[1], "artifact-locations example blocks diverged"
+
+
+def test_example_config_does_not_promote_tmp_sink_alias():
+    """D1: only classes.scratch.path configures scratch in the example."""
+    for path in EXAMPLE_FILES:
+        block = _artifact_example_block(path)
+        assert "scratch:" in block and "path:" in block
+        # tmp-sink must not be configured as a second scratch source here.
+        assert not re.search(r"(?m)^\s*#?\s*tmp-sink\s*:", block), (
+            f"tmp-sink configured inside artifact-locations block in {path}"
+        )
+
+
+def test_example_config_uses_token_naming():
+    """D3: ADR naming uses the token canon; no <TOKEN> display form in config."""
+    for path in EXAMPLE_FILES:
+        block = _artifact_example_block(path)
+        assert "ADR-{nnn}_{slug}.md" in block
+        assert "<TOKEN>" not in block and "<YYYY-MM-DD>" not in block
+        assert not re.search(r"<[A-Z_]+>", block)
+
+
+def test_changelog_entry_mentions_migration():
+    """CHANGELOG [Unreleased] carries the feature entry and migration notes."""
+    changelog = CHANGELOG.read_text(encoding="utf-8")
+    unreleased = changelog.split("## [Unreleased]", 1)[1].split("## [", 1)[0]
+    for token in ("artifact-locations", "legacy[]", "enabled: false",
+                  "--migrate-artifact-aliases", "ADR-{nnn}_{slug}.md"):
+        assert token in unreleased, f"CHANGELOG migration note missing {token!r}"
