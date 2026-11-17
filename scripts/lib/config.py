@@ -9,11 +9,24 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from .agents import (
     build_agent_hints,
     build_agent_table,
     build_routing_tool_definitions_for_providers,
+)
+from .artifact_locations import (
+    ArtifactLocationsError,
+    CLASS_REGISTRY,
+    load_presets,
+    resolve_artifact_locations,
+    validate_kind,
+    validate_naming,
+    validate_path,
+    validate_preset,
+    validate_scratch_sources,
+    validate_subdir,
 )
 from .context_profile import (
     context_profile_log_lines,
@@ -856,7 +869,7 @@ def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Five kinds of checks:
+    Six kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -879,7 +892,13 @@ def _validate_config(config: dict, config_path: Path) -> None:
        Structure/path checks always run, even when the mode is disabled, so a
        later opt-in never surfaces a dormant misconfiguration.
 
-    5. Schema validation against agent-meta.schema.json if jsonschema is
+    5. Hard-fatal semantic matrix checks (_validate_artifact_locations): the
+       11 artifact-locations error codes (Spec 4.1, AC-11) are checked
+       independently of jsonschema. Structure/path checks always run, even
+       with ``enabled: false``; only the SE start-critical check depends on an
+       active systems-engineering cascade.
+
+    6. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
@@ -888,6 +907,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
     _validate_providers(config, config_path)
     _validate_orchestrator_topology(config, config_path)
     _validate_repo_containment(config, config_path)
+    _validate_artifact_locations(config, config_path, _framework_root())
     _validate_subagent_permissions(config, config_path)
     validate_test_environments(config, config_path)
     from .release_checklist import validate_release_checklist
@@ -1191,6 +1211,182 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
                 "Migration: change tmp-sink.path to a relative path inside "
                 "the repo, e.g. '.tmp' (default) or 'scratch/out'."
             )
+
+
+#: The 11 stable hard-error codes of the semantic matrix validator (Spec §4.1).
+_ARTIFACT_LOCATION_ERROR_CODES = frozenset({
+    "artifact-locations.path-invalid",
+    "artifact-locations.mode-parent-missing",
+    "artifact-locations.fallback-parent-unknown",
+    "artifact-locations.se-required-off",
+    "artifact-locations.subdir-invalid",
+    "artifact-locations.kind-invalid",
+    "artifact-locations.unknown-preset",
+    "artifact-locations.legacy-intersect",
+    "artifact-locations.unmanaged-intersect",
+    "artifact-locations.scratch-sink-divergence",
+    "artifact-locations.naming-invalid",
+})
+
+#: Classes whose ``mode: off`` keeps audit evidence through a documented
+#: frontmatter sink instead of an explicit parent (Spec §3.1, se-critic.md).
+#: The sink only exists while the SE cascade is active.
+_FRONTMATTER_SINK_CLASSES = frozenset({"reviews"})
+
+#: Classes that may be switched off outright (Spec §4.1 / AC-11):
+#: ``se-requirements`` is the cascade root (no parent exists) and
+#: ``se-decomposition`` may be written directly by the architect.
+_MODE_OFF_EXEMPT = frozenset({"se-requirements", "se-decomposition"})
+
+
+def _se_cascade_active(config: dict) -> bool:
+    """True when the systems-engineering cascade is enabled in this config."""
+    block = config.get("systems-engineering")
+    if isinstance(block, dict) and block.get("enabled"):
+        return True
+    return bool(config.get("SE_ENABLED"))
+
+
+def _validate_artifact_locations(
+    config: dict, config_path: Path, agent_meta_root: Path
+) -> None:
+    """Hard-validate the semantic ``artifact-locations`` matrix (Spec §4.1).
+
+    The T4 resolver owns the individual ``validate_*`` helpers and the stable
+    error codes; this hook translates their ``ArtifactLocationsError`` into a
+    user-facing stderr line plus ``sys.exit(1)``. It runs independently of
+    jsonschema and always performs the structural checks, even when the matrix
+    master switch is ``enabled: false`` — only the SE start-critical check is
+    cascade-dependent.
+
+    Check order: structure -> kind -> naming -> path -> mode/parent ->
+    SE start-critical -> subdir -> preset -> scratch single source ->
+    legacy intersection -> unmanaged intersection.
+    """
+    section = config.get("artifact-locations")
+    if not isinstance(section, dict) or not section:
+        return
+
+    def _fail(code: str, message: str) -> None:
+        print(f"ERROR: {config_path}: {code}: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    def _fail_error(error: ArtifactLocationsError, field: Optional[str] = None) -> None:
+        message = error.message
+        if field is not None:
+            message = f"invalid '{field}': {message}"
+        _fail(error.code, message)
+
+    raw_classes = section.get("classes") or {}
+    classes = raw_classes if isinstance(raw_classes, dict) else {}
+    valid_names = {
+        name for name in classes if isinstance(classes[name], dict) and name in CLASS_REGISTRY
+    }
+
+    # 1. kind: class-scoped enum, checked independently of jsonschema (AC-13).
+    for name in valid_names:
+        kind_value = classes[name].get("kind", ()) or ()
+        values = [kind_value] if isinstance(kind_value, str) else kind_value
+        for value in values:
+            try:
+                validate_kind(value, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 2. naming: closed token canon + class applicability (D3).
+    for name in valid_names:
+        naming = classes[name].get("naming")
+        if naming:
+            try:
+                validate_naming(naming, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 3. path structure: always relative and inside the project root.
+    for name in valid_names:
+        path = classes[name].get("path")
+        if path:
+            try:
+                validate_path(path, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 4. mode + fallback-parent.
+    cascade_active = _se_cascade_active(config)
+    for name in valid_names:
+        entry = classes[name]
+        mode = entry.get("mode")
+        parent = entry.get("fallback-parent")
+        if parent is not None and parent not in CLASS_REGISTRY:
+            _fail(
+                "artifact-locations.fallback-parent-unknown",
+                f"invalid 'artifact-locations.classes.{name}.fallback-parent': "
+                f"unknown class '{parent}'",
+            )
+        if name in _MODE_OFF_EXEMPT:
+            continue
+        has_sink = cascade_active and name in _FRONTMATTER_SINK_CLASSES
+        if mode == "off" and parent is None and not has_sink:
+            _fail(
+                "artifact-locations.mode-parent-missing",
+                f"invalid 'artifact-locations.classes.{name}.mode': 'off' "
+                "requires 'fallback-parent' or a frontmatter sink",
+            )
+
+    # 5. SE start-critical: only with an active cascade (AC-11).
+    se_requirements = classes.get("se-requirements")
+    if (
+        cascade_active
+        and isinstance(se_requirements, dict)
+        and se_requirements.get("mode") == "off"
+    ):
+        _fail(
+            "artifact-locations.se-required-off",
+            "invalid 'artifact-locations.classes.se-requirements.mode': the "
+            "cascade cannot start without requirements — 'se-decomposition' "
+            "is the allowed alternative",
+        )
+
+    # 6. subdir: a single flat path segment for SE leaf classes.
+    for name in valid_names:
+        subdir = classes[name].get("subdir")
+        if subdir:
+            try:
+                validate_subdir(subdir, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 7. preset: unknown names are hard errors (no silent default fallback).
+    preset_name = section.get("preset")
+    if preset_name is not None:
+        try:
+            validate_preset(preset_name, load_presets(agent_meta_root))
+        except ArtifactLocationsError as exc:
+            _fail_error(exc, field="artifact-locations.preset")
+
+    # 8. scratch single source (D1): a hard error even with enabled: false,
+    #    because two write targets for one sink are never acceptable.
+    try:
+        validate_scratch_sources(config, classes)
+    except ArtifactLocationsError as exc:
+        _fail_error(exc)
+
+    # 9./10. legacy[] and unmanaged[] may not shadow an active class path.
+    matrix = resolve_artifact_locations(config, agent_meta_root, None)
+    active_paths = {resolved.path for resolved in matrix.classes.values() if resolved.path}
+    for key, code in (
+        ("legacy", "artifact-locations.legacy-intersect"),
+        ("unmanaged", "artifact-locations.unmanaged-intersect"),
+    ):
+        entries = section.get(key) or ()
+        if not isinstance(entries, (list, tuple)):
+            continue
+        for entry in entries:
+            if entry in active_paths:
+                _fail(
+                    code,
+                    f"invalid 'artifact-locations.{key}': '{entry}' is also an active class path",
+                )
 
 
 def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
