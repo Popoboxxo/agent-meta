@@ -1,0 +1,246 @@
+# Artifact-location presets for Issue #1186 (SPEC-1186-artifact-locations-matrix).
+#
+# Data only. Every field used here is declared in config/project-config.schema.json
+# (root section "artifact-locations" plus its eight shared $defs). Presets are not
+# copied into project.yaml - a project stores only the preset name and overrides.
+# Naming values follow the closed token canon of Spec §3.2.1 (D3).
+version: 1
+
+presets:
+
+  # Full matrix from Spec §3.2: 14 non-SE classes (12 persistent + 2 ephemeral)
+  # plus the 9 SE cell classes. Legacy/unmanaged lists are framework-owned.
+  default:
+    classes:
+      specs:
+        path: docs/specs
+        mode: files
+        git: tracked
+        naming: "{date}-{slug}.md"
+      plans:
+        path: docs/plans
+        mode: files
+        git: tracked
+        naming: "{date}-{slug}.md"
+        archive: docs/plans/archive
+      concepts:
+        path: docs/concepts
+        mode: files
+        git: tracked
+        naming: "{date}-{slug}.md"
+      spikes:
+        path: docs/spikes
+        mode: files
+        git: tracked
+        naming: "{date}-issue-{n}-{topic}-spike.md"
+      reviews:
+        path: docs/reviews
+        mode: files
+        git: tracked
+        naming: "{kind}-{date}-{slug}.md"
+        kind: [code, concept, domain, copyedit, proofread, se]
+      audits:
+        path: docs/audits
+        mode: files
+        git: tracked
+        naming: "{kind}-{date}-{slug}.md"
+        kind: [security, dependency, a11y, lifecycle, prompt, ai-security]
+      analysis:
+        path: docs/analysis
+        mode: files
+        git: tracked
+        naming: "{kind}-{date}-{slug}.md"
+        kind: [analysis, triage, perf, log, research, estimate, conclusion]
+      reports:
+        path: docs/reports
+        mode: files
+        git: tracked
+        naming: "{date}-{slug}.md"
+        kind: [vv]
+      adr:
+        path: docs/adr
+        mode: files
+        git: tracked
+        naming: "ADR-{nnn}_{slug}.md"
+      traceability:
+        path: docs/traceability
+        mode: files
+        git: tracked
+        naming: "TRACE_{scope}.md"
+      runbooks:
+        path: docs/runbooks
+        mode: files
+        git: tracked
+        naming: "{date}-{slug}.md"
+      project-docs:
+        mode: files
+        files:
+          architecture: docs/ARCHITECTURE.md
+          codebase-overview: docs/CODEBASE_OVERVIEW.md
+          requirements: docs/REQUIREMENTS.md
+          issue-labels: docs/issue-labels.md
+      scratch:
+        path: .tmp
+        git: ignored
+        retention: manual
+        subdirs:
+          logs: .tmp/logs
+          test-output: .tmp/test-output
+          drafts: .tmp/drafts
+      state:
+        path: .meta-viz
+        git: ignored
+        retention: keep
+        subdirs:
+          progress: .meta-viz/progress
+          checkpoints: .meta-viz/checkpoints
+          handoffs: .meta-viz/handoffs
+        event-log: .meta-viz/events.jsonl
+      se-requirements:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Requirements.md"
+        subdir: ""
+      se-architecture:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Architecture.md"
+        subdir: ""
+      se-decomposition:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L2_architectural_decomposition_iter-N.md"
+        subdir: ""
+      se-interfaces:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Interfaces.md"
+        subdir: ""
+      se-implementation:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Impl.md"
+        subdir: implementation
+      se-testplan:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_TestPlan.md"
+        subdir: validation
+      se-validation:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Validation.md"
+        subdir: validation
+      se-verification:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Verification.md"
+        subdir: validation
+      se-decisions:
+        path: SE
+        mode: files
+        git: tracked
+        naming: "L{level}_{folder}_Decisions.md"
+        subdir: ""
+    # Framework-owned, read-only and additive (project entries extend, never remove).
+    legacy: &framework-legacy
+      - "docs/superpowers/specs"
+      - "docs/superpowers/plans"
+      - "docs/plans/audit-*.md"
+      - "docs/specs/*-review.md"
+      - "docs/conclusions/"
+      - "docs/estimates/"
+      - "docs/research/"
+      - "SE/VV/**"
+      - ".meta-viz/handoffs/**"
+      - "docs/se/**"
+      - "docs/adr/[0-9][0-9][0-9][0-9]-*.md"
+      - "docs/adr/ADR-[0-9][0-9][0-9]-*.md"
+    unmanaged: &framework-unmanaged
+      - ".meta-config/issue-labels-state.json"
+      - "docs/api/**"
+      - "docs/howto/**"
+      - "docs/guides/**"
+      - "docs/testing/**"
+      - "docs/providers/**"
+      - "docs/issues/**"
+      - "docs/se-cascade/**"
+
+  # Only specs/plans/reviews/audits produce files; every other mode-bearing
+  # class is inline. Ephemeral classes have no mode field in the schema.
+  minimal:
+    classes:
+      specs: {mode: files}
+      plans: {mode: files}
+      reviews: {mode: files}
+      audits: {mode: files}
+      concepts: {mode: inline}
+      spikes: {mode: inline}
+      analysis: {mode: inline}
+      reports: {mode: inline}
+      adr: {mode: inline}
+      traceability: {mode: inline}
+      runbooks: {mode: inline}
+      # artifactFileSet requires "files" even when the mode is inline.
+      project-docs:
+        mode: inline
+        files:
+          architecture: docs/ARCHITECTURE.md
+          codebase-overview: docs/CODEBASE_OVERVIEW.md
+          requirements: docs/REQUIREMENTS.md
+          issue-labels: docs/issue-labels.md
+      se-requirements: {mode: inline}
+      se-architecture: {mode: inline}
+      se-decomposition: {mode: inline}
+      se-interfaces: {mode: inline}
+      se-implementation: {mode: inline}
+      se-testplan: {mode: inline}
+      se-validation: {mode: inline}
+      se-verification: {mode: inline}
+      se-decisions: {mode: inline}
+    legacy: *framework-legacy
+    unmanaged: *framework-unmanaged
+
+  # Every class writes directly under docs/ (no per-class subfolder).
+  # Ephemeral scratch/state keep their framework paths for containment reasons.
+  flat:
+    classes:
+      specs: {path: docs}
+      plans: {path: docs}
+      concepts: {path: docs}
+      spikes: {path: docs}
+      reviews: {path: docs}
+      audits: {path: docs}
+      analysis: {path: docs}
+      reports: {path: docs}
+      adr: {path: docs}
+      traceability: {path: docs}
+      runbooks: {path: docs}
+      se-requirements: {path: docs}
+      se-architecture: {path: docs}
+      se-decomposition: {path: docs}
+      se-interfaces: {path: docs}
+      se-implementation: {path: docs}
+      se-testplan: {path: docs}
+      se-validation: {path: docs}
+      se-verification: {path: docs}
+      se-decisions: {path: docs}
+    legacy: *framework-legacy
+    unmanaged: *framework-unmanaged
+
+  # Documentation artifacts only: ephemeral scratch/state have no path
+  # ("ohne Pfad", Plan T2), which disables their ephemeral output.
+  docs-only:
+    classes:
+      scratch: {}
+      state: {}
+    legacy: *framework-legacy
+    unmanaged: *framework-unmanaged
