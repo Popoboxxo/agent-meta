@@ -61,6 +61,7 @@ from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.model_contracts import check_model_contracts
 from lib.consistency.placeholders import check_placeholders, load_project_vars
+from lib.consistency.project_context_injection import check_project_context_injection
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
 from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
@@ -274,6 +275,11 @@ def run_checks(
         # Context topology consistency (SPEC-CONTEXT-FILE-MODES, AC-19):
         # WARNING-only validation of context_file.topology / adapter keys.
         findings.extend(check_context_topology_consistency(root))
+
+        # Project-context injection scope (issue #1187, T11): four check IDs
+        # on config consistency and rendered pointer lines. Silent when the
+        # project has no project-context-injection section.
+        findings.extend(check_project_context_injection(root, project_config))
 
         # Orchestrator topology consistency (SPEC-orchestrator-topology, AC-3/
         # AC-7/AC-14/AC-16/AC-20): WARNING-only, one finding per check ID and

@@ -663,7 +663,7 @@ Begründung: #1187 ist der kleinste Eingriff und setzt die Rollen-Schleife neu a
 | AC6 (Delta im Sync-Log) | §3.5 | Test: Log-Zeile `project-context-injection: mode=… injected=n/total chars saved=k`; bei `all` ist `k == 0` |
 | AC7 (Prompt-Qualität bei `core`) | §5.4, §7 (AC7-Auslegung), §8.2 OQ-4 | `sync.py --validate` bleibt grün; `pointer-missing` = 0; Frontmatter-/Platzhalter-Checks unverändert grün (D7, drei Bedingungen) |
 | Issue-Requirement „Default bleibt `all`" | §3.1, §4.1 | Schema-Default `all` + Golden-Test AC2 |
-| Issue-Requirement „Delegation-Contract unverändert" | §4.5 | `schemas/a2a-handoff.schema.json` unverändert — Diff gegen den eingefrorenen Basis-Hash `git diff --name-only aaed14c2..HEAD -- schemas/a2a-handoff.schema.json` ist leer (nicht `HEAD`, sonst nach dem Commit vakuum-grün) |
+| Issue-Requirement „Delegation-Contract unverändert" | §4.5 | `schemas/a2a-handoff.schema.json` unverändert — Diff gegen den eingefrorenen Basis-Hash (Branch-Point) `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- schemas/a2a-handoff.schema.json` ist leer (nicht `HEAD`, sonst nach dem Commit vakuum-grün) |
 | Issue-Requirement „Provider-aware Pointer" | §2.4, §3.2 | Test über alle 9 Provider in `config/ai-providers.yaml`; Gemini-Fall explizit (`AGENTS.md`, nicht `GEMINI.md`) |
 | **D5** `orchestrator-roles` konfigurierbar | §3.1.1, §4.1, §4.2 | 5 Resolver-/Schema-Tests: Default-Menge pro Provider-Set, expliziter Override ersetzt vollständig, unbekannte Rolle = `SyncError`, leere Liste zulässig, Schema ohne `default` |
 | **D6** `exclude` gewinnt mit WARN | §3.1.2, §5.1, §5.2 | Kein `SyncError` mehr; WARN-Text-Assertion (`exclude-overrides-mode`), genau **eine** WARN pro Lauf; Szenario-Lauf F |
@@ -671,6 +671,8 @@ Begründung: #1187 ist der kleinste Eingriff und setzt die Rollen-Schleife neu a
 | **D8** Pointer-Text und -Sprache | §3.2.1, §4.1, §4.2, §5.1 | 5 Tests: Default (`en`), `de`, `project` (inkl. Fallback-WARN), `pointer-text`-Override, unbekannter Token/mehrzeilig = `SyncError` |
 
 **Keine AC ohne Task.** Umgekehrt gilt: T3, T14 sind Voraussetzungen (Registrierung/Doku), keine eigenen ACs.
+
+> **Amendment 2026-11-17 (Wahl A):** Golden-Gate-Basis auf den Branch-Point `6eeeff4475f301690b198f0eba2249ec2b65d384` geholt — `aaed14c2` war die Plan-Basis; dazwischen lagen beta.9-Golden-Änderungen (4 Golden-Pfade), die den Literal-Guard unerfüllbar machten. Der Guard bleibt in Kraft, **kein Rebaseline**. Gilt für die Delegation-Contract-Zeile (§11) und den zugehörigen Review-Eintrag RVW-1187-04 (§12).
 
 ---
 
@@ -684,7 +686,7 @@ Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Damals `DRAFT`, s
 | **RVW-1187-01** (MAJOR) | M1-Gate erwartete die erst in T7 (M2) implementierte Logzeile. Log-Assertion aus M1 entfernt und in M2 verschoben. | Plan §3 M1/M2-Gates |
 | **RVW-1187-02** (MAJOR) | **Eine** Pointer-Mechanik festgelegt: Block blankieren → leere `**Project context:**`-Zeile entfernen → Pointer als **eine** Zeile vor dem letzten `</context>` einfügen (Fallbacks vor `</workflow>` bzw. Dateiende). Die widersprüchliche Formulierung „an der Stelle des Platzhalters" ist ersatzlos gestrichen. | Spec §3.2, §3.6 D-2, §5.3 Schritt 5, §5.2; Plan T6, §5.3 |
 | **RVW-1187-03** (MAJOR) | AC3-Rollenmenge exakt benannt: 15 Rollen ohne Platzhalter = 13 `se-*` + `intern-developer` + `mammouth-expert` (`se-integration-and-test-manager` trägt den Platzhalter und gehört **nicht** dazu). Dreistufiger Fallback dokumentiert; `intern-developer` → `</workflow>`, 13 `se-*` + `mammouth-expert` → Dateiende. | Spec §3.2 (Tabelle), §5.2, §8.1, §11 AC3; Plan T6, OQ-7 |
-| **RVW-1187-04** (MAJOR) | Negativ-Assertions über `git diff --name-only HEAD` (nach Commit vakuum-grün) ersetzt durch `git diff --name-only aaed14c2..HEAD -- <pfad>` (eingefrorener Basis-Hash). | Plan T10, T15, §9; Spec §11 (Delegation-Contract-Zeile) |
+| **RVW-1187-04** (MAJOR) | Negativ-Assertions über `git diff --name-only HEAD` (nach Commit vakuum-grün) ersetzt durch `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- <pfad>` (eingefrorener Basis-Hash = Branch-Point, Amendment 2026-11-17). | Plan T10, T15, §9; Spec §11 (Delegation-Contract-Zeile) |
 | **RVW-1187-05** (MINOR) | „`project.yaml` byte-identisch" ist mit Minimal-Fixture falsch (strukturelle Auto-Fills). Assertion auf `grep -c '^project-context-injection:' == 0` verengt (ursprünglich Plan T15 Schritt 8; mit RVW2-1187-02 nach Schritt 2 / Lauf A verschoben). | Plan T15, §7; Spec §4.1, §8.1, §11 AC2 |
 | **RVW-1187-06** (MINOR) | `_SYNC_SKIPPED_DEFAULT_KEYS`-Begründung entschärft: Sektion hat keinen Top-Level-Default, Nested-Fill behandelt nur `dod.*`; Eintrag ist reiner Regressionsschutz, kein heute wirksamer Fix. | Spec §4.1; Plan T2 |
 | **Validator-WARN** (`spec:433`) | Falscher #1181-Key korrigiert: `auto_commit.authority_overrides` (nested), nicht `commit-authority-overrides`/`tools-overrides`. | Spec §10 (Schema-Zeile) |

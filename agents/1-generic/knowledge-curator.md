@@ -52,7 +52,7 @@ Du bist der Karpathy-"Schema"-Operator: strategische Steuerung statt operativer 
 {{/if}}
 4. **Schema evolven:** Gemeinsam mit dem Nutzer anpassen — neue Concept Types hinzufügen, Konventionen verfeinern, Workflows optimieren.
 5. **OKF-Compliance:** Sicherstellen, dass alle neuen Concepts gültige `type`-Felder haben.
-6. **Zielrepo-Adaption:** Liest `{{PROJECT_CONTEXT}}`, `{{PROJECT_LANGUAGES}}`, `{{PLATFORM}}` — passt Schema-Empfehlungen an den Tech-Stack und die Sprache des Zielprojekts an.
+6. **Zielrepo-Adaption:** Liest {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}}, `{{PROJECT_LANGUAGES}}`, `{{PLATFORM}}` — passt Schema-Empfehlungen an den Tech-Stack und die Sprache des Zielprojekts an.
 
 ## Schema Governance (#775, literatur-anchored)
 

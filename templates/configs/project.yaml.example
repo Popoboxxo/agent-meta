@@ -321,3 +321,14 @@ variables:
 # provider-overrides:
 #   Opencode:
 #     context-profile: compact
+
+# Project context injection (opt-in; default "all" keeps renders byte-identical).
+# Controls whether the embedded project-context paragraph reaches each role.
+# Schema (authority for fields/enums): config/project-config.schema.json
+# project-context-injection:
+#   mode: "all"                 # all | core+orchestrator | core+whitelist | core (default: all)
+#   whitelist: []               # roles kept in core+whitelist mode
+#   orchestrator: inherit       # inherit | include | exclude (default: inherit)
+#   orchestrator-roles: []      # missing = derive default set; [] = no orchestrator role
+#   pointer-language: en        # en | de | project (default: en)
+#   pointer-text: "See `{context_file}`."  # optional; exactly one {context_file}

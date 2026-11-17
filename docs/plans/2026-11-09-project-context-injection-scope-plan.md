@@ -387,7 +387,8 @@ Die 4 Block-Vorkommen (`ui-ux-designer.md:72`, `bug-feature-analyzer.md:76`, `kn
 ### T10 — Golden-Gate unverändert grün (AC2-Beleg)
 **Datei:** keine Änderung — `tests/test_template_slimming_equivalence.py` (nur ausführen) · `tests/test_project_context_injection_render.py` (neu)
 **Test zuerst:** Der Test existiert bereits; der Beweis ist der **unveränderte, grüne** Lauf. Zusätzlich:
-- `test_golden_gate_file_untouched_by_this_issue` — `subprocess.run(["git","diff","--name-only","aaed14c2..HEAD","--","tests/test_template_slimming_equivalence.py","tests/fixtures/slimming-golden"])` liefert **leeren** Output (eingefrorener Basis-Hash; `HEAD` allein wäre nach dem Commit vakuum-grün). Muster in `tests/test_context_compact_mode.py:24-26`, aber mit explizitem Basis-Hash statt `HEAD`.
+- `test_golden_gate_file_untouched_by_this_issue` — `subprocess.run(["git","diff","--name-only","6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD","--","tests/test_template_slimming_equivalence.py","tests/fixtures/slimming-golden"])` liefert **leeren** Output (eingefrorener Basis-Hash — Branch-Point; `HEAD` allein wäre nach dem Commit vakuum-grün). Muster in `tests/test_context_compact_mode.py:24-26`, aber mit explizitem Basis-Hash statt `HEAD`.
+> **Amendment 2026-11-17 (Wahl A):** Golden-Gate-Basis auf den Branch-Point `6eeeff4475f301690b198f0eba2249ec2b65d384` geholt — `aaed14c2` war die Plan-Basis; dazwischen lagen beta.9-Golden-Änderungen (4 Golden-Pfade), die den Literal-Guard unerfüllbar machten. Der Guard bleibt in Kraft, **kein Rebaseline**. Gilt für T10 und T15 Schritt 9.
 **Implementierung:** nichts. Wenn der Golden-Lauf nach T9 rot wird, ist die D-3-Umsetzung falsch — **nicht** die Fixtures rebaselinen.
 **Verifikation:** `python3 -m pytest tests/test_template_slimming_equivalence.py --basetemp="$PYTEST_BASETEMP" -q` → grün, ohne Fixture-Änderung.
 **Abhängigkeiten:** T9 · **Größe:** S
@@ -473,7 +474,7 @@ Keine Datei → überspringen (nie Fehler). Registrierung in `scripts/consistenc
    - **Lauf G (D5):** `mode: core+orchestrator` + `orchestrator-roles: [senior-developer]` → Absatz **nur** in `senior-developer.md`; `orchestrator.md` ohne Absatz, mit Pointer. Zusatzlauf `orchestrator-roles: []` → Exit **0**, keine Rolle mit Absatz, genau eine WARN `empty-orchestrator-set`. Zusatzlauf `orchestrator-roles: [nope]` → Exit ≠ 0, `nope` in stderr, Fehlercode `orchestrator-roles-unknown`.
    - **Lauf H (D8):** `mode: core` + `pointer-language: de` → jede Rollendatei enthält den deutschen Pointer (z. B. „Projektkontext: lies zuerst `CLAUDE.md`"), **nicht** den englischen. Zusatzlauf `pointer-text: "See \`{context_file}\` for project facts."` → exakt dieser Text mit ersetztem Dateinamen. Negativ: `pointer-text: "Read {context_file} and {mode}."` → Exit ≠ 0 mit `pointer-text-unknown-token` und `{mode}` in stderr; `pointer-language: fr` → Exit ≠ 0 mit `pointer-language-unknown`.
 8. `python3 scripts/sync.py --validate` im Konsumenten → PASS (AC7); die Materialisierungs-Assertion (`grep -c '^project-context-injection:' == 0`) steht in Schritt 2 (Lauf A), **nicht** nach Lauf B — dort setzt die Test-Config die Sektion selbst. **Keine** Byte-Identitäts-Assertion der ganzen Datei, weil strukturelle Auto-Fills sie ändern.
-9. Negativ-Assertions gegen den eingefrorenen Basis-Hash: `git diff --name-only aaed14c2..HEAD -- schemas/a2a-handoff.schema.json tests/test_template_slimming_equivalence.py tests/fixtures/slimming-golden` ist leer (nicht `HEAD` allein — nach dem Commit wäre das vakuum-grün).
+9. Negativ-Assertions gegen den eingefrorenen Basis-Hash (Branch-Point): `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- schemas/a2a-handoff.schema.json tests/test_template_slimming_equivalence.py tests/fixtures/slimming-golden` ist leer (nicht `HEAD` allein — nach dem Commit wäre das vakuum-grün).
 **Implementierung:** `run.sh` mit `set -euo pipefail` und einem `assert_eq`/`assert_contains`-Helper; Exit `SCENARIO OK`. Ergebnisse (Datum, HEAD, 5 Logzeilen) in einem Abschnitt „Ausführungsnachweis" am Planende dokumentieren. Falls der Wave-Orchestrator das Szenario doch in `tests/scenarios/registry.md` registriert, sind `95`–`98` für #1187 reserviert (`94` gehört #1181, `99` #1186).
 **Zusätzlich (Regression):** `python3 -m pytest tests/test_project_context_injection_config.py tests/test_project_context_injection_render.py tests/test_project_context_injection_consistency.py tests/test_admin_ui_project_context_injection_section.py tests/test_template_slimming_equivalence.py tests/test_admin_server.py tests/test_context_profile_admin.py --basetemp="$PYTEST_BASETEMP" -q`.
 **Verifikation:** `bash .tmp/scenario-context-1187/run.sh` → `SCENARIO OK`; Regression grün.
@@ -618,7 +619,7 @@ Provider-Achse wird über `pc["context_file"]` parametrisiert, nicht über Provi
 | **AC6** Delta im Sync-Log | T7 | 4 Log-Tests inkl. `chars saved == 0` bei `all`; `len(pointer)` = aufgelöster Pointer (D8) |
 | **AC7** Prompt-Qualität bei `core` | T8, T11, T15 | `test_core_keeps_required_sections_non_empty`, `pointer-missing = 0`, `sync.py --validate` grün im Szenario — D7: alle **drei** Bedingungen, kein neuer Check |
 | Issue-Requirement „Default bleibt `all`" | T2, T8 | `test_scope_absent_config_defaults_to_all`, AC2-Tests |
-| Issue-Requirement „Delegation-Contract unverändert" | T15 (Diff-Check) | `schemas/a2a-handoff.schema.json` nicht in `git diff --name-only aaed14c2..HEAD -- schemas/a2a-handoff.schema.json` (eingefrorener Basis-Hash, nicht `HEAD`) |
+| Issue-Requirement „Delegation-Contract unverändert" | T15 (Diff-Check) | `schemas/a2a-handoff.schema.json` nicht in `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- schemas/a2a-handoff.schema.json` (eingefrorener Basis-Hash = Branch-Point, nicht `HEAD`) |
 | Issue-Requirement „Provider-aware Pointer" | T6 | Test über alle Provider aus `config/ai-providers.yaml`, Gemini-Fall (`AGENTS.md`) explizit |
 | **D5** `orchestrator-roles` | T1, T2, T5, T8, T13, T15 | Default-Menge, Override, leere Liste, unbekannte Rolle, Pane-Feld, Szenario-Lauf G |
 | **D6** `exclude` gewinnt mit WARN | T2, T5, T8, T15 | Kein `SyncError`, exakter WARN-Text, genau eine WARN pro Lauf, Szenario-Lauf F |
@@ -679,7 +680,7 @@ Alle Befunde aus dem Review vom 2026-11-09 sind eingearbeitet. Damals `DRAFT`, s
 | **RVW-1187-01** (MAJOR) | Logzeilen-Assertion aus M1-Gate entfernt (dort erst nach T7/M2 möglich) und in M2-Gate verschoben. | §3 M1/M2-Gates |
 | **RVW-1187-02** (MAJOR) | Eine Pointer-Mechanik: Block blankieren → leere `**Project context:**`-Zeile entfernen → Pointer vor letztem `</context>`; Fallbacks `</workflow>` und Dateiende. Spec §3.2/§3.6 D-2/§5.3 nachgezogen, T6-Tests entsprechend. | T6, §5.3, §5.4 |
 | **RVW-1187-03** (MAJOR) | AC3-Rollenmenge exakt: 15 Rollen ohne Platzhalter = 13 `se-*` + `intern-developer` + `mammouth-expert`; dreistufiger Fallback in Spec §3.2. T6-Test deckt alle Fallback-Gruppen ab; T15-Schritt 4 prüft `mammouth-expert`/`se-architect`/`intern-developer`. | T6, T15, §11 F2 |
-| **RVW-1187-04** (MAJOR) | Negativ-Assertions über `git diff --name-only HEAD` durch `git diff --name-only aaed14c2..HEAD -- <pfad>` ersetzt (T10, T15 Schritt 9, §9 Delegation-Contract). | T10, T15, §9 |
+| **RVW-1187-04** (MAJOR) | Negativ-Assertions über `git diff --name-only HEAD` (nach Commit vakuum-grün) ersetzt durch `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- <pfad>` (eingefrorener Basis-Hash = Branch-Point, Amendment 2026-11-17). | T10, T15, §9 |
 | **RVW-1187-05** (MINOR) | „`project.yaml` byte-identisch" ersetzt durch `grep -c '^project-context-injection:' == 0` (ursprünglich T15 Schritt 8, §7; mit RVW2-1187-02 nach Schritt 2 verschoben). | T15, §7 |
 | **RVW-1187-06** (MINOR) | `_SYNC_SKIPPED_DEFAULT_KEYS`-Begründung entschärft: Sektion hat keinen Top-Level-Default, Eintrag ist reiner Regressionsschutz. | T2 |
 | **Validator-WARN** (`spec:433`) | #1181-Key ist `auto_commit.authority_overrides` (nested), in der Konfliktmatrix korrigiert. | §2 (agent_sync-Zeile), §8; Spec §10 |
@@ -734,4 +735,15 @@ bestehenden `roles_without_template`-Meldung.
 
 ## 15. Ausführungsnachweis
 
-> **Noch leer — wird bei Umsetzung gefüllt** (Datum, HEAD, Szenario-Logzeilen, Testläufe). Es ist ein Ergebnisprotokoll, **kein** Platzhalter für Implementierungsdetails.
+> **Ausgeführt 2026-11-17** auf `feat/1187-project-context-injection`, HEAD `e4de3f5f80c7a741ab67b1aa92e864b71248c358` (T1–T14 committed). Ergebnisprotokoll, kein Platzhalter für Implementierungsdetails.
+>
+> - **Szenario:** `bash .tmp/scenario-context-1187/run.sh` → `SCENARIO OK` (A–H inkl. Negativfälle, 14 echte Sync-Läufe in `.tmp/`-Konsumenten; Scratch, kein Repo-Artefakt).
+> - **Regression:** 345 passed, 20 subtests passed, 2 warnings (61.73 s) — 7 Testdateien, `--basetemp=.tmp/pytest-basetemp-1187-t15`.
+> - **Gates (Repo-Root):** `--validate` → `[PASS] All checks passed.` (4 WARNs, alle vorbestehend); `--check` → DRY-RUN, rc 0, keine `project-context-injection`-Findings (2 umgebungsabhängige WARNs `mcp.duplicate-plugin` / `opencode-v2 gate` bereits in früheren Logs belegt).
+> - **Golden-Gate:** `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- schemas/a2a-handoff.schema.json tests/test_template_slimming_equivalence.py tests/fixtures/slimming-golden` → leer.
+> - **Logzeilen (Auszug):**
+>   - `mode=all injected=9/9 roles, pointer=0, chars saved=0 (vs mode=all)`
+>   - `mode=core injected=0/9 roles, pointer=9, chars saved=4269 (vs mode=all)`
+>   - `project-context-injection.exclude-overrides-mode: mode=all + orchestrator=exclude — orchestrator roles (orchestrator) excluded; exclude wins`
+>   - `mode=core+orchestrator injected=1/9 roles, pointer=8, chars saved=3472 (vs mode=all)`
+>   - `project-context-injection.empty-orchestrator-set: mode=core+orchestrator + orchestrator-roles=[] — no role receives the block (mode degenerates to core)`

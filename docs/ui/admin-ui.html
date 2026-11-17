@@ -1648,6 +1648,7 @@ function buildSidebar() {
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
         { route: "/project/auto-commit",          label: "Auto-Commit",          icon: "⏱" },
+        { route: "/project/project-context-injection", label: "Project Context Injection", icon: "◈" },
         { route: "/project/commit",                label: "Commit Trailers",      icon: "✎" },
         { route: "/project/release-checklist",     label: "Release Checklist",    icon: "☑" },
 
@@ -7818,6 +7819,210 @@ async function viewProjectAutoCommit() {
   return wrap;
 }
 
+/* ---------------------- Project Context Injection ---------------------- */
+async function viewProjectContextInjection() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Project Context Injection"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Controls per-role embedding of {{PROJECT_CONTEXT}} into generated role prompts (issue #1187). ",
+    "mode all (default) keeps today's byte-identical output for every role; core embeds nothing; ",
+    "core+orchestrator adds orchestrator roles; core+whitelist adds the listed roles. ",
+    "orchestrator (inherit/include/exclude) refines the orchestrator set. ",
+    "orchestrator-roles overrides the derived set: omit the key for default derivation, or write ",
+    "an explicit empty list for no orchestrator role. The server is authoritative for the result.",
+  ]));
+
+  const data = await loadProject();
+  const pci = (data["project-context-injection"] && typeof data["project-context-injection"] === "object")
+    ? clone(data["project-context-injection"]) : {};
+
+  const status = el("p", {
+    id: "project-context-injection-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const setError = (msg) => {
+    toast(msg, "error");
+    status.textContent = msg;
+    status.style.color = "var(--accent-red)";
+  };
+
+  const MODES = ["all", "core+orchestrator", "core+whitelist", "core"];
+  const ORCHESTRATOR = ["inherit", "include", "exclude"];
+  const POINTER_LANGUAGES = ["en", "de", "project"];
+
+  // Role options come from role-defaults (super-admin path); fall back to the
+  // project payload, then to a free-text comma field when neither has roles.
+  let roleNames = [];
+  try {
+    const rd = await api.get("/api/config/role-defaults");
+    const roles = rd.roles || {};
+    roleNames = Array.isArray(roles) ? roles.slice() : Object.keys(roles);
+  } catch {
+    const fallback = data.roles || [];
+    roleNames = Array.isArray(fallback) ? fallback.slice() : Object.keys(fallback || {});
+  }
+
+  const whitelistInitial = Array.isArray(pci["whitelist"]) ? pci["whitelist"].slice() : [];
+  const orchRolesInitial = Array.isArray(pci["orchestrator-roles"]) ? pci["orchestrator-roles"].slice() : null;
+  const pointerTextInitial = typeof pci["pointer-text"] === "string" ? pci["pointer-text"] : "";
+
+  let mode = MODES.includes(pci["mode"]) ? pci["mode"] : "all";
+  let orchestrator = ORCHESTRATOR.includes(pci["orchestrator"]) ? pci["orchestrator"] : "inherit";
+  let pointerLanguage = POINTER_LANGUAGES.includes(pci["pointer-language"]) ? pci["pointer-language"] : "en";
+  let whitelist = whitelistInitial.slice();
+  let orchRoles = orchRolesInitial ? orchRolesInitial.slice() : [];
+  // Toggle on => drop the orchestrator-roles key (server derives the set).
+  let deriveOrchRoles = orchRolesInitial === null;
+
+  const multiField = (id, label, selected, onChange, help) => {
+    if (roleNames.length > 0) {
+      return checkboxGroupField(
+        label,
+        roleNames.map(name => ({ name, id: `${id}-${name}` })),
+        selected,
+        onChange,
+        help
+      );
+    }
+    const inp = textInputEl(id, (selected || []).join(", "), "role-a, role-b", (v) => {
+      onChange(v.split(",").map(s => s.trim()).filter(Boolean));
+    });
+    return a11yField({ id, label, help, control: inp });
+  };
+
+  const scopePanel = el("div", { class: "panel" });
+  scopePanel.appendChild(el("h2", {}, ["Scope"]));
+  scopePanel.appendChild(dropdownField(
+    "Mode", MODES, mode, v => { mode = v; updatePreview(); },
+    {
+      all: "all — embed for every role (default, byte-identical)",
+      "core+orchestrator": "core+orchestrator — only orchestrator roles",
+      "core+whitelist": "core+whitelist — only whitelisted roles",
+      core: "core — embed no project context",
+    },
+    "Which roles receive the {{PROJECT_CONTEXT}} paragraph."
+  ));
+  scopePanel.appendChild(dropdownField(
+    "Orchestrator", ORCHESTRATOR, orchestrator, v => { orchestrator = v; updatePreview(); },
+    {
+      inherit: "inherit — use the provider's orchestrator/primary role set",
+      include: "include — always include orchestrator roles",
+      exclude: "exclude — always exclude orchestrator roles (wins over mode)",
+    },
+    "Refines how orchestrator roles are treated."
+  ));
+  wrap.appendChild(scopePanel);
+
+  const rolesPanel = el("div", { class: "panel" });
+  rolesPanel.appendChild(el("h2", {}, ["Role selection"]));
+  rolesPanel.appendChild(multiField(
+    "project-context-injection-whitelist", "Whitelist", whitelist,
+    v => { whitelist = v; updatePreview(); },
+    "Roles that receive the block under mode core+whitelist."
+  ));
+  rolesPanel.appendChild(checkboxField(
+    "Default derivation (orchestrator-roles)", deriveOrchRoles,
+    v => { deriveOrchRoles = v; updatePreview(); },
+    "On: omit the orchestrator-roles key so the server derives the set. " +
+    "Off: write the selected list (an empty list means no orchestrator role)."
+  ));
+  rolesPanel.appendChild(multiField(
+    "project-context-injection-orch-roles", "Orchestrator roles", orchRoles,
+    v => { orchRoles = v; updatePreview(); },
+    "Explicit orchestrator role set. Only written when default derivation is off."
+  ));
+  wrap.appendChild(rolesPanel);
+
+  const pointerPanel = el("div", { class: "panel" });
+  pointerPanel.appendChild(el("h2", {}, ["Pointer"]));
+  pointerPanel.appendChild(dropdownField(
+    "Pointer language", POINTER_LANGUAGES, pointerLanguage, v => { pointerLanguage = v; },
+    {
+      en: "en — English pointer (default)",
+      de: "de — German pointer",
+      project: "project — derive from COMMUNICATION_LANGUAGE (unknown falls back to en)",
+    },
+    "Language of the read-first pointer."
+  ));
+  const pointerInput = textInputEl(
+    "project-context-injection-pointer-text", pointerTextInitial, "Allowed token: {context_file}", () => {}
+  );
+  pointerPanel.appendChild(a11yField({
+    id: "project-context-injection-pointer-text", label: "Pointer text",
+    help: "Single line, at least one character, exactly one {context_file} token. " +
+          "Leave empty to omit the key and use the language default.",
+    control: pointerInput,
+  }));
+  wrap.appendChild(pointerPanel);
+
+  const previewPanel = el("div", { class: "panel" });
+  previewPanel.appendChild(el("h2", {}, ["Effect preview (read-only)"]));
+  const previewBody = el("div", { class: "muted", style: "white-space:pre-line;" }, ["…"]);
+  previewPanel.appendChild(previewBody);
+  previewPanel.appendChild(el("p", { class: "field-help" }, [
+    "The server is authoritative — this preview only estimates the effect.",
+  ]));
+  wrap.appendChild(previewPanel);
+
+  function updatePreview() {
+    const isOrch = (role) => deriveOrchRoles
+      ? role === "orchestrator"
+      : orchRoles.includes(role);
+    const rows = roleNames.map(role => {
+      let injected;
+      if (mode === "all") injected = true;
+      else if (mode === "core") injected = false;
+      else if (mode === "core+orchestrator") injected = isOrch(role);
+      else injected = whitelist.includes(role); // core+whitelist
+      if (isOrch(role)) {
+        if (orchestrator === "exclude") injected = false;
+        else if (orchestrator === "include") injected = true;
+      }
+      return `${role} → ${injected ? "injected" : "not injected"}`;
+    });
+    previewBody.textContent = rows.length ? rows.join("\n") : "No roles available for preview.";
+  }
+  updatePreview();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const rawPointer = pointerInput.value;
+      const pointerText = rawPointer.trim();
+      if (rawPointer.includes("\n")) {
+        setError("pointer-text must be a single line.");
+        return;
+      }
+      if (pointerText !== "" && !/\{context_file\}/.test(pointerText)) {
+        setError("pointer-text must contain the {context_file} token.");
+        return;
+      }
+      if ((pointerText.match(/\{context_file\}/g) || []).length > 1) {
+        setError("pointer-text must contain exactly one {context_file} token.");
+        return;
+      }
+      // Clone the loaded section so unknown keys survive a partial save.
+      const out = clone(pci);
+      out.mode = mode;
+      out.whitelist = [...new Set(whitelist)];
+      out.orchestrator = orchestrator;
+      if (deriveOrchRoles) {
+        delete out["orchestrator-roles"];
+      } else {
+        const selected = [...new Set(orchRoles)];
+        if (selected.length === 0) { out["orchestrator-roles"] = []; }
+        else { out["orchestrator-roles"] = selected; }
+      }
+      out["pointer-language"] = pointerLanguage;
+      if (pointerText !== "") { out["pointer-text"] = pointerText; }
+      else { delete out["pointer-text"]; }
+      try { await saveProjectSection("project-context-injection", out, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
 /* --------------------------- Commit Trailers --------------------------- */
 async function viewProjectCommit() {
   const wrap = el("div");
@@ -11362,6 +11567,7 @@ async function init() {
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
   router.register("/project/auto-commit",          viewProjectAutoCommit);
+  router.register("/project/project-context-injection", viewProjectContextInjection);
   router.register("/project/commit",               viewProjectCommit);
   router.register("/project/release-checklist",    viewProjectReleaseChecklist);
 
@@ -11480,6 +11686,7 @@ init();
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",
+    "project/project-context-injection": "project_instance-project_context_injection",
     "project/commit": "project_instance-commit",
     "project/release-checklist": "project_instance-release_checklist",
     "project/test-environments": "project_instance-test_environments",

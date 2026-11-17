@@ -2873,6 +2873,45 @@
         "full",
         "compact"
       ]
+    },
+    "project-context-injection": {
+      "type": "object",
+      "description": "Issue #1187: scope of {{PROJECT_CONTEXT}} injection into generated role prompts. 'all' (default) reproduces today's output byte-identically.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["all", "core+orchestrator", "core+whitelist", "core"],
+          "default": "all"
+        },
+        "whitelist": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "uniqueItems": true,
+          "default": []
+        },
+        "orchestrator": {
+          "type": "string",
+          "enum": ["inherit", "include", "exclude"],
+          "default": "inherit"
+        },
+        "orchestrator-roles": {
+          "type": "array",
+          "description": "Explicit orchestrator role set; REPLACES the derived default (orchestrator + active providers' primary-role). Absent key = derived default; [] = no orchestrator role. No schema default on purpose (a materialized [] would change the next sync's semantics).",
+          "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "uniqueItems": true
+        },
+        "pointer-language": {
+          "type": "string",
+          "enum": ["en", "de", "project"],
+          "default": "en"
+        },
+        "pointer-text": {
+          "type": "string",
+          "description": "Overrides the language default completely. Exactly one '{context_file}' token, single physical line, no other braces. No schema default on purpose.",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

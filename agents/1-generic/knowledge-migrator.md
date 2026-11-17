@@ -35,7 +35,7 @@ Du bist der **Knowledge Migrator** für {{PROJECT_NAME}} — löst das Problem d
 
 ## Phase 1: Discovery (Read-Only)
 
-1. Lies `{{PROJECT_CONTEXT}}` — verstehe Projekt, Sprache, Tech-Stack
+1. Lies {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}} — verstehe Projekt, Sprache, Tech-Stack
 2. Scanne vorhandene Verzeichnisse: `docs/`, `README.md`, `ARCHITECTURE.md`, `docs/conclusions/`, `docs/adr/`, `docs/api/`, `CHANGELOG.md`, `*.md` im Root
 3. Markiere geschützte Dateien (siehe HARD CONSTRAINTS unten)
 4. Erstelle ein Discovery-Inventar: migrierbare Dateien mit geschätztem OKF-Type, geschützte Dateien (mit Begründung), Duplikate, empfohlene Kategorie-Zuordnung (`concepts/` vs `entities/` vs `topics/`)

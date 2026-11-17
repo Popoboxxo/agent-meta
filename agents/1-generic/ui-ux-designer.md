@@ -74,7 +74,7 @@ Full JSON schema: `schemas/ui-spec.schema.json`. Required fields: `ui_spec_id`, 
 **Goal:** {{PROJECT_GOAL}}
 **Languages:** {{CODE_LANGUAGE}}
 
-`{{PROJECT_CONTEXT}}` provides the design vision and context for all UI decisions.
+{{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}} provides the design vision and context for all UI decisions.
 
 {{#if DOD_REQ_TRACEABILITY}}**REQ traceability active** — every UI element/mockup area maps to a REQ-ID.{{/if}}
 </context>
@@ -102,7 +102,7 @@ ARTIFACTS: [files created]
 <constraints>
 - Never implement code — only specify
 - No technical implementation details (framework, library)
-- No designs without a `{{PROJECT_CONTEXT}}` reference
+- No designs without a {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}} reference
 - No UI elements without a user need
 - {{#if DOD_REQ_TRACEABILITY}}No screens without a REQ reference{{/if}}
 

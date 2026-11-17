@@ -699,6 +699,13 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # inactive even when the variables dict does not carry it yet.
     conditional_vars.update(_INSTANCE_CONDITIONAL_FLAGS)
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
+    # #1187: the project-context injection gate. Statically whitelisted so an
+    # absent value keeps the historic `all` branch active (deliberately NOT in
+    # _FALSE_DEFAULT_CONDITIONALS): it is only set explicitly to "false" for
+    # excluded roles by agent_sync.apply_project_context_scope. Without this
+    # entry the orphaned-marker cleanup keeps BOTH {{#if}} branches, doubling
+    # the project-context prose in every template that uses the gate.
+    conditional_vars.update({"PROJECT_CONTEXT_INJECTED"})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})

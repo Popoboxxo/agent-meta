@@ -587,7 +587,77 @@ def _build_provider_vars(
             active_set=active_set,
         )
     )
+    # #1187 (T4): project-context provider defaults. Imported lazily because
+    # config.py must not be imported at module load time (load-time cycle);
+    # same seam as resolve_subagent_permission_provider_vars above.
+    from .config import (
+        _PROJECT_CONTEXT_POINTER_TEXTS,
+        format_project_context_pointer,
+    )
+
+    _pc_scope = variables.get("_PROJECT_CONTEXT_SCOPE") or {}
+    provider_vars["PROJECT_CONTEXT_MODE"] = _pc_scope.get("mode", "all")
+    # Conservative default: today's behavior embeds the context for everyone.
+    # The per-role value is applied later in the role loop (T5).
+    provider_vars["PROJECT_CONTEXT_INJECTED"] = "true"
+    provider_vars["_PROJECT_CONTEXT_POINTER"] = format_project_context_pointer(
+        _pc_scope.get("pointer_text") or _PROJECT_CONTEXT_POINTER_TEXTS["en"],
+        provider_vars["CONTEXT_FILE"],
+    )
     return {**variables, **provider_vars}
+
+
+def apply_project_context_scope(merged_vars: dict, role: str, scope: dict) -> bool:
+    """Apply the per-role injection decision to one role's merged variables.
+
+    Sets ``PROJECT_CONTEXT_INJECTED`` to ``'true'``/``'false'`` and blanks
+    ``merged_vars['PROJECT_CONTEXT']`` for excluded roles (spec §5.3 step 3).
+    ``merged_vars`` is a per-role shallow copy from ``_build_provider_vars``,
+    so mutating it never leaks into the caller's shared ``variables`` dict.
+    The decision itself is pure and lives in :mod:`lib.config` (imported lazily
+    to avoid the module-level load-time cycle); consistency checks reuse it
+    without depending on ``agent_sync``. Returns the injected flag.
+    """
+    from .config import project_context_injected_for_role
+
+    injected = project_context_injected_for_role(scope or {}, role)
+    merged_vars["PROJECT_CONTEXT_INJECTED"] = "true" if injected else "false"
+    if not injected:
+        merged_vars["PROJECT_CONTEXT"] = ""
+    return injected
+
+
+def insert_project_context_pointer(content: str, pointer: str, role: str,
+                                   source_name: str, log) -> str:
+    """Insert exactly one project-context pointer line into a rendered role.
+
+    1. Drop an empty ``**Project context:**`` label line (only when the line
+    contains nothing besides the label); blanking ``PROJECT_CONTEXT`` leaves
+    such a line behind. 2. Insert ``pointer`` as a single line before the last
+    ``</context>``, else before the last ``</workflow>``, else append at EOF and
+    emit a note (spec §3.2, D-2). ``pointer`` always comes from the resolved
+    provider variable ``_PROJECT_CONTEXT_POINTER`` — config.py is the single
+    source of the sentence (D8), so no text literal lives in this module.
+    ``role`` is part of the interface for callers/logging symmetry.
+    """
+    # Step 1: remove label lines that became empty after PROJECT_CONTEXT = "".
+    content = re.sub(
+        r"^[ \t]*\*\*Project context:\*\*[ \t]*\r?\n", "", content,
+        flags=re.MULTILINE)
+
+    # Step 2: 3-stage fallback — last </context>, else last </workflow>, else
+    # EOF + note. ``rfind`` keeps the pointer in the last matching section.
+    for closing_tag in ("</context>", "</workflow>"):
+        idx = content.rfind(closing_tag)
+        if idx != -1:
+            line_start = content.rfind("\n", 0, idx) + 1
+            return content[:line_start] + pointer + "\n" + content[line_start:]
+
+    log.note(
+        "project-context-injection",
+        f"no <context>/</workflow> in {source_name} — pointer appended at EOF")
+    return content.rstrip("\n") + "\n\n" + pointer + "\n"
+
 
 def _should_skip_role(
     role: str,
@@ -1550,6 +1620,18 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
     expected_filenames: set = set()
     project_name = config.get('project', {}).get('name', 'unknown')
 
+    # #1187 (T7): per-provider delta counters for AC6, reported once after the
+    # role loop. ``chars_removed`` measures paragraph text actually blanked
+    # (only for roles whose template carries the placeholder); ``chars_added``
+    # measures the pointer text inserted in its place. Both stay zero for
+    # ``mode: all`` because no role is excluded and no pointer is inserted.
+    roles_seen = 0
+    roles_injected = 0
+    pointer_lines = 0
+    chars_removed = 0
+    chars_added = 0
+    pc_mode = (variables.get("_PROJECT_CONTEXT_SCOPE") or {}).get("mode", "all")
+
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
             role, source_path, provider, pc, role_map, None,
@@ -1558,6 +1640,7 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         if skip:
             continue
 
+        roles_seen += 1
         expected_filenames.add(filename)
         target_path = safe_path(target_dir, filename)
         content, _can_spawn, rel_source, source_version, description = _compose_role_content(
@@ -1566,10 +1649,38 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
         merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root, config=config,
                                            active_set=active_set)
+        # #1187 (T7): measure the paragraph length before T5 blanks it, but
+        # only for roles whose composed template actually carries the
+        # placeholder — a role without a block occurrence saves no paragraph
+        # chars (spec §3.5 / risk table) and contributes only -len(pointer).
+        paragraph_chars = (
+            len(merged_vars.get("PROJECT_CONTEXT") or "")
+            if "{{PROJECT_CONTEXT}}" in content else 0
+        )
+        # #1187 (T5): decide per role whether the project-context paragraph is
+        # embedded. Must run before _apply_content_pipeline (substitute +
+        # strip_inactive_conditional_blocks read these values, spec §5.3).
+        injected = apply_project_context_scope(
+            merged_vars, role, variables.get("_PROJECT_CONTEXT_SCOPE") or {})
+        if injected:
+            roles_injected += 1
         _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
             platform_vars, agent_meta_root, log)
+        # #1187 (T6): excluded roles lose the paragraph and get exactly one
+        # pointer line instead. Runs after substitution/strip so the emptied
+        # label can be cleaned up (spec §5.3 step 6, D-2). Injected roles keep
+        # byte-identical content (AC2).
+        if not injected:
+            content = insert_project_context_pointer(
+                content, merged_vars["_PROJECT_CONTEXT_POINTER"], role,
+                filename, log)
+            # #1187 (T7): account for the inserted pointer line and the
+            # paragraph text removed from this role's content.
+            pointer_lines += 1
+            chars_added += len(merged_vars["_PROJECT_CONTEXT_POINTER"])
+            chars_removed += paragraph_chars
         content = _finalize_agent_content(
             content, role, filename, source_path, provider, provider_config,
             source_version, description, _can_spawn, config, agent_meta_root,
@@ -1589,6 +1700,14 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
     _cleanup_stale_agents(target_dir, expected_filenames, provider, wrapper_filenames,
                           pc, project_root, dry_run, log)
 
+    # #1187 (T7 / AC6): one delta line per active provider, emitted regardless
+    # of dry_run so --check shows the decision before any write. Uses the
+    # existing SyncLog API (log.note) like the other project-context notes.
+    log.note(
+        "project-context-injection",
+        f"mode={pc_mode} injected={roles_injected}/{roles_seen} roles, "
+        f"pointer={pointer_lines}, chars saved={chars_removed - chars_added} "
+        f"(vs mode=all)")
 
     _run_provider_bootstrap(
         provider, pc, target_dir, project_root, variables, agent_meta_root,

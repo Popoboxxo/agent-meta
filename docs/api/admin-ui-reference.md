@@ -184,6 +184,12 @@ Repository and branch conventions surfaced in the `git` section of `project.yaml
 <!-- author: Agent Meta Admin -->
 Controls the opt-in tiered commit authority for write-capable agents (issue #694). `off` (default) keeps today's behaviour where only the dedicated `git` role commits. `suggest` has agents propose a commit message in their own report but never run git. `auto` lets agents commit directly when any selected trigger (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`, `custom`) fires — any one is enough (OR). `custom` hands the entire decision to `custom_script` and ignores the built-in triggers. `file_count_threshold` (default 5) is only read for the `file-count-threshold` trigger. `secret_scan` (default true) runs the project's secret scan against the staged diff before any auto/custom commit. A `custom` mode, or `custom` among the triggers, requires `custom_script`.
 
+### Project Context Injection
+<!-- help-id: project_instance-project_context_injection -->
+<!-- last-updated: 2026-11-17 -->
+<!-- author: Agent Meta Admin -->
+Configures the optional `project-context-injection` section of `project.yaml` (issue #1187): per-role control over whether the `{{PROJECT_CONTEXT}}` paragraph is embedded into generated role prompts. `mode` is one of `all` (default — byte-identical to the previous behaviour for every role), `core+orchestrator`, `core+whitelist` or `core` (embed nothing). `whitelist` is a unique list of lowercase role slugs consulted only under `core+whitelist`. `orchestrator` (`inherit`, `include`, `exclude`) refines the orchestrator set; `exclude` wins over the mode. `orchestrator-roles` overrides the derived orchestrator set: **omitting the key** means default derivation (the active provider's orchestrator ∪ primary-role set), while an **explicit empty list** means no orchestrator role. `pointer-language` (`en`, `de`, `project`) selects the read-first pointer language; `project` derives it from `COMMUNICATION_LANGUAGE` and falls back to `en` for unknown values. `pointer-text` is an optional override: a single line, at least one character, containing exactly one `{context_file}` token. Leave `pointer-text` empty to use the language default. The Admin UI writes this whole section through `PUT /api/config/project/section` and shows a read-only effect preview — the server is authoritative for the effective result.
+
 ### Commit Trailers
 <!-- help-id: project_instance-commit -->
 <!-- last-updated: 2026-11-15 -->

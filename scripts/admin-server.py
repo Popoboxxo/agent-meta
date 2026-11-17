@@ -244,7 +244,8 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
     "provider-isolation", "environments", "model-source-preference",
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
-    "context_file", "context-profile", "plugins", "repo_containment",
+    "context_file", "context-profile", "project-context-injection", "plugins",
+    "repo_containment",
     # Test environments (issue #1089): validated by
     # _guard_test_environments_write so a bad payload never reaches disk.
     "test-environments",

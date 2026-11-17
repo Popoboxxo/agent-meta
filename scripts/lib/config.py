@@ -192,6 +192,10 @@ _SYNC_SKIPPED_DEFAULT_KEYS = frozenset({
     "max-parallel-agents",
     "debug-mode",
     "allow-committed-secrets",
+    # #1187: regression guard for a future generic nested-default materialization.
+    # The section has no top-level default; its meaningful values (orchestrator-roles,
+    # pointer-text) must never be persisted by a plain sync.
+    "project-context-injection",
 })
 
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
@@ -233,6 +237,217 @@ _VARIABLE_FALLBACKS: dict[str, str] = {
     "PROJECT_LANGUAGES": "",
     "CODE_CONVENTIONS": "",
 }
+
+
+# ---------------------------------------------------------------------------
+# Project-context injection scope (issue #1187)
+# ---------------------------------------------------------------------------
+# Stable enums: the schema, the resolver and the renderer share these tuples.
+PROJECT_CONTEXT_MODES: tuple[str, ...] = (
+    "all", "core+orchestrator", "core+whitelist", "core")
+_ORCHESTRATOR_VALUES: tuple[str, ...] = ("inherit", "include", "exclude")
+_POINTER_LANGUAGES: tuple[str, ...] = ("en", "de", "project")
+# Plan-facing aliases so callers can use either the public or the private name.
+PROJECT_CONTEXT_ORCHESTRATOR_VALUES = _ORCHESTRATOR_VALUES
+PROJECT_CONTEXT_POINTER_LANGUAGES = _POINTER_LANGUAGES
+
+# Single source of truth for the pointer sentence (spec §3.2/§3.2.1). Only the
+# literal ``{context_file}`` token is substituted; see format_project_context_pointer.
+_PROJECT_CONTEXT_POINTER_TEXTS: dict[str, str] = {
+    "en": "Project context: read `{context_file}` first — it is the single source for "
+          "project-specific facts (embedded here only when "
+          "`project-context-injection.mode` includes this role).",
+    "de": "Projektkontext: lies zuerst `{context_file}` — sie ist die einzige Quelle für "
+          "projektspezifische Fakten (hier nur eingebettet, wenn "
+          "`project-context-injection.mode` diese Rolle einschließt).",
+}
+_POINTER_LANGUAGE_ALIASES: dict[str, str] = {
+    "de": "de", "deutsch": "de", "german": "de", "ger": "de",
+    "en": "en", "englisch": "en", "english": "en", "eng": "en",
+}
+
+
+def _validate_project_context_role_names(names, role_map: dict, error_code: str) -> None:
+    """Raise SyncError with ALL unknown role names (sorted, comma-separated)."""
+    unknown = sorted({name for name in names if name not in role_map})
+    if unknown:
+        raise SyncError(
+            f"project-context-injection.{error_code}: "
+            f"unknown role(s): {', '.join(unknown)} (not in role registry)")
+
+
+def _validate_project_context_pointer_text(text: str) -> None:
+    """Enforce the four hard pointer-text rules (spec §3.2.1)."""
+    if "\n" in text or "\r" in text:
+        raise SyncError(
+            "project-context-injection.pointer-text-multiline: pointer-text must be "
+            "a single physical line")
+    # Everything except the one allowed literal token is an unknown token.
+    remainder = text.replace("{context_file}", "")
+    tokens = set(re.findall(r"\{[^{}]*\}", remainder))
+    # Lone/unescaped braces (e.g. `{{context_file}}` -> '{}') are errors too.
+    tokens.update(re.findall(r"\{+|\}+", remainder))
+    if tokens:
+        raise SyncError(
+            "project-context-injection.pointer-text-unknown-token: "
+            f"unsupported token(s): {', '.join(sorted(tokens))}")
+    count = text.count("{context_file}")
+    if count != 1:
+        raise SyncError(
+            "project-context-injection.pointer-text-context-file-count: "
+            f"'{{context_file}}' must appear exactly once, found {count}")
+
+
+def resolve_project_context_scope(
+    config: dict, agent_meta_root: Path,
+    provider_config: dict | None = None,
+    communication_language: str | None = None,
+    warn_sink: list[str] | None = None,
+) -> dict:
+    """Resolve the project-wide ``project-context-injection`` scope (issue #1187).
+
+    Returns a dict with ``mode``, ``whitelist``, ``orchestrator``,
+    ``orchestrator_roles`` (tuple), ``pointer_text``, ``pointer_language``
+    (resolved) and ``present``. Raises :class:`SyncError` for invalid enums,
+    unknown configured role names and malformed pointer text.
+
+    ``provider_config=None`` loads ``config/ai-providers.yaml``; tests inject a
+    fake registry. ``communication_language`` is the already-defaulted
+    ``variables['COMMUNICATION_LANGUAGE']`` value, passed in so this resolver
+    does not re-implement that fallback chain. ``warn_sink`` collects the
+    once-per-run D6/D8 warnings drained into ``build_variables``' pre_warnings.
+    """
+    section = config.get("project-context-injection") if isinstance(config, dict) else None
+    present = isinstance(section, dict)
+    if not present:
+        section = {}
+
+    mode = section.get("mode", "all")
+    orchestrator = section.get("orchestrator", "inherit")
+    pointer_language = section.get("pointer-language", "en")
+    if mode not in PROJECT_CONTEXT_MODES:
+        raise SyncError(
+            f"project-context-injection.mode-unknown: unknown mode {mode!r}; "
+            f"expected one of {', '.join(PROJECT_CONTEXT_MODES)}")
+    if orchestrator not in _ORCHESTRATOR_VALUES:
+        raise SyncError(
+            f"project-context-injection.orchestrator-unknown: unknown value "
+            f"{orchestrator!r}; expected one of {', '.join(_ORCHESTRATOR_VALUES)}")
+    if pointer_language not in _POINTER_LANGUAGES:
+        raise SyncError(
+            f"project-context-injection.pointer-language-unknown: unknown value "
+            f"{pointer_language!r}; expected one of {', '.join(_POINTER_LANGUAGES)}")
+
+    warnings = warn_sink if warn_sink is not None else []
+    role_map = build_role_map(agent_meta_root)
+
+    whitelist = list(section.get("whitelist") or [])
+    _validate_project_context_role_names(whitelist, role_map, "whitelist-unknown-role")
+
+    # D5: an explicit key (including []) replaces the derived default wholly;
+    # only explicitly configured names are registry-checked (derived names come
+    # from the provider registry, not from project config).
+    if "orchestrator-roles" in section:
+        orchestrator_roles = tuple(section["orchestrator-roles"] or [])
+        _validate_project_context_role_names(
+            orchestrator_roles, role_map, "orchestrator-roles-unknown")
+    else:
+        registry = (
+            provider_config if provider_config is not None
+            else load_providers_config(agent_meta_root)
+        )
+        derived = {"orchestrator"}
+        for provider in resolve_providers(config, registry):
+            primary_role = (registry.get(provider) or {}).get("primary-role")
+            if primary_role:
+                derived.add(primary_role)
+        orchestrator_roles = tuple(sorted(derived))
+
+    # D6: `exclude` never raises. At most one orchestrator warning per call;
+    # exclude-overrides-mode wins over empty-orchestrator-set.
+    if orchestrator == "exclude" and mode in ("all", "core+orchestrator"):
+        roles_text = ", ".join(sorted(orchestrator_roles)) or "none"
+        warnings.append(
+            "project-context-injection.exclude-overrides-mode: "
+            f"mode={mode} + orchestrator=exclude — "
+            f"orchestrator roles ({roles_text}) excluded; exclude wins")
+    elif (mode == "core+orchestrator" and orchestrator != "exclude"
+          and not orchestrator_roles):
+        warnings.append(
+            "project-context-injection.empty-orchestrator-set: "
+            f"mode={mode} + orchestrator-roles=[] — "
+            "no role receives the block (mode degenerates to core)")
+
+    # D8: pointer-text > pointer-language > en. The language is resolved
+    # independently so the returned scope always reports a concrete language.
+    if pointer_language == "project":
+        alias_key = (communication_language or "").strip().lower()
+        resolved_language = _POINTER_LANGUAGE_ALIASES.get(alias_key)
+        if resolved_language is None:
+            resolved_language = "en"
+            warnings.append(
+                "project-context-injection.pointer-language-fallback: "
+                f"COMMUNICATION_LANGUAGE={communication_language!r} has no pointer "
+                "text — falling back to 'en'")
+    else:
+        resolved_language = pointer_language
+
+    configured_text = section.get("pointer-text")
+    if configured_text is not None:
+        _validate_project_context_pointer_text(configured_text)
+        pointer_text = configured_text
+    else:
+        pointer_text = _PROJECT_CONTEXT_POINTER_TEXTS[resolved_language]
+
+    return {
+        "mode": mode,
+        "whitelist": whitelist,
+        "orchestrator": orchestrator,
+        "orchestrator_roles": orchestrator_roles,
+        "pointer_text": pointer_text,
+        "pointer_language": resolved_language,
+        "present": present,
+    }
+
+
+def format_project_context_pointer(template: str, context_file: str) -> str:
+    """Substitute the single allowed ``{context_file}`` token (pure, no I/O).
+
+    Token validity is enforced at resolve time, so this never raises for a
+    scope returned by :func:`resolve_project_context_scope`.
+    """
+    return template.format(context_file=context_file)
+
+
+def project_context_injected_for_role(scope: dict, role: str) -> bool:
+    """Pure per-role injection decision (spec §3.1); never raises.
+
+    ``scope`` is a resolved scope dict (see :func:`resolve_project_context_scope`).
+    Missing keys fall back to the historic ``all`` behavior, so an empty scope
+    embeds context for everyone. ``orchestrator='inherit'`` means "mode default",
+    not "include"; only ``include`` promotes the orchestrator set outside
+    ``core+orchestrator``. ``exclude`` always wins (D6).
+    """
+    mode = scope.get("mode", "all")
+    orchestrator = scope.get("orchestrator", "inherit")
+    orchestrator_roles = scope.get("orchestrator_roles") or ()
+    whitelist = scope.get("whitelist") or ()
+    is_orchestrator = role in orchestrator_roles
+
+    if mode == "all":
+        # "all" except the orchestrator set when exclude overrides the mode.
+        return not (orchestrator == "exclude" and is_orchestrator)
+    if mode == "core":
+        # Nobody, unless include promotes the orchestrator set.
+        return orchestrator == "include" and is_orchestrator
+    if mode == "core+orchestrator":
+        # Only the orchestrator set; exclude degenerates the mode to core.
+        return orchestrator != "exclude" and is_orchestrator
+    if mode == "core+whitelist":
+        # Only the whitelist; the orchestrator set joins on include only.
+        return role in whitelist or (orchestrator == "include" and is_orchestrator)
+    # Unknown mode: fail closed (resolver rejects such modes before this point).
+    return False
 
 
 # Top-level keys whose project-config.schema.json type is scalar/array. An
@@ -2936,5 +3151,15 @@ def build_variables(
     # project_root is needed for the project-layer platform URL fallback.
     variables.update(build_test_environment_variables(config, project_root))
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
+
+    # #1187: resolve the project-wide injection scope once (provider-agnostic).
+    # Warnings are collected into `unmapped` and emitted once per run by the
+    # pre-warning drain in cli_commands.py.
+    variables["_PROJECT_CONTEXT_SCOPE"] = resolve_project_context_scope(
+        config, agent_meta_root,
+        communication_language=variables.get("COMMUNICATION_LANGUAGE"),
+        warn_sink=unmapped,
+    )
+    variables["PROJECT_CONTEXT_MODE"] = variables["_PROJECT_CONTEXT_SCOPE"]["mode"]
 
     return variables, unmapped
