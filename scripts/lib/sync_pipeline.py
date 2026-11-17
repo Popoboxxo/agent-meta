@@ -2025,6 +2025,32 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     write_atomic(allowlist_path, json.dumps(resolved, indent=2, sort_keys=True) + "\n")
 
 
+def _sync_stage_artifact_locations_resolved(
+    agent_meta_root: Path, project_root: Path, config: dict,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Stage 14c (Issue #1186, T15): write the resolved matrix data file.
+
+    ``.meta-config/artifact-locations.resolved.json`` is the single data file
+    consumed by the path-guard hook, the containment hook (D1) and the T14
+    legacy-write baseline. It runs after hash-capture (13), the auto-commit
+    allowlist (14) and the context checks (14b), so its own write is never
+    captured into the drift hash baseline. A dry-run never writes it — a
+    preview must not capture a baseline from a non-applied sync.
+    """
+    if getattr(args, "dry_run", False):
+        log.skip("artifact-locations.resolved", "dry-run - data file not written")
+        return
+    from lib.artifact_status import RESOLVED_RELPATH, build_resolved_payload
+
+    payload = build_resolved_payload(config, agent_meta_root, project_root)
+    write_atomic(
+        project_root / RESOLVED_RELPATH,
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+    )
+    log.action("WRITE", RESOLVED_RELPATH.as_posix(), "resolved artifact-locations matrix")
+
+
 def _log_context_finding(log: SyncLog, finding) -> None:
     """Route one consistency Finding into sync.log: INFO -> note, ERROR -> error, else WARN.
 
