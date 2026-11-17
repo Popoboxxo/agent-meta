@@ -5,6 +5,7 @@ later tasks can append without disturbing existing tests.
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -933,4 +934,32 @@ def test_all_prose_matches_golden(tmp_path):
                 f"{role}: prose line drift for {fragment!r}\n"
                 f"golden: {g_line}\nrender: {r_line}"
             )
+
+
+# ---------------------------------------------------------------------------
+# T10 — golden gate (AC2 evidence)
+# ---------------------------------------------------------------------------
+
+
+def test_golden_gate_file_untouched_by_this_issue():
+    """AC2 evidence: the golden test and its fixtures did not drift in #1187.
+
+    The guard compares against the frozen branch-point base hash, not bare
+    HEAD (which would be vacuously green after this issue's commits). Any
+    change to the equivalence test or the golden fixtures anywhere on this
+    branch turns the gate red instead of silently accepting a rebaseline.
+    """
+    result = subprocess.run(
+        [
+            "git", "diff", "--name-only",
+            "6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD",
+            "--",
+            "tests/test_template_slimming_equivalence.py",
+            "tests/fixtures/slimming-golden",
+        ],
+        cwd=_ROOT, capture_output=True, text=True, check=True,
+    )
+    assert result.stdout.strip() == "", (
+        "golden gate drifted — AC2 forbids rebaselining:\n" + result.stdout
+    )
 
