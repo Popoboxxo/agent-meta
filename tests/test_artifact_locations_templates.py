@@ -288,3 +288,52 @@ def test_atomic_write_uses_scratch_dir():
         assert "rename" in text, f"{role}.md: atomic rename missing"
     assert "{{ARTIFACT_SE_ARCHITECTURE_DIR}}" in _read("se-architect")
     assert "{{ARTIFACT_SE_REPORTS_DIR}}" in _read("se-critic")
+
+
+# ---------------------------------------------------------------------------
+# T12 — routing
+# ---------------------------------------------------------------------------
+
+REVIEWERS_YAML = ROOT / "config" / "routing" / "reviewers.yaml"
+
+# Full audit report target per role -> class-scoped audit kind (Spec §3.1).
+T12_AUDIT_ROLES = {
+    "security-auditor": "security",
+    "ai-security-guardian": "ai-security",
+    "app-lifecycle-governor": "lifecycle",
+    "prompt-governor": "prompt",
+}
+
+
+def test_reviewers_notes_reference_matrix():
+    """Reviewer-routing notes name the matrix, not the deprecated tmp sink."""
+    notes = REVIEWERS_YAML.read_text(encoding="utf-8")
+    assert "{{ARTIFACT_REVIEWS_DIR}}" in notes
+    assert "{{TMP_SINK_PATH}}" not in notes
+    assert "tmp sink" not in notes
+
+
+def test_auditor_reports_go_to_audits_dir():
+    """Each audit role writes its full report into the audits matrix dir."""
+    for role in T12_AUDIT_ROLES:
+        assert "{{ARTIFACT_AUDITS_DIR}}" in _read(role), (
+            f"{role}.md: missing {{ARTIFACT_AUDITS_DIR}} report target"
+        )
+    # Regression anchor from the plan: app-lifecycle-governor.md:100.
+    assert "{{ARTIFACT_AUDITS_DIR}}" in _lines("app-lifecycle-governor")[99]
+
+
+def test_audit_kind_matches_role():
+    """Each audit role carries its class-scoped audit kind (Spec §3.1)."""
+    for role, kind in T12_AUDIT_ROLES.items():
+        assert f"kind: {kind}" in _read(role), (
+            f"{role}.md: missing 'kind: {kind}'"
+        )
+
+
+def test_ephemeral_evidence_still_uses_scratch():
+    """Raw evidence (logs, long tool output) stays on the scratch sink."""
+    for role in T12_AUDIT_ROLES:
+        assert "{{TMP_SINK_PATH}}" in _read(role), (
+            f"{role}.md: raw-evidence scratch sink missing"
+        )

@@ -1049,6 +1049,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (``db73f601…`` ->
   ``090cfabe…``); ``slimming-golden`` was re-pinned separately (8 role goldens) to ``d8c20af6…``;
   ``compact-golden`` stayed unchanged (``4ac22975…``).
+- Issue #1186 T12 (2026-11-17, audit-role artifact matrix): the four audit-role templates route their
+  long-report artifact path from ``{{TMP_SINK_PATH}}`` to ``{{ARTIFACT_AUDITS_DIR}}`` and take patch bumps
+  (``ai-security-guardian`` 1.4.1 -> 1.4.2, ``app-lifecycle-governor`` 1.4.1 -> 1.4.2,
+  ``prompt-governor`` 1.5.2 -> 1.5.3, ``security-auditor`` 2.8.0 -> 2.8.1). Re-generated via ``--write``:
+  exactly **36 of 1204 hashes moved; 0 added/removed** (the 4 roles x 9 providers; the manifest's
+  ``generated-file-hashes.json`` keys are path-set-only and unchanged). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``090cfabe…`` -> ``7d92667b…``;
+  ``slimming-golden`` re-pinned separately (app-lifecycle-governor golden); ``compact-golden`` unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

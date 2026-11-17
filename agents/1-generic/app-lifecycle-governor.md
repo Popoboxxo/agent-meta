@@ -1,6 +1,6 @@
 ---
 name: template-app-lifecycle-governor
-version: "1.4.1"
+version: "1.4.2"
 description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
@@ -97,7 +97,7 @@ FINDINGS: <structured list per app record format>
 ARTIFACTS: <report file path, or "none">
 ```
 
-Long reports → write to `{{TMP_SINK_PATH}}/app-lifecycle-governor-<topic>.md`, return path only.
+Long reports → write the full report to `{{ARTIFACT_AUDITS_DIR}}/lifecycle-<YYYY-MM-DD>-<topic>.md` (kind: lifecycle), return path only. Raw evidence (logs, long tool output) stays on `{{TMP_SINK_PATH}}/`; only the report artifact moves into the matrix.
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

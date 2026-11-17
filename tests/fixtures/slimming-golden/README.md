@@ -106,3 +106,18 @@ meta token touched): `concept-reviewer.md` (1.9.2 -> 1.9.3), `documenter.md`
 `requirements.md` (1.9.1 -> 1.9.2). The other 50 goldens, `_GOLDEN_ROLE_COUNT`
 (58) and the normalization table are unchanged. The AC-T4 digest was re-pinned
 accordingly; see the log in `tests/test_template_slimming_equivalence.py`.
+
+## Diff manifest — Issue #1186 T12 rebaseline (2026-11-17)
+
+**Reason:** four audit-role templates switched their long-report artifact path
+from `{{TMP_SINK_PATH}}` to `{{ARTIFACT_AUDITS_DIR}}` and took patch version bumps
+(`ai-security-guardian` 1.4.1 -> 1.4.2, `app-lifecycle-governor` 1.4.1 -> 1.4.2,
+`prompt-governor` 1.5.2 -> 1.5.3, `security-auditor` 2.8.0 -> 2.8.1). Only one of
+those four has a golden: `app-lifecycle-governor.md` was rebaselined per line —
+the frontmatter and `generated-from` version pins (1.4.1 -> 1.4.2) and the
+rendered artifact path (`.tmp/app-lifecycle-governor-<topic>.md` ->
+`docs/audits/lifecycle-<YYYY-MM-DD>-<topic>.md`, with the raw-evidence-on-`.tmp/`
+clause); no project meta token touched. The other three audit roles have no
+golden; the remaining 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and the normalization
+table are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
+`tests/test_template_slimming_equivalence.py`.

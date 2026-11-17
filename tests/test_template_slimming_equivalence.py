@@ -249,6 +249,15 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and ``compact-golden`` are
   unchanged. AC-T4 digest ``d72cf5b2…`` -> ``d8c20af6…``; diff manifest entry in
   ``tests/fixtures/slimming-golden/README.md``.
+* Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ``app-lifecycle-governor.md`` golden
+  rebaselined after ``{{TMP_SINK_PATH}}`` -> ``{{ARTIFACT_AUDITS_DIR}}`` for its long-report path.
+  Exactly three lines moved: the frontmatter and ``generated-from`` version pins (1.4.1 -> 1.4.2)
+  and the rendered artifact path (``.tmp/app-lifecycle-governor-<topic>.md`` ->
+  ``docs/audits/lifecycle-<YYYY-MM-DD>-<topic>.md``, with the raw-evidence-on-``.tmp/`` clause).
+  The other three audit roles (``security-auditor``, ``ai-security-guardian``, ``prompt-governor``)
+  have no golden, so no other golden changed. ``_GOLDEN_ROLE_COUNT`` (58), the normalization table
+  and ``compact-golden`` are unchanged. AC-T4 digest ``d8c20af6…`` -> ``22ac56a9…``; diff manifest
+  entry in ``tests/fixtures/slimming-golden/README.md``.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
