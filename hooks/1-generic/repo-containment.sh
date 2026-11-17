@@ -5,6 +5,11 @@
 # matcher: ""
 # description: Confine Write/Edit/Bash file writes to repo root (+ optional .tmp sink).
 # enabled_by_default: true
+#
+# T24 (D1): the effective scratch sink path is resolved in repo-containment-impl.sh
+# from ARTIFACT_SCRATCH_DIR -> .meta-config/artifact-locations.resolved.json
+# (classes.scratch.path) -> repo_containment.tmp-sink.path -> .tmp. This wrapper
+# stays intentionally logic-free; the sink switch and lexical rules are unchanged.
 
 set -uo pipefail
 
