@@ -153,6 +153,13 @@ presets:
     tool-graphify:
       channel: skill
       skill-description: "Use when asking architecture or file-relationship questions with graphify — hooks and permitted injections."
+    # Artifact-location matrix (issue #1186): where every artifact class is
+    # written — 23 classes, files|inline|off modes, naming and role guidance.
+    # Generator pointer table is owned by #1180; until then hand-maintained in
+    # rules/1-generic/use-lazy-rules.md.
+    artifact-locations:
+      channel: skill
+      skill-description: "Use when deciding where any project artifact is written — 23-class output-location matrix, files/inline/off modes, naming and role output targets (issue #1186)."
     # Key = stripped output stem (rules.py:141 strips the platform prefix
     # "hacs-" from rules/2-platform/hacs-integration-development.md).
     integration-development:

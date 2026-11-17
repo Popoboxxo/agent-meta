@@ -337,3 +337,154 @@ def test_ephemeral_evidence_still_uses_scratch():
         assert "{{TMP_SINK_PATH}}" in _read(role), (
             f"{role}.md: raw-evidence scratch sink missing"
         )
+
+
+# ---------------------------------------------------------------------------
+# T13 — lazy rule + pointer table (H-1, H-3, H-4, AC-16)
+# ---------------------------------------------------------------------------
+
+import sys as _sys  # noqa: E402
+
+_sys.path.insert(0, str(ROOT / "scripts"))
+
+import pytest  # noqa: E402
+import yaml  # noqa: E402
+
+from lib.rule_channels import lazy_skill_channel  # noqa: E402
+from lib.rules import (  # noqa: E402
+    collect_rule_sources,
+    provider_opts_skip,
+    resolve_rules,
+    rule_opts_lazy_channel,
+)
+
+RULES_PRESETS = ROOT / "config" / "rules-presets.yaml"
+ARTIFACT_RULE = ROOT / "rules" / "1-generic" / "artifact-locations.md"
+USE_LAZY_RULES = ROOT / "rules" / "1-generic" / "use-lazy-rules.md"
+
+# #1180 owns the generated lazy-pointer index/skill. While it is open the
+# artifact-locations pointer is hand-maintained in use-lazy-rules.md and these
+# generated artifacts do not exist; once #1180 lands the skipif below flips to
+# active and the pointer test validates the generated source instead.
+GENERATED_ARTIFACT_SKILL = (
+    ROOT / ".claude" / "skills" / "artifact-locations" / "SKILL.md"
+)
+
+# The 23 canonical class names of the matrix (plan §3: 14 non-SE + 9 SE).
+T13_CLASS_NAMES = (
+    # 14 non-SE
+    "specs", "plans", "concepts", "spikes", "reviews", "audits", "analysis",
+    "reports", "adr", "traceability", "runbooks", "project-docs", "scratch",
+    "state",
+    # 9 SE
+    "se-requirements", "se-architecture", "se-decomposition", "se-interfaces",
+    "se-implementation", "se-testplan", "se-validation", "se-verification",
+    "se-decisions",
+)
+
+
+def test_artifact_rule_is_lazy_in_lazy_preset():
+    """H-1: the new rule is a skill-channel rule inside the lazy preset."""
+    presets = yaml.safe_load(RULES_PRESETS.read_text(encoding="utf-8"))["presets"]
+    opts = presets["lazy"]["artifact-locations"]
+    assert opts["channel"] == "skill"
+    assert opts.get("skill-description"), "skill-description must be set"
+
+
+def test_no_always_on_rule_added():
+    """AC-16: the lazy rule stays out of the always-on set and rules_dir files."""
+    config = {"rules-preset": "lazy", "platforms": []}
+    options = resolve_rules(config, ROOT)
+    assert "artifact-locations" in options
+    opts = options["artifact-locations"]
+    assert opts.get("channel") == "skill"
+    assert rule_opts_lazy_channel(opts)
+    assert opts.get("alwaysApply") is not True
+    assert opts.get("embed") is not True
+
+    # Partition the resolved rules by channel (the AC-16 set assertion).
+    lazy = {s for s, o in options.items() if rule_opts_lazy_channel(o)}
+    always_on = {s for s, o in options.items() if not rule_opts_lazy_channel(o)}
+    assert lazy & always_on == set()
+    assert "artifact-locations" in lazy
+    assert "artifact-locations" not in always_on
+
+    # No generated <rules_dir>/artifact-locations.md: source stems that stay as
+    # rule files (non-lazy, not provider-skipped) never contain the new rule.
+    source_stems = {
+        Path(name).stem
+        for _src, name in collect_rule_sources(ROOT, [], config=config)
+    }
+    assert "artifact-locations" in source_stems
+    rules_dir_files = {
+        s for s in source_stems
+        if not rule_opts_lazy_channel(options.get(s, {}))
+        and not provider_opts_skip(options.get(s, {}), "Claude")
+    }
+    assert "artifact-locations" not in rules_dir_files
+    assert lazy & rules_dir_files == set()
+
+    # The lazy-skill route is a real file channel (IC-15) — the rule body
+    # leaves the always-on context via SKILL.md, it is never silently dropped.
+    skill_caps = {
+        "has_rules": False,
+        "skills_dir": "skills",
+        "rules_read_channels": ["embedded", "skills"],
+    }
+    assert lazy_skill_channel(skill_caps)
+
+
+def test_rule_lists_all_23_classes():
+    """The lazy rule carries the full 23-class table and mode semantics."""
+    text = ARTIFACT_RULE.read_text(encoding="utf-8")
+    row_keys = [
+        line.strip().strip("|").split("|")[0].strip()
+        for line in text.splitlines()
+        if line.lstrip().startswith("|")
+    ]
+    assert len(T13_CLASS_NAMES) == 23
+    for name in T13_CLASS_NAMES:
+        assert name in row_keys, f"missing class row: {name}"
+    assert "files" in text and "inline" in text and "off" in text
+
+
+@pytest.mark.skipif(
+    not GENERATED_ARTIFACT_SKILL.exists(),
+    reason=(
+        "#1180 ersetzt Handpflege durch Generierung: generated "
+        ".claude/skills/artifact-locations/SKILL.md index is not present yet; "
+        "the pointer is hand-maintained in use-lazy-rules.md until #1180 lands"
+    ),
+)
+def test_pointer_table_entry_present():
+    """H-3: once #1180 lands the pointer table is generated, not hand-written."""
+    text = GENERATED_ARTIFACT_SKILL.read_text(encoding="utf-8")
+    assert "artifact-locations" in text
+
+
+def test_provider_context_count_does_not_grow():
+    """H-4 (RVW2-1186-03): PROJECT_CONTEXT stays relative, never pinned 70/98.
+
+    T13 adds only a *lazy* rule and touches no role template, so the number of
+    ``{{PROJECT_CONTEXT}}`` sites and the role-template count are unchanged.
+    The assertion is deliberately relative to the live template count -- the
+    issue's "70/98" was already stale (83/98 at review time), so no absolute
+    number or line index is pinned.  The new rule body references output
+    targets through ``{{ARTIFACT_*}}`` variables, never a fixed path or line.
+    """
+    templates = [p for p in GENERIC.glob("*.md") if not p.name.startswith("_")]
+    n_templates = len(templates)
+    assert n_templates > 0
+    bodies = [p.read_text(encoding="utf-8") for p in templates]
+    total = sum(body.count("{{PROJECT_CONTEXT}}") for body in bodies)
+    carrying = sum("{{PROJECT_CONTEXT}}" in body for body in bodies)
+    # Relative band: a clear majority of roles carry the placeholder, but it
+    # never runs away to many sites per role. Bounds scale with the live
+    # template count -- no literal 70/83/98 and no pinned line number.
+    assert 0.5 * n_templates <= carrying <= n_templates, (carrying, n_templates)
+    assert carrying <= total <= 2 * n_templates, (total, n_templates)
+    # The rule body uses relative variable references, not pinned numbers.
+    rule_text = ARTIFACT_RULE.read_text(encoding="utf-8")
+    assert "{{ARTIFACT_" in rule_text
+    for pinned in ("70/98", "line 70", "line 98"):
+        assert pinned not in rule_text

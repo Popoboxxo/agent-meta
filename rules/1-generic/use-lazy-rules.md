@@ -7,6 +7,7 @@
 | sync-interface | sync.py, Templates/Rules ändern |
 | admin-ui | Admin-Server/UI betreiben (Lifecycle, Token, Ports) |
 | architecture | Templates/Overrides/Placeholder ändern |
+| artifact-locations | Artefakt-Ausgabeorte: 23 Klassen, Modi, Variablen (bis #1180 manuell) |
 | conventions | Vor Commits in agents/, config/, scripts/lib |
 | submodule-protection | .agent-meta/, external/, .gitmodules |
 | a2a-delegation-gates | A2A-Delegation an Subagenten |
