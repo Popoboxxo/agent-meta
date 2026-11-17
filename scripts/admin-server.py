@@ -5616,6 +5616,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._guard_test_environments_write(section, data, existing)
         data = self._guard_release_checklist_write(section, data)
         self._guard_commit_write({section: data})
+        # Issue #1186 (T18): validate the artifact-location matrix before the
+        # disk write so a bad payload is rejected with HTTP 400 (ValueError)
+        # and leaves project.yaml byte-identical (AC-06).
+        self._guard_artifact_locations_write(section, data)
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write(
             "project", existing, allow_lossy=allow_lossy))
@@ -5627,6 +5631,171 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         errors = commit_violations(cfg)
         if errors:
             raise ValueError("invalid 'commit': " + "; ".join(errors))
+
+    def _guard_artifact_locations_write(self, section: str, data: Any) -> None:
+        """Reject an ``artifact-locations`` write that would break sync (HTTP 400).
+
+        AC-06: apply the same structural + semantic validation as the sync-side
+        validator (``lib.config._validate_artifact_locations``) using the T4
+        resolver helpers, plus ``lib.io.safe_path`` for path containment. Every
+        violation is raised as ``ValueError`` — mapped to HTTP 400 by
+        ``do_PUT``/``do_POST`` — with the offending *field name* in the message,
+        before any disk write. Other sections pass through untouched.
+
+        Note: the plan sketches a single ``artifact_locations.validate_section``
+        entry point; T4 ships the individual ``validate_*`` helpers instead, so
+        this guard composes them here (the sync validator does the same). The
+        mode/parent and SE-critical rules mirror config.py's private constants
+        to keep the guard at least as strict as the sync path.
+        """
+        if section != "artifact-locations":
+            return
+        if not isinstance(data, dict):
+            raise ValueError(
+                "invalid 'artifact-locations': expected a mapping, "
+                f"got {type(data).__name__}"
+            )
+
+        _ensure_scripts_on_path(self.__class__.root)
+        from lib import artifact_locations as al  # noqa: PLC0415 - lazy lib import
+        from lib.io import safe_path  # noqa: PLC0415 - lazy lib import
+
+        existing = self.__class__.config_manager.read("project")
+        if not isinstance(existing, dict):
+            existing = {}
+        config = dict(existing)
+        config["artifact-locations"] = data
+
+        errors: list[str] = []
+        raw_classes = data.get("classes") or {}
+        classes = raw_classes if isinstance(raw_classes, dict) else {}
+
+        # 1. Structural: reject unknown class keys, naming the offending field.
+        for name in sorted(str(key) for key in classes):
+            if name not in al.CLASS_REGISTRY:
+                errors.append(
+                    f"invalid 'artifact-locations.classes.{name}': unknown artifact class"
+                )
+
+        valid_names = [
+            name for name in classes
+            if name in al.CLASS_REGISTRY and isinstance(classes[name], dict)
+        ]
+
+        # 2. Structural: kind / naming / path / subdir via the T4 pure helpers.
+        for name in valid_names:
+            entry = classes[name]
+            kind_value = entry.get("kind", ()) or ()
+            values = [kind_value] if isinstance(kind_value, str) else kind_value
+            for value in values:
+                try:
+                    al.validate_kind(value, name)
+                except al.ArtifactLocationsError as exc:
+                    errors.append(exc.message)
+
+            naming = entry.get("naming")
+            if naming:
+                try:
+                    al.validate_naming(naming, name)
+                except al.ArtifactLocationsError as exc:
+                    errors.append(exc.message)
+
+            path = entry.get("path")
+            if path:
+                try:
+                    al.validate_path(path, name)
+                except al.ArtifactLocationsError as exc:
+                    errors.append(exc.message)
+                else:
+                    # Additional containment layer (the resolver uses the same).
+                    try:
+                        safe_path(self.__class__.root, path)
+                    except ValueError as exc:
+                        errors.append(
+                            f"invalid 'artifact-locations.classes.{name}.path': {exc}"
+                        )
+
+            subdir = entry.get("subdir")
+            if subdir:
+                try:
+                    al.validate_subdir(subdir, name)
+                except al.ArtifactLocationsError as exc:
+                    errors.append(exc.message)
+
+            parent = entry.get("fallback-parent")
+            if parent is not None and parent not in al.CLASS_REGISTRY:
+                errors.append(
+                    f"invalid 'artifact-locations.classes.{name}.fallback-parent': "
+                    f"unknown class '{parent}'"
+                )
+
+        # 3. Semantic: mode/parent, SE start-critical, preset, scratch alias.
+        se_block = config.get("systems-engineering")
+        cascade_active = (
+            isinstance(se_block, dict) and bool(se_block.get("enabled"))
+        ) or bool(config.get("SE_ENABLED"))
+        mode_off_exempt = {"se-requirements", "se-decomposition"}
+        frontmatter_sink = {"reviews"}
+        for name in valid_names:
+            if name in mode_off_exempt:
+                continue
+            entry = classes[name]
+            mode = entry.get("mode")
+            parent = entry.get("fallback-parent")
+            has_sink = cascade_active and name in frontmatter_sink
+            if mode == "off" and parent is None and not has_sink:
+                errors.append(
+                    f"invalid 'artifact-locations.classes.{name}.mode': 'off' "
+                    "requires 'fallback-parent' or a frontmatter sink"
+                )
+
+        se_requirements = classes.get("se-requirements")
+        if (
+            cascade_active and isinstance(se_requirements, dict)
+            and se_requirements.get("mode") == "off"
+        ):
+            errors.append(
+                "invalid 'artifact-locations.classes.se-requirements.mode': the "
+                "cascade cannot start without requirements — 'se-decomposition' "
+                "is the allowed alternative"
+            )
+
+        preset_name = data.get("preset")
+        if preset_name is not None:
+            try:
+                al.validate_preset(preset_name, al.load_presets(self.__class__.root))
+            except al.ArtifactLocationsError as exc:
+                errors.append(f"invalid 'artifact-locations.preset': {exc.message}")
+
+        try:
+            al.validate_scratch_sources(config, classes)
+        except al.ArtifactLocationsError as exc:
+            errors.append(exc.message)
+
+        # 4. Semantic: legacy[]/unmanaged[] may not shadow an active class path.
+        try:
+            matrix = al.resolve_artifact_locations(config, self.__class__.root, None)
+        except al.ArtifactLocationsError as exc:
+            errors.append(exc.message)
+            matrix = None
+        if matrix is not None:
+            active_paths = {r.path for r in matrix.classes.values() if r.path}
+            for key in ("legacy", "unmanaged"):
+                entries = data.get(key) or ()
+                if not isinstance(entries, (list, tuple)):
+                    continue
+                for entry in entries:
+                    if entry in active_paths:
+                        errors.append(
+                            f"invalid 'artifact-locations.{key}': '{entry}' "
+                            "is also an active class path"
+                        )
+
+        if errors:
+            # The resolver re-validates paths/scratch; collapse identical messages.
+            unique_errors = list(dict.fromkeys(errors))
+            raise ValueError(
+                "invalid 'artifact-locations': " + "; ".join(unique_errors))
 
     def _guard_release_checklist_write(self, section: str, data: Any) -> Any:
         """Normalise/validate a ``release-checklist`` write before it is stored.
