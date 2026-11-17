@@ -1,6 +1,6 @@
 ---
 name: concept-reviewer
-version: 1.9.2
+version: 1.9.3
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block
@@ -14,7 +14,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.9.2
+generated-from: 1-generic/concept-reviewer.md@1.9.3
 model: claude-opus-4-8
 ---
 
@@ -95,7 +95,7 @@ missing the 4 questions entirely → **major** finding.
 ## 7. Report template (issue #370)
 
 Read the format template from `.claude/snippets/concept-review-report.md` (sync-generated).
-Then **write** the completed review report as an artifact (e.g. `concept-review-<topic>.md`)
+Then **write** the completed review report as an artifact under `docs/reviews/` (e.g. `concept-review-<topic>.md`)
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
 

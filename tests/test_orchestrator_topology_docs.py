@@ -1152,11 +1152,16 @@ _PROJECT_SCHEMA = _REPO_ROOT / "config" / "project-config.schema.json"
 _SCHEMA_BASELINE_COMMIT = "a41745e"
 
 # AC-26 freezes the schema property tree so the ORCHESTRATOR TOPOLOGY gate
-# cannot silently add properties. Issue #1187 (project-context injection) is a
-# SEPARATE config wave, not part of the topology gate: its dedicated section is
-# therefore legitimate and explicitly allowlisted here. Only that section is
+# cannot silently add properties. Issues #1187 (project-context injection) and
+# #1186 (artifact-locations matrix + deprecated se_output alias) are SEPARATE
+# config waves, not part of the topology gate: their dedicated sections are
+# therefore legitimate and explicitly allowlisted here. Only those sections are
 # exempt; any other newly added property is still reported as AC-26 drift.
-_AC26_ALLOWED_NEW_PROPERTY_PREFIXES = ("project-context-injection",)
+_AC26_ALLOWED_NEW_PROPERTY_PREFIXES = (
+    "project-context-injection",
+    "artifact-locations",
+    "se_output",
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_orchestrator_topology_effective_flags import (  # noqa: E402
@@ -1285,11 +1290,12 @@ def _schema_property_paths(node: dict, prefix: str = "") -> set[str]:
 
 
 def _ac26_unexpected_paths(current_paths: set[str], frozen_paths: set[str]) -> set[str]:
-    """Newly added property paths that are not legitimately from #1187.
+    """Newly added property paths that are not legitimately from #1187/#1186.
 
-    Paths under ``_AC26_ALLOWED_NEW_PROPERTY_PREFIXES`` belong to a separate
-    config wave (project-context injection), not the topology gate, so they are
-    exempt. Everything else that is newly added is AC-26 drift.
+    Paths under ``_AC26_ALLOWED_NEW_PROPERTY_PREFIXES`` belong to separate
+    config waves (project-context injection, artifact-locations matrix), not the
+    topology gate, so they are exempt. Everything else that is newly added is
+    AC-26 drift.
     """
     return {
         path
@@ -1303,8 +1309,9 @@ def test_schema_has_no_new_properties():
 
     Property PATHS are frozen from the pre-implementation commit; titles,
     descriptions and enum values may change, the property tree may not. The
-    dedicated ``project-context-injection.*`` section (#1187) belongs to a
-    separate config wave and is explicitly allowed.
+    ``project-context-injection.*`` (#1187), ``artifact-locations.*`` and
+    ``se_output.*`` (#1186) sections belong to separate config waves and are
+    explicitly allowed.
     """
     import json
 

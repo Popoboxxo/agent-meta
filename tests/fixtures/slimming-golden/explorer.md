@@ -1,6 +1,6 @@
 ---
 name: explorer
-version: 1.5.0
+version: 1.5.1
 description: Codebase research (read-only for code, Write only for reports), dependency
   and impact mapping, file and symbol search.
 hint: Analyze codebase / dependencies / impact — read-only for code, writes reports
@@ -12,7 +12,7 @@ tools:
 - Grep
 - Write
 - TodoWrite
-generated-from: 1-generic/explorer.md@1.5.0
+generated-from: 1-generic/explorer.md@1.5.1
 model: claude-haiku-4-5-20251001
 ---
 

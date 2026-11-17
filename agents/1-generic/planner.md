@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.6.1"
+version: "1.6.2"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -72,7 +72,7 @@ Reference `effort-estimator` in text for an overall effort summary — do not ca
 ## 5. Persist (dual convention)
 
 - **Knowledge Engine active** (`project.yaml` → `knowledge-engine.enabled: true`): write directly to `knowledge/wiki/plans/<topic>.md` with frontmatter `type: Plan` (see `knowledge/schema.md`). Update `knowledge/wiki/index.md` and `knowledge/wiki/log.md` yourself, same OKF frontmatter/log conventions `knowledge-ingestor` uses for other sources — no delegation to `knowledge-ingestor` (avoids a redundant agent hop for a single artifact).
-- **Knowledge Engine inactive:** write `plan-<topic>.md` in the project root (same naming convention as `ideation`'s `concept-<topic>.md`).
+- **Knowledge Engine inactive:** write `{{ARTIFACT_PLANS_DIR}}/plan-<YYYY-MM-DD>-<topic>.md` (same naming convention as `ideation`'s concept artifact).
 
 **Frontmatter-Konvention:** Das `pipeline_stages`-Feld ist Pflicht, sobald der Plan für eine Pipeline mit `plan-driven`-Stages verwendet wird (z.B. `feature-lifecycle`). Es ist Teil des verpflichtenden Plan-Templates in §3:
 ```yaml
@@ -97,7 +97,7 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 <tools>
 - **Read** — read the source concept/REQ/bug
-- **Write** — persist `plan-<topic>.md` or the Knowledge-Wiki page
+- **Write** — persist `{{ARTIFACT_PLANS_DIR}}/plan-<YYYY-MM-DD>-<topic>.md` or the Knowledge-Wiki page
 - **Glob/Grep** — check existing project structure before assigning steps to roles
 - **TodoWrite** — track decomposition for plans with >3 steps
 </tools>
@@ -125,7 +125,7 @@ ARTIFACTS: <persisted plan path>
 | 1 | <task> | <role> | — | <measurable> |
 | 2 | <task> | <role> | 1 | <measurable> |
 
-**Persisted to:** <knowledge/wiki/plans/<topic>.md | plan-<topic>.md>
+**Persisted to:** <knowledge/wiki/plans/<topic>.md | {{ARTIFACT_PLANS_DIR}}/plan-<YYYY-MM-DD>-<topic>.md>
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

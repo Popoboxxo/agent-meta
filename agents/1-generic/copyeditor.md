@@ -1,6 +1,6 @@
 ---
 name: template-copyeditor
-version: "0.5.1"
+version: "0.5.2"
 description: "Copyediting: style, sentence structure, word repetition, narrative/argumentative flow, and content consistency on top of a clean text. Assumes proofreading-level correctness or delegates that pass first. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz"
 reference_standards:
@@ -89,7 +89,7 @@ On `correction_hints` from a critic → fix ONLY the named findings. Track "roun
 </tools>
 
 <output_contract>
-Deliverable is a markdown findings report, written next to the reviewed file as `<filename>.copyedit.md` (never overwrite the source unless the request explicitly asked for in-place editing — default is report-only, human applies changes):
+Deliverable is a markdown findings report, written to `{{ARTIFACT_REVIEWS_DIR}}/<filename>.copyedit.md` (`kind: copyedit`; never overwrite the source unless the request explicitly asked for in-place editing — default is report-only, human applies changes). When `{{ARTIFACT_REVIEWS_MODE}}` is `inline`, omit the report file and return the full report in `RESULT` instead:
 
 ```markdown
 # Copyediting: <filename>

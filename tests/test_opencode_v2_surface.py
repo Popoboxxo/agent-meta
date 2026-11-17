@@ -5510,9 +5510,10 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # explorer 1.5.0 (Write for reports): ac01-baseline re-pinned (explorer entries in hashes.json); slimming-golden re-pinned (explorer.md patched per line); compact-golden re-pinned (explorer line in agents-managed.md).
 # orchestrator-guard-impl.sh 1.12.0 (batch3 PR2): ac01-baseline re-pinned (2 hook renders, Claude + Gemini); slimming/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # Release 2.0.0-beta.9: ac01-baseline re-pinned (its hashes.json, 82 version-bearing entries -> ea9ea6cb.. -> db73f601..) and compact-golden re-pinned (agent-meta v2.0.0-beta.9 stamp -> d02d1de1.. -> 4ac22975..); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1186 T10 (2026-11-17, artifact-locations matrix): ac01-baseline re-pinned (81 per-file hashes of the 10 templated roles + their .toml sidecars, plus 108 new docs/*/.gitkeep placeholder keys -> db73f601.. -> 090cfabe..); slimming-golden re-pinned (8 role goldens: version/generated-from bumps + {{ARTIFACT_*}} rendered paths -> d72cf5b2.. -> d8c20af6..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "db73f601848552c8a41c0fc2c0f9f236ad41be5b941cc223e72a357ace4a11e7",
-    "slimming-golden": "d72cf5b24cb76bcd42bc4b0dcab7e0818adde37bcbb38801220420fb477e5465",
+    "ac01-baseline": "090cfabedfa2fb7b403f29f326a17cfcd428d7c53d69ed5599d9f5c78e814f5e",
+    "slimming-golden": "d8c20af60fd643dfc1f47eb6a5cc718329370a036888d01d44377ce99f492f51",
     "compact-golden": "4ac22975342e936b559951baee9b8928ad3e616b0361cabd4a6f1e6f4a50ca1b",
 }
 
