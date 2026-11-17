@@ -189,3 +189,211 @@ def test_apply_scope_does_not_mutate_shared_variables():
     assert variables["PROJECT_CONTEXT"] == "PARA"
     assert variables["PROJECT_CONTEXT_INJECTED"] == "true"
 
+
+# ---------------------------------------------------------------------------
+# T6 — pointer
+# ---------------------------------------------------------------------------
+
+# The English default is a single source of truth in config.py (D8). Keep this
+# copy in the TEST only as the expected value; the renderer must not duplicate
+# the sentence (test_pointer_line_text_is_exact).
+_T6_EXPECTED_EN = (
+    "Project context: read `{context_file}` first — it is the single source "
+    "for project-specific facts (embedded here only when "
+    "`project-context-injection.mode` includes this role)."
+)
+
+
+def _t6_impl():
+    """Lazy imports: T6 helpers stay importable before T6 lands (T4/T5 green)."""
+    from lib.agent_sync import insert_project_context_pointer
+    from lib.config import resolve_project_context_scope
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+
+    return insert_project_context_pointer, resolve_project_context_scope, SyncLog, load_providers_config
+
+
+def _t6_scope(section):
+    """Resolve a project-context-injection config section into a scope dict."""
+    _, resolve_scope, _, load_providers = _t6_impl()
+    return resolve_scope(
+        {"project-context-injection": section}, _ROOT,
+        provider_config=load_providers(_ROOT))
+
+
+def _t6_pointer_text(scope, provider):
+    """Format a provider's pointer exactly as the renderer seam does (T4)."""
+    from lib.agent_sync import _build_provider_vars
+    from lib.providers import load_providers_config
+
+    pc = dict(load_providers_config(_ROOT)[provider])
+    merged = _build_provider_vars(
+        pc, provider, {"_PROJECT_CONTEXT_SCOPE": scope}, _ROOT,
+        active_set=frozenset())
+    return merged["_PROJECT_CONTEXT_POINTER"]
+
+
+@pytest.fixture(scope="module")
+def t6_core_run(tmp_path_factory):
+    """One real Claude render in core+whitelist (only ``planner`` injected).
+
+    Covers all three fallback groups plus label cleanup in a single run:
+    developer (</context>), intern-developer (</workflow>), mammouth-expert
+    (EOF + note), orchestrator (dangling label). German is the configured
+    pointer language, so the German default is exercised end-to-end.
+    """
+    from lib.config import resolve_project_context_scope
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+    from lib.agent_sync import sync_agents_for_provider
+
+    provider_config = load_providers_config(_ROOT)
+    scope = resolve_project_context_scope(
+        {"project-context-injection": {
+            "mode": "core+whitelist", "whitelist": ["planner"],
+            "pointer-language": "de",
+        }},
+        _ROOT, provider_config=provider_config)
+    config = {"project": {"name": "T6"}, "platforms": []}
+    variables = {
+        "PROJECT_CONTEXT": "PARA", "COMMUNICATION_LANGUAGE": "Deutsch",
+        "_PROJECT_CONTEXT_SCOPE": scope,
+    }
+    project_root = tmp_path_factory.mktemp("t6-core")
+    log = SyncLog()
+    sync_agents_for_provider(
+        _ROOT, project_root, config, variables, log, dry_run=False,
+        provider="Claude", provider_config=provider_config)
+    artifacts = {
+        path.stem: path.read_text(encoding="utf-8")
+        for path in (project_root / ".claude" / "agents").glob("*.md")
+    }
+    return {
+        "artifacts": artifacts,
+        "log": log,
+        "pointer": scope["pointer_text"].format(context_file="CLAUDE.md"),
+    }
+
+
+def test_pointer_line_text_is_exact():
+    """The English default is one line in config.py; no renderer-local copy."""
+    insert, _, _, _ = _t6_impl()
+    assert insert is not None
+    assert _PROJECT_CONTEXT_POINTER_TEXTS["en"] == _T6_EXPECTED_EN
+    assert "\n" not in _T6_EXPECTED_EN
+    assert "`{context_file}`" in _T6_EXPECTED_EN
+    source = (_ROOT / "scripts" / "lib" / "agent_sync.py").read_text(encoding="utf-8")
+    assert "it is the single source for" not in source
+
+
+def test_pointer_german_default_used(t6_core_run):
+    """A German scope renders the German default (no English leak, D8)."""
+    content = t6_core_run["artifacts"]["developer"]
+    assert "Projektkontext: lies zuerst `CLAUDE.md`" in content
+    assert "Project context: read" not in content
+
+
+def test_pointer_text_override_used_verbatim():
+    """``pointer-text`` wins verbatim over both language defaults."""
+    insert, _, SyncLog, _ = _t6_impl()
+    scope = _t6_scope({
+        "mode": "core+whitelist", "whitelist": ["planner"],
+        "pointer-text": "See `{context_file}` for project facts.",
+    })
+    pointer = _t6_pointer_text(scope, "Claude")
+    assert pointer == "See `CLAUDE.md` for project facts."
+    rendered = insert("<context>\nfoo\n</context>\n", pointer, "developer",
+                      "developer.md", SyncLog())
+    assert "See `CLAUDE.md` for project facts." in rendered.splitlines()
+    assert "Project context" not in rendered
+    assert "Projektkontext" not in rendered
+
+
+def test_pointer_uses_resolved_context_file_per_provider():
+    """Each provider's pointer names its own resolved ``context_file``."""
+    scope = _t6_scope({"mode": "core"})
+    expected = {
+        "Claude": "CLAUDE.md",
+        "Gemini": "AGENTS.md",
+        "Opencode": "AGENTS.md",
+        "Continue": ".continue/rules/project-context.md",
+    }
+    for provider, context_file in expected.items():
+        pointer = _t6_pointer_text(scope, provider)
+        assert f"`{context_file}`" in pointer, (provider, pointer)
+        assert "{context_file}" not in pointer
+
+
+def test_pointer_inserted_at_end_of_context_section(t6_core_run):
+    """developer: exactly one pointer line immediately before the last </context>."""
+    content = t6_core_run["artifacts"]["developer"]
+    lines = content.splitlines()
+    pointer = t6_core_run["pointer"]
+    at = lines.index(pointer)
+    close = max(i for i, line in enumerate(lines) if line.strip() == "</context>")
+    assert at < close
+    assert content.count(pointer) == 1
+
+
+def test_pointer_inserted_before_workflow_when_no_context_section(t6_core_run):
+    """intern-developer: no <context>, so the pointer goes before </workflow>."""
+    content = t6_core_run["artifacts"]["intern-developer"]
+    lines = content.splitlines()
+    pointer = t6_core_run["pointer"]
+    assert "<context>" not in content
+    at = lines.index(pointer)
+    close = max(i for i, line in enumerate(lines) if line.strip() == "</workflow>")
+    assert at < close
+    assert content.count(pointer) == 1
+
+
+def test_pointer_appended_at_eof_with_note(t6_core_run):
+    """Neither section: pointer at EOF plus an explicit log note."""
+    content = t6_core_run["artifacts"]["mammouth-expert"]
+    pointer = t6_core_run["pointer"]
+    assert "<context>" not in content and "</workflow>" not in content
+    lines = content.splitlines()
+    assert lines.index(pointer) >= len(lines) - 3
+    notes = " ".join(t6_core_run["log"].infos)
+    assert ("no <context>/</workflow> in mammouth-expert.md — "
+            "pointer appended at EOF") in notes
+
+
+def test_dangling_project_context_label_is_removed(t6_core_run):
+    """A blanked ``**Project context:**`` label line leaves no empty header."""
+    content = t6_core_run["artifacts"]["orchestrator"]
+    assert "**Project context:**" not in content
+
+
+def test_no_pointer_when_injected(t6_core_run):
+    """Whitelisted (injected) roles keep their paragraph and get no pointer."""
+    pointer = t6_core_run["pointer"]
+    planner = t6_core_run["artifacts"]["planner"]
+    assert "PARA" in planner
+    assert pointer not in planner
+
+
+def test_exactly_one_pointer_per_excluded_role(t6_core_run):
+    """Every excluded role has exactly one pointer; injected roles have none.
+
+    The run covers all three fallback groups (developer, intern-developer,
+    mammouth-expert).
+    """
+    pointer = t6_core_run["pointer"]
+    artifacts = t6_core_run["artifacts"]
+    assert "<context>" in artifacts["developer"]
+    assert "<context>" not in artifacts["intern-developer"]
+    assert "</workflow>" in artifacts["intern-developer"]
+    assert "<context>" not in artifacts["mammouth-expert"]
+    assert "</workflow>" not in artifacts["mammouth-expert"]
+    excluded = 0
+    for role, content in artifacts.items():
+        count = content.count(pointer)
+        if role == "planner":
+            assert count == 0, role
+        else:
+            assert count == 1, (role, count)
+            excluded += 1
+    assert excluded >= 3
+

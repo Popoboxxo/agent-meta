@@ -627,6 +627,38 @@ def apply_project_context_scope(merged_vars: dict, role: str, scope: dict) -> bo
     return injected
 
 
+def insert_project_context_pointer(content: str, pointer: str, role: str,
+                                   source_name: str, log) -> str:
+    """Insert exactly one project-context pointer line into a rendered role.
+
+    1. Drop an empty ``**Project context:**`` label line (only when the line
+    contains nothing besides the label); blanking ``PROJECT_CONTEXT`` leaves
+    such a line behind. 2. Insert ``pointer`` as a single line before the last
+    ``</context>``, else before the last ``</workflow>``, else append at EOF and
+    emit a note (spec §3.2, D-2). ``pointer`` always comes from the resolved
+    provider variable ``_PROJECT_CONTEXT_POINTER`` — config.py is the single
+    source of the sentence (D8), so no text literal lives in this module.
+    ``role`` is part of the interface for callers/logging symmetry.
+    """
+    # Step 1: remove label lines that became empty after PROJECT_CONTEXT = "".
+    content = re.sub(
+        r"^[ \t]*\*\*Project context:\*\*[ \t]*\r?\n", "", content,
+        flags=re.MULTILINE)
+
+    # Step 2: 3-stage fallback — last </context>, else last </workflow>, else
+    # EOF + note. ``rfind`` keeps the pointer in the last matching section.
+    for closing_tag in ("</context>", "</workflow>"):
+        idx = content.rfind(closing_tag)
+        if idx != -1:
+            line_start = content.rfind("\n", 0, idx) + 1
+            return content[:line_start] + pointer + "\n" + content[line_start:]
+
+    log.note(
+        "project-context-injection",
+        f"no <context>/</workflow> in {source_name} — pointer appended at EOF")
+    return content.rstrip("\n") + "\n\n" + pointer + "\n"
+
+
 def _should_skip_role(
     role: str,
     source_path: Path,
@@ -1607,12 +1639,20 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         # #1187 (T5): decide per role whether the project-context paragraph is
         # embedded. Must run before _apply_content_pipeline (substitute +
         # strip_inactive_conditional_blocks read these values, spec §5.3).
-        apply_project_context_scope(
+        injected = apply_project_context_scope(
             merged_vars, role, variables.get("_PROJECT_CONTEXT_SCOPE") or {})
         _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
             platform_vars, agent_meta_root, log)
+        # #1187 (T6): excluded roles lose the paragraph and get exactly one
+        # pointer line instead. Runs after substitution/strip so the emptied
+        # label can be cleaned up (spec §5.3 step 6, D-2). Injected roles keep
+        # byte-identical content (AC2).
+        if not injected:
+            content = insert_project_context_pointer(
+                content, merged_vars["_PROJECT_CONTEXT_POINTER"], role,
+                filename, log)
         content = _finalize_agent_content(
             content, role, filename, source_path, provider, provider_config,
             source_version, description, _can_spawn, config, agent_meta_root,
