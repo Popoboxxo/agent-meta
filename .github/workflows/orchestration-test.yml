@@ -199,7 +199,7 @@ jobs:
   test:
     needs: changes
     if: needs.changes.outputs.run_tests == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Same backstop as `subprocess-shard`: a loaded 3.12 shard reached 30 m 19 s
     # at 97 % (run 41491331808) and was cancelled by the old 30 min ceiling.
     # Duration, not failure -- see the timeout budget in the header comment.
@@ -378,7 +378,7 @@ jobs:
   subprocess-shard:
     needs: changes
     if: needs.changes.outputs.run_tests == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 451 tests in total, but strictly serial per job. The timeout is only a
     # backstop -- the per-subprocess timeouts in tests/timeouts.py are the real
     # guard -- and three-way module-disjoint splitting keeps every group below
