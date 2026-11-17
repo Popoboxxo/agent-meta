@@ -78,6 +78,7 @@ from lib.cli_commands import (
     _handle_doctor,
     _handle_fill_defaults,
     _handle_list_backups,
+    _handle_migrate_artifact_aliases,
     _handle_only_variables,
     _handle_optimize_config,
     _handle_prune_backups,
@@ -243,6 +244,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "With --json emit one JSON object (schema_version '1') with every "
                              "class (path/files, mode, source, exists); otherwise print a "
                              "23-row table. Read-only; exit 2 when a class is unresolvable.")
+    parser.add_argument("--migrate-artifact-aliases", action="store_true",
+                        help="Preview a migration of legacy artifact-location aliases "
+                             "(Issue #1186, D1) into the artifact-locations matrix. Prints a "
+                             "ready-to-paste snippet; writes nothing unless --write is given. "
+                             "With --write the project.yaml is updated atomically and "
+                             "comment-preservingly; idempotent. Exit 1 on alias/matrix "
+                             "divergence or when the matrix is disabled.")
+    parser.add_argument("--write", action="store_true",
+                        help="With --migrate-artifact-aliases: apply the planned alias "
+                             "migration to project.yaml (atomic, comment-preserving, "
+                             "idempotent). Without that flag this is a no-op.")
     parser.add_argument("--context-report", action="store_true",
                         help="Measure the rendered context artifacts (entry file, rules, "
                              "orchestrator, harness roster) per active provider. Renders into "
@@ -801,6 +813,7 @@ _MODE_HANDLERS = [
     (lambda a: a.only_variables, _handle_only_variables),
     (lambda a: a.cleanup_preview, _handle_cleanup_preview),
     (lambda a: a.status_artifacts, _handle_status_artifacts),
+    (lambda a: a.migrate_artifact_aliases, _handle_migrate_artifact_aliases),
     (lambda a: a.context_report, _handle_context_report),
     (lambda a: a.optimize_config, _handle_optimize_config),
     (lambda a: a.apply_config_patch is not None, _handle_apply_config_patch),
@@ -832,7 +845,8 @@ _MODE_HANDLERS = [
 
 # Modes that run _build_context with dry_run forced on and stdout on stderr.
 _STDOUT_CLEAN_MODES = ("cleanup_preview", "prune_sync_backups", "context_report", "deactivation_status",
-                       "doctor", "optimize_config", "apply_config_patch", "status_artifacts")
+                       "doctor", "optimize_config", "apply_config_patch", "status_artifacts",
+                       "migrate_artifact_aliases")
 
 
 def _dispatch(ctx: _SyncContext) -> None:

@@ -1230,6 +1230,45 @@ def _handle_status_artifacts(ctx: _SyncContext) -> None:
     _exit(0)
 
 
+def _handle_migrate_artifact_aliases(ctx: _SyncContext) -> None:
+    """Handle ``--migrate-artifact-aliases [--write]`` (Issue #1186, T23/D1).
+
+    Prints the ready ``artifact-locations`` snippet as a dry-run preview. Only
+    with ``--write`` does it apply the plan to ``project.yaml`` — atomically and
+    comment-preservingly via ``lib.artifact_migration``. Divergence and a
+    disabled matrix are refused (exit 1) before any disk write.
+    """
+    from lib.artifact_migration import (
+        MigrationError,
+        apply_migration,
+        build_migration_plan,
+        render_snippets,
+    )
+
+    ctx.read_only = True
+    ctx.mode = "migrate_artifact_aliases"
+
+    def _fail(exc: MigrationError) -> None:
+        print(f"{exc.code}: {exc.message}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        plan = build_migration_plan(ctx.config)
+    except MigrationError as exc:
+        _fail(exc)
+
+    # The preview is always on stdout (dry-run contract).
+    print(render_snippets(plan))
+
+    if ctx.args.write:
+        try:
+            report = apply_migration(ctx.config_path, plan)
+        except MigrationError as exc:
+            _fail(exc)
+        print(report.message)
+    sys.exit(0)
+
+
 def _handle_context_report(ctx: _SyncContext) -> None:
     """Handle ``--context-report`` (IC-11): render into the tmp-sink, measure, exit.
 
