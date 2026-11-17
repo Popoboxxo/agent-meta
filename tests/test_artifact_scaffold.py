@@ -97,6 +97,24 @@ def test_second_run_is_idempotent(tmp_path):
         assert len(list((tmp_path / rel).glob(".gitkeep"))) == 1
 
 
+def test_dry_run_with_existing_markers_logs_no_create(tmp_path):
+    """--check must stay clean when markers already exist (T8 regression).
+
+    A synced checkout has all 12 markers on disk; a dry-run over that state
+    must report zero CREATE actions so ``sync.py --check`` exits 0. Missing
+    markers are still reported (covered by ``test_dry_run_writes_nothing``).
+    """
+    cfg = _config()
+    real = SyncLog()
+    scaffold_artifact_dirs(REPO_ROOT, tmp_path, cfg, real, dry_run=False)
+    assert len([a for a in real.actions if "artifact scaffolding" in a]) == 12
+
+    check = SyncLog()
+    scaffold_artifact_dirs(REPO_ROOT, tmp_path, cfg, check, dry_run=True)
+    assert [a for a in check.actions if "artifact scaffolding" in a] == []
+    assert len([u for u in check.unchanged if ".gitkeep" in u]) == 12
+
+
 def test_wrapper_keeps_old_behaviour(tmp_path):
     log = SyncLog()
     scaffold_spec_plan_dirs(REPO_ROOT, tmp_path, _config(), log, dry_run=False)

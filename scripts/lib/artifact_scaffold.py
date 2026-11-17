@@ -46,17 +46,22 @@ def _scaffold_marker(
 ) -> None:
     """Create ``<rel>/.gitkeep`` idempotently and log the operation.
 
-    In dry-run the whole managed set is reported regardless of what is already
-    on disk: the matrix defines which directories are managed, so a caller sees
-    the complete plan (AC-02). Real runs stay incremental via ``write_checked``.
+    A dry-run reports only markers that would actually be created: an existing
+    marker is a no-op (recorded as unchanged) so ``sync.py --check`` stays clean
+    on a synced checkout. Missing markers are still reported as CREATE in both
+    dry-run and real runs; real runs stay incremental via ``write_checked``.
     """
     target = safe_path(project_root, rel)
     label = f"{rel}/.gitkeep"
+    marker_path = target / ".gitkeep"
     if dry_run:
-        log.action("CREATE", label, source)
+        if marker_path.exists():
+            log.note_unchanged(label)
+        else:
+            log.action("CREATE", label, source)
         return
     target.mkdir(parents=True, exist_ok=True)
-    if write_checked(target / ".gitkeep", "", log, label):
+    if write_checked(marker_path, "", log, label):
         log.action("CREATE", label, source)
     else:
         log.note_unchanged(label)
