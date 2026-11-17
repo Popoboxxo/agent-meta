@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.8.3
+version: 1.8.4
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -168,7 +168,7 @@ ARTIFACTS: <step persistence files, empty if none>
 
 After completing implementation (status: `done`), persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
+**Output file:** `{{ARTIFACT_SE_IMPLEMENTATION_DIR}}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
 
 **Frontmatter format:**
 ```yaml

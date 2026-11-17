@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.7.4
+version: 1.7.5
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -174,7 +174,7 @@ Return your final output **only** as a JSON object matching the following schema
 
 After completing validation, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Validation.md`
+**Output file:** `{{ARTIFACT_SE_VALIDATION_DIR}}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Validation.md`
 
 **Frontmatter format:**
 ```yaml

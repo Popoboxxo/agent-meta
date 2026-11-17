@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.11.3
+version: 1.11.4
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -150,7 +150,7 @@ Define these explicitly per interface — they become the binding test oracle fo
 
 After completing interface registration, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Interfaces.md`
+**Output file:** `{{ARTIFACT_SE_INTERFACES_DIR}}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Interfaces.md`
 
 **Frontmatter format:**
 ```yaml

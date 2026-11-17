@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.8.2
+version: 1.8.3
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on
@@ -188,7 +188,7 @@ ARTIFACTS: <persisted step/report files (see Step Persistence)>
 
 After completing verification, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Verification.md`
+**Output file:** `{{ARTIFACT_SE_VERIFICATION_DIR}}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Verification.md`
 
 **Frontmatter format:**
 ```yaml

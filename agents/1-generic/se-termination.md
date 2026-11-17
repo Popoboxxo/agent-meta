@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.12.3
+version: 1.12.4
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -151,7 +151,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 
 After completing termination decisions, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Decisions.md`
+**Output file:** `{{ARTIFACT_SE_DECISIONS_DIR}}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Decisions.md`
 
 **Frontmatter format:**
 ```yaml

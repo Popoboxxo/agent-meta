@@ -171,3 +171,120 @@ def test_fallback_mentions_inline_mode():
                     f"{role}.md references a _MODE variable but never mentions inline"
                 )
     assert not offenders, "\n".join(offenders)
+
+
+# ---------------------------------------------------------------------------
+# T11 — SE
+# ---------------------------------------------------------------------------
+
+# The 12 SE templates owned by T11 (plan T11 row).
+T11_TEMPLATES = (
+    "se-requirements",
+    "se-component-requirements",
+    "se-architect",
+    "se-interface-mgr",
+    "se-developer",
+    "se-senior-developer",
+    "se-junior-developer",
+    "se-integration-and-test-manager",
+    "se-validator",
+    "se-verifier",
+    "se-termination",
+    "se-critic",
+)
+
+# F-1: single-brace `{SE_*}` is never substituted by sync.py.
+SE_SINGLE_BRACE_RE = re.compile(r"(?<!\{)\{SE_[A-Z0-9_]*(?!\})")
+
+# Role -> resolved matrix class variable (Spec §2.4, §3.4).
+SE_CLASS_VARIABLES = {
+    "se-requirements": "ARTIFACT_SE_REQUIREMENTS_DIR",
+    "se-component-requirements": "ARTIFACT_SE_REQUIREMENTS_DIR",
+    "se-architect": "ARTIFACT_SE_ARCHITECTURE_DIR",
+    "se-interface-mgr": "ARTIFACT_SE_INTERFACES_DIR",
+    "se-developer": "ARTIFACT_SE_IMPLEMENTATION_DIR",
+    "se-senior-developer": "ARTIFACT_SE_IMPLEMENTATION_DIR",
+    "se-junior-developer": "ARTIFACT_SE_IMPLEMENTATION_DIR",
+    "se-integration-and-test-manager": "ARTIFACT_SE_TESTPLAN_DIR",
+    "se-validator": "ARTIFACT_SE_VALIDATION_DIR",
+    "se-verifier": "ARTIFACT_SE_VERIFICATION_DIR",
+    "se-termination": "ARTIFACT_SE_DECISIONS_DIR",
+    "se-critic": "ARTIFACT_SE_REVIEWS_DIR",
+}
+
+# Canonical leaf naming must survive the variable substitution (Spec §3.1/§3.2).
+SE_LEAF_PATTERNS = {
+    "se-requirements": "L{level}_{FolderName}_Requirements.md",
+    "se-component-requirements": "L3_{FolderName}_Requirements.md",
+    "se-architect": "L{level}_{FolderName}_Architecture.md",
+    "se-interface-mgr": "L{level}_{FolderName}_Interfaces.md",
+    "se-developer": "L{level}_{FolderName}_Impl.md",
+    "se-senior-developer": "L{level}_{FolderName}_Impl.md",
+    "se-junior-developer": "L{level}_{FolderName}_Impl.md",
+    "se-integration-and-test-manager": "L{level}_{FolderName}_TestPlan.md",
+    "se-validator": "L{level}_{FolderName}_Validation.md",
+    "se-verifier": "L{level}_{FolderName}_Verification.md",
+    "se-termination": "L{level}_{FolderName}_Decisions.md",
+    "se-critic": "L{level}_{FolderName}_{review_target}_critic_report.md",
+}
+
+
+def test_no_single_brace_se_token():
+    """F-1: no single-brace `{SE_*}` and no legacy SE_BASE_DIR token left."""
+    offenders: list[str] = []
+    for role in T11_TEMPLATES:
+        text = _read(role)
+        if SE_SINGLE_BRACE_RE.search(text):
+            offenders.append(f"{role}.md: single-brace SE token")
+        if "SE_BASE_DIR" in text:
+            offenders.append(f"{role}.md: legacy SE_BASE_DIR token")
+    assert not offenders, (
+        "unsubstituted SE path token (use {{ARTIFACT_*}}):\n"
+        + "\n".join(offenders)
+    )
+
+
+def test_each_se_role_uses_its_class_variable():
+    """Every SE role points at its resolved cell-class variable."""
+    offenders: list[str] = []
+    for role, variable in SE_CLASS_VARIABLES.items():
+        if "{{" + variable + "}}" not in _read(role):
+            offenders.append(f"{role}.md: missing {{{{{variable}}}}}")
+    assert not offenders, "\n".join(offenders)
+
+
+def test_leaf_naming_preserved():
+    """Leaf naming stays canonical; no role-specific naming was introduced."""
+    offenders: list[str] = []
+    for role, leaf in SE_LEAF_PATTERNS.items():
+        if leaf not in _read(role):
+            offenders.append(f"{role}.md: missing leaf '{leaf}'")
+    assert not offenders, "\n".join(offenders)
+
+
+def test_protocol_path_uses_se_reviews_projection():
+    """se-critic review protocol targets the SE reviews projection (D-7)."""
+    text = _read("se-critic")
+    assert "{{ARTIFACT_SE_REVIEWS_DIR}}/REVIEW_<YYYY-MM-DD>_<scope>.md" in text
+    assert "docs/reviews" not in text
+    assert "{SE_BASE_DIR}/reviews" not in text
+
+
+def test_critic_report_uses_se_reports_projection():
+    """Critic end-report targets the SE reports projection, not docs/reports."""
+    text = _read("se-critic")
+    assert (
+        "{{ARTIFACT_SE_REPORTS_DIR}}/{FolderName}/"
+        "L{level}_{FolderName}_{review_target}_critic_report.md"
+    ) in text
+    assert "{{ARTIFACT_REPORTS_DIR}}" not in text
+
+
+def test_atomic_write_uses_scratch_dir():
+    """The scratch sink stays for intermediates; the target uses class vars."""
+    for role in ("se-architect", "se-critic"):
+        text = _read(role)
+        assert "{{TMP_SINK_PATH}}/se-" in text, f"{role}.md: scratch sink missing"
+        assert "rename" in text, f"{role}.md: atomic rename missing"
+    assert "{{ARTIFACT_SE_ARCHITECTURE_DIR}}" in _read("se-architect")
+    assert "{{ARTIFACT_SE_REPORTS_DIR}}" in _read("se-critic")
