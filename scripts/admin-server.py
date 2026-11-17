@@ -236,7 +236,9 @@ PROJECT_FILES: dict[str, str] = {
 # ``submodule-protection`` are runtime sections that predate/reach beyond the
 # schema; both are consumed by sync.py (lib/backup.py, lib/hooks.py).
 PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
-    "agent-prompts", "model-overrides", "model-override-all",
+    # Issue #1186 (T17): artifact output-location matrix. Hand-maintained here;
+    # the schema-derived whitelist is T22 (follow-up, after #1141).
+    "agent-prompts", "artifact-locations", "model-overrides", "model-override-all",
     "model-inherit-main-chat", "memory-overrides", "permission-mode-overrides",
     "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz",
     "admin-ui", "provider-tier-overrides", "project", "dod-preset",

@@ -8,6 +8,7 @@ import time and shared across test cases.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import json
@@ -2172,6 +2173,78 @@ class TestWriteProjectSectionFeatureBSections(unittest.TestCase):
             with self.assertRaises(ValueError):
                 handler._write_project_section()
             self.assertNotIn("variables", handler.config_manager.read("project"))
+
+
+class TestArtifactLocationsWhitelist(unittest.TestCase):
+    """T17 (issue #1186, AC-07a): ``artifact-locations`` must be a writable
+    project.yaml section via ``PUT /api/config/project/section``.
+
+    This task adds exactly ONE hand-maintained entry to
+    ``PROJECT_WRITABLE_SECTIONS``. Schema-derived whitelists
+    (``_SCHEMA_SECTIONS`` / ``_RUNTIME_ONLY_SECTIONS``) belong to T22
+    (follow-up, after #1141) and must not exist yet.
+    """
+
+    # Snapshot of ``PROJECT_WRITABLE_SECTIONS`` at HEAD/aaed14c2 (pre-T17).
+    # Pinned so the "exactly +1 entry" assertion detects any collateral
+    # add/remove done in this task.
+    _PRE_T17_WRITABLE_SECTIONS = frozenset({
+        "admin-ui", "agent-prompts", "ai-providers", "auto_commit", "backup",
+        "commit", "context-profile", "context_file", "conventions",
+        "conventions-preset", "debug-mode", "dod", "dod-preset", "environments",
+        "external-skills", "git", "gitignore", "hooks", "knowledge-engine",
+        "mcp-role-overrides", "memory-overrides", "model-inherit-main-chat",
+        "model-override-all", "model-overrides", "model-source-preference",
+        "orchestrator", "permission-mode-overrides", "platforms", "plugins",
+        "project", "project-context-injection", "provider-isolation",
+        "provider-options", "provider-tier-overrides", "release-checklist",
+        "repo_containment", "roles", "rules", "rules-preset", "se-focus",
+        "skills-registry", "speech-mode", "steps-overrides",
+        "subagent_permissions", "submodule-protection", "test-environments",
+        "tier-overrides", "tier-preset", "viz",
+    })
+
+    def test_artifact_locations_is_writable(self) -> None:
+        self.assertIn("artifact-locations", admin_server.PROJECT_WRITABLE_SECTIONS)
+
+    def test_section_is_accepted_by_put(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            handler = admin_server.AdminRequestHandler.__new__(
+                admin_server.AdminRequestHandler)
+            admin_server.AdminRequestHandler.root = root
+            admin_server.AdminRequestHandler.config_manager = (
+                admin_server.ConfigManager(root, mode="project_admin"))
+            handler._send_json = lambda result: None
+            handler._read_body = lambda: {
+                "section": "artifact-locations", "data": {"enabled": True}}
+            # Without the whitelist entry _assert_project_sections_writable
+            # raises ValueError -> HTTP 400 before any disk write.
+            handler._write_project_section()  # must not raise
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["artifact-locations"], {"enabled": True})
+
+    def test_whitelist_size_increased_by_one(self) -> None:
+        added = (admin_server.PROJECT_WRITABLE_SECTIONS
+                 - self._PRE_T17_WRITABLE_SECTIONS)
+        removed = (self._PRE_T17_WRITABLE_SECTIONS
+                   - admin_server.PROJECT_WRITABLE_SECTIONS)
+        self.assertEqual(added, {"artifact-locations"})
+        self.assertEqual(removed, set())
+        self.assertEqual(len(admin_server.PROJECT_WRITABLE_SECTIONS),
+                         len(self._PRE_T17_WRITABLE_SECTIONS) + 1)
+
+    def test_no_derivation_in_this_task(self) -> None:
+        tree = ast.parse(_ADMIN_SERVER_PATH.read_text(encoding="utf-8"))
+        bound_or_used: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                bound_or_used.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                bound_or_used.add(node.attr)
+        self.assertNotIn("_SCHEMA_SECTIONS", bound_or_used)
+        self.assertNotIn("_RUNTIME_ONLY_SECTIONS", bound_or_used)
 
 
 class TestProjectFullPutGuardWp3(unittest.TestCase):
