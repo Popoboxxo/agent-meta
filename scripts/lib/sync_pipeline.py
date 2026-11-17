@@ -148,6 +148,7 @@ from lib.skills import (
     load_external_skills_config,
     sync_external_skills_for_provider,
 )
+from lib.artifact_scaffold import scaffold_artifact_dirs
 from lib.release_scaffold import scaffold_release_process
 from lib.spec_plan_scaffold import scaffold_spec_plan_dirs
 from lib.variables import _provider_topology_flags
@@ -1788,6 +1789,14 @@ def _sync_stage_knowledge_and_isolation(
         scaffold_spec_plan_dirs(agent_meta_root, project_root, config, log, args.dry_run)
     except SyncError as exc:
         print(f"\n  !!  Spec/plan scaffolding aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    # Generalized artifact scaffolding (Issue #1186, T8): runs in addition to
+    # the backward-compatible spec/plan wrapper.
+    try:
+        scaffold_artifact_dirs(agent_meta_root, project_root, config, log, args.dry_run)
+    except SyncError as exc:
+        print(f"\n  !!  Artifact scaffolding aborted: {exc}", file=sys.stderr)
         sys.exit(1)
 
     try:
