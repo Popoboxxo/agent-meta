@@ -74,6 +74,7 @@ from .pipelines import (
 )
 from .analysis import FileAffinityAnalyzer, analyze_project
 from .consistency.placeholders import _BUILTIN_VARS
+from .consistency.report import Finding, Severity
 from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
@@ -2535,9 +2536,9 @@ def _build_orch_variables(
     # (context.py::_build_context_vars, rules.py::_merged_rule_vars) re-resolve
     # with provider=... and overwrite these, so a provider override wins.
     variables.update(repo_containment_variables(config))
-    # TMP_SINK_PATH (IC-34): configured tmp-sink path for role templates; same
-    # resolution as REPO_CONTAINMENT_TMP_PATH. Provided only, not yet rendered.
-    variables["TMP_SINK_PATH"] = variables["REPO_CONTAINMENT_TMP_PATH"]
+    # TMP_SINK_PATH (IC-34, D1) is fed from the resolved artifact matrix in
+    # build_variables — after _build_artifact_variables — so the scratch sink
+    # has exactly one source. Do not re-derive it from REPO_CONTAINMENT_TMP_PATH.
     # IC-05/ADR-01: every other tmp-sink form comes from the single resolver.
     # TMP_SINK_ABS_PATH/TMP_SINK_ENV_PIN_BLOCK are omitted for a disabled sink
     # (AC-25); PYTEST_BASETEMP is always available and shell-quoted into the
@@ -2905,6 +2906,135 @@ def _build_artifact_variables(
     for class_name in CLASS_REGISTRY:
         stem = class_name.upper().replace("-", "_")
         variables[f"ARTIFACT_{stem}_MODE"] = classes[class_name].mode
+
+
+def _artifact_deprecation_warnings(
+    config: dict, agent_meta_root: Path, project_root: Path | None = None,
+) -> list[Finding]:
+    """Collect one-time deprecation warnings for legacy alias keys (Spec §3.6, T9).
+
+    Once ``artifact-locations.enabled`` is true the matrix is the single source;
+    the old keys are read as aliases. A legacy key that diverges from the
+    resolved matrix (and the scratch migration alias, which is always
+    deprecated) yields exactly one WARNING Finding per alias. With the master
+    switch off the old keys stay the sole source and nothing is reported.
+
+    Hard errors (scratch value divergence) belong to the T5 validator — this
+    function never calls ``sys.exit`` and never mutates ``config``.
+    """
+    section = config.get("artifact-locations") or {}
+    if not isinstance(section, dict):
+        section = {}
+    if section.get("enabled", True) is False:
+        return []
+
+    findings: list[Finding] = []
+
+    def _warn(message: str) -> None:
+        findings.append(Finding(
+            severity=Severity.WARNING,
+            check="artifact-locations.deprecated-alias",
+            file=".meta-config/project.yaml",
+            message=message,
+        ))
+
+    matrix = resolve_artifact_locations(config, agent_meta_root, project_root)
+    matrix_classes = section.get("classes") or {}
+    if not isinstance(matrix_classes, dict):
+        matrix_classes = {}
+
+    # 1. spec-plan-workflow.paths.{specs,plans,spikes} -> classes.*.path.
+    spw = config.get("spec-plan-workflow") or {}
+    spw_paths = (spw.get("paths") or {}) if isinstance(spw, dict) else {}
+    if not isinstance(spw_paths, dict):
+        spw_paths = {}
+    for key in ("specs", "plans", "spikes"):
+        alias = spw_paths.get(key)
+        if alias is None:
+            continue
+        target_key = f"artifact-locations.classes.{key}.path"
+        target = matrix.classes[key].path
+        if alias != target:
+            _warn(
+                f"deprecated alias 'spec-plan-workflow.paths.{key}' ({alias}) "
+                f"diverges from '{target_key}' ({target}); the matrix value wins"
+            )
+
+    # 2. se_output.base_dir -> classes.se-*.path (ARTIFACT_SE_ROOT / SE_BASE_DIR).
+    se_output = config.get("se_output") or {}
+    se_alias = se_output.get("base_dir") if isinstance(se_output, dict) else None
+    if se_alias is not None:
+        target_key = "artifact-locations.classes.se-*.path"
+        target = matrix.classes["se-requirements"].path
+        if se_alias != target:
+            _warn(
+                f"deprecated alias 'se_output.base_dir' ({se_alias}) diverges "
+                f"from '{target_key}' ({target}); the matrix value wins"
+            )
+
+    # 3. repo_containment.tmp-sink.path -> classes.scratch.path (D1). The alias
+    #    is always deprecated: one warning for the migration case (class
+    #    absent) and one for the removal case (both present and equal).
+    containment = config.get("repo_containment") or {}
+    tmp_sink = (
+        (containment.get("tmp-sink") or {}) if isinstance(containment, dict) else {}
+    )
+    if not isinstance(tmp_sink, dict):
+        tmp_sink = {}
+    alias_path = tmp_sink.get("path")
+    if alias_path is not None:
+        scratch_entry = matrix_classes.get("scratch") or {}
+        class_path = (
+            scratch_entry.get("path") if isinstance(scratch_entry, dict) else None
+        )
+        if class_path is not None:
+            _warn(
+                "deprecated alias 'repo_containment.tmp-sink.path' duplicates "
+                "'artifact-locations.classes.scratch.path'; remove the deprecated "
+                "alias key to keep one source"
+            )
+        else:
+            _warn(
+                "deprecated alias 'repo_containment.tmp-sink.path': migrate to "
+                "'artifact-locations.classes.scratch.path' with "
+                "'sync.py --migrate-artifact-aliases --write'"
+            )
+
+    # 4. progress.* / viz.event_log -> classes.state.subdirs.* / event-log.
+    state_entry = matrix_classes.get("state") or {}
+    if not isinstance(state_entry, dict):
+        state_entry = {}
+    state_subdirs = state_entry.get("subdirs") or {}
+    if not isinstance(state_subdirs, dict):
+        state_subdirs = {}
+    progress = config.get("progress") or {}
+    if not isinstance(progress, dict):
+        progress = {}
+    for config_key, target_key in (
+        ("dir", "progress"),
+        ("checkpoint-dir", "checkpoints"),
+        ("handoffs-dir", "handoffs"),
+    ):
+        alias = progress.get(config_key)
+        if alias is None or target_key not in state_subdirs:
+            continue
+        if alias != state_subdirs[target_key]:
+            _warn(
+                f"deprecated alias 'progress.{config_key}' ({alias}) diverges "
+                f"from 'artifact-locations.classes.state.subdirs.{target_key}' "
+                f"({state_subdirs[target_key]}); the matrix value wins"
+            )
+    viz = config.get("viz") or {}
+    viz_alias = viz.get("event_log") if isinstance(viz, dict) else None
+    state_log = state_entry.get("event-log")
+    if viz_alias is not None and state_log is not None and viz_alias != state_log:
+        _warn(
+            f"deprecated alias 'viz.event_log' ({viz_alias}) diverges from "
+            f"'artifact-locations.classes.state.event-log' ({state_log}); "
+            "the matrix value wins"
+        )
+
+    return findings
 
 
 def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -> dict:
@@ -3321,6 +3451,10 @@ def build_variables(
     `_build_*_variables()` sub-function (see their docstrings for the exact
     parameter/mutation contract and any inter-group ordering constraints).
     """
+    # T9: deprecation warnings are Sync-Warnungen — emitted only when a caller
+    # supplies the sync ActiveSet. Static variable derivation (derive_builder_vars)
+    # and snapshot tests call build_variables without one and stay silent.
+    emit_deprecation_warnings = active_set is not None
     # IC-17/IC-18: one ActiveSet per build; the sync pipeline passes its own.
     active_set = _resolve_active_set(active_set, config, agent_meta_root, project_root)
     variables: dict = {}
@@ -3337,6 +3471,14 @@ def build_variables(
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     _build_artifact_variables(variables, config, agent_meta_root, project_root)
+    # D1 (T9): the runtime scratch alias has exactly one source — the resolved
+    # matrix. Must run after the artifact builder so both names share one result.
+    variables["TMP_SINK_PATH"] = variables["ARTIFACT_SCRATCH_DIR"]
+    if emit_deprecation_warnings:
+        for finding in _artifact_deprecation_warnings(
+            config, agent_meta_root, project_root,
+        ):
+            unmapped.append(f"{finding.check}: {finding.message}")
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
     # #1180: generated docs may point at docs/REQUIREMENTS.md only if it exists.
     variables["REQUIREMENTS_DOC_REF"] = (
