@@ -1028,6 +1028,18 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (``Claude/.claude/hooks/orchestrator-guard-impl.sh``, ``Gemini/.agents/hooks/orchestrator-guard-impl.sh``);
   re-written via ``--write`` with a diff gate (only those two lines changed). AC-T4 digest
   ``166ae303…`` -> ``ea9ea6cb…``; slimming/compact-golden unchanged. ``AC01_EXCEPTIONS`` is NOT extended.
+- Release 2.0.0-beta.9 (VERSION bump 2.0.0-beta.8 -> 2.0.0-beta.9): only version strings in the rendered
+  entry files, agent headers and the dependent sidecars changed (82 of 1096 hashes; 0 added/removed;
+  the seven role templates that embed ``AGENT_META_VERSION``, the nine copied ``project.yaml`` files whose
+  ``agent-meta-version`` the sync rewrites, the entry files, ``context-hashes.json``, ``config.yaml`` and
+  ``copilot-instructions.md``; ``generated-file-hashes.json`` follows the version it embeds). No
+  substantive render change; ``AC01_EXCEPTIONS`` is NOT extended. Manifest regenerated with ``--write``
+  on the release branch (diff verified: identical 1096-key set, exactly the 82 version-bearing entries
+  changed). Because ``hashes.json`` is the only ``ac01-baseline`` file, its AC-T4 digest in
+  ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree (recomputed from the fixture bytes:
+  ``ea9ea6cb…`` -> ``db73f601…``); ``compact-golden`` (the ``agent-meta vX`` stamp) was re-pinned to
+  ``4ac22975…``; ``slimming-golden`` was re-verified as unchanged. The meta-optimizer fixture pins and the
+  compact-golden version stamp were bumped beta.8 -> beta.9 in the same release fix.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
