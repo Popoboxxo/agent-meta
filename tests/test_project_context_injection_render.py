@@ -397,3 +397,98 @@ def test_exactly_one_pointer_per_excluded_role(t6_core_run):
             excluded += 1
     assert excluded >= 3
 
+
+# ---------------------------------------------------------------------------
+# T7 — log
+# ---------------------------------------------------------------------------
+
+# Three roles that each carry a ``{{PROJECT_CONTEXT}}`` placeholder in their
+# template, so every excluded role contributes a positive paragraph delta.
+_T7_ROLES = ("developer", "planner", "bug-feature-analyzer")
+
+# A paragraph deliberately longer than the pointer line so that "chars saved"
+# is a positive number (as in a real sync) and the accounting is deterministic.
+_T7_PARA = (
+    "Project context: this is a deliberately long paragraph used to make the "
+    "delta accounting positive and deterministic in the T7 log-line tests. "
+    "It stands in for a real project description and is longer than the "
+    "pointer line, so 'chars saved' resolves to a positive number."
+)
+
+
+def _t7_impl():
+    """Lazy imports for the T7 log seam (T4-T6 stay importable/unchanged)."""
+    from lib.agent_sync import sync_agents_for_provider
+    from lib.config import resolve_project_context_scope
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+
+    return sync_agents_for_provider, resolve_project_context_scope, SyncLog, load_providers_config
+
+
+def _t7_run(mode_cfg, tmp_path, dry_run=False, para=None):
+    """Run one real Claude sync over the controlled 3-role set; return (scope, log)."""
+    sync, resolve_scope, SyncLog, load_providers = _t7_impl()
+    provider_config = load_providers(_ROOT)
+    scope = resolve_scope(
+        {"project-context-injection": dict(mode_cfg)}, _ROOT,
+        provider_config=provider_config)
+    config = {"project": {"name": "T7"}, "platforms": [], "roles": list(_T7_ROLES)}
+    variables = {
+        "PROJECT_CONTEXT": para if para is not None else _T7_PARA,
+        "COMMUNICATION_LANGUAGE": "English",
+        "_PROJECT_CONTEXT_SCOPE": scope,
+    }
+    log = SyncLog()
+    sync(
+        _ROOT, tmp_path / "root", config, variables, log, dry_run=dry_run,
+        provider="Claude", provider_config=provider_config)
+    return scope, log
+
+
+def _t7_log_line(log):
+    """Return the single delta log line (distinct from the EOF-pointer note)."""
+    matches = [
+        info for info in log.infos
+        if "project-context-injection" in info and "mode=" in info
+    ]
+    assert len(matches) == 1, matches
+    return matches[0]
+
+
+def test_log_line_format_all_mode(tmp_path):
+    """All mode logs the exact AC6 format with a zero pointer/savings delta."""
+    line = _t7_log_line(_t7_run({"mode": "all"}, tmp_path)[1])
+    expected = (
+        f"mode=all injected={len(_T7_ROLES)}/{len(_T7_ROLES)} roles, "
+        "pointer=0, chars saved=0 (vs mode=all)"
+    )
+    assert expected in line, line
+
+
+def test_log_line_counts_pointer_and_savings(tmp_path):
+    """Core mode: pointer count = excluded roles; savings = Σpara - Σpointer."""
+    scope, log = _t7_run({"mode": "core"}, tmp_path)
+    line = _t7_log_line(log)
+    pointer = scope["pointer_text"].format(context_file="CLAUDE.md")
+    expected_saved = len(_T7_ROLES) * len(_T7_PARA) - len(_T7_ROLES) * len(pointer)
+    expected = (
+        f"mode=core injected=0/{len(_T7_ROLES)} roles, "
+        f"pointer={len(_T7_ROLES)}, chars saved={expected_saved} (vs mode=all)"
+    )
+    assert expected in line, (line, expected)
+
+
+def test_log_line_chars_saved_is_zero_for_all(tmp_path):
+    """All mode saves exactly 0 — no 'approximate' or signed value."""
+    line = _t7_log_line(_t7_run({"mode": "all"}, tmp_path)[1])
+    assert "chars saved=0 (vs mode=all)" in line, line
+    assert "chars saved=-" not in line, line
+
+
+def test_log_line_emitted_in_dry_run(tmp_path):
+    """--check (dry_run) emits the very same delta line as a real write."""
+    _, dry_log = _t7_run({"mode": "core"}, tmp_path / "dry", dry_run=True)
+    _, real_log = _t7_run({"mode": "core"}, tmp_path / "real", dry_run=False)
+    assert _t7_log_line(dry_log) == _t7_log_line(real_log)
+
