@@ -21,6 +21,7 @@ from .artifact_locations import (
     CLASS_REGISTRY,
     load_presets,
     resolve_artifact_locations,
+    resolve_se_projection,
     validate_kind,
     validate_naming,
     validate_path,
@@ -2832,6 +2833,80 @@ def _build_platform_variables(
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
 
 
+# --- Artifact-location variables (Issue #1186, T6) ------------------------
+#: Closed project-docs file-set mapping (key -> variable stem, framework
+#: default). Iterating this map keeps the exported set at exactly 54 names even
+#: when a project overrides ``classes.project-docs.files``.
+_ARTIFACT_FILE_KEYS: tuple[tuple[str, str, str], ...] = (
+    ("architecture", "ARCHITECTURE", "docs/ARCHITECTURE.md"),
+    ("codebase-overview", "CODEBASE_OVERVIEW", "docs/CODEBASE_OVERVIEW.md"),
+    ("requirements", "REQUIREMENTS", "docs/REQUIREMENTS.md"),
+    ("issue-labels", "ISSUE_LABELS", "docs/issue-labels.md"),
+)
+
+#: SE-global projections derived from ARTIFACT_SE_ROOT (D-7), not config fields.
+_ARTIFACT_SE_PROJECTIONS: tuple[tuple[str, str], ...] = (
+    ("SE_REVIEWS", "se-reviews"),
+    ("SE_REPORTS", "se-reports"),
+    ("SE_ADR", "se-adr"),
+    ("SE_TRACEABILITY", "se-traceability"),
+)
+
+
+def _build_artifact_variables(
+    variables: dict, config: dict, agent_meta_root: Path,
+    project_root: Path | None = None,
+) -> None:
+    """Export the 54 ``ARTIFACT_*`` names from the resolved matrix (Spec §3.4).
+
+    Parameter contract:
+        variables: mutated in place — receives 22 ``_DIR`` (13 non-SE + 9 SE
+            cell classes), 4 derived SE projection ``_DIR``, ``ARTIFACT_SE_ROOT``,
+            4 file-set ``_FILE`` and 23 ``_MODE`` values. ``SE_BASE_DIR`` is
+            overwritten with the resolved SE root so the legacy alias and the
+            matrix variable share exactly one source.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for the preset file).
+        project_root: consuming project's root; may be ``None`` because
+            ``derive_builder_vars`` (placeholders.py:312-319) calls builders
+            with no project root. The resolver is total on ``{}``.
+
+    No provider branch: the matrix is resolved once and exported into the
+    single provider-agnostic variable dict.
+    """
+    matrix = resolve_artifact_locations(config, agent_meta_root, project_root)
+    classes = matrix.classes
+
+    # 22 _DIR variables: every class except the file-set project-docs.
+    for class_name, spec in CLASS_REGISTRY.items():
+        if spec.form == "file-set":
+            continue
+        stem = class_name.upper().replace("-", "_")
+        variables[f"ARTIFACT_{stem}_DIR"] = classes[class_name].path
+
+    # SE root + four derived projections (D-7). The root is the se-requirements
+    # class path — the same source resolve_se_projection uses — so SE_BASE_DIR
+    # becomes an alias of it instead of a second se_output.base_dir read.
+    variables["ARTIFACT_SE_ROOT"] = classes["se-requirements"].path
+    for stem, projection in _ARTIFACT_SE_PROJECTIONS:
+        variables[f"ARTIFACT_{stem}_DIR"] = resolve_se_projection(
+            projection, matrix=matrix,
+        )
+    variables["SE_BASE_DIR"] = variables["ARTIFACT_SE_ROOT"]
+
+    # Four file-set variables from project-docs.files with framework defaults,
+    # so the closed 54-name set stays stable under project overrides.
+    resolved_files = classes["project-docs"].files
+    for key, stem, default in _ARTIFACT_FILE_KEYS:
+        variables[f"ARTIFACT_{stem}_FILE"] = resolved_files.get(key, default)
+
+    # 23 _MODE variables, one per class. Scratch/state have no schema mode
+    # field, so their resolver value stays the constant "files" (K-1).
+    for class_name in CLASS_REGISTRY:
+        stem = class_name.upper().replace("-", "_")
+        variables[f"ARTIFACT_{stem}_MODE"] = classes[class_name].mode
+
+
 def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -> dict:
     """Populate Definition-of-Done variables and return the resolved DoD dict.
 
@@ -3261,6 +3336,7 @@ def build_variables(
     )
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
+    _build_artifact_variables(variables, config, agent_meta_root, project_root)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
     # #1180: generated docs may point at docs/REQUIREMENTS.md only if it exists.
     variables["REQUIREMENTS_DOC_REF"] = (

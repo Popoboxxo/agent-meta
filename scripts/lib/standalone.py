@@ -308,10 +308,67 @@ def _standalone_active_set_flags(agent_meta_root: Path) -> dict:
     return flags
 
 
+# Issue #1186 (T6): a standalone persona has no project config to resolve the
+# artifact-location matrix from, so it ships the same 54 ARTIFACT_* names with
+# framework defaults (Spec §3.4). Without this block the 26 matrix-driven
+# templates would render "[ARTIFACT_* — not available]" notes (D2/D9).
+_ARTIFACT_MODE_STEMS: tuple[str, ...] = (
+    # 13 non-SE classes
+    "SPECS", "PLANS", "CONCEPTS", "SPIKES", "REVIEWS", "AUDITS", "ANALYSIS",
+    "REPORTS", "ADR", "TRACEABILITY", "RUNBOOKS", "SCRATCH", "STATE",
+    "PROJECT_DOCS",
+    # 9 SE cell classes
+    "SE_REQUIREMENTS", "SE_ARCHITECTURE", "SE_DECOMPOSITION", "SE_INTERFACES",
+    "SE_IMPLEMENTATION", "SE_TESTPLAN", "SE_VALIDATION", "SE_VERIFICATION",
+    "SE_DECISIONS",
+)
+
+_ARTIFACT_FALLBACKS: dict[str, str] = {
+    # 13 non-SE _DIR variables
+    "ARTIFACT_SPECS_DIR": "docs/specs",
+    "ARTIFACT_PLANS_DIR": "docs/plans",
+    "ARTIFACT_CONCEPTS_DIR": "docs/concepts",
+    "ARTIFACT_SPIKES_DIR": "docs/spikes",
+    "ARTIFACT_REVIEWS_DIR": "docs/reviews",
+    "ARTIFACT_AUDITS_DIR": "docs/audits",
+    "ARTIFACT_ANALYSIS_DIR": "docs/analysis",
+    "ARTIFACT_REPORTS_DIR": "docs/reports",
+    "ARTIFACT_ADR_DIR": "docs/adr",
+    "ARTIFACT_TRACEABILITY_DIR": "docs/traceability",
+    "ARTIFACT_RUNBOOKS_DIR": "docs/runbooks",
+    "ARTIFACT_SCRATCH_DIR": ".tmp",
+    "ARTIFACT_STATE_DIR": ".meta-viz",
+    # 9 SE cell _DIR variables (path is the SE root; cell hierarchy stays in templates)
+    "ARTIFACT_SE_REQUIREMENTS_DIR": "SE",
+    "ARTIFACT_SE_ARCHITECTURE_DIR": "SE",
+    "ARTIFACT_SE_DECOMPOSITION_DIR": "SE",
+    "ARTIFACT_SE_INTERFACES_DIR": "SE",
+    "ARTIFACT_SE_IMPLEMENTATION_DIR": "SE",
+    "ARTIFACT_SE_TESTPLAN_DIR": "SE",
+    "ARTIFACT_SE_VALIDATION_DIR": "SE",
+    "ARTIFACT_SE_VERIFICATION_DIR": "SE",
+    "ARTIFACT_SE_DECISIONS_DIR": "SE",
+    # 4 derived SE projections (D-7) + the SE root
+    "ARTIFACT_SE_REVIEWS_DIR": "SE/reviews",
+    "ARTIFACT_SE_REPORTS_DIR": "SE/reports",
+    "ARTIFACT_SE_ADR_DIR": "SE/ADR",
+    "ARTIFACT_SE_TRACEABILITY_DIR": "SE/traceability",
+    "ARTIFACT_SE_ROOT": "SE",
+    # 4 project-docs file-set entries
+    "ARTIFACT_ARCHITECTURE_FILE": "docs/ARCHITECTURE.md",
+    "ARTIFACT_CODEBASE_OVERVIEW_FILE": "docs/CODEBASE_OVERVIEW.md",
+    "ARTIFACT_REQUIREMENTS_FILE": "docs/REQUIREMENTS.md",
+    "ARTIFACT_ISSUE_LABELS_FILE": "docs/issue-labels.md",
+    # 23 _MODE values (no project config => never inline/off)
+    **{f"ARTIFACT_{_stem}_MODE": "files" for _stem in _ARTIFACT_MODE_STEMS},
+}
+
+
 def _standalone_variables(agent_meta_root: Path) -> dict:
     variables: dict = {}
     variables.update(_IDENTITY_FALLBACKS)
     variables.update(_ORCHESTRATION_FALLBACKS)
+    variables.update(_ARTIFACT_FALLBACKS)
     variables.update(_CONDITIONAL_FALSE_FLAGS)
     # Render-neutral source de-dup blocks (IC-31): plain English boilerplate
     # that read identically inline before the snippet extraction, so they
