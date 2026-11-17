@@ -37,7 +37,7 @@ Before classifying, search the issue tracker (`gh issue list --search "<title ke
 
 ## 4. Check against project goals (on suspected feature)
 
-1. Behavior covered by `{{PROJECT_CONTEXT}}`? Yes → FEATURE in scope
+1. Behavior covered by {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}}? Yes → FEATURE in scope
 2. Contradicts explicit don'ts/architecture? Yes → OUT-OF-SCOPE
 3. Reasonable extension? Yes → FEATURE (REQ-ID needed)
 

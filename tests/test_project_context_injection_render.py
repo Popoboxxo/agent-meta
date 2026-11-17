@@ -800,3 +800,137 @@ def test_pointer_language_de_renders_german_pointer(tmp_path):
         for role in _T8_ROLES:
             assert all_run["pointer"] not in all_run["artifacts"][role], role
 
+
+# ---------------------------------------------------------------------------
+# T9 — prose conditionals (D-3)
+# ---------------------------------------------------------------------------
+
+# The four roles that carry an in-sentence `{{PROJECT_CONTEXT}}` prose site.
+_T9_ROLES = (
+    "ui-ux-designer", "bug-feature-analyzer",
+    "knowledge-curator", "knowledge-migrator",
+)
+
+_T9_TEMPLATES = {
+    role: _ROOT / "agents" / "1-generic" / f"{role}.md" for role in _T9_ROLES
+}
+
+# Distinctive fragments identifying each of the five prose sites. The mapping
+# is role -> tuple of fragments (ui-ux-designer has two prose sites).
+_T9_PROSE_FRAGMENTS = {
+    "ui-ux-designer": (
+        "provides the design vision and context for all UI decisions",
+        "No designs without a `",
+    ),
+    "bug-feature-analyzer": ("Behavior covered by `",),
+    "knowledge-curator": ("**Zielrepo-Adaption:** Liest `",),
+    "knowledge-migrator": ("1. Lies `",),
+}
+
+
+def _t9_if_body(text):
+    """Return the bodies of every `{{#if PROJECT_CONTEXT_INJECTED}}` branch."""
+    import re
+    return re.findall(
+        r"\{\{#if PROJECT_CONTEXT_INJECTED\}\}(.*?)\{\{/if\}\}",
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def test_no_bare_prose_placeholder_remains():
+    """D-3: every non-block `{{PROJECT_CONTEXT}}` sits inside a conditional.
+
+    The four `**Project context:** {{PROJECT_CONTEXT}}` block occurrences are
+    renderer-controlled (spec D-4) and stay bare; every other occurrence must
+    live inside a `{{#if PROJECT_CONTEXT_INJECTED}}` branch.
+    """
+    import re
+    for role, path in _T9_TEMPLATES.items():
+        text = path.read_text(encoding="utf-8")
+        total = text.count("{{PROJECT_CONTEXT}}")
+        # Two block shapes occur in the corpus: a labelled
+        # `**Project context:** {{PROJECT_CONTEXT}}` line and a bare standalone
+        # `{{PROJECT_CONTEXT}}` line. Both are renderer-controlled (spec D-4).
+        labelled = len(re.findall(
+            r"\*\*Project context:\*\* \{\{PROJECT_CONTEXT\}\}", text
+        ))
+        bare_line = sum(
+            1 for line in text.splitlines()
+            if line.strip() == "{{PROJECT_CONTEXT}}"
+        )
+        block = labelled + bare_line
+        wrapped = sum(body.count("{{PROJECT_CONTEXT}}")
+                      for body in _t9_if_body(text))
+        assert total == block + wrapped, (
+            f"{role}: {total} occurrences but {block} block + {wrapped} wrapped"
+        )
+        assert wrapped >= 1, f"{role}: no conditional prose site found"
+
+
+def test_core_prose_stays_grammatical(tmp_path):
+    """D-3: core render shows `CLAUDE.md`, never an empty double-backtick."""
+    run = _render_run(
+        {"project-context-injection": {"mode": "core"}},
+        tmp_path / "t9-core", roles=("ui-ux-designer",),
+    )
+    art = run["artifacts"]["ui-ux-designer"]
+    assert "`CLAUDE.md` provides the design vision" in art
+    assert "`` provides the design vision" not in art
+
+
+def _t9_line_with(lines, fragment):
+    matches = [line for line in lines if fragment in line]
+    assert len(matches) == 1, (
+        f"expected exactly one line for {fragment!r}, got {len(matches)}"
+    )
+    return matches[0]
+
+
+def _t9_all_render(tmp_path):
+    """Render the four roles with the real project config (default all mode)."""
+    from scripts.lib.config import build_variables, load_config
+    from scripts.lib.providers import load_providers_config
+    from scripts.lib.log import SyncLog
+    from scripts.lib.agent_sync import sync_agents_for_provider
+
+    config = load_config(_ROOT / ".meta-config" / "project.yaml")
+    variables, _warnings = build_variables(config, _ROOT, tmp_path)
+    log = SyncLog()
+    sync_agents_for_provider(
+        _ROOT, tmp_path / "project", config, variables, log,
+        dry_run=False, provider="Claude",
+        provider_config=load_providers_config(_ROOT),
+    )
+    artifacts = {
+        path.stem: path.read_text(encoding="utf-8")
+        for path in (tmp_path / "project").rglob("*.md")
+        if path.stem in _T9_ROLES
+    }
+    return artifacts, variables
+
+
+def test_all_prose_matches_golden(tmp_path):
+    """AC2: all-mode prose sites stay byte-identical to the frozen goldens."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_template_slimming_equivalence import _port_golden_meta_tokens
+
+    render, variables = _t9_all_render(tmp_path / "t9-all")
+    golden_dir = _ROOT / "tests" / "fixtures" / "slimming-golden"
+    for role, fragments in _T9_PROSE_FRAGMENTS.items():
+        assert role in render, role
+        current = render[role]
+        golden = _port_golden_meta_tokens(
+            (golden_dir / f"{role}.md").read_text(encoding="utf-8"),
+            variables,
+        )
+        g_lines = golden.splitlines()
+        r_lines = current.splitlines()
+        for fragment in fragments:
+            g_line = _t9_line_with(g_lines, fragment)
+            r_line = _t9_line_with(r_lines, fragment)
+            assert g_line == r_line, (
+                f"{role}: prose line drift for {fragment!r}\n"
+                f"golden: {g_line}\nrender: {r_line}"
+            )
+
