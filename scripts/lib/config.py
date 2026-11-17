@@ -419,6 +419,37 @@ def format_project_context_pointer(template: str, context_file: str) -> str:
     return template.format(context_file=context_file)
 
 
+def project_context_injected_for_role(scope: dict, role: str) -> bool:
+    """Pure per-role injection decision (spec §3.1); never raises.
+
+    ``scope`` is a resolved scope dict (see :func:`resolve_project_context_scope`).
+    Missing keys fall back to the historic ``all`` behavior, so an empty scope
+    embeds context for everyone. ``orchestrator='inherit'`` means "mode default",
+    not "include"; only ``include`` promotes the orchestrator set outside
+    ``core+orchestrator``. ``exclude`` always wins (D6).
+    """
+    mode = scope.get("mode", "all")
+    orchestrator = scope.get("orchestrator", "inherit")
+    orchestrator_roles = scope.get("orchestrator_roles") or ()
+    whitelist = scope.get("whitelist") or ()
+    is_orchestrator = role in orchestrator_roles
+
+    if mode == "all":
+        # "all" except the orchestrator set when exclude overrides the mode.
+        return not (orchestrator == "exclude" and is_orchestrator)
+    if mode == "core":
+        # Nobody, unless include promotes the orchestrator set.
+        return orchestrator == "include" and is_orchestrator
+    if mode == "core+orchestrator":
+        # Only the orchestrator set; exclude degenerates the mode to core.
+        return orchestrator != "exclude" and is_orchestrator
+    if mode == "core+whitelist":
+        # Only the whitelist; the orchestrator set joins on include only.
+        return role in whitelist or (orchestrator == "include" and is_orchestrator)
+    # Unknown mode: fail closed (resolver rejects such modes before this point).
+    return False
+
+
 # Top-level keys whose project-config.schema.json type is scalar/array. An
 # explicit YAML null for these means "unset" (absent), NOT an empty mapping.
 # Mirrors the schema and acts as a fallback when the schema is unavailable;

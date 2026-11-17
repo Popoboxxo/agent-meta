@@ -606,6 +606,27 @@ def _build_provider_vars(
     )
     return {**variables, **provider_vars}
 
+
+def apply_project_context_scope(merged_vars: dict, role: str, scope: dict) -> bool:
+    """Apply the per-role injection decision to one role's merged variables.
+
+    Sets ``PROJECT_CONTEXT_INJECTED`` to ``'true'``/``'false'`` and blanks
+    ``merged_vars['PROJECT_CONTEXT']`` for excluded roles (spec §5.3 step 3).
+    ``merged_vars`` is a per-role shallow copy from ``_build_provider_vars``,
+    so mutating it never leaks into the caller's shared ``variables`` dict.
+    The decision itself is pure and lives in :mod:`lib.config` (imported lazily
+    to avoid the module-level load-time cycle); consistency checks reuse it
+    without depending on ``agent_sync``. Returns the injected flag.
+    """
+    from .config import project_context_injected_for_role
+
+    injected = project_context_injected_for_role(scope or {}, role)
+    merged_vars["PROJECT_CONTEXT_INJECTED"] = "true" if injected else "false"
+    if not injected:
+        merged_vars["PROJECT_CONTEXT"] = ""
+    return injected
+
+
 def _should_skip_role(
     role: str,
     source_path: Path,
@@ -1583,6 +1604,11 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
         merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root, config=config,
                                            active_set=active_set)
+        # #1187 (T5): decide per role whether the project-context paragraph is
+        # embedded. Must run before _apply_content_pipeline (substitute +
+        # strip_inactive_conditional_blocks read these values, spec §5.3).
+        apply_project_context_scope(
+            merged_vars, role, variables.get("_PROJECT_CONTEXT_SCOPE") or {})
         _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
