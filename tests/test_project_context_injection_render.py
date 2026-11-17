@@ -492,3 +492,311 @@ def test_log_line_emitted_in_dry_run(tmp_path):
     _, real_log = _t7_run({"mode": "core"}, tmp_path / "real", dry_run=False)
     assert _t7_log_line(dry_log) == _t7_log_line(real_log)
 
+
+# ---------------------------------------------------------------------------
+# T8 — render contracts per mode (AC2, AC3, AC4, AC5)
+# ---------------------------------------------------------------------------
+
+# A distinctive marker we inject as PROJECT_CONTEXT; counting it in a rendered
+# artifact tells us exactly how many project-context blocks survived.
+_T8_PARA = "T8_MARKER_PROJECT_CONTEXT_PARAGRAPH_2026"
+
+# The eight roles named in the plan's T8 contract matrix. Two of them
+# (knowledge-curator, knowledge-migrator) sit behind activation groups, which
+# _render_run enables explicitly (see below).
+_T8_ROLES = (
+    "developer", "orchestrator", "ui-ux-designer", "bug-feature-analyzer",
+    "knowledge-curator", "knowledge-migrator", "intern-developer",
+    "mammouth-expert",
+)
+
+
+def _render_run(config, tmp_path, roles=None, para=_T8_PARA,
+                provider="Claude", provider_config=None):
+    """Render a controlled role set through the real per-role sync path.
+
+    Pattern from tests/test_template_slimming_equivalence.py:1191-1240:
+    ``config`` is passed directly instead of via ``load_config``; variables are
+    produced by the real ``build_variables`` (so config -> scope resolution and
+    its D6/D8 warnings are exercised), and every role goes through the
+    production ``_compose_role_content`` -> ``_apply_content_pipeline`` ->
+    ``_finalize_agent_content`` chain inside ``sync_agents_for_provider``.
+    That loop also applies the per-role scope (T5) and pointer (T6), which is
+    why the full sync function is used rather than rebuilding the pipeline by
+    hand.
+
+    ``provider_config`` optionally re-resolves the scope against a fake
+    provider registry (to exercise primary-role derivation at render level);
+    the actual sync always uses the real registry. Returns a dict exposing the
+    artifacts, build warnings, log, resolved scope and the formatted pointer.
+    """
+    from lib.config import build_variables, resolve_project_context_scope
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+    from lib.agent_sync import sync_agents_for_provider
+
+    roles = tuple(roles) if roles is not None else _T8_ROLES
+    full = {
+        "project": {"name": "T8"},
+        "platforms": [],
+        "roles": list(roles),
+        "variables": {"PROJECT_CONTEXT": para},
+        # Enable the two activation groups gating contract roles.
+        "knowledge-engine": {"enabled": True},
+        "systems-engineering": {"enabled": True},
+    }
+    full.update(config)  # `config` may override any base key, incl. the section
+    # Keep the marker under our control even if a caller replaced `variables`.
+    full.setdefault("variables", {})["PROJECT_CONTEXT"] = para
+
+    variables, warnings = build_variables(full, _ROOT, tmp_path)
+    if provider_config is not None:
+        variables["_PROJECT_CONTEXT_SCOPE"] = resolve_project_context_scope(
+            full, _ROOT, provider_config=provider_config,
+            communication_language=variables.get("COMMUNICATION_LANGUAGE"),
+            warn_sink=warnings,
+        )
+        variables["PROJECT_CONTEXT_MODE"] = (
+            variables["_PROJECT_CONTEXT_SCOPE"]["mode"])
+
+    real_provider_config = load_providers_config(_ROOT)
+    log = SyncLog()
+    sync_agents_for_provider(
+        _ROOT, tmp_path / "project", full, variables, log,
+        dry_run=False, provider=provider, provider_config=real_provider_config,
+    )
+    artifacts = {
+        path.stem: path.read_text(encoding="utf-8")
+        for path in (tmp_path / "project").rglob("*.md")
+        if path.stem in roles
+    }
+    scope = variables["_PROJECT_CONTEXT_SCOPE"]
+    context_file = real_provider_config[provider]["context_file"]
+    return {
+        "artifacts": artifacts,
+        "warnings": warnings,
+        "log": log,
+        "scope": scope,
+        "pointer": scope["pointer_text"].format(context_file=context_file),
+    }
+
+
+def _render(role, config, tmp_path):
+    """Return one rendered artifact (plan T8 render-helper signature)."""
+    return _render_run(config, tmp_path)["artifacts"][role]
+
+
+def _pc_warnings(run):
+    """Only the once-per-run project-context-injection warnings."""
+    return [w for w in run["warnings"] if "project-context-injection." in w]
+
+
+def test_all_matches_default_absent_key(tmp_path):
+    """AC2: an absent section and explicit mode=all render byte-identically."""
+    absent = _render_run({}, tmp_path / "absent")["artifacts"]
+    explicit = _render_run(
+        {"project-context-injection": {"mode": "all"}},
+        tmp_path / "explicit",
+    )["artifacts"]
+    for role in _T8_ROLES:
+        assert role in absent and role in explicit, role
+        assert absent[role] == explicit[role], role
+    # The single-role helper renders the same bytes as the full-run helper.
+    assert _render("developer", {}, tmp_path / "helper") == absent["developer"]
+
+
+def test_core_renders_zero_blocks(tmp_path):
+    """AC3: core embeds zero paragraphs and exactly one pointer per role."""
+    run = _render_run({"project-context-injection": {"mode": "core"}}, tmp_path)
+    for role in _T8_ROLES:
+        content = run["artifacts"][role]
+        assert content.count(_T8_PARA) == 0, role
+        assert content.count(run["pointer"]) == 1, role
+
+
+def test_core_whitelist_only_whitelisted_roles(tmp_path):
+    """AC4: only whitelisted roles keep the block; inherit adds no orchestrator."""
+    run = _render_run(
+        {"project-context-injection": {
+            "mode": "core+whitelist", "whitelist": ["developer"]}},
+        tmp_path,
+        roles=_T8_ROLES + ("planner",),
+    )
+    artifacts = run["artifacts"]
+    assert artifacts["developer"].count(_T8_PARA) >= 1
+    assert run["pointer"] not in artifacts["developer"]
+    # `planner` is not whitelisted; `orchestrator` is excluded because inherit
+    # is the mode default (it does NOT promote the orchestrator set).
+    for role in ("planner", "orchestrator"):
+        assert artifacts[role].count(_T8_PARA) == 0, role
+        assert artifacts[role].count(run["pointer"]) == 1, role
+
+
+def test_core_whitelist_include_adds_orchestrator(tmp_path):
+    """AC4/AC5: include promotes the orchestrator set; exclude does not."""
+    included = _render_run(
+        {"project-context-injection": {
+            "mode": "core+whitelist", "whitelist": ["developer"],
+            "orchestrator": "include"}},
+        tmp_path / "include",
+    )["artifacts"]
+    assert included["developer"].count(_T8_PARA) >= 1
+    assert included["orchestrator"].count(_T8_PARA) >= 1
+
+    excluded = _render_run(
+        {"project-context-injection": {
+            "mode": "core+whitelist", "whitelist": ["developer"],
+            "orchestrator": "exclude"}},
+        tmp_path / "exclude",
+    )["artifacts"]
+    assert excluded["developer"].count(_T8_PARA) >= 1
+    assert excluded["orchestrator"].count(_T8_PARA) == 0
+
+
+def test_core_whitelist_unknown_name_fails_render(tmp_path):
+    """AC4: an unknown whitelist name aborts the render through build_variables."""
+    from lib.io import SyncError
+
+    with pytest.raises(SyncError, match="whitelist-unknown-role") as exc_info:
+        _render_run(
+            {"project-context-injection": {
+                "mode": "core+whitelist", "whitelist": ["developer", "nope"]}},
+            tmp_path,
+        )
+    assert "nope" in str(exc_info.value)
+
+
+def test_core_orchestrator_only_orchestrator_roles(tmp_path):
+    """AC5: core+orchestrator embeds only the orchestrator set.
+
+    A fake provider registry supplies a distinct ``primary-role`` (``planner``)
+    so the provider-derived member is verified separately from ``orchestrator``.
+    """
+    run = _render_run(
+        {"project-context-injection": {"mode": "core+orchestrator"}},
+        tmp_path,
+        roles=_T8_ROLES + ("planner",),
+        provider_config={"Claude": {"primary-role": "planner"}},
+    )
+    scope_roles = run["scope"]["orchestrator_roles"]
+    assert "orchestrator" in scope_roles and "planner" in scope_roles
+    artifacts = run["artifacts"]
+    for role in ("orchestrator", "planner"):
+        assert artifacts[role].count(_T8_PARA) >= 1, role
+        assert run["pointer"] not in artifacts[role], role
+    assert artifacts["developer"].count(_T8_PARA) == 0
+    assert artifacts["developer"].count(run["pointer"]) == 1
+
+
+def test_core_include_moves_orchestrator_in(tmp_path):
+    """AC5: core + orchestrator=include behaves like core+orchestrator."""
+    run = _render_run(
+        {"project-context-injection": {
+            "mode": "core", "orchestrator": "include"}},
+        tmp_path,
+    )
+    assert "orchestrator" in run["scope"]["orchestrator_roles"]
+    artifacts = run["artifacts"]
+    assert artifacts["orchestrator"].count(_T8_PARA) >= 1
+    assert run["pointer"] not in artifacts["orchestrator"]
+    assert artifacts["developer"].count(_T8_PARA) == 0
+    assert artifacts["developer"].count(run["pointer"]) == 1
+
+
+def test_core_keeps_required_sections_non_empty(tmp_path):
+    """AC7 pre-gate: core never drops frontmatter, headings or context bodies."""
+    all_run = _render_run({}, tmp_path / "all")
+    core_run = _render_run(
+        {"project-context-injection": {"mode": "core"}}, tmp_path / "core")
+    for role in _T8_ROLES:
+        base = all_run["artifacts"][role]
+        core = core_run["artifacts"][role]
+        assert base.startswith("---") and core.startswith("---"), role
+        base_heads = [line for line in base.splitlines() if line.startswith("## ")]
+        core_heads = [line for line in core.splitlines() if line.startswith("## ")]
+        assert base_heads == core_heads, role
+        # The paragraph placeholder is substituted/blanked, never left raw.
+        assert "{{PROJECT_CONTEXT}}" not in core, role
+        if "<context>" in base:
+            body = core.split("<context>", 1)[1].split("</context>", 1)[0]
+            assert body.strip(), role
+        else:
+            # intern-developer / mammouth-expert / knowledge-* have no context
+            # section: the pointer fallback must be present instead.
+            assert core_run["pointer"] in core, role
+
+
+def test_all_plus_exclude_only_orchestrator_excluded(tmp_path):
+    """AC5/D6: all + exclude excludes only the orchestrator set, with one WARN."""
+    run = _render_run(
+        {"project-context-injection": {
+            "mode": "all", "orchestrator": "exclude"}},
+        tmp_path,
+    )
+    artifacts = run["artifacts"]
+    assert artifacts["orchestrator"].count(_T8_PARA) == 0
+    assert artifacts["orchestrator"].count(run["pointer"]) == 1
+    assert artifacts["developer"].count(_T8_PARA) >= 1
+    assert run["pointer"] not in artifacts["developer"]
+    warns = _pc_warnings(run)
+    assert len(warns) == 1, warns
+    assert "exclude-overrides-mode" in warns[0] and "mode=all" in warns[0]
+
+
+def test_core_orchestrator_with_overridden_roles(tmp_path):
+    """AC5/D5: an explicit orchestrator-roles override replaces the default set."""
+    run = _render_run(
+        {"project-context-injection": {
+            "mode": "core+orchestrator",
+            "orchestrator-roles": ["senior-developer"]}},
+        tmp_path,
+        roles=_T8_ROLES + ("senior-developer", "junior-developer"),
+    )
+    artifacts = run["artifacts"]
+    assert artifacts["senior-developer"].count(_T8_PARA) >= 1
+    assert artifacts["orchestrator"].count(_T8_PARA) == 0
+    assert artifacts["developer"].count(_T8_PARA) == 0
+
+
+def test_core_orchestrator_with_empty_roles_injects_nothing(tmp_path):
+    """AC5/D5: an empty orchestrator set injects nothing and warns once."""
+    run = _render_run(
+        {"project-context-injection": {
+            "mode": "core+orchestrator", "orchestrator-roles": []}},
+        tmp_path,
+    )
+    for role in _T8_ROLES:
+        content = run["artifacts"][role]
+        assert content.count(_T8_PARA) == 0, role
+        assert content.count(run["pointer"]) == 1, role
+    warns = _pc_warnings(run)
+    assert len(warns) == 1, warns
+    assert "empty-orchestrator-set" in warns[0]
+
+
+def test_pointer_language_de_renders_german_pointer(tmp_path):
+    """AC3/D8: German pointer text renders per provider; all mode stays clean."""
+    for provider, context_file in (("Claude", "CLAUDE.md"),
+                                   ("Gemini", "AGENTS.md")):
+        run = _render_run(
+            {"project-context-injection": {
+                "mode": "core", "pointer-language": "de"}},
+            tmp_path / provider,
+            provider=provider,
+        )
+        pointer = run["pointer"]
+        assert f"Projektkontext: lies zuerst `{context_file}`" in pointer
+        for role in _T8_ROLES:
+            content = run["artifacts"][role]
+            assert content.count(pointer) == 1, (provider, role)
+            assert "Project context: read" not in content, (provider, role)
+
+        all_run = _render_run(
+            {"project-context-injection": {
+                "mode": "all", "pointer-language": "de"}},
+            tmp_path / f"{provider}-all",
+            provider=provider,
+        )
+        for role in _T8_ROLES:
+            assert all_run["pointer"] not in all_run["artifacts"][role], role
+
