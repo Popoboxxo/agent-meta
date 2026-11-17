@@ -224,6 +224,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # #1187: the T10 golden-gate guard diffs against a base SHA that is
+          # absent from a shallow clone; full history keeps that diff valid.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
