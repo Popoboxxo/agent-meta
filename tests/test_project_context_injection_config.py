@@ -385,3 +385,40 @@ def test_build_variables_exposes_mode():
     assert scope["mode"] == "core"
     assert "pointer_text" in scope
     assert "orchestrator_roles" in scope
+
+
+# ---------------------------------------------------------------------------
+# T3 — diagnose variables (D-5) + conditional whitelist
+# ---------------------------------------------------------------------------
+
+
+def test_builtin_vars_contain_project_context_flags():
+    from lib.consistency.placeholders import _BUILTIN_VARS
+
+    assert "PROJECT_CONTEXT_INJECTED" in _BUILTIN_VARS
+    assert "PROJECT_CONTEXT_MODE" in _BUILTIN_VARS
+
+
+def test_builtin_known_set_has_no_project_context_findings():
+    from lib.consistency.placeholders import check_builder_known_set
+
+    assert [
+        f for f in check_builder_known_set(REPO_ROOT) if "PROJECT_CONTEXT" in f.message
+    ] == []
+
+
+def test_conditional_strip_removes_inactive_project_context_branch():
+    from lib.variables import strip_inactive_conditional_blocks as strip
+
+    template = "A{{#if PROJECT_CONTEXT_INJECTED}}X{{else}}Y{{/if}}B"
+    # Inactive: only the {{else}} branch survives.
+    assert strip(template, {"PROJECT_CONTEXT_INJECTED": "false"}) == "AYB"
+    # Active: only the {{#if}} branch survives.
+    assert strip(template, {"PROJECT_CONTEXT_INJECTED": "true"}) == "AXB"
+
+
+def test_standalone_flags_default_to_all():
+    from lib.standalone import _CONDITIONAL_FALSE_FLAGS
+
+    assert _CONDITIONAL_FALSE_FLAGS["PROJECT_CONTEXT_INJECTED"] == "true"
+    assert _CONDITIONAL_FALSE_FLAGS["PROJECT_CONTEXT_MODE"] == "all"

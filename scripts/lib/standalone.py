@@ -214,6 +214,11 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "DOD_SE_OPTIONAL": "true",
     "DOD_SE_RECOMMENDED": "false",
     "DOD_SE_STRICT": "false",
+    # #1187: standalone has no project config/scope, so it renders the historic
+    # `all` injection branch: the role-specific gate stays active and the mode
+    # is the conservative default (matches _build_provider_vars' fallback).
+    "PROJECT_CONTEXT_INJECTED": "true",
+    "PROJECT_CONTEXT_MODE": "all",
 }
 # Orchestrator mode flags (mutually exclusive) — reuse the real resolver so
 # standalone matches the schema's own default (orchestrator.enabled=true,

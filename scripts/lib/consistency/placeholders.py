@@ -13,9 +13,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Core project identifiers
     "PREFIX", "PROJECT_SHORT", "PROJECT_NAME", "PROJECT_DESCRIPTION",
     "PROJECT_CONTEXT", "PROJECT_GOAL", "PROJECT_LANGUAGES", "PROJECT_STRUCTURE",
-    # #1187: project-wide context injection mode, derived from the resolved
-    # injection scope by config.build_variables (see _PROJECT_CONTEXT_SCOPE).
-    "PROJECT_CONTEXT_MODE",
+    # #1187: project-wide context injection flags, derived from the resolved
+    # injection scope. MODE comes from config.build_variables; INJECTED is set
+    # per role by agent_sync.apply_project_context_scope (see _PROJECT_CONTEXT_SCOPE).
+    "PROJECT_CONTEXT_MODE", "PROJECT_CONTEXT_INJECTED",
     "ENTRY_POINT_PATTERN", "KEY_PATTERNS", "PLATFORM", "RUNTIME", "LANGUAGE",
     # Agent-meta metadata
     "AGENT_META_VERSION", "AGENT_META_DATE", "AGENT_META_REPO", "AGENT_META_REL_PATH",
