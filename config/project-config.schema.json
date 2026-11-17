@@ -2995,6 +2995,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "se_output": {
+      "type": "object",
+      "deprecated": true,
+      "description": "Deprecated alias: use artifact-locations.classes.se-*.path (issue #1186).",
+      "properties": {
+        "base_dir": {
+          "type": "string",
+          "default": "SE"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

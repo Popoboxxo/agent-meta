@@ -289,3 +289,23 @@ def test_artifact_naming_def_is_shared():
     assert defs["artifactSeClass"]["properties"]["naming"] == {
         "$ref": "#/$defs/artifactNaming"
     }
+
+
+def test_se_output_is_declared():
+    # T3: deprecated se_output alias must be declared so #1141 cannot break
+    # existing projects. The base_dir default must stay "SE".
+    se_output = _schema()["properties"]["se_output"]
+    assert se_output["properties"]["base_dir"]["default"] == "SE"
+    assert se_output["deprecated"] is True
+
+
+def test_se_output_rejects_unknown_subkey():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _config(se_output={"base_dir": "SE", "bogus": 1}), _schema()
+        )
+
+
+def test_se_output_base_dir_type():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_config(se_output={"base_dir": 1}), _schema())
