@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Project context injection (`project-context-injection`, #1187):** new optional `project.yaml` section controlling whether the embedded project-context paragraph reaches each generated role. Keys: `mode` (`all` | `core+orchestrator` | `core+whitelist` | `core`, default `all`), `whitelist`, `orchestrator` (`inherit` | `include` | `exclude`), `orchestrator-roles` (missing = derive from `orchestrator` plus the active providers' primary roles; `[]` = no orchestrator role), `pointer-language` (`en` | `de` | `project`) and `pointer-text` (single-line override with exactly one `{context_file}`). Excluded roles keep a one-line context-file pointer instead of the paragraph. Without the section behaviour is unchanged (byte-identical render). Migration: run `sync.py` after the upgrade.
+
 ## [2.0.0-beta.9] - 2026-11-16
 
 ### Added

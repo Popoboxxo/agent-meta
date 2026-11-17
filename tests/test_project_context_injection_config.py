@@ -422,3 +422,65 @@ def test_standalone_flags_default_to_all():
 
     assert _CONDITIONAL_FALSE_FLAGS["PROJECT_CONTEXT_INJECTED"] == "true"
     assert _CONDITIONAL_FALSE_FLAGS["PROJECT_CONTEXT_MODE"] == "all"
+
+
+# ---------------------------------------------------------------------------
+# T14 — docs
+# ---------------------------------------------------------------------------
+
+_EXAMPLE_PATHS = (
+    REPO_ROOT / "howto" / "configs" / "project.yaml.example",
+    REPO_ROOT / "templates" / "configs" / "project.yaml.example",
+)
+_PROJECT_CONTEXT_KEYS = (
+    "mode", "whitelist", "orchestrator", "orchestrator-roles",
+    "pointer-language", "pointer-text",
+)
+
+
+def _extract_injection_block(text):
+    """Return the commented ``project-context-injection`` block verbatim."""
+    lines = text.splitlines()
+    start = next(
+        (i for i, line in enumerate(lines)
+         if line.lstrip().startswith("# project-context-injection:")),
+        None,
+    )
+    assert start is not None
+    block = []
+    for line in lines[start:]:
+        if not line.lstrip().startswith("#"):
+            break
+        block.append(line.rstrip())
+    return "\n".join(block)
+
+
+def test_docs_sync_concept_documents_both_variables():
+    doc = (REPO_ROOT / "docs" / "guides" / "features" / "sync-concept.md").read_text(
+        encoding="utf-8")
+    # Scope to the auto-injected variable table; an incidental mention elsewhere
+    # must not satisfy the check.
+    start = doc.index("**Auto-injiziert**")
+    end = doc.index("Unbekannte Variablen", start)
+    table = doc[start:end]
+    assert "`{{PROJECT_CONTEXT_MODE}}`" in table
+    assert "`{{PROJECT_CONTEXT_INJECTED}}`" in table
+
+
+def test_project_example_documents_section():
+    blocks = {}
+    for path in _EXAMPLE_PATHS:
+        block = _extract_injection_block(path.read_text(encoding="utf-8"))
+        for key in _PROJECT_CONTEXT_KEYS:
+            assert f"#   {key}:" in block, f"{key!r} missing in {path}"
+        assert "missing" in block and "no orchestrator role" in block, (
+            f"orchestrator-roles derivation hint missing in {path}")
+        blocks[path] = block
+    # Both example files document the same section — they must not diverge.
+    assert blocks[_EXAMPLE_PATHS[0]] == blocks[_EXAMPLE_PATHS[1]]
+
+
+def test_changelog_mentions_issue_1187():
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    unreleased = changelog.split("## [Unreleased]", 1)[1].split("## [", 1)[0]
+    assert "#1187" in unreleased

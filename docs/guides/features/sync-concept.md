@@ -290,6 +290,8 @@ Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ers
 | `{{%RELEASE_CHECKLIST_BLOCK%}}` | Gerenderter Prosa-Block der Release-Checkliste, leer bei `off` (escaped, Issue #1082) |
 | `{{%TEST_ENVIRONMENT_BLOCK%}}` | Markdown-Block der deklarierten Test-Umgebungen aus `test-environments`, leer wenn nicht konfiguriert |
 | `{{%TEST_ENVIRONMENTS_SET%}}` | `true`/`false`; steuert das Gate um den Block in den Rollen-Templates |
+| `{{PROJECT_CONTEXT_MODE}}` | Effective `project-context-injection.mode` (`all`, `core+orchestrator`, `core+whitelist`, `core`); default `all` |
+| `{{PROJECT_CONTEXT_INJECTED}}` | `true`/`false` per role — whether the embedded project-context paragraph is included; otherwise the `{{CONTEXT_FILE}}` pointer is used |
 
 Unbekannte Variablen (kein Wert in Config) — Grace-Fenster bis `2.1.0` (`63b12bde`):
 - bis `2.1.0`: Platzhalter bleibt unverändert sichtbar, Eintrag im Logfile unter `WARNINGS`; die Warnung nennt den künftigen Fehler wörtlich
