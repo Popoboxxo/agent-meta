@@ -735,4 +735,15 @@ bestehenden `roles_without_template`-Meldung.
 
 ## 15. Ausführungsnachweis
 
-> **Noch leer — wird bei Umsetzung gefüllt** (Datum, HEAD, Szenario-Logzeilen, Testläufe). Es ist ein Ergebnisprotokoll, **kein** Platzhalter für Implementierungsdetails.
+> **Ausgeführt 2026-11-17** auf `feat/1187-project-context-injection`, HEAD `e4de3f5f80c7a741ab67b1aa92e864b71248c358` (T1–T14 committed). Ergebnisprotokoll, kein Platzhalter für Implementierungsdetails.
+>
+> - **Szenario:** `bash .tmp/scenario-context-1187/run.sh` → `SCENARIO OK` (A–H inkl. Negativfälle, 14 echte Sync-Läufe in `.tmp/`-Konsumenten; Scratch, kein Repo-Artefakt).
+> - **Regression:** 345 passed, 20 subtests passed, 2 warnings (61.73 s) — 7 Testdateien, `--basetemp=.tmp/pytest-basetemp-1187-t15`.
+> - **Gates (Repo-Root):** `--validate` → `[PASS] All checks passed.` (4 WARNs, alle vorbestehend); `--check` → DRY-RUN, rc 0, keine `project-context-injection`-Findings (2 umgebungsabhängige WARNs `mcp.duplicate-plugin` / `opencode-v2 gate` bereits in früheren Logs belegt).
+> - **Golden-Gate:** `git diff --name-only 6eeeff4475f301690b198f0eba2249ec2b65d384..HEAD -- schemas/a2a-handoff.schema.json tests/test_template_slimming_equivalence.py tests/fixtures/slimming-golden` → leer.
+> - **Logzeilen (Auszug):**
+>   - `mode=all injected=9/9 roles, pointer=0, chars saved=0 (vs mode=all)`
+>   - `mode=core injected=0/9 roles, pointer=9, chars saved=4269 (vs mode=all)`
+>   - `project-context-injection.exclude-overrides-mode: mode=all + orchestrator=exclude — orchestrator roles (orchestrator) excluded; exclude wins`
+>   - `mode=core+orchestrator injected=1/9 roles, pointer=8, chars saved=3472 (vs mode=all)`
+>   - `project-context-injection.empty-orchestrator-set: mode=core+orchestrator + orchestrator-roles=[] — no role receives the block (mode degenerates to core)`
