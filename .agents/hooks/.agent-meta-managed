@@ -1,4 +1,5 @@
 antigravity-json-adapter.sh
+artifact-path-guard.sh
 auto-github-release.sh
 orchestrator-guard-impl.sh
 orchestrator-guard.sh
