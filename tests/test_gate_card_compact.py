@@ -38,6 +38,9 @@ Rebaseline log:
 - Release 2.0.0-beta.8 (VERSION bump 2.0.0-beta.7 -> 2.0.0-beta.8): only the
   ``agent-meta v...`` version string in the compact gate-card header changed
   (line 4, ``v2.0.0-beta.7`` -> ``v2.0.0-beta.8``). No substantive render change.
+- Release 2.0.0-beta.9 (VERSION bump 2.0.0-beta.8 -> 2.0.0-beta.9): only the
+  ``agent-meta v...`` version string in the compact gate-card header changed
+  (line 4, ``v2.0.0-beta.8`` -> ``v2.0.0-beta.9``). No substantive render change.
 - Issue #1157: the embedded ``a2a-delegation-gates`` gate 3 gains one sentence
   ("Ein Worker-Lauf, der ohne diesen Abschluss-Report endet, gilt als
   ``failed``."); exactly that one line changed (patched in place).
