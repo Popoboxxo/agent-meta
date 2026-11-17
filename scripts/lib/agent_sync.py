@@ -587,6 +587,23 @@ def _build_provider_vars(
             active_set=active_set,
         )
     )
+    # #1187 (T4): project-context provider defaults. Imported lazily because
+    # config.py must not be imported at module load time (load-time cycle);
+    # same seam as resolve_subagent_permission_provider_vars above.
+    from .config import (
+        _PROJECT_CONTEXT_POINTER_TEXTS,
+        format_project_context_pointer,
+    )
+
+    _pc_scope = variables.get("_PROJECT_CONTEXT_SCOPE") or {}
+    provider_vars["PROJECT_CONTEXT_MODE"] = _pc_scope.get("mode", "all")
+    # Conservative default: today's behavior embeds the context for everyone.
+    # The per-role value is applied later in the role loop (T5).
+    provider_vars["PROJECT_CONTEXT_INJECTED"] = "true"
+    provider_vars["_PROJECT_CONTEXT_POINTER"] = format_project_context_pointer(
+        _pc_scope.get("pointer_text") or _PROJECT_CONTEXT_POINTER_TEXTS["en"],
+        provider_vars["CONTEXT_FILE"],
+    )
     return {**variables, **provider_vars}
 
 def _should_skip_role(
