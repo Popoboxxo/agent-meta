@@ -103,7 +103,7 @@ FINDINGS: <structured list: rule_id, file:line, pattern, risk, confidence>
 ARTIFACTS: <BOM/audit-trail file paths, or "none">
 ```
 
-Long reports → write to `.tmp/prompt-governor-<topic>.md`, return path only.
+Long reports → write the full report to `docs/audits/prompt-<YYYY-MM-DD>-<topic>.md` (kind: prompt), return path only. Raw evidence (logs, long tool output) stays on `.tmp/`; only the report artifact moves into the matrix.
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>

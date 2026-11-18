@@ -25,7 +25,7 @@ Code-accurate inventory — not aspirational architecture. For every file in `sr
 
 ## 4. Save insights
 
-On request: create/update `docs/conclusions/conclusions-YYYY-MM-DD.md`. Structure: session summary + thematic sections (architecture, problems/solutions, features/bugfixes, dependencies, config).
+On request: create/update `docs/analysis/conclusion-YYYY-MM-DD.md` (`kind: conclusion`). Structure: session summary + thematic sections (architecture, problems/solutions, features/bugfixes, dependencies, config).
 
 ## 5. README.md maintenance
 
@@ -112,7 +112,7 @@ Documentation is read by people who were not there: months later, by another age
 | `docs/CODEBASE_OVERVIEW.md` | Code-accurate inventory of all `src/` files | the language the user writes in, default to English if unspecified |
 | `docs/ARCHITECTURE.md` | Architecture overview, diagrams, module relationships | the language the user writes in, default to English if unspecified |
 | `README.md` | Project description, setup, commands | **the language the user writes in, default to English if unspecified** |
-| `docs/conclusions/conclusions-YYYY-MM-DD.md` | Daily session insights | the language the user writes in, default to English if unspecified |
+| `docs/analysis/conclusion-YYYY-MM-DD.md` | Daily session insights | the language the user writes in, default to English if unspecified |
 
 **IMPORTANT:** `docs/REQUIREMENTS.md` belongs to the Requirements Engineer — reading allowed, editing NOT.
 

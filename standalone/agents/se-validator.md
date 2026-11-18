@@ -161,7 +161,7 @@ Return your final output **only** as a JSON object matching the following schema
 
 After completing validation, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Validation.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Validation.md`
 
 **Frontmatter format:**
 ```yaml

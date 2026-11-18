@@ -195,7 +195,7 @@ Nach Abschluss aller V&V-Aktivitäten:
 
 After completing the integration plan, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_TestPlan.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_TestPlan.md`
 
 **Frontmatter format:**
 ```yaml

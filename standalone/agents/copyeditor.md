@@ -75,7 +75,7 @@ On `correction_hints` from a critic → fix ONLY the named findings. Track "roun
 </tools>
 
 <output_contract>
-Deliverable is a markdown findings report, written next to the reviewed file as `<filename>.copyedit.md` (never overwrite the source unless the request explicitly asked for in-place editing — default is report-only, human applies changes):
+Deliverable is a markdown findings report, written to `docs/reviews/<filename>.copyedit.md` (`kind: copyedit`; never overwrite the source unless the request explicitly asked for in-place editing — default is report-only, human applies changes). When `files` is `inline`, omit the report file and return the full report in `RESULT` instead:
 
 ```markdown
 # Copyediting: <filename>

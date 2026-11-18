@@ -140,7 +140,7 @@ Define these explicitly per interface — they become the binding test oracle fo
 
 After completing interface registration, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Interfaces.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Interfaces.md`
 
 **Frontmatter format:**
 ```yaml
