@@ -5512,10 +5512,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Release 2.0.0-beta.9: ac01-baseline re-pinned (its hashes.json, 82 version-bearing entries -> ea9ea6cb.. -> db73f601..) and compact-golden re-pinned (agent-meta v2.0.0-beta.9 stamp -> d02d1de1.. -> 4ac22975..); slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # Issue #1186 T10 (2026-11-17, artifact-locations matrix): ac01-baseline re-pinned (81 per-file hashes of the 10 templated roles + their .toml sidecars, plus 108 new docs/*/.gitkeep placeholder keys -> db73f601.. -> 090cfabe..); slimming-golden re-pinned (8 role goldens: version/generated-from bumps + {{ARTIFACT_*}} rendered paths -> d72cf5b2.. -> d8c20af6..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ac01-baseline re-pinned (36 per-file hashes, the 4 audit roles x 9 providers, -> 090cfabe.. -> 7d92667b..); slimming-golden re-pinned (app-lifecycle-governor golden: version/generated-from 1.4.1 -> 1.4.2 + {{ARTIFACT_AUDITS_DIR}} rendered path, plus the README manifest entry -> d8c20af6.. -> 22ac56a9..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
+# Issue #1186 (2026-11-18, artifact-locations rule): compact-golden re-pinned (agents-managed.md: one "Weitere Regeln als Skills" line + artifact-locations; 4ac22975.. -> ef8123cc..); ac01-baseline/slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
     "ac01-baseline": "e3f2cd50349280f4c563af6a84b93e8e3445e956d670155071b03fe7c2dff628",
     "slimming-golden": "10f5c4c7fd14de4285735fd9a080c5f4b7254fe21477a81c32a3d29ab7fba2c0",
-    "compact-golden": "4ac22975342e936b559951baee9b8928ad3e616b0361cabd4a6f1e6f4a50ca1b",
+    "compact-golden": "ef8123cc4687f63fafb87d1a9e4a4b6a920bf6cb71fbb4a0dfeb8cb9f033aaaf",
 }
 
 
