@@ -2044,10 +2044,19 @@ def _sync_stage_artifact_locations_resolved(
     from lib.artifact_status import RESOLVED_RELPATH, build_resolved_payload
 
     payload = build_resolved_payload(config, agent_meta_root, project_root)
-    write_atomic(
-        project_root / RESOLVED_RELPATH,
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-    )
+    target = project_root / RESOLVED_RELPATH
+    # Keep the previous wall-clock stamp when nothing else changed, so a repeat
+    # sync is byte-identical (idempotency).
+    try:
+        previous = json.loads(target.read_text(encoding="utf-8"))
+        old_stamp = previous["baseline"]["generated_at"]
+        new_stamp = payload["baseline"]["generated_at"]
+        payload["baseline"]["generated_at"] = old_stamp
+        if payload != previous:
+            payload["baseline"]["generated_at"] = new_stamp
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    write_atomic(target, json.dumps(payload, indent=2, sort_keys=True) + "\n")
     log.action("WRITE", RESOLVED_RELPATH.as_posix(), "resolved artifact-locations matrix")
 
 

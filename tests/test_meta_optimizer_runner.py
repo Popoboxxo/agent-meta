@@ -479,6 +479,26 @@ def test_credential_neighbour_context_is_redacted(tmp_path):
 
 # --- AC-55: proof failure ---------------------------------------------------
 
+def test_stage_14c_snapshot_does_not_break_l0_proof(tmp_path):
+    """The gitignored Stage 14c snapshot carries a wall-clock ``generated_at``
+    and must not make two otherwise identical proof renders diverge (#1186)."""
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    for tree in (before, after):
+        (tree / ".meta-config").mkdir(parents=True)
+        (tree / "CLAUDE.md").write_text("# context\n", encoding="utf-8")
+    (before / ".meta-config/artifact-locations.resolved.json").write_text(
+        '{"baseline": {"generated_at": "2026-11-17T00:00:00Z"}}\n', encoding="utf-8")
+    (after / ".meta-config/artifact-locations.resolved.json").write_text(
+        '{"baseline": {"generated_at": "2026-11-17T00:00:01Z"}}\n', encoding="utf-8")
+
+    assert all(rel != ".meta-config/artifact-locations.resolved.json"
+               for rel, _ in mo._iter_render_files(before))
+    report = mo.prove(before, after, "", "", "L0", comparison_files=())
+    assert report.ok, report.reasons
+    assert report.changed_files == ()
+
+
 def test_proof_failed_on_effective_variable(tmp_path):
     """A candidate whose removal changes the render -> meta-optimizer.proof-failed."""
     cfg = _init_project(tmp_path, _fixture("claude-minimal.yaml"))

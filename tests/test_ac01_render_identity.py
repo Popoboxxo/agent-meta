@@ -1115,7 +1115,10 @@ def is_host_local(path: str) -> bool:
 
 
 # Volatile, non-render artifacts: never part of the manifest.
-_SKIP_RE = re.compile(r"(^|/)(\.git)(/|$)|(^|/)sync\.log$|\.sync-backup-")
+# The Stage 14c artifact-locations snapshot carries a wall-clock timestamp (#1186).
+_SKIP_RE = re.compile(
+    r"(^|/)(\.git)(/|$)|(^|/)sync\.log$|\.sync-backup-"
+    r"|(^|/)artifact-locations\.resolved\.json$")
 
 
 def _run_sync(project: Path, *extra: str) -> subprocess.CompletedProcess:

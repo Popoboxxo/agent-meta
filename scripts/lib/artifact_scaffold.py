@@ -19,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .artifact_locations import CLASS_REGISTRY, resolve_artifact_locations
+from .dod import resolve_spec_plan_bundle
 from .io import safe_path, write_checked
 from .log import SyncLog
 
@@ -32,6 +33,8 @@ LEGACY_CONCLUSIONS_DIR = "docs/conclusions"
 DEFAULT_SPECS_DIR = "docs/specs"
 DEFAULT_PLANS_DIR = "docs/plans"
 DEFAULT_SPIKES_DIR = "docs/spikes"
+
+_SPEC_PLAN_CLASSES = frozenset({"specs", "plans", "spikes"})
 
 _LEGACY_SOURCE = "spec-plan scaffolding"
 _ARTIFACT_SOURCE = "artifact scaffolding"
@@ -114,8 +117,13 @@ def scaffold_artifact_dirs(
         scaffold_legacy_spec_plan_dirs(project_root, config, log, dry_run)
         return
 
+    # specs/plans/spikes stay governed by the spec-plan-workflow switch: a
+    # disabled workflow must not scaffold them (scenarios 51/56).
+    spec_plan_scaffold = resolve_spec_plan_bundle(config, agent_meta_root)["scaffold"]
     for name, spec in CLASS_REGISTRY.items():
         if spec.form != "directory":
+            continue
+        if name in _SPEC_PLAN_CLASSES and not spec_plan_scaffold:
             continue
         resolved = matrix.classes.get(name)
         if resolved is None or resolved.mode != "files" or not resolved.path:

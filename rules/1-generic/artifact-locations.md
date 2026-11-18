@@ -33,7 +33,7 @@ Konkrete, aufgelöste Werte liefert `python3 scripts/sync.py --status-artifacts 
 | adr | `{{ARTIFACT_ADR_DIR}}` | Architecture Decision Records |
 | traceability | `{{ARTIFACT_TRACEABILITY_DIR}}` | Traceability-Matrizen |
 | runbooks | `{{ARTIFACT_RUNBOOKS_DIR}}` | Runbooks |
-| project-docs | `{{ARTIFACT_ARCHITECTURE_FILE}}`, `{{ARTIFACT_CODEBASE_OVERVIEW_FILE}}`, `{{ARTIFACT_REQUIREMENTS_FILE}}`, `{{ARTIFACT_ISSUE_LABELS_FILE}}` | Projekt-Dokumente (Datei-Set) |
+| project-docs | `ARTIFACT_ARCHITECTURE_FILE`, `ARTIFACT_CODEBASE_OVERVIEW_FILE`, `ARTIFACT_REQUIREMENTS_FILE`, `ARTIFACT_ISSUE_LABELS_FILE` | Projekt-Dokumente (Datei-Set); konkrete Pfade via `--status-artifacts --json` |
 | scratch | `{{ARTIFACT_SCRATCH_DIR}}` | Ephemere Zwischenstände (ignored) |
 | state | `{{ARTIFACT_STATE_DIR}}` | Ephemerer Zustand / Event-Log (ignored) |
 

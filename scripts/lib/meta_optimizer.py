@@ -132,6 +132,12 @@ L0_COMPARISON_FILES = (
 _NON_ARTIFACT_FILES = ("sync.log",)
 #: The render's verbatim copy of the input config (not a generated artifact).
 _INPUT_CONFIG_COPY = ".meta-config/project.yaml"
+#: Stage 14c runtime snapshot: gitignored, carries a wall-clock ``generated_at``
+#: timestamp, so two otherwise identical proof renders can never be byte-equal.
+#: Like ``sync.log`` it is outside the deterministic L0 proof surface; the
+#: content-optimizer only removes ``variables.*`` keys and never touches the
+#: artifact-locations matrix this file is derived from.
+_NON_DETERMINISTIC_FILES = (".meta-config/artifact-locations.resolved.json",)
 #: Scope of what L0 proves (IC-25 Rev. 3, B-1/B-3).
 SCOPE_NOTE = (
     "L0 proves byte-equality of the generated artifacts in the CURRENT active set only.",
@@ -724,15 +730,17 @@ def _wrapped_config_text(config: Mapping, names: Sequence[str]) -> str:
 def _iter_render_files(render_root: Path):
     """Yield ``(relative_posix_path, path)`` for every comparable render file.
 
-    Excludes VCS metadata, the rendered config copy and the run log; everything
-    else is a generated artifact the L0 proof must find byte-equal.
+    Excludes VCS metadata, the rendered config copy, the run log and the
+    non-deterministic Stage 14c snapshot; everything else is a generated
+    artifact the L0 proof must find byte-equal.
     """
     render_root = Path(render_root)
     for path in sorted(render_root.rglob("*")):
         if not path.is_file():
             continue
         rel = path.relative_to(render_root).as_posix()
-        if rel.startswith(".git/") or rel in _NON_ARTIFACT_FILES or rel == _INPUT_CONFIG_COPY:
+        if (rel.startswith(".git/") or rel in _NON_ARTIFACT_FILES
+                or rel == _INPUT_CONFIG_COPY or rel in _NON_DETERMINISTIC_FILES):
             continue
         yield rel, path
 

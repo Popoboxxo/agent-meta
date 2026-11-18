@@ -5513,8 +5513,8 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1186 T10 (2026-11-17, artifact-locations matrix): ac01-baseline re-pinned (81 per-file hashes of the 10 templated roles + their .toml sidecars, plus 108 new docs/*/.gitkeep placeholder keys -> db73f601.. -> 090cfabe..); slimming-golden re-pinned (8 role goldens: version/generated-from bumps + {{ARTIFACT_*}} rendered paths -> d72cf5b2.. -> d8c20af6..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ac01-baseline re-pinned (36 per-file hashes, the 4 audit roles x 9 providers, -> 090cfabe.. -> 7d92667b..); slimming-golden re-pinned (app-lifecycle-governor golden: version/generated-from 1.4.1 -> 1.4.2 + {{ARTIFACT_AUDITS_DIR}} rendered path, plus the README manifest entry -> d8c20af6.. -> 22ac56a9..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "7d92667beb9c02db2c25c3bf15efe45bbaca5df93d3ad9c4a58a222bb7d15f15",
-    "slimming-golden": "22ac56a950de5619952263152d756b4ffeb5800e9095997d3d8583c13c44ff8e",
+    "ac01-baseline": "e3f2cd50349280f4c563af6a84b93e8e3445e956d670155071b03fe7c2dff628",
+    "slimming-golden": "10f5c4c7fd14de4285735fd9a080c5f4b7254fe21477a81c32a3d29ab7fba2c0",
     "compact-golden": "4ac22975342e936b559951baee9b8928ad3e616b0361cabd4a6f1e6f4a50ca1b",
 }
 
