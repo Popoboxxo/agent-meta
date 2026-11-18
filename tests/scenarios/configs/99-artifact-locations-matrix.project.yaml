@@ -21,6 +21,8 @@ artifact-locations:
   classes:
     scratch:
       path: .tmp
+spec-plan-workflow:
+  enabled: true
 project:
   name: scenario-artifact-locations-matrix
   prefix: a99

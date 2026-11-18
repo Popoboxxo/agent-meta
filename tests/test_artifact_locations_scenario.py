@@ -172,7 +172,10 @@ def test_artifact_locations_end_to_end() -> None:
 
         # --- Phase A: default matrix, resolver, variables, allow-list,
         #     scaffold, migration dry-run, containment scratch, admin guard.
-        project_a = _make_project("phase-a", "\nartifact-locations:\n  enabled: true\n")
+        project_a = _make_project(
+            "phase-a",
+            "\nartifact-locations:\n  enabled: true\nspec-plan-workflow:\n  enabled: true\n",
+        )
 
         dry = _run_sync(project_a, "--dry-run")
         assert dry.returncode == 0, dry.stderr
@@ -310,7 +313,10 @@ def test_artifact_locations_end_to_end() -> None:
         print("PHASE C: SE cell paths + AC-11 gate OK")
 
         # --- Phase D: baseline-based legacy-write detection.
-        project_d = _make_project("phase-d", "\nartifact-locations:\n  enabled: true\n")
+        project_d = _make_project(
+            "phase-d",
+            "\nartifact-locations:\n  enabled: true\nspec-plan-workflow:\n  enabled: true\n",
+        )
         (project_d / "docs" / "estimates").mkdir(parents=True)
         (project_d / "docs" / "estimates" / "baseline-note.md").write_text(
             "legacy note present at baseline time\n", encoding="utf-8",
