@@ -20,6 +20,7 @@ from .io import (
 )
 from .json_persistence import save_json_document
 from .log import SyncLog
+from .rules import load_speech_rule_text
 from .plugins import resolve_plugin_compact
 from .rule_index import (
     bootstrap_previously_managed,
@@ -3130,6 +3131,13 @@ def _build_managed_block(
                     )
         except ImportError:
             pass
+
+    if not has_native_rules:
+        # #1300: no native rules channel -> speech rule rides in the block, after
+        # the regular rules (None for mode full -> block stays byte-identical).
+        _speech = load_speech_rule_text(agent_meta_root, config, log)
+        if _speech is not None:
+            embedded_rules.append({"content": "## Speech-Mode\n\n" + _speech.strip("\n")})
 
     local_vars["embedded_rules"] = embedded_rules
     # Composition flags for agents-managed.md: embedded core rules render via

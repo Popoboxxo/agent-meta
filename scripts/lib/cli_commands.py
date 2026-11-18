@@ -329,8 +329,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                        variables=test_variables, rules_dir=pc.get("rules_dir"),
                        provider=provider, provider_config=provider_config,
                        active_set=active_set)
-            sync_speech_mode(agent_meta_root, test_repo_path, config, log, dry_run,
-                             rules_dir=pc.get("rules_dir"))
+        sync_speech_mode(agent_meta_root, test_repo_path, config, log, dry_run,
+                         rules_dir=pc.get("rules_dir"), provider_config=pc)
         if pc["has_hooks"]:
             sync_hooks(agent_meta_root, test_repo_path, config, log, dry_run,
                        provider=provider, provider_config=provider_config)

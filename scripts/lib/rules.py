@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import sys
+from typing import Optional
 from pathlib import Path
 
 from .frontmatter import _split_frontmatter
@@ -818,6 +819,18 @@ def sync_rules(
     write_managed_index(managed_index_path, now_managed, dry_run)
 
 
+def load_speech_rule_text(agent_meta_root: Path, config: dict, log: SyncLog) -> Optional[str]:
+    """Return speech/<mode>.md content; None for mode 'full' or a missing source (warned)."""
+    mode = config.get("speech-mode", "full")
+    if mode == "full":
+        return None
+    source_path = agent_meta_root / SPEECH_DIR / f"{mode}.md"
+    if not source_path.exists():
+        log.warning(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
+        return None
+    return source_path.read_text(encoding="utf-8")
+
+
 def sync_speech_mode(
     agent_meta_root: Path,
     project_root: Path,
@@ -825,6 +838,7 @@ def sync_speech_mode(
     log: SyncLog,
     dry_run: bool,
     rules_dir: str | None = None,
+    provider_config: Optional[dict] = None,
 ):
     """Copy speech/<mode>.md to .claude/rules/speech-mode.md.
 
@@ -836,6 +850,10 @@ def sync_speech_mode(
     the 'full' -> 'full' no-op and 'full' -> remove transition.
     """
     mode = config.get("speech-mode", "full")
+    # has_rules:false providers get the embed channel (context.py); never touch the
+    # rules dir for them, so no CLAUDE_RULES_DIR fallback and no cleanup (#1300).
+    if provider_config is not None and not provider_config.get("has_rules", False):
+        return
     target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     target_path = target_dir / SPEECH_RULE_FILENAME
     managed_index_path = target_dir / ".agent-meta-managed"
@@ -855,12 +873,9 @@ def sync_speech_mode(
             managed_index_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
         return
 
-    source_path = agent_meta_root / SPEECH_DIR / f"{mode}.md"
-    if not source_path.exists():
-        log.warning(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
+    source_content = load_speech_rule_text(agent_meta_root, config, log)
+    if source_content is None:
         return
-
-    source_content = source_path.read_text(encoding="utf-8")
     rel_out = str(target_path.relative_to(project_root))
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)

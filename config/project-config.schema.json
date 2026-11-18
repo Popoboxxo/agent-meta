@@ -719,7 +719,7 @@
     },
     "speech-mode": {
       "type": "string",
-      "description": "Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech. 'asozial' = technically correct but dripping with contempt — New Kids style, insults the user's intelligence. 'submissive' = completely devoted and submissive, no contradiction, no own opinion, addresses user as master/mistress. 'business' = formal corporate tone. 'bullshit-bingo' = management speak, buzzwords. 'linkedin' = LinkedIn influencer style, inspirational.",
+      "description": "Communication style for all agents. Written as a rules file (e.g. .claude/rules/speech-mode.md) when the provider has rules support (has_rules: true); otherwise embedded into the provider context file (e.g. AGENTS.md). 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech. 'asozial' = technically correct but dripping with contempt — New Kids style, insults the user's intelligence. 'submissive' = completely devoted and submissive, no contradiction, no own opinion, addresses user as master/mistress. 'business' = formal corporate tone. 'bullshit-bingo' = management speak, buzzwords. 'linkedin' = LinkedIn influencer style, inspirational.",
       "enum": [
         "full",
         "short",

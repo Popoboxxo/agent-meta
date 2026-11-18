@@ -5763,3 +5763,20 @@ def test_validator_flags_top_level_subagent_depth_in_v2_doc():
     assert "experimental.subagent_depth" in bad[0].suggestion
     assert validate_json_document('{"experimental": {"subagent_depth": 3}}',
                                   "opencode-json-v2", "opencode.json") == []
+
+
+def test_opencode_speech_mode_embeds_in_agents_md(tmp_path):  # #1300
+    cfg = tmp_path / "p.yaml"
+    cfg.write_text(
+        'agent-meta-version: "2.0.0-beta.1"\nai-providers:\n- Opencode\n'
+        "speech-mode: caveman\ndod-preset: rapid-prototyping\n"
+        "variables:\n  PROJECT_NAME: t\n  PROJECT_PREFIX: t\n"
+        "  AGENT_META_REPO: example/agent-meta\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    r = subprocess.run([sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"),
+                        "--config", str(cfg), "--init"], cwd=tmp_path,
+                       capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout[-800:] + r.stderr[-800:]
+    text = (_REPO_ROOT / "speech" / "caveman.md").read_text(encoding="utf-8").strip("\n")
+    assert text in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    assert not (tmp_path / ".claude" / "rules" / "speech-mode.md").exists()
