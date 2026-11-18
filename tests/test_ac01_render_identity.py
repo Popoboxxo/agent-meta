@@ -1057,6 +1057,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``generated-file-hashes.json`` keys are path-set-only and unchanged). No other render changed;
   ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``090cfabe…`` -> ``7d92667b…``;
   ``slimming-golden`` re-pinned separately (app-lifecycle-governor golden); ``compact-golden`` unchanged.
+- Issue #1300 (2026-11-18, speech-mode embed): the schema description of ``speech-mode`` in
+  ``config/project-config.schema.json`` changed, which is embedded in the rendered ``.meta-config/project.yaml``.
+  Patched **per entry**: exactly **9 of 1182 hashes moved (the 9 ``.meta-config/project.yaml``, one per provider); 0
+  added/removed**. No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the
+  harness's own ``_hash_file``. AC-T4: ac01 ``e3f2cd50…`` -> ``9cee45b8…``; ``slimming-golden`` and
+  ``compact-golden`` unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

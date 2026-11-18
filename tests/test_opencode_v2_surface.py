@@ -5513,8 +5513,9 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1186 T10 (2026-11-17, artifact-locations matrix): ac01-baseline re-pinned (81 per-file hashes of the 10 templated roles + their .toml sidecars, plus 108 new docs/*/.gitkeep placeholder keys -> db73f601.. -> 090cfabe..); slimming-golden re-pinned (8 role goldens: version/generated-from bumps + {{ARTIFACT_*}} rendered paths -> d72cf5b2.. -> d8c20af6..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ac01-baseline re-pinned (36 per-file hashes, the 4 audit roles x 9 providers, -> 090cfabe.. -> 7d92667b..); slimming-golden re-pinned (app-lifecycle-governor golden: version/generated-from 1.4.1 -> 1.4.2 + {{ARTIFACT_AUDITS_DIR}} rendered path, plus the README manifest entry -> d8c20af6.. -> 22ac56a9..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 (2026-11-18, artifact-locations rule): compact-golden re-pinned (agents-managed.md: one "Weitere Regeln als Skills" line + artifact-locations; 4ac22975.. -> ef8123cc..); ac01-baseline/slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1300 (2026-11-18, speech-mode schema description): ac01-baseline re-pinned (9 .meta-config/project.yaml hashes, 1 per provider; e3f2cd50.. -> 9cee45b8..); slimming-golden/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "e3f2cd50349280f4c563af6a84b93e8e3445e956d670155071b03fe7c2dff628",
+    "ac01-baseline": "9cee45b80ecc8d2ebcdab7f9c10342a3f245e3262fbc394dc1e21f28b48a6eab",
     "slimming-golden": "10f5c4c7fd14de4285735fd9a080c5f4b7254fe21477a81c32a3d29ab7fba2c0",
     "compact-golden": "ef8123cc4687f63fafb87d1a9e4a4b6a920bf6cb71fbb4a0dfeb8cb9f033aaaf",
 }
@@ -5763,3 +5764,20 @@ def test_validator_flags_top_level_subagent_depth_in_v2_doc():
     assert "experimental.subagent_depth" in bad[0].suggestion
     assert validate_json_document('{"experimental": {"subagent_depth": 3}}',
                                   "opencode-json-v2", "opencode.json") == []
+
+
+def test_opencode_speech_mode_embeds_in_agents_md(tmp_path):  # #1300
+    cfg = tmp_path / "p.yaml"
+    cfg.write_text(
+        'agent-meta-version: "2.0.0-beta.1"\nai-providers:\n- Opencode\n'
+        "speech-mode: caveman\ndod-preset: rapid-prototyping\n"
+        "variables:\n  PROJECT_NAME: t\n  PROJECT_PREFIX: t\n"
+        "  AGENT_META_REPO: example/agent-meta\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    r = subprocess.run([sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"),
+                        "--config", str(cfg), "--init"], cwd=tmp_path,
+                       capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout[-800:] + r.stderr[-800:]
+    text = (_REPO_ROOT / "speech" / "caveman.md").read_text(encoding="utf-8").strip("\n")
+    assert text in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    assert not (tmp_path / ".claude" / "rules" / "speech-mode.md").exists()

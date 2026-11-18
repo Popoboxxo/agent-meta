@@ -1543,8 +1543,9 @@ def _sync_stage_per_provider(
                        platform_vars=platform_vars, variables=provider_variables,
                        rules_dir=pc.get("rules_dir"), provider=provider,
                        provider_config=provider_config, active_set=active_set)
-            sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
-                             rules_dir=pc.get("rules_dir"))
+        # Independent of has_rules: sync_speech_mode skips has_rules:false itself (#1300).
+        sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
+                         rules_dir=pc.get("rules_dir"), provider_config=pc)
         _cleanup_retired_rules_dirs(project_root, config, provider_config, providers,
                                     pc, log, args.dry_run)
         if pc.get("skills_dir") and pc.get("context_file"):
