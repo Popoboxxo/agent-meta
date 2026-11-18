@@ -297,16 +297,19 @@ TOLERANCE_MAX_BYTES = 4096
 # Left unchanged (shrink only, pins sit above the measurement): harness-roster/always-loaded
 # of Claude/Codex/Opencode (-18.3..-18.4 KB; the roster carries the orchestrator file).
 # YAML-format providers and the compact profile (line block, no JSON) are unaffected.
+# RE-PIN (2026-11-18, #1186): the artifact-locations rule (23-class table required by
+# tests/test_artifact_locations_templates.py) is embedded under the default rules-preset
+# (+~3.5 KB rules; entry-file/always-loaded/roster follow). Only violating entries re-pinned.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 72183, "rules": 18208},
-    "Codex": {"always-loaded": 702748, "entry-file": 24787, "harness-roster": 678518, "orchestrator": 71773},
-    "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 74393, "rules": 21080},
-    "Copilot": {"always-loaded": 31852, "entry-file": 10887, "orchestrator": 74269, "rules": 20876},
-    "Gemini": {"always-loaded": 32873, "entry-file": 32873, "orchestrator": 72180},
-    "KimiCode": {"always-loaded": 695981, "entry-file": 24801, "harness-roster": 671737, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 691238, "entry-file": 24798, "harness-roster": 666997, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 705658, "entry-file": 24862, "harness-roster": 681353, "orchestrator": 71845},
-    "ZCode": {"always-loaded": 693854, "entry-file": 25700, "harness-roster": 668711, "orchestrator": 74965},
+    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 72183, "rules": 20690},
+    "Codex": {"always-loaded": 702748, "entry-file": 27231, "harness-roster": 678518, "orchestrator": 71773},
+    "Continue": {"always-loaded": 24058, "entry-file": 358, "orchestrator": 74393, "rules": 23700},
+    "Copilot": {"always-loaded": 34415, "entry-file": 10887, "orchestrator": 74269, "rules": 23500},
+    "Gemini": {"always-loaded": 35874, "entry-file": 35874, "orchestrator": 72180},
+    "KimiCode": {"always-loaded": 703110, "entry-file": 27248, "harness-roster": 675862, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 698329, "entry-file": 27244, "harness-roster": 666997, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 705658, "entry-file": 28166, "harness-roster": 681353, "orchestrator": 71845},
+    "ZCode": {"always-loaded": 700979, "entry-file": 28143, "harness-roster": 672836, "orchestrator": 74965},
 }
 
 
@@ -581,15 +584,15 @@ def test_ac07_missing_ceiling_is_a_violation():
 # always-loaded +845..+1,192 B; the multi-provider AGENTS.md stays 12,519 B.
 # RE-PIN (2026-11-10, #1190 G1 primary gate text + T8/T10/T18 wording): Opencode entry-file 3,807 -> 4,724 B (Opencode is the only provider that derives `primary`).
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 649417, "entry-file": 2461, "harness-roster": 629305, "orchestrator": 34792, "rules": 18208},
-    "Codex": {"always-loaded": 625634, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
-    "Continue": {"always-loaded": 21438, "entry-file": 358, "orchestrator": 35357, "rules": 21080},
-    "Copilot": {"always-loaded": 31852, "entry-file": 10887, "orchestrator": 35231, "rules": 20876},
+    "Claude": {"always-loaded": 656608, "entry-file": 2461, "harness-roster": 633459, "orchestrator": 34792, "rules": 20690},
+    "Codex": {"always-loaded": 630218, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
+    "Continue": {"always-loaded": 24058, "entry-file": 358, "orchestrator": 35357, "rules": 23700},
+    "Copilot": {"always-loaded": 34415, "entry-file": 10887, "orchestrator": 35231, "rules": 23500},
     "Gemini": {"always-loaded": 11274, "entry-file": 11274, "orchestrator": 36105},
-    "KimiCode": {"always-loaded": 633773, "entry-file": 3749, "harness-roster": 630350, "orchestrator": 35659},
-    "Mammouth": {"always-loaded": 629072, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},
-    "Opencode": {"always-loaded": 628610, "entry-file": 4724, "harness-roster": 625129, "orchestrator": 34428},
-    "ZCode": {"always-loaded": 631646, "entry-file": 4652, "harness-roster": 627320, "orchestrator": 34298},
+    "KimiCode": {"always-loaded": 638391, "entry-file": 3749, "harness-roster": 634479, "orchestrator": 35659},
+    "Mammouth": {"always-loaded": 633653, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},
+    "Opencode": {"always-loaded": 634355, "entry-file": 4724, "harness-roster": 629527, "orchestrator": 34428},
+    "ZCode": {"always-loaded": 636264, "entry-file": 4652, "harness-roster": 631449, "orchestrator": 34298},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
