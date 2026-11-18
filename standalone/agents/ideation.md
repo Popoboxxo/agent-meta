@@ -82,7 +82,7 @@ Risks:           [What could become problematic?]
 Assumptions:     [Risk-test the idea before handoff: name the riskiest assumptions + cheapest test for each]
 ```
 
-Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
+Artifact: `docs/concepts/concept-<YYYY-MM-DD>-<topic>.md` — built strictly from the skeleton above; the
 effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
 ## 6. Route (Requirements-Pfad)

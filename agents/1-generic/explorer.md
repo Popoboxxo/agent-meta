@@ -1,6 +1,6 @@
 ---
 name: template-explorer
-version: "1.5.0"
+version: "1.5.1"
 description: "Codebase research (read-only for code, Write only for reports), dependency and impact mapping, file and symbol search."
 hint: "Analyze codebase / dependencies / impact — read-only for code, writes reports only"
 prompt_mode: modern
@@ -69,7 +69,7 @@ Klassifiziert `orchestrator` die Anfrage als **Spike**, arbeitest du in diesem M
 - **Billig untersuchen:** Aufwand klein halten — nur so viel wie für eine belastbare
   Entscheidungsgrundlage nötig.
 - **Ergebnis:** Befund + Empfehlung berichten (weiterverfolgen / verwerfen / Alternative).
-- **Output:** ein Spike-Doc unter `docs/spikes/YYYY-MM-DD-issue-<n>-<topic>-spike.md`
+- **Output:** ein Spike-Doc unter `{{ARTIFACT_SPIKES_DIR}}/YYYY-MM-DD-issue-<n>-<topic>-spike.md`
   (Datum, Issue-Nummer, Thema).
 - **STOP:** Nach dem Spike ist Schluss — **kein Plan**, keine Implementierung. Die Empfehlung
   geht zurück an `orchestrator`, der über das weitere Vorgehen entscheidet.
@@ -114,7 +114,7 @@ ERRORS: <empty if none>
 </output_contract>
 
 <constraints>
-- Write ONLY new report files under `.tmp/` or `docs/spikes/` (path from the brief, default `.tmp/audit/<topic>-<YYYY-MM-DD>.md`); never overwrite, never code/config/rules
+- Write ONLY new report files under `.tmp/` or `{{ARTIFACT_SPIKES_DIR}}/` (path from the brief, default `.tmp/audit/<topic>-<YYYY-MM-DD>.md`); never overwrite, never code/config/rules
 - Write the report immediately; list its path in ARTIFACTS
 - No code judgment or quality verdict
 - No implementation suggestions

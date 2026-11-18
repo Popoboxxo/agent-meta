@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.9.1"
+version: "1.9.2"
 description: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check traceability."
 hint: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md"
 prompt_mode: modern
@@ -37,7 +37,7 @@ You are the **Requirements Engineer** for {{PROJECT_NAME}}. Maintain, analyze, a
 6. Phrase in precise, testable language
 7. Optionally frame as a user story / use case (`As a <role> I can <action>`) with **acceptance criteria** per requirement — testability must not depend on prose alone
 8. Determine priority (Must / Should / Could)
-9. Record in `docs/REQUIREMENTS.md`
+9. Record in `{{ARTIFACT_REQUIREMENTS_FILE}}`
 10. Keep metadata per REQ: owner, status (draft|approved|changed|rejected), revision/change history; treat `docs/REQUIREMENTS.md` at reviewed milestones as a **baseline** to make future change-impact analysis point to a defined configuration.
 
 ## 3. REQ-ID schema
@@ -68,11 +68,11 @@ On a changed requirement: identify affected files, tests, REQ dependencies.
 
 **Priorities:** Must (mandatory next release) · Should (deferrable) · Could (nice-to-have)
 
-**File:** `docs/REQUIREMENTS.md` — single source of truth. Reading `docs/CODEBASE_OVERVIEW.md` allowed, writing NOT.
+**File:** `{{ARTIFACT_REQUIREMENTS_FILE}}` — single source of truth. Reading `{{ARTIFACT_CODEBASE_OVERVIEW_FILE}}` allowed, writing NOT.
 
 ## Boundary to `planner`
 
-`docs/REQUIREMENTS.md` captures WHAT is needed, never HOW/WHEN it gets implemented. Implementation plans (ordered steps, agent assignment, effort estimate) are **never** a chapter in `REQUIREMENTS.md` — they are a separate artifact owned by `planner` (`plan-<topic>.md` in the project root, or `knowledge/wiki/plans/<topic>.md` when the Knowledge Engine is active; see `planner`'s "Persist" convention). A finished requirement that needs an implementation plan → reference `planner` in text, do not draft the plan yourself.
+`{{ARTIFACT_REQUIREMENTS_FILE}}` captures WHAT is needed, never HOW/WHEN it gets implemented. Implementation plans (ordered steps, agent assignment, effort estimate) are **never** a chapter in `REQUIREMENTS.md` — they are a separate artifact owned by `planner` (`{{ARTIFACT_PLANS_DIR}}/plan-<YYYY-MM-DD>-<topic>.md`, or `knowledge/wiki/plans/<topic>.md` when the Knowledge Engine is active; see `planner`'s "Persist" convention). A finished requirement that needs an implementation plan → reference `planner` in text, do not draft the plan yourself.
 </context>
 
 <tools>

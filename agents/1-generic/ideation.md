@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.15.0"
+version: "1.15.1"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -94,7 +94,7 @@ Risks:           [What could become problematic?]
 Assumptions:     [Risk-test the idea before handoff: name the riskiest assumptions + cheapest test for each]
 ```
 
-Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
+Artifact: `{{ARTIFACT_CONCEPTS_DIR}}/concept-<YYYY-MM-DD>-<topic>.md` — built strictly from the skeleton above; the
 effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
 ## 6. Route (Requirements-Pfad)

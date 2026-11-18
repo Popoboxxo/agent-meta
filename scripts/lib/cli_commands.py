@@ -77,6 +77,7 @@ from lib.rules import create_rule
 from lib.schema import update_providers_enum, update_roles_enum
 from lib.skill_admin import add_skill
 from lib.sync_pipeline import (
+    _sync_stage_artifact_locations_resolved,
     _sync_stage_auto_commit_allowlist,
     _sync_stage_claude_base,
     _sync_stage_config_and_presets,
@@ -1184,6 +1185,90 @@ def _handle_prune_backups(ctx: _SyncContext) -> None:
     ctx.mode = mode
 
 
+def _handle_status_artifacts(ctx: _SyncContext) -> None:
+    """Handle ``--status-artifacts`` (Issue #1186, AC-14): report and exit.
+
+    Read-only: builds the report from the single resolver, never writes. With
+    ``--json`` exactly one JSON object (``schema_version: "1"``) goes to stdout;
+    otherwise a 23-row human table is printed. Exit 0 when all classes resolve;
+    exit 2 when any class is unresolvable — then stderr carries ``key: reason``
+    and stdout stays empty in JSON mode (no partial/default report).
+    """
+    import json
+
+    from lib.artifact_locations import ArtifactLocationsError
+    from lib.artifact_status import build_report, render_table
+
+    def _exit(code: int) -> None:
+        ctx.read_only = True
+        ctx.mode = "status_artifacts"
+        sys.exit(code)
+
+    try:
+        report = build_report(ctx.config, ctx.agent_meta_root, ctx.project_root)
+    except ArtifactLocationsError as exc:
+        print(f"{exc.code}: {exc.message}", file=sys.stderr)
+        _exit(2)
+
+    unresolved = [
+        finding
+        for entry in report["classes"].values()
+        for finding in entry.get("violations", [])
+    ]
+    if unresolved:
+        for finding in unresolved:
+            print(
+                f"{finding['path']}: {finding['code']}: expected {finding['expected']}",
+                file=sys.stderr,
+            )
+        _exit(2)
+
+    if ctx.args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(render_table(report))
+    _exit(0)
+
+
+def _handle_migrate_artifact_aliases(ctx: _SyncContext) -> None:
+    """Handle ``--migrate-artifact-aliases [--write]`` (Issue #1186, T23/D1).
+
+    Prints the ready ``artifact-locations`` snippet as a dry-run preview. Only
+    with ``--write`` does it apply the plan to ``project.yaml`` — atomically and
+    comment-preservingly via ``lib.artifact_migration``. Divergence and a
+    disabled matrix are refused (exit 1) before any disk write.
+    """
+    from lib.artifact_migration import (
+        MigrationError,
+        apply_migration,
+        build_migration_plan,
+        render_snippets,
+    )
+
+    ctx.read_only = True
+    ctx.mode = "migrate_artifact_aliases"
+
+    def _fail(exc: MigrationError) -> None:
+        print(f"{exc.code}: {exc.message}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        plan = build_migration_plan(ctx.config)
+    except MigrationError as exc:
+        _fail(exc)
+
+    # The preview is always on stdout (dry-run contract).
+    print(render_snippets(plan))
+
+    if ctx.args.write:
+        try:
+            report = apply_migration(ctx.config_path, plan)
+        except MigrationError as exc:
+            _fail(exc)
+        print(report.message)
+    sys.exit(0)
+
+
 def _handle_context_report(ctx: _SyncContext) -> None:
     """Handle ``--context-report`` (IC-11): render into the tmp-sink, measure, exit.
 
@@ -1697,6 +1782,12 @@ def _handle_sync(ctx: _SyncContext) -> None:
         ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
         info_messages=(ctx.variables or {}).get("_ROUTING_INFO"),
         profile_info_messages=(ctx.variables or {}).get("_CONTEXT_PROFILE_INFO"))
+    # Stage 14c (Issue #1186, T15): resolved artifact-locations matrix -- the
+    # shared data file for the path-guard hook and the legacy-write baseline.
+    # Kept isolated directly after Stage 14b so a later #1181 rebase on Stage
+    # 14 only has to touch the adjacent allowlist call, not this block.
+    _sync_stage_artifact_locations_resolved(
+        ctx.agent_meta_root, ctx.project_root, config, ctx.args, ctx.log)
     # Stage 15: version bookkeeping (#720) -- write the actually-deployed
     # agent-meta version back into project.yaml so it never silently drifts
     # behind a submodule upgrade.

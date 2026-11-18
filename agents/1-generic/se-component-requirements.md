@@ -1,6 +1,6 @@
 ---
 name: se-component-requirements
-version: 1.2.2
+version: 1.2.3
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 description: Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur eine eigenständige L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF und se-developer-Input.
@@ -58,7 +58,7 @@ Jede L3-Component-Requirements-Datei enthält **mindestens 2 REQ-L3**.
 ## Output File Convention
 
 ```
-{{SE_BASE_DIR}}/{parent_path}/Components/{FolderName}/L3_{FolderName}_Requirements.md
+{{ARTIFACT_SE_REQUIREMENTS_DIR}}/{parent_path}/Components/{FolderName}/L3_{FolderName}_Requirements.md
 ```
 
 - `{parent_path}`: Zellpfad der Parent-Systemzelle (z. B. `L1/{Name}System/L2/{SubSystem}System`); Component-Zellen liegen im `Components`-Subfolder der Parent-Zelle (Taxonomie `se-cascade-artifact-taxonomy.md`).
@@ -139,7 +139,7 @@ Zeigt die Ableitung eine architektonische Lücke (z. B. Responsibility ohne abbi
 
 Beim Erstellen einer neuen REQ-L3 prüfen, ob bestehende ADR-Entscheidungen berührt werden:
 
-1. `{{SE_BASE_DIR}}/ADR/ADR-*.md` nach Titeln/Entscheidungen durchsuchen (Keyword-Matching auf Component-Responsibility und Domäne).
+1. `{{ARTIFACT_SE_ADR_DIR}}/ADR-*.md` nach Titeln/Entscheidungen durchsuchen (Keyword-Matching auf Component-Responsibility und Domäne).
 2. Treffer → ADR-ID in `open_adrs: []` des REQ-Frontmatter eintragen.
 3. ADR-relevante Lücke ohne bestehenden ADR → `arch_trigger` so formulieren, dass `se-architect` einen ADR anlegen kann (siehe `se-cascade-adr-standard.md`).
 
@@ -156,7 +156,7 @@ Beim Erstellen einer neuen REQ-L3 prüfen, ob bestehende ADR-Entscheidungen ber�
   "schema_ref": "schemas/handoffs/task-spec.schema.json",
   "payload": {
     "t": "L3-Component-Requirements für Leaf-Components",
-    "ctx": "COMP-Tabelle: {SE_BASE_DIR}/L1/HeizungSystem/L2/SteuerungSystem/L2_SteuerungSystem_Architecture.md",
+    "ctx": "COMP-Tabelle: {{ARTIFACT_SE_ARCHITECTURE_DIR}}/L1/HeizungSystem/L2/SteuerungSystem/L2_SteuerungSystem_Architecture.md",
     "leaf_decisions": [
       {"system_id": "REQ-L2-012", "decision": "leaf", "designation": "component", "handoff_target": "se-component-requirements"}
     ],
@@ -278,7 +278,7 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked` (auch: <2 REQ-L3
 
 ## Step Persistence
 
-**Output file:** `{{SE_BASE_DIR}}/{parent_path}/Components/{FolderName}/L3_{FolderName}_Requirements.md`
+**Output file:** `{{ARTIFACT_SE_REQUIREMENTS_DIR}}/{parent_path}/Components/{FolderName}/L3_{FolderName}_Requirements.md`
 **Frontmatter:** `step: component-requirements`, `agent: se-component-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus die Pflichtfelder des REQ-Frontmatter-Standards (siehe oben; `document_frontmatter`-Felder direkt in den YAML-Block übernehmen).
 **Atomic write:** write to `{{TMP_SINK_PATH}}/se-component-requirements-<topic>.md` → rename → `.se-state.yaml` (cell-local in der Component-Zelle, Taxonomie) `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
 

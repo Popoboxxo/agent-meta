@@ -2395,6 +2395,89 @@
       },
       "additionalProperties": false
     },
+    "artifact-locations": {
+      "type": "object",
+      "description": "Issue #1186 (SPEC-1186-artifact-locations-matrix): configurable artifact-location matrix for all artifact classes. Optional section; absence preserves today's behaviour. Every object level is closed (additionalProperties: false).",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "strict": {
+          "type": "boolean",
+          "default": false
+        },
+        "preset": {
+          "type": "string",
+          "default": "default"
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["files", "inline", "off"],
+              "default": "files"
+            },
+            "naming": {
+              "allOf": [{ "$ref": "#/$defs/artifactNaming" }],
+              "default": "{date}-{slug}.md"
+            },
+            "archive": {
+              "type": "string"
+            },
+            "git": {
+              "enum": ["tracked", "ignored"],
+              "default": "tracked"
+            },
+            "retention": {
+              "enum": ["manual", "keep", "prune"],
+              "default": "manual"
+            }
+          }
+        },
+        "classes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "specs": { "$ref": "#/$defs/artifactClass" },
+            "plans": { "$ref": "#/$defs/artifactClass" },
+            "concepts": { "$ref": "#/$defs/artifactClass" },
+            "spikes": { "$ref": "#/$defs/artifactClass" },
+            "reviews": { "$ref": "#/$defs/artifactClass" },
+            "audits": { "$ref": "#/$defs/artifactClass" },
+            "analysis": { "$ref": "#/$defs/artifactClass" },
+            "reports": { "$ref": "#/$defs/artifactClass" },
+            "adr": { "$ref": "#/$defs/artifactClass" },
+            "traceability": { "$ref": "#/$defs/artifactClass" },
+            "runbooks": { "$ref": "#/$defs/artifactClass" },
+            "project-docs": { "$ref": "#/$defs/artifactFileSet" },
+            "scratch": { "$ref": "#/$defs/artifactEphemeral" },
+            "state": { "$ref": "#/$defs/artifactState" },
+            "se-requirements": { "$ref": "#/$defs/artifactSeClass" },
+            "se-architecture": { "$ref": "#/$defs/artifactSeClass" },
+            "se-decomposition": { "$ref": "#/$defs/artifactSeClass" },
+            "se-interfaces": { "$ref": "#/$defs/artifactSeClass" },
+            "se-implementation": { "$ref": "#/$defs/artifactSeClass" },
+            "se-testplan": { "$ref": "#/$defs/artifactSeClass" },
+            "se-validation": { "$ref": "#/$defs/artifactSeClass" },
+            "se-verification": { "$ref": "#/$defs/artifactSeClass" },
+            "se-decisions": { "$ref": "#/$defs/artifactSeClass" }
+          }
+        },
+        "legacy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "unmanaged": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
     "viz": {
       "type": "object",
       "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",
@@ -2912,6 +2995,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "se_output": {
+      "type": "object",
+      "deprecated": true,
+      "description": "Deprecated alias: use artifact-locations.classes.se-*.path (issue #1186).",
+      "properties": {
+        "base_dir": {
+          "type": "string",
+          "default": "SE"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
@@ -3135,6 +3230,96 @@
         }
       },
       "additionalProperties": false
+    },
+    "artifactKind": {
+      "enum": [
+        "code", "concept", "domain", "copyedit", "proofread", "se", "vv",
+        "security", "dependency", "a11y", "lifecycle", "prompt", "ai-security",
+        "analysis", "triage", "perf", "log", "research", "estimate", "conclusion"
+      ]
+    },
+    "artifactClassName": {
+      "enum": [
+        "specs", "plans", "concepts", "spikes", "reviews", "audits", "analysis",
+        "reports", "adr", "traceability", "runbooks", "project-docs", "scratch", "state",
+        "se-requirements", "se-architecture", "se-decomposition", "se-interfaces",
+        "se-implementation", "se-testplan", "se-validation", "se-verification",
+        "se-decisions"
+      ]
+    },
+    "artifactNaming": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Closed token pattern (D3). Allowed tokens: {class} {date} {slug} {kind} {n} {topic} {scope} {nnn} {level} {folder}. No path separator, no '..', no '<' or '>' (the <TOKEN> display form is documentation prose, not a config value). Class applicability and the file extension are enforced by the semantic validator (artifact-locations.naming-invalid).",
+      "pattern": "^(?!.*\\.\\.)(?:[^{}/<>]|\\{(?:class|date|slug|kind|n|topic|scope|nnn|level|folder)\\})+$"
+    },
+    "artifactClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$" },
+        "mode": { "enum": ["files", "inline", "off"] },
+        "git": { "enum": ["tracked", "ignored"] },
+        "naming": { "$ref": "#/$defs/artifactNaming" },
+        "archive": { "type": "string" },
+        "retention": { "enum": ["manual", "keep", "prune"] },
+        "kind": { "type": "array", "items": { "$ref": "#/$defs/artifactKind" }, "uniqueItems": true },
+        "fallback-parent": { "$ref": "#/$defs/artifactClassName" }
+      }
+    },
+    "artifactSeClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$" },
+        "mode": { "enum": ["files", "inline", "off"] },
+        "git": { "enum": ["tracked", "ignored"] },
+        "naming": { "$ref": "#/$defs/artifactNaming" },
+        "archive": { "type": "string" },
+        "retention": { "enum": ["manual", "keep", "prune"] },
+        "fallback-parent": { "$ref": "#/$defs/artifactClassName" },
+        "subdir": { "type": "string", "pattern": "^[^/]*$" }
+      }
+    },
+    "artifactFileSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files"],
+      "properties": {
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "architecture": { "type": "string" },
+            "codebase-overview": { "type": "string" },
+            "requirements": { "type": "string" },
+            "issue-labels": { "type": "string" }
+          }
+        },
+        "mode": { "enum": ["files", "inline", "off"] },
+        "fallback-parent": { "$ref": "#/$defs/artifactClassName" }
+      }
+    },
+    "artifactEphemeral": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "git": { "enum": ["ignored", "tracked"] },
+        "retention": { "enum": ["manual", "keep", "prune"] },
+        "subdirs": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "artifactState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "git": { "enum": ["ignored", "tracked"] },
+        "retention": { "enum": ["manual", "keep", "prune"] },
+        "subdirs": { "type": "object", "additionalProperties": { "type": "string" } },
+        "event-log": { "type": "string" }
+      }
     }
   }
 }

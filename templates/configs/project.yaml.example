@@ -184,6 +184,60 @@ repo_containment:
   # provider-overrides:
   #   Continue: { enabled: false }
 
+# --- artifact-locations (Issue #1186) BEGIN ---
+# Artifact-Locations-Matrix — eine Quelle fuer jeden Ausgabeort (Issue #1186).
+# Optional: ohne diesen Block bleibt das bisherige Verhalten erhalten.
+# 23 Klassen (14 Nicht-SE + 9 SE); je Klasse ein Pfad, Modus (files|inline|off),
+# Naming und Git-Behandlung. `enabled: false` stellt exakt das Legacy-Verhalten wieder her.
+# Scratch hat NUR eine Quelle: `classes.scratch.path` hier setzen — nicht
+# `repo_containment.tmp-sink.path` (dieser Alias dient nur der Migration via
+# `sync.py --migrate-artifact-aliases --write`). ADR-Naming nutzt den D3-Token-Kanon;
+# die alten Formen NNNN-… / ADR-NNN-… bleiben ueber `legacy[]` lesbar.
+# artifact-locations:
+#   enabled: true                 # false = exakt das Legacy-Verhalten
+#   strict: false                 # true = der artifact-path-guard blockt Fehlrouten (opt-in)
+#   preset: default               # default | minimal | flat | docs-only
+#   classes:
+#     specs:         {path: docs/specs,          mode: files, naming: "{date}-{slug}.md"}
+#     plans:         {path: docs/plans,          mode: files, naming: "{date}-{slug}.md"}
+#     concepts:      {path: docs/concepts,       mode: files, naming: "{date}-{slug}.md"}
+#     spikes:        {path: docs/spikes,         mode: files, naming: "{date}-issue-{n}-{topic}-spike.md"}
+#     reviews:       {path: docs/reviews,        mode: files, naming: "{kind}-{date}-{slug}.md", kind: [code, concept, domain, copyedit, proofread, se]}
+#     audits:        {path: docs/audits,         mode: files, naming: "{kind}-{date}-{slug}.md", kind: [security, dependency, a11y, lifecycle, prompt, ai-security]}
+#     analysis:      {path: docs/analysis,       mode: files, naming: "{kind}-{date}-{slug}.md"}
+#     reports:       {path: docs/reports,        mode: files, naming: "{date}-{slug}.md", kind: [vv]}
+#     adr:           {path: docs/adr,            mode: files, naming: "ADR-{nnn}_{slug}.md"}
+#     traceability:  {path: docs/traceability,   mode: files, naming: "TRACE_{scope}.md"}
+#     runbooks:      {path: docs/runbooks,       mode: files, naming: "{date}-{slug}.md"}
+#     project-docs:
+#       mode: files
+#       files:
+#         architecture: docs/ARCHITECTURE.md
+#         codebase-overview: docs/CODEBASE_OVERVIEW.md
+#         requirements: docs/REQUIREMENTS.md
+#         issue-labels: docs/issue-labels.md
+#     scratch:                     # D1: einzige Scratch-Quelle
+#       path: ".tmp"
+#       git: ignored
+#       retention: manual
+#     state:
+#       path: ".meta-viz"
+#       git: ignored
+#       event-log: .meta-viz/events.jsonl
+#     se-requirements: {path: SE, mode: files, subdir: ""}
+#     se-validation:   {path: SE, mode: files, subdir: validation}
+#   legacy:                       # additiv, read-only — keine Datei wird verschoben/geloescht
+#     - "docs/superpowers/specs"
+#     - "docs/conclusions/"
+#     - "docs/se/**"              # frueherer SE-Default, jetzt Legacy (D4)
+#     - "docs/adr/[0-9][0-9][0-9][0-9]-*.md"
+#     - "docs/adr/ADR-[0-9][0-9][0-9]-*.md"
+#   unmanaged:                    # keine Klasse, kein Scaffold, keine Hook-Warnung
+#     - ".meta-config/issue-labels-state.json"
+#     - "docs/api/**"
+#     - "docs/guides/**"
+# --- artifact-locations (Issue #1186) END ---
+
 # ---------------------------------------------------------------------------
 # Modell-Tiers — provider-agnostisch (empfohlen)
 # ---------------------------------------------------------------------------

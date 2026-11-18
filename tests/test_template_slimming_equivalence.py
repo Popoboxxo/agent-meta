@@ -235,6 +235,29 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   extended rule paragraph). The other 57 goldens,
   ``_GOLDEN_ROLE_COUNT`` (58) and ``compact-golden`` are unchanged. Diff manifest
   section 27.
+* Issue #1186 T10 (2026-11-17, artifact-locations matrix): eight goldens rebaselined
+  after the 10 non-SE templates switched their artifact paths to ``{{ARTIFACT_*}}``
+  vars. Per-file: ``concept-reviewer`` (1.9.2 -> 1.9.3, ``docs/reviews/``),
+  ``documenter`` (1.11.1 -> 1.11.2, ``docs/analysis/conclusion-*``), ``effort-estimator``
+  (1.4.0 -> 1.4.1, ``ARTIFACTS: docs/analysis/*``), ``explorer`` (1.5.0 -> 1.5.1,
+  version-only: ``{{ARTIFACT_SPIKES_DIR}}`` renders to the same ``docs/spikes/``),
+  ``ideation`` (1.15.0 -> 1.15.1, ``docs/concepts/concept-<date>-*``),
+  ``knowledge-migrator`` (1.5.2 -> 1.5.3, two ``<!-- artifact-read-ok -->`` markers),
+  ``planner`` (1.6.1 -> 1.6.2, ``docs/plans/plan-<date>-*`` in three places) and
+  ``requirements`` (1.9.1 -> 1.9.2, planner-artifact path). Version pins and
+  rendered ``{{ARTIFACT_*}}`` paths / content markers only; the remaining 50 goldens,
+  ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and ``compact-golden`` are
+  unchanged. AC-T4 digest ``d72cf5b2…`` -> ``d8c20af6…``; diff manifest entry in
+  ``tests/fixtures/slimming-golden/README.md``.
+* Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ``app-lifecycle-governor.md`` golden
+  rebaselined after ``{{TMP_SINK_PATH}}`` -> ``{{ARTIFACT_AUDITS_DIR}}`` for its long-report path.
+  Exactly three lines moved: the frontmatter and ``generated-from`` version pins (1.4.1 -> 1.4.2)
+  and the rendered artifact path (``.tmp/app-lifecycle-governor-<topic>.md`` ->
+  ``docs/audits/lifecycle-<YYYY-MM-DD>-<topic>.md``, with the raw-evidence-on-``.tmp/`` clause).
+  The other three audit roles (``security-auditor``, ``ai-security-guardian``, ``prompt-governor``)
+  have no golden, so no other golden changed. ``_GOLDEN_ROLE_COUNT`` (58), the normalization table
+  and ``compact-golden`` are unchanged. AC-T4 digest ``d8c20af6…`` -> ``22ac56a9…``; diff manifest
+  entry in ``tests/fixtures/slimming-golden/README.md``.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

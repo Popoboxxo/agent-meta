@@ -116,6 +116,21 @@ catching typo'd keys, wrong types and invalid enum values that a plain sync
 would silently ignore. Never tell a user "the config is valid" without
 having actually run `--validate` in this turn.
 
+**Audit artifact destinations:** to see where each artifact class actually
+writes (resolved path, mode and source), use the machine-readable status report:
+
+```bash
+python3 {{AGENT_META_REL_PATH}}scripts/sync.py --status-artifacts --json
+```
+
+Run it from the project root; it reads the default `.meta-config/project.yaml`
+(add `--config <path>` for a non-default location). Exit `0` means every class
+resolved; exit `2` prints `class: reason` on stderr and leaves stdout empty in
+JSON mode. The report carries one entry per class plus top-level `legacy`,
+`unmanaged` and `naming` data and writes nothing — it is the same data the Admin
+UI "Artifacts" pane shows. Use it before and after a `project.yaml` change to
+confirm the matrix resolves as intended.
+
 After a successful sync / `--validate` run:
 1. Trigger a re-render of the README badges row (documenter.md §5). The `documenter` is the **only** writer of that row (B1) — this agent never writes or patches README markup itself.
 2. The value source is the sync-embedded `{{AGENT_META_VERSION}}`, refreshed by the re-sync above — never a separate live read and never this prompt's (possibly stale) copy.

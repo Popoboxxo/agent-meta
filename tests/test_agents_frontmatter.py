@@ -197,14 +197,14 @@ def test_build_frontmatter_strip_fields_empty_list_is_noop():
 
 def test_documenter_documents_plan_archive_target():
     text = (_REPO_ROOT / "agents" / "1-generic" / "documenter.md").read_text(encoding="utf-8")
-    assert "docs/plans/archive" in text
+    assert "{{ARTIFACT_PLANS_DIR}}/archive" in text
     assert "plan-complete" in text
 
 
 def test_explorer_documents_spike_mode():
     text = (_REPO_ROOT / "agents" / "1-generic" / "explorer.md").read_text(encoding="utf-8")
     assert "Spike-Modus" in text or "Spike mode" in text
-    assert "docs/spikes/" in text
+    assert "{{ARTIFACT_SPIKES_DIR}}/" in text
     assert "read-only" in text
 
 

@@ -13,13 +13,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .artifact_scaffold import (
+    DEFAULT_PLANS_DIR,
+    DEFAULT_SPECS_DIR,
+    DEFAULT_SPIKES_DIR,
+    scaffold_legacy_spec_plan_dirs,
+)
 from .io import safe_path, write_checked
 from .log import SyncLog
 from .dod import resolve_spec_plan_bundle
 
-DEFAULT_SPECS_DIR = "docs/specs"
-DEFAULT_PLANS_DIR = "docs/plans"
-DEFAULT_SPIKES_DIR = "docs/spikes"
 DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"
 _FILE_INDEX_SKELETON = "# INDEX\n\n> File-based index fallback (spec-plan-workflow, D8).\n"
 
@@ -46,19 +49,17 @@ def resolve_index_mode(config: dict) -> tuple[str, str]:
 
 def scaffold_spec_plan_dirs(agent_meta_root: Path, project_root: Path,
                             config: dict, log: SyncLog, dry_run: bool) -> None:
+    """Backward-compatible wrapper around the generalized artifact scaffold.
+
+    The three legacy directories are delegated to ``artifact_scaffold``; the
+    file-index fallback stays here because it is a spec-plan concern, not an
+    artifact-location. Existing imports (``sync_pipeline``, ``knowledge``)
+    keep working unchanged.
+    """
     if not resolve_spec_plan_bundle(config, agent_meta_root)["scaffold"]:
         log.skip("spec-plan-workflow", "disabled")
         return
-    block = config.get("spec-plan-workflow") or {}
-    paths = block.get("paths") or {}
-    for key, default in (("specs", DEFAULT_SPECS_DIR), ("plans", DEFAULT_PLANS_DIR),
-                         ("spikes", DEFAULT_SPIKES_DIR)):
-        rel = paths.get(key, default)
-        target = safe_path(project_root, rel)
-        if not dry_run:
-            target.mkdir(parents=True, exist_ok=True)
-        if write_checked(target / ".gitkeep", "", log, f"{rel}/.gitkeep", dry_run=dry_run):
-            log.action("CREATE", f"{rel}/.gitkeep", "spec-plan scaffolding")
+    scaffold_legacy_spec_plan_dirs(project_root, config, log, dry_run)
     mode, fallback = resolve_index_mode(config)
     if mode == "file-index":
         index_path = safe_path(project_root, fallback)

@@ -25,5 +25,6 @@ notes: >-
   WCAG work to accessibility-specialist. Long reports: the read-only reviewer
   quartet writes no files and returns a compact summary, splitting oversized
   output into chunks (k/n) on the return channel; writable roles write the
-  full report to the configured tmp sink (`{{TMP_SINK_PATH}}/`) and return
-  only the path (issue #514).
+  full report to the matrix-backed reviews directory (`{{ARTIFACT_REVIEWS_DIR}}/`)
+  and return only the path. Raw evidence (logs, long tool output) stays on the
+  configured scratch sink (issues #514, #1186).

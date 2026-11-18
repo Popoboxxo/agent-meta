@@ -141,7 +141,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 
 After completing termination decisions, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Decisions.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Decisions.md`
 
 **Frontmatter format:**
 ```yaml

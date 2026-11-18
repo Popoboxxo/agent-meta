@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "2.8.0"
+version: "2.8.1"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, cryptographic weaknesses, plus CISO audit domains (frontend security, data-access control, auth policy, DIY crypto detection, AI-generated code risks) — read-only, no code execution."
 hint: "Security audit: OWASP, secrets, dependencies, supply chain, frontend security, auth policy, RLS validation, DIY crypto, AI code risks — static analysis without code execution"
 reference_standards:
@@ -220,7 +220,7 @@ PROGRAM_FINDINGS: <count>
 
 CISO phase counters: findings per deep-dive checklist; report `0` when the phase ran clean or its domain is out of scope.
 
-Long reports → write to `{{TMP_SINK_PATH}}/security-auditor-<topic>.md`, return path only.
+Long reports → write the full report to `{{ARTIFACT_AUDITS_DIR}}/security-<YYYY-MM-DD>-<topic>.md` (kind: security), return path only. Raw evidence (logs, long tool output) stays on `{{TMP_SINK_PATH}}/`; only the report artifact moves into the matrix.
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
 {{CLOSING_SUMMARY_BLOCK}}
 

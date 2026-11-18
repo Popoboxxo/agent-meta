@@ -9,11 +9,25 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from .agents import (
     build_agent_hints,
     build_agent_table,
     build_routing_tool_definitions_for_providers,
+)
+from .artifact_locations import (
+    ArtifactLocationsError,
+    CLASS_REGISTRY,
+    load_presets,
+    resolve_artifact_locations,
+    resolve_se_projection,
+    validate_kind,
+    validate_naming,
+    validate_path,
+    validate_preset,
+    validate_scratch_sources,
+    validate_subdir,
 )
 from .context_profile import (
     context_profile_log_lines,
@@ -60,6 +74,7 @@ from .pipelines import (
 )
 from .analysis import FileAffinityAnalyzer, analyze_project
 from .consistency.placeholders import _BUILTIN_VARS
+from .consistency.report import Finding, Severity
 from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
@@ -856,7 +871,7 @@ def _validate_orchestrator_topology(config: dict, config_path: Path) -> None:
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Five kinds of checks:
+    Six kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -879,7 +894,13 @@ def _validate_config(config: dict, config_path: Path) -> None:
        Structure/path checks always run, even when the mode is disabled, so a
        later opt-in never surfaces a dormant misconfiguration.
 
-    5. Schema validation against agent-meta.schema.json if jsonschema is
+    5. Hard-fatal semantic matrix checks (_validate_artifact_locations): the
+       11 artifact-locations error codes (Spec 4.1, AC-11) are checked
+       independently of jsonschema. Structure/path checks always run, even
+       with ``enabled: false``; only the SE start-critical check depends on an
+       active systems-engineering cascade.
+
+    6. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
@@ -888,6 +909,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
     _validate_providers(config, config_path)
     _validate_orchestrator_topology(config, config_path)
     _validate_repo_containment(config, config_path)
+    _validate_artifact_locations(config, config_path, _framework_root())
     _validate_subagent_permissions(config, config_path)
     validate_test_environments(config, config_path)
     from .release_checklist import validate_release_checklist
@@ -1191,6 +1213,182 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
                 "Migration: change tmp-sink.path to a relative path inside "
                 "the repo, e.g. '.tmp' (default) or 'scratch/out'."
             )
+
+
+#: The 11 stable hard-error codes of the semantic matrix validator (Spec §4.1).
+_ARTIFACT_LOCATION_ERROR_CODES = frozenset({
+    "artifact-locations.path-invalid",
+    "artifact-locations.mode-parent-missing",
+    "artifact-locations.fallback-parent-unknown",
+    "artifact-locations.se-required-off",
+    "artifact-locations.subdir-invalid",
+    "artifact-locations.kind-invalid",
+    "artifact-locations.unknown-preset",
+    "artifact-locations.legacy-intersect",
+    "artifact-locations.unmanaged-intersect",
+    "artifact-locations.scratch-sink-divergence",
+    "artifact-locations.naming-invalid",
+})
+
+#: Classes whose ``mode: off`` keeps audit evidence through a documented
+#: frontmatter sink instead of an explicit parent (Spec §3.1, se-critic.md).
+#: The sink only exists while the SE cascade is active.
+_FRONTMATTER_SINK_CLASSES = frozenset({"reviews"})
+
+#: Classes that may be switched off outright (Spec §4.1 / AC-11):
+#: ``se-requirements`` is the cascade root (no parent exists) and
+#: ``se-decomposition`` may be written directly by the architect.
+_MODE_OFF_EXEMPT = frozenset({"se-requirements", "se-decomposition"})
+
+
+def _se_cascade_active(config: dict) -> bool:
+    """True when the systems-engineering cascade is enabled in this config."""
+    block = config.get("systems-engineering")
+    if isinstance(block, dict) and block.get("enabled"):
+        return True
+    return bool(config.get("SE_ENABLED"))
+
+
+def _validate_artifact_locations(
+    config: dict, config_path: Path, agent_meta_root: Path
+) -> None:
+    """Hard-validate the semantic ``artifact-locations`` matrix (Spec §4.1).
+
+    The T4 resolver owns the individual ``validate_*`` helpers and the stable
+    error codes; this hook translates their ``ArtifactLocationsError`` into a
+    user-facing stderr line plus ``sys.exit(1)``. It runs independently of
+    jsonschema and always performs the structural checks, even when the matrix
+    master switch is ``enabled: false`` — only the SE start-critical check is
+    cascade-dependent.
+
+    Check order: structure -> kind -> naming -> path -> mode/parent ->
+    SE start-critical -> subdir -> preset -> scratch single source ->
+    legacy intersection -> unmanaged intersection.
+    """
+    section = config.get("artifact-locations")
+    if not isinstance(section, dict) or not section:
+        return
+
+    def _fail(code: str, message: str) -> None:
+        print(f"ERROR: {config_path}: {code}: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    def _fail_error(error: ArtifactLocationsError, field: Optional[str] = None) -> None:
+        message = error.message
+        if field is not None:
+            message = f"invalid '{field}': {message}"
+        _fail(error.code, message)
+
+    raw_classes = section.get("classes") or {}
+    classes = raw_classes if isinstance(raw_classes, dict) else {}
+    valid_names = {
+        name for name in classes if isinstance(classes[name], dict) and name in CLASS_REGISTRY
+    }
+
+    # 1. kind: class-scoped enum, checked independently of jsonschema (AC-13).
+    for name in valid_names:
+        kind_value = classes[name].get("kind", ()) or ()
+        values = [kind_value] if isinstance(kind_value, str) else kind_value
+        for value in values:
+            try:
+                validate_kind(value, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 2. naming: closed token canon + class applicability (D3).
+    for name in valid_names:
+        naming = classes[name].get("naming")
+        if naming:
+            try:
+                validate_naming(naming, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 3. path structure: always relative and inside the project root.
+    for name in valid_names:
+        path = classes[name].get("path")
+        if path:
+            try:
+                validate_path(path, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 4. mode + fallback-parent.
+    cascade_active = _se_cascade_active(config)
+    for name in valid_names:
+        entry = classes[name]
+        mode = entry.get("mode")
+        parent = entry.get("fallback-parent")
+        if parent is not None and parent not in CLASS_REGISTRY:
+            _fail(
+                "artifact-locations.fallback-parent-unknown",
+                f"invalid 'artifact-locations.classes.{name}.fallback-parent': "
+                f"unknown class '{parent}'",
+            )
+        if name in _MODE_OFF_EXEMPT:
+            continue
+        has_sink = cascade_active and name in _FRONTMATTER_SINK_CLASSES
+        if mode == "off" and parent is None and not has_sink:
+            _fail(
+                "artifact-locations.mode-parent-missing",
+                f"invalid 'artifact-locations.classes.{name}.mode': 'off' "
+                "requires 'fallback-parent' or a frontmatter sink",
+            )
+
+    # 5. SE start-critical: only with an active cascade (AC-11).
+    se_requirements = classes.get("se-requirements")
+    if (
+        cascade_active
+        and isinstance(se_requirements, dict)
+        and se_requirements.get("mode") == "off"
+    ):
+        _fail(
+            "artifact-locations.se-required-off",
+            "invalid 'artifact-locations.classes.se-requirements.mode': the "
+            "cascade cannot start without requirements — 'se-decomposition' "
+            "is the allowed alternative",
+        )
+
+    # 6. subdir: a single flat path segment for SE leaf classes.
+    for name in valid_names:
+        subdir = classes[name].get("subdir")
+        if subdir:
+            try:
+                validate_subdir(subdir, name)
+            except ArtifactLocationsError as exc:
+                _fail_error(exc)
+
+    # 7. preset: unknown names are hard errors (no silent default fallback).
+    preset_name = section.get("preset")
+    if preset_name is not None:
+        try:
+            validate_preset(preset_name, load_presets(agent_meta_root))
+        except ArtifactLocationsError as exc:
+            _fail_error(exc, field="artifact-locations.preset")
+
+    # 8. scratch single source (D1): a hard error even with enabled: false,
+    #    because two write targets for one sink are never acceptable.
+    try:
+        validate_scratch_sources(config, classes)
+    except ArtifactLocationsError as exc:
+        _fail_error(exc)
+
+    # 9./10. legacy[] and unmanaged[] may not shadow an active class path.
+    matrix = resolve_artifact_locations(config, agent_meta_root, None)
+    active_paths = {resolved.path for resolved in matrix.classes.values() if resolved.path}
+    for key, code in (
+        ("legacy", "artifact-locations.legacy-intersect"),
+        ("unmanaged", "artifact-locations.unmanaged-intersect"),
+    ):
+        entries = section.get(key) or ()
+        if not isinstance(entries, (list, tuple)):
+            continue
+        for entry in entries:
+            if entry in active_paths:
+                _fail(
+                    code,
+                    f"invalid 'artifact-locations.{key}': '{entry}' is also an active class path",
+                )
 
 
 def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
@@ -2338,9 +2536,9 @@ def _build_orch_variables(
     # (context.py::_build_context_vars, rules.py::_merged_rule_vars) re-resolve
     # with provider=... and overwrite these, so a provider override wins.
     variables.update(repo_containment_variables(config))
-    # TMP_SINK_PATH (IC-34): configured tmp-sink path for role templates; same
-    # resolution as REPO_CONTAINMENT_TMP_PATH. Provided only, not yet rendered.
-    variables["TMP_SINK_PATH"] = variables["REPO_CONTAINMENT_TMP_PATH"]
+    # TMP_SINK_PATH (IC-34, D1) is fed from the resolved artifact matrix in
+    # build_variables — after _build_artifact_variables — so the scratch sink
+    # has exactly one source. Do not re-derive it from REPO_CONTAINMENT_TMP_PATH.
     # IC-05/ADR-01: every other tmp-sink form comes from the single resolver.
     # TMP_SINK_ABS_PATH/TMP_SINK_ENV_PIN_BLOCK are omitted for a disabled sink
     # (AC-25); PYTEST_BASETEMP is always available and shell-quoted into the
@@ -2634,6 +2832,209 @@ def _build_platform_variables(
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
+
+
+# --- Artifact-location variables (Issue #1186, T6) ------------------------
+#: Closed project-docs file-set mapping (key -> variable stem, framework
+#: default). Iterating this map keeps the exported set at exactly 54 names even
+#: when a project overrides ``classes.project-docs.files``.
+_ARTIFACT_FILE_KEYS: tuple[tuple[str, str, str], ...] = (
+    ("architecture", "ARCHITECTURE", "docs/ARCHITECTURE.md"),
+    ("codebase-overview", "CODEBASE_OVERVIEW", "docs/CODEBASE_OVERVIEW.md"),
+    ("requirements", "REQUIREMENTS", "docs/REQUIREMENTS.md"),
+    ("issue-labels", "ISSUE_LABELS", "docs/issue-labels.md"),
+)
+
+#: SE-global projections derived from ARTIFACT_SE_ROOT (D-7), not config fields.
+_ARTIFACT_SE_PROJECTIONS: tuple[tuple[str, str], ...] = (
+    ("SE_REVIEWS", "se-reviews"),
+    ("SE_REPORTS", "se-reports"),
+    ("SE_ADR", "se-adr"),
+    ("SE_TRACEABILITY", "se-traceability"),
+)
+
+
+def _build_artifact_variables(
+    variables: dict, config: dict, agent_meta_root: Path,
+    project_root: Path | None = None,
+) -> None:
+    """Export the 54 ``ARTIFACT_*`` names from the resolved matrix (Spec §3.4).
+
+    Parameter contract:
+        variables: mutated in place — receives 22 ``_DIR`` (13 non-SE + 9 SE
+            cell classes), 4 derived SE projection ``_DIR``, ``ARTIFACT_SE_ROOT``,
+            4 file-set ``_FILE`` and 23 ``_MODE`` values. ``SE_BASE_DIR`` is
+            overwritten with the resolved SE root so the legacy alias and the
+            matrix variable share exactly one source.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for the preset file).
+        project_root: consuming project's root; may be ``None`` because
+            ``derive_builder_vars`` (placeholders.py:312-319) calls builders
+            with no project root. The resolver is total on ``{}``.
+
+    No provider branch: the matrix is resolved once and exported into the
+    single provider-agnostic variable dict.
+    """
+    matrix = resolve_artifact_locations(config, agent_meta_root, project_root)
+    classes = matrix.classes
+
+    # 22 _DIR variables: every class except the file-set project-docs.
+    for class_name, spec in CLASS_REGISTRY.items():
+        if spec.form == "file-set":
+            continue
+        stem = class_name.upper().replace("-", "_")
+        variables[f"ARTIFACT_{stem}_DIR"] = classes[class_name].path
+
+    # SE root + four derived projections (D-7). The root is the se-requirements
+    # class path — the same source resolve_se_projection uses — so SE_BASE_DIR
+    # becomes an alias of it instead of a second se_output.base_dir read.
+    variables["ARTIFACT_SE_ROOT"] = classes["se-requirements"].path
+    for stem, projection in _ARTIFACT_SE_PROJECTIONS:
+        variables[f"ARTIFACT_{stem}_DIR"] = resolve_se_projection(
+            projection, matrix=matrix,
+        )
+    variables["SE_BASE_DIR"] = variables["ARTIFACT_SE_ROOT"]
+
+    # Four file-set variables from project-docs.files with framework defaults,
+    # so the closed 54-name set stays stable under project overrides.
+    resolved_files = classes["project-docs"].files
+    for key, stem, default in _ARTIFACT_FILE_KEYS:
+        variables[f"ARTIFACT_{stem}_FILE"] = resolved_files.get(key, default)
+
+    # 23 _MODE variables, one per class. Scratch/state have no schema mode
+    # field, so their resolver value stays the constant "files" (K-1).
+    for class_name in CLASS_REGISTRY:
+        stem = class_name.upper().replace("-", "_")
+        variables[f"ARTIFACT_{stem}_MODE"] = classes[class_name].mode
+
+
+def _artifact_deprecation_warnings(
+    config: dict, agent_meta_root: Path, project_root: Path | None = None,
+) -> list[Finding]:
+    """Collect one-time deprecation warnings for legacy alias keys (Spec §3.6, T9).
+
+    Once ``artifact-locations.enabled`` is true the matrix is the single source;
+    the old keys are read as aliases. A legacy key that diverges from the
+    resolved matrix (and the scratch migration alias, which is always
+    deprecated) yields exactly one WARNING Finding per alias. With the master
+    switch off the old keys stay the sole source and nothing is reported.
+
+    Hard errors (scratch value divergence) belong to the T5 validator — this
+    function never calls ``sys.exit`` and never mutates ``config``.
+    """
+    section = config.get("artifact-locations") or {}
+    if not isinstance(section, dict):
+        section = {}
+    if section.get("enabled", True) is False:
+        return []
+
+    findings: list[Finding] = []
+
+    def _warn(message: str) -> None:
+        findings.append(Finding(
+            severity=Severity.WARNING,
+            check="artifact-locations.deprecated-alias",
+            file=".meta-config/project.yaml",
+            message=message,
+        ))
+
+    matrix = resolve_artifact_locations(config, agent_meta_root, project_root)
+    matrix_classes = section.get("classes") or {}
+    if not isinstance(matrix_classes, dict):
+        matrix_classes = {}
+
+    # 1. spec-plan-workflow.paths.{specs,plans,spikes} -> classes.*.path.
+    spw = config.get("spec-plan-workflow") or {}
+    spw_paths = (spw.get("paths") or {}) if isinstance(spw, dict) else {}
+    if not isinstance(spw_paths, dict):
+        spw_paths = {}
+    for key in ("specs", "plans", "spikes"):
+        alias = spw_paths.get(key)
+        if alias is None:
+            continue
+        target_key = f"artifact-locations.classes.{key}.path"
+        target = matrix.classes[key].path
+        if alias != target:
+            _warn(
+                f"deprecated alias 'spec-plan-workflow.paths.{key}' ({alias}) "
+                f"diverges from '{target_key}' ({target}); the matrix value wins"
+            )
+
+    # 2. se_output.base_dir -> classes.se-*.path (ARTIFACT_SE_ROOT / SE_BASE_DIR).
+    se_output = config.get("se_output") or {}
+    se_alias = se_output.get("base_dir") if isinstance(se_output, dict) else None
+    if se_alias is not None:
+        target_key = "artifact-locations.classes.se-*.path"
+        target = matrix.classes["se-requirements"].path
+        if se_alias != target:
+            _warn(
+                f"deprecated alias 'se_output.base_dir' ({se_alias}) diverges "
+                f"from '{target_key}' ({target}); the matrix value wins"
+            )
+
+    # 3. repo_containment.tmp-sink.path -> classes.scratch.path (D1). The alias
+    #    is always deprecated: one warning for the migration case (class
+    #    absent) and one for the removal case (both present and equal).
+    containment = config.get("repo_containment") or {}
+    tmp_sink = (
+        (containment.get("tmp-sink") or {}) if isinstance(containment, dict) else {}
+    )
+    if not isinstance(tmp_sink, dict):
+        tmp_sink = {}
+    alias_path = tmp_sink.get("path")
+    if alias_path is not None:
+        scratch_entry = matrix_classes.get("scratch") or {}
+        class_path = (
+            scratch_entry.get("path") if isinstance(scratch_entry, dict) else None
+        )
+        if class_path is not None:
+            _warn(
+                "deprecated alias 'repo_containment.tmp-sink.path' duplicates "
+                "'artifact-locations.classes.scratch.path'; remove the deprecated "
+                "alias key to keep one source"
+            )
+        else:
+            _warn(
+                "deprecated alias 'repo_containment.tmp-sink.path': migrate to "
+                "'artifact-locations.classes.scratch.path' with "
+                "'sync.py --migrate-artifact-aliases --write'"
+            )
+
+    # 4. progress.* / viz.event_log -> classes.state.subdirs.* / event-log.
+    state_entry = matrix_classes.get("state") or {}
+    if not isinstance(state_entry, dict):
+        state_entry = {}
+    state_subdirs = state_entry.get("subdirs") or {}
+    if not isinstance(state_subdirs, dict):
+        state_subdirs = {}
+    progress = config.get("progress") or {}
+    if not isinstance(progress, dict):
+        progress = {}
+    for config_key, target_key in (
+        ("dir", "progress"),
+        ("checkpoint-dir", "checkpoints"),
+        ("handoffs-dir", "handoffs"),
+    ):
+        alias = progress.get(config_key)
+        if alias is None or target_key not in state_subdirs:
+            continue
+        if alias != state_subdirs[target_key]:
+            _warn(
+                f"deprecated alias 'progress.{config_key}' ({alias}) diverges "
+                f"from 'artifact-locations.classes.state.subdirs.{target_key}' "
+                f"({state_subdirs[target_key]}); the matrix value wins"
+            )
+    viz = config.get("viz") or {}
+    viz_alias = viz.get("event_log") if isinstance(viz, dict) else None
+    state_log = state_entry.get("event-log")
+    if viz_alias is not None and state_log is not None and viz_alias != state_log:
+        _warn(
+            f"deprecated alias 'viz.event_log' ({viz_alias}) diverges from "
+            f"'artifact-locations.classes.state.event-log' ({state_log}); "
+            "the matrix value wins"
+        )
+
+    return findings
 
 
 def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -> dict:
@@ -3050,6 +3451,10 @@ def build_variables(
     `_build_*_variables()` sub-function (see their docstrings for the exact
     parameter/mutation contract and any inter-group ordering constraints).
     """
+    # T9: deprecation warnings are Sync-Warnungen — emitted only when a caller
+    # supplies the sync ActiveSet. Static variable derivation (derive_builder_vars)
+    # and snapshot tests call build_variables without one and stay silent.
+    emit_deprecation_warnings = active_set is not None
     # IC-17/IC-18: one ActiveSet per build; the sync pipeline passes its own.
     active_set = _resolve_active_set(active_set, config, agent_meta_root, project_root)
     variables: dict = {}
@@ -3065,6 +3470,15 @@ def build_variables(
     )
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
+    _build_artifact_variables(variables, config, agent_meta_root, project_root)
+    # D1 (T9): the runtime scratch alias has exactly one source — the resolved
+    # matrix. Must run after the artifact builder so both names share one result.
+    variables["TMP_SINK_PATH"] = variables["ARTIFACT_SCRATCH_DIR"]
+    if emit_deprecation_warnings:
+        for finding in _artifact_deprecation_warnings(
+            config, agent_meta_root, project_root,
+        ):
+            unmapped.append(f"{finding.check}: {finding.message}")
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
     # #1180: generated docs may point at docs/REQUIREMENTS.md only if it exists.
     variables["REQUIREMENTS_DOC_REF"] = (

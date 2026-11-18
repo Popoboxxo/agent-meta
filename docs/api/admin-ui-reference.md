@@ -166,6 +166,12 @@ When enabled, the framework adds the scratch directory to the agent-meta managed
 <!-- author: Agent Meta Admin -->
 How the scratch directory is pruned. `manual` (default) never deletes contents automatically. `on-sync` is a destructive opt-in: the directory contents are pruned on every sync run, so only choose it when the scratch data is truly disposable.
 
+### Artifacts
+<!-- help-id: project_instance-artifact_locations -->
+<!-- last-updated: 2026-11-17 -->
+<!-- author: Agent Meta Admin -->
+The consolidated `artifact-locations` matrix (issue #1186). Each artifact class has one editable row keyed by its `artifact.id`, with a relative `path`, a `mode` (`files`, `inline`, `off`), a `git` treatment (`tracked`, `ignored`) and an optional `naming` pattern. Per-class values override the selected `preset`; the master `enabled` switch falls back to the legacy behaviour when off. The `legacy[]` and `unmanaged[]` lists are framework-declared and shown read-only — they cannot be edited here. The preview ("where each role writes") is fed exclusively by `sync.py --status-artifacts --json` (exposed as `/api/status-artifacts` or embedded as `window.__ARTIFACT_STATUS_JSON__`); the browser never re-resolves artifact locations. Writes are validated by the admin server before they reach `project.yaml`.
+
 ### Subagent Permissions
 <!-- help-id: project_instance-subagent_permissions -->
 <!-- last-updated: 2026-09-12 -->

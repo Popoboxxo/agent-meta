@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib.log import SyncLog  # noqa: E402
+import lib.spec_plan_scaffold as spec_plan_scaffold  # noqa: E402
 from lib.spec_plan_scaffold import resolve_index_mode, scaffold_spec_plan_dirs  # noqa: E402
 
 
@@ -81,3 +82,16 @@ def test_off_mode_writes_no_index(tmp_path):
     assert not (tmp_path / "docs" / "INDEX.md").exists()
     for sub in ("docs/specs", "docs/plans", "docs/spikes"):
         assert (tmp_path / sub / ".gitkeep").is_file(), f"missing {sub}/.gitkeep"
+
+
+def test_wrapper_delegates_legacy_dirs_to_artifact_scaffold(monkeypatch, tmp_path):
+    """The wrapper stays importable but delegates the 3 legacy dirs."""
+    calls = []
+
+    def _fake(project_root, config, log, dry_run):
+        calls.append((project_root, config, log, dry_run))
+
+    monkeypatch.setattr(spec_plan_scaffold, "scaffold_legacy_spec_plan_dirs", _fake)
+    cfg = _config(True)
+    scaffold_spec_plan_dirs(REPO_ROOT, tmp_path, cfg, SyncLog(), dry_run=False)
+    assert calls == [(tmp_path, cfg, calls[0][2], False)]

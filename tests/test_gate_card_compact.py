@@ -58,6 +58,8 @@ Rebaseline log:
   reference and the render is byte-identical to it.
 - Issue #1183: the compact render appends one pointer line
   (``Weitere Regeln als Skills: ...``) to the gate card; nothing else changed.
+- Issue #1186: the new always-on rule ``artifact-locations`` joins the
+  ``Weitere Regeln als Skills`` pointer list (that one line); nothing else.
 """
 from __future__ import annotations
 

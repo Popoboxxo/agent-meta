@@ -41,6 +41,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 _AGENT_META_ROOT = _SCRIPTS_DIR.parent
 
 from lib.consistency.artifact_contracts import check_artifact_contracts
+from lib.consistency.artifact_locations import check_artifact_locations
 from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
 from lib.consistency.context_size import check_context_file_size
 from lib.consistency.context_topology import check_context_topology_consistency
@@ -262,6 +263,12 @@ def run_checks(
         # shipped text must not point at the machine temp directory.
         if include_temp_literals:
             findings += check_temp_literals(root, root, project_config)
+
+        # Artifact-location matrix (Issue #1186, AC-08/09/13, Spec §4.6):
+        # managed path literals, baseline-based legacy writes, inline promises,
+        # missing scoped directories and state-alias divergence. The framework
+        # tree holds the role templates; the project tree holds the baseline.
+        findings += check_artifact_locations(_AGENT_META_ROOT, root, project_config)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))

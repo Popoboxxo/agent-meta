@@ -1,6 +1,6 @@
 ---
 name: knowledge-migrator
-version: 1.5.2
+version: 1.5.3
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 hint: Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)
@@ -11,7 +11,7 @@ tools:
 - Glob
 - Grep
 - Bash
-generated-from: 1-generic/knowledge-migrator.md@1.5.2
+generated-from: 1-generic/knowledge-migrator.md@1.5.3
 model: claude-sonnet-5
 ---
 
@@ -34,7 +34,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 ## Phase 1: Discovery (Read-Only)
 
 1. Lies `agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.` — verstehe Projekt, Sprache, Tech-Stack
-2. Scanne vorhandene Verzeichnisse: `docs/`, `README.md`, `ARCHITECTURE.md`, `docs/conclusions/`, `docs/adr/`, `docs/api/`, `CHANGELOG.md`, `*.md` im Root
+2. Scanne vorhandene Verzeichnisse: `docs/`, `README.md`, `ARCHITECTURE.md`, `docs/conclusions/`, `docs/adr/`, `docs/api/`, `CHANGELOG.md`, `*.md` im Root <!-- artifact-read-ok -->
 3. Markiere geschützte Dateien (siehe HARD CONSTRAINTS unten)
 4. Erstelle ein Discovery-Inventar: migrierbare Dateien mit geschätztem OKF-Type, geschützte Dateien (mit Begründung), Duplikate, empfohlene Kategorie-Zuordnung (`concepts/` vs `entities/` vs `topics/`)
 5. Präsentiere dem Nutzer einen Migration-Plan zur EXPLIZITEN Freigabe — Phase 2 startet NIE ohne diese Freigabe
@@ -45,7 +45,7 @@ Für jedes freigegebene Dokument:
 
 1. KOPIERE (nicht verschiebe!) das Original nach `knowledge/sources/<name>` — Originale bleiben wo sie sind
 2. Erstelle eine OKF-konforme Wiki-Seite:
-   - Bestimme den OKF-Type aus dem Inhalt (README → `Project Overview`, ARCHITECTURE.md → `Architecture`, `docs/adr/*.md` → `ADR`, `docs/guides/*.md` → `Guide`, `docs/api/*.md` → `API Reference`, `docs/conclusions/*.md` → `Session Conclusion`, Fallback → `Document`)
+   - Bestimme den OKF-Type aus dem Inhalt (README → `Project Overview`, ARCHITECTURE.md → `Architecture`, `docs/adr/*.md` → `ADR`, `docs/guides/*.md` → `Guide`, `docs/api/*.md` → `API Reference`, `docs/conclusions/*.md` → `Session Conclusion`, Fallback → `Document`) <!-- artifact-read-ok -->
    - Setze YAML-Frontmatter: `type`, `title`, `description`, `tags`, `timestamp` (File-Modification-Date als ISO 8601), `resource` (relativer Pfad zum Original), `migrated_from` (originaler Pfad)
    - Schreibe die Datei an den passenden Ort (Architecture → `wiki/concepts/architecture.md`, ADR → `wiki/concepts/adr-<name>.md`, Guide → `wiki/topics/<name>.md`, API Ref → `wiki/entities/<api-name>.md`, Session → `wiki/sources/<date>-session.md`)
 3. Pflege Cross-References zwischen migrierten Seiten

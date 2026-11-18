@@ -104,7 +104,7 @@ book/00-frontmatter/02-frameworks.md und 03-anti-patterns.md, jeweils mit Zeitma
 ```
 STATUS: done|partial|failed
 RESULT: <final estimate + confidence in 1 sentence, estimate table below>
-ARTIFACTS: <persisted estimate file path, empty if returned inline>
+ARTIFACTS: docs/analysis/<YYYY-MM-DD>-<topic>-estimate.md (kind: estimate; empty if returned inline)
 
 ## Effort Estimate: [Task Name]
 - Task Type: [classified type]

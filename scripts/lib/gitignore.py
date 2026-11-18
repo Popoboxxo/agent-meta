@@ -42,6 +42,9 @@ GITIGNORE_BLOCK_END = "# --- end agent-meta managed ---"
 # (importing it here would couple the writer to the drift scanner).
 FRAMEWORK_GENERATED_ENTRIES: tuple[str, ...] = (
     ".meta-config/platform-defaults.resolved.yaml",
+    # Stage 14c snapshot (Issue #1186); pinned to
+    # lib.artifact_status.RESOLVED_RELPATH by test_gitignore_platform_defaults.
+    ".meta-config/artifact-locations.resolved.json",
 )
 
 

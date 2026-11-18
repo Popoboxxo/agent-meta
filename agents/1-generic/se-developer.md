@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.8.3
+version: 1.8.4
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -185,7 +185,7 @@ ARTIFACTS: <step persistence files, empty if none>
 
 After completing implementation (status: `done`), persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
+**Output file:** `{{ARTIFACT_SE_IMPLEMENTATION_DIR}}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
 
 **Frontmatter format:**
 ```yaml

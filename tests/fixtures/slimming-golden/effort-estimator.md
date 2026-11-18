@@ -1,6 +1,6 @@
 ---
 name: effort-estimator
-version: 1.4.0
+version: 1.4.1
 description: Estimates effort for development tasks based on task type and LLM capabilities
   — with named assumptions, lead time and slack instead of a bare point value.
 hint: Effort estimation for tasks — delegate here when the user asks about time/cost
@@ -10,7 +10,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/effort-estimator.md@1.4.0
+generated-from: 1-generic/effort-estimator.md@1.4.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -116,7 +116,7 @@ book/00-frontmatter/02-frameworks.md und 03-anti-patterns.md, jeweils mit Zeitma
 ```
 STATUS: done|partial|failed
 RESULT: <final estimate + confidence in 1 sentence, estimate table below>
-ARTIFACTS: <persisted estimate file path, empty if returned inline>
+ARTIFACTS: docs/analysis/<YYYY-MM-DD>-<topic>-estimate.md (kind: estimate; empty if returned inline)
 
 ## Effort Estimate: [Task Name]
 - Task Type: [classified type]

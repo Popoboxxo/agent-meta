@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 2.2.4
+version: 2.2.5
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report. Federt Implementierungs-Befunde
   bottom-up in die Kaskade zurück (Issue #339 B6).'
@@ -260,7 +260,7 @@ Nach Abschluss aller V&V-Aktivitäten:
 
 After completing the integration plan, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_TestPlan.md`
+**Output file:** `{{ARTIFACT_SE_TESTPLAN_DIR}}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_TestPlan.md`
 
 **Frontmatter format:**
 ```yaml

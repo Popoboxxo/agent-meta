@@ -169,7 +169,7 @@ ARTIFACTS: <persisted step/report files (see Step Persistence)>
 
 After completing verification, persist your output atomically:
 
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Verification.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Verification.md`
 
 **Frontmatter format:**
 ```yaml

@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 2.2.2
+version: 2.2.3
 reference_standards:
 - "IEEE 1028-2008"
 description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
@@ -53,7 +53,7 @@ Jede Review-Iteration bekommt ein Protokoll — Reviews ohne Protokoll, ohne Ite
 
 - **Review-ID:** `RVW-YYYY-MM-DD-NNN` (NNN 3-stellig, pro Tag monoton steigend).
 - **Finding-IDs:** `RVW-YYYY-MM-DD-NNN-<k>` (k 2-stellig innerhalb des Protokolls) — jeder Befund trägt eine stabile, referenzierbare ID.
-- **Protokoll-Datei:** `{SE_BASE_DIR}/reviews/REVIEW_<YYYY-MM-DD>_<scope>.md` mit Frontmatter `review_id`, `target_req`, `iteration`, `status` (`open | response | closed`), `date`, `reviewer`, `findings[]` (je `id`, `severity` (`major | minor | info`), `category`, `description`, `suggested_fix`).
+- **Protokoll-Datei:** `{{ARTIFACT_SE_REVIEWS_DIR}}/REVIEW_<YYYY-MM-DD>_<scope>.md` mit Frontmatter `review_id`, `target_req`, `iteration`, `status` (`open | response | closed`), `date`, `reviewer`, `findings[]` (je `id`, `severity` (`major | minor | info`), `category`, `description`, `suggested_fix`).
 - Befunde leben IM Protokoll, **nie inline in REQ-Dateien** (L2-Trennregel) — Generator und REQ referenzieren nur die IDs.
 - **REQ-Frontmatter-Sync** nach jeder Iteration: `review_state` (`open | reviewed | approved`), `last_reviewed` (ISO-8601), `reviewer: se-critic`, `review_iteration` (+1, monoton steigend).
 - Protokoll-Status: `open` (Befunde offen) → `response` (Generator hat reagiert) → `closed` (Befunde abgearbeitet).
@@ -107,11 +107,11 @@ Schema: `schemas/se-critic.schema.json`
 
 ## Step Persistence
 **Review-Protokoll (je Iteration, Pflicht):**
-`{SE_BASE_DIR}/reviews/REVIEW_<YYYY-MM-DD>_<scope>.md`
+`{{ARTIFACT_SE_REVIEWS_DIR}}/REVIEW_<YYYY-MM-DD>_<scope>.md`
 (`scope` = REQ-ID oder Zellname, lowercase; Frontmatter laut `se-cascade-review-lifecycle.md`).
 
 **Critic-Endreport (bei Abschluss des Review-Zyklus):**
-`{SE_BASE_DIR}/reports/{FolderName}/L{level}_{FolderName}_{review_target}_critic_report.md`
+`{{ARTIFACT_SE_REPORTS_DIR}}/{FolderName}/L{level}_{FolderName}_{review_target}_critic_report.md`
 — enthält Verdict, Checks, Befunde mit RVW-IDs und optional `iteration_history` als Audit-Trail (Issue #334, Punkt 4).
 
 **Keine Review-Intermediate im Zellen-Ordner (Issue #334):** `*.critic.iter-N.md`, `*.critic.final.md` und `*.iter-N.md` werden NICHT neben den Final-Artefakten persistiert — der Iterations-Zustand lebt im A2A-Loop und in den Review-Protokollen. Stale-Intermediate älterer Läufe im Zellen-Ordner entfernen.

@@ -77,7 +77,7 @@ missing the 4 questions entirely → **major** finding.
 ## 7. Report template (issue #370)
 
 Read the format template from `[SNIPPETS_DIR — not available outside a full agent-meta install]/concept-review-report.md` (sync-generated).
-Then **write** the completed review report as an artifact (e.g. `concept-review-<topic>.md`)
+Then **write** the completed review report as an artifact under `docs/reviews/` (e.g. `concept-review-<topic>.md`)
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
 

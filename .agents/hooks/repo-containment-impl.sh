@@ -50,6 +50,14 @@
 # is not deployed); the parity test fails when they drift from
 # provider_root_dirs.
 #
+# T24 (D1): the SCRATCH SINK PATH has a single source with this precedence:
+# ARTIFACT_SCRATCH_DIR env -> classes[scratch].path from
+# .meta-config/artifact-locations.resolved.json -> repo_containment.tmp-sink.path
+# -> .tmp. Candidate paths pass through the SAME unchanged path_error() below;
+# an unsafe value is ignored (fail-closed). The sink_enabled switch stays with
+# repo_containment, and SINK_PATH emitted by the reader stays the raw
+# project.yaml value so the parity suite keeps pinning the lexical rules.
+#
 # Provider identity: `AGENT_META_PROVIDER` is substituted per provider by
 # sync.py's per-provider copy step (scripts/lib/hooks.py, which replaces the
 # braced AGENT_META_PROVIDER placeholder with the provider name), exactly like
@@ -506,10 +514,12 @@ fi
 CONFIG_FILE="$REPO_ROOT/.meta-config/project.yaml"
 
 # --- Effective config resolution (mirrors scripts/lib/repo_containment.py) ---
-# Prints exactly three KEY=VALUE lines; ALWAYS exits 0. Any failure (file
-# missing, PyYAML missing, unparseable YAML) prints the safe-side defaults.
+# Prints three KEY=VALUE lines (ENABLED/SINK_ENABLED/SINK_PATH, the raw
+# project.yaml values pinned by the parity suite) plus SCRATCH_PATH, the
+# effective T24 sink path. ALWAYS exits 0. Any failure prints safe defaults.
 read_effective_containment() {
   "$_PY" - "$1" "$2" <<'PYEOF'
+import json
 import os
 import posixpath
 import re
@@ -574,6 +584,75 @@ def path_error(path):
     return None
 
 
+def resolved_scratch_path(project_path, config_file):
+    """T24 (D1): resolve the single scratch source without widening the jail.
+
+    Precedence: ARTIFACT_SCRATCH_DIR env -> classes[scratch].path in the
+    resolved matrix data file -> repo_containment.tmp-sink.path -> '.tmp'.
+    Every candidate is checked with the SAME unchanged path_error() above; an
+    unsafe value is ignored with a warning and the next source is tried. A
+    missing or broken data file falls back to the legacy key (fail closed) --
+    it never opens the prison. project_path is already validated/canonical.
+    """
+    sources = []
+    env_path = os.environ.get("ARTIFACT_SCRATCH_DIR")
+    if env_path:
+        sources.append(("environment ARTIFACT_SCRATCH_DIR", env_path))
+
+    data_file = os.path.join(
+        os.path.dirname(config_file), "artifact-locations.resolved.json"
+    )
+    if os.path.isfile(data_file):
+        try:
+            with open(data_file, encoding="utf-8") as handle:
+                data = json.load(handle)
+            # T15 emits classes as a name-keyed mapping; the path-guard
+            # contract also documents a name-tagged list. Accept both.
+            classes = data.get("classes") if isinstance(data, dict) else None
+            scratch = classes.get("scratch") if isinstance(classes, dict) else None
+            if scratch is None and isinstance(classes, list):
+                scratch = next(
+                    (c for c in classes
+                     if isinstance(c, dict) and c.get("name") == "scratch"),
+                    None,
+                )
+            data_path = scratch.get("path") if isinstance(scratch, dict) else None
+            if isinstance(data_path, str) and data_path.strip():
+                sources.append(("artifact-locations.classes.scratch.path", data_path))
+            else:
+                print(
+                    "REPO_CONTAINMENT: warning: " + data_file
+                    + " has no artifact-locations.classes.scratch.path; falling back"
+                    + " to repo_containment.tmp-sink.path (fail-closed).",
+                    file=sys.stderr,
+                )
+        except Exception as exc:
+            print(
+                "REPO_CONTAINMENT: warning: could not read " + data_file
+                + " (" + type(exc).__name__ + "); falling back to"
+                + " repo_containment.tmp-sink.path (fail-closed).",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            "REPO_CONTAINMENT: warning: " + data_file
+            + " not found; falling back to repo_containment.tmp-sink.path"
+            + " for the scratch sink (fail-closed).",
+            file=sys.stderr,
+        )
+
+    sources.append(("repo_containment.tmp-sink.path", project_path))
+    for label, candidate in sources:
+        if path_error(candidate) is None:
+            return canonical_path(candidate)
+        print(
+            "REPO_CONTAINMENT: warning: unsafe scratch path from " + label
+            + " (" + repr(candidate) + "); ignored (fail-closed).",
+            file=sys.stderr,
+        )
+    return ".tmp"
+
+
 def emit(enabled, sink_enabled, sink_path, rejected=False):
     # SINK_REJECTED is observed only by tests/test_tmp_sink_path_parity.py
     # (AC-97); the shell consumer deliberately ignores it (silent fallback).
@@ -620,6 +699,9 @@ try:
     path = ".tmp" if rejected else canonical_path(path)
 
     emit(enabled, sink_enabled, path, rejected)
+    # T24 (D1): SCRATCH_PATH is the effective path after precedence; SINK_PATH
+    # above stays the raw project.yaml value so the parity suite keeps its pin.
+    print("SCRATCH_PATH=%s" % resolved_scratch_path(path, CONFIG_FILE))
 except Exception as exc:
     # F4 safe-side: missing/unreadable/unparseable config never opens silently.
     # SR-B-20: this used to be silent, so a project that had explicitly set
@@ -637,6 +719,8 @@ except Exception as exc:
         file=sys.stderr,
     )
     emit(True, True, ".tmp")
+    # Fail-closed: an unreadable config must not let the env/matrix widen the jail.
+    print("SCRATCH_PATH=.tmp")
 PYEOF
 }
 
@@ -644,13 +728,22 @@ CONFIG_OUT="$(read_effective_containment "$CONFIG_FILE" "$PROVIDER")"
 ENABLED="1"
 SINK_ENABLED="1"
 SINK_PATH=".tmp"
+SCRATCH_PATH=""
 while IFS='=' read -r _key _value; do
   case "$_key" in
     ENABLED) ENABLED="$_value" ;;
     SINK_ENABLED) SINK_ENABLED="$_value" ;;
     SINK_PATH) SINK_PATH="$_value" ;;
+    SCRATCH_PATH) SCRATCH_PATH="$_value" ;;
   esac
 done < <(printf '%s\n' "$CONFIG_OUT")
+
+# T24 (D1): the resolved matrix (or the exported env var) is the single source
+# for the scratch sink; the legacy project.yaml key is only a fallback. The
+# sink_enabled switch and the lexical rules are unchanged.
+if [ -n "$SCRATCH_PATH" ]; then
+  SINK_PATH="$SCRATCH_PATH"
+fi
 
 # Absolute sink for messages and for the allow-list text (AC-18): the hook's
 # effective sink is the realpath of <root>/<sink>, matching
@@ -734,9 +827,12 @@ block_write() {
     echo "  target:    $absolute" >&2
     echo "  reason:    the tmp-sink ($SINK_ABS) is writable only when" >&2
     echo "             repo_containment.tmp-sink.enabled: true." >&2
+    echo "             Its path comes from artifact-locations.classes.scratch.path" >&2
+    echo "             (fallback: repo_containment.tmp-sink.path)." >&2
     echo "  anchor:    $WORKDIR            ($(anchor_label))" >&2
     echo "  repair:    set repo_containment.tmp-sink.enabled: true in" >&2
-    echo "             $REPO_ROOT/.meta-config/project.yaml, or write outside the tmp-sink." >&2
+    echo "             $REPO_ROOT/.meta-config/project.yaml, adjust" >&2
+    echo "             artifact-locations.classes.scratch.path, or write outside the tmp-sink." >&2
   else
     echo "REPO_CONTAINMENT: write target is outside the repository root (prison mode)." >&2
     echo "  target:    $absolute" >&2

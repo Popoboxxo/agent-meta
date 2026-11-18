@@ -1,6 +1,6 @@
 ---
 name: documenter
-version: 1.11.1
+version: 1.11.2
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights — as artefacts that stand alone and stay traceable.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/documenter.md@1.11.1
+generated-from: 1-generic/documenter.md@1.11.2
 model: claude-haiku-4-5-20251001
 memory: project
 ---
@@ -41,7 +41,7 @@ Code-accurate inventory — not aspirational architecture. For every file in `sr
 
 ## 4. Save insights
 
-On request: create/update `docs/conclusions/conclusions-YYYY-MM-DD.md`. Structure: session summary + thematic sections (architecture, problems/solutions, features/bugfixes, dependencies, config).
+On request: create/update `docs/analysis/conclusion-YYYY-MM-DD.md` (`kind: conclusion`). Structure: session summary + thematic sections (architecture, problems/solutions, features/bugfixes, dependencies, config).
 
 ## 5. README.md maintenance
 
@@ -130,7 +130,7 @@ Documentation is read by people who were not there: months later, by another age
 | `docs/CODEBASE_OVERVIEW.md` | Code-accurate inventory of all `src/` files | Deutsch |
 | `docs/ARCHITECTURE.md` | Architecture overview, diagrams, module relationships | Deutsch |
 | `README.md` | Project description, setup, commands | **Englisch** |
-| `docs/conclusions/conclusions-YYYY-MM-DD.md` | Daily session insights | Deutsch |
+| `docs/analysis/conclusion-YYYY-MM-DD.md` | Daily session insights | Deutsch |
 
 **IMPORTANT:** `docs/REQUIREMENTS.md` belongs to the Requirements Engineer — reading allowed, editing NOT.
 

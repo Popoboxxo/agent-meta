@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.9.2"
+version: "1.9.3"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
@@ -89,7 +89,7 @@ missing the 4 questions entirely → **major** finding.
 ## 7. Report template (issue #370)
 
 Read the format template from `{{SNIPPETS_DIR}}/concept-review-report.md` (sync-generated).
-Then **write** the completed review report as an artifact (e.g. `concept-review-<topic>.md`)
+Then **write** the completed review report as an artifact under `{{ARTIFACT_REVIEWS_DIR}}/` (e.g. `concept-review-<topic>.md`)
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
 

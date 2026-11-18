@@ -7,8 +7,10 @@ Verbindliche Taxonomie, Trennregel und Output-Location-Regeln für alle SE-Artef
 
 ## Verzeichnisstruktur
 
-Basis-Verzeichnis: `{{SE_BASE_DIR}}` (Konzept-Default: `docs/se`; tatsächlich gilt der
-per `se_output.base_dir` konfigurierte Wert).
+Basis-Verzeichnis: `{{ARTIFACT_SE_ROOT}}` (aufgelöst aus der Artefakt-Matrix,
+Issue #1186; kompatibler Alias `{{SE_BASE_DIR}}`). `docs/se/**` ist **Legacy**
+(`legacy[]`), kein Default; der Wert aus `se_output.base_dir` wirkt nur noch,
+wenn die Matrix deaktiviert ist (`enabled: false`).
 
 ```
 {{SE_BASE_DIR}}/

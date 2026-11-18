@@ -1,0 +1,36 @@
+# Scenario 99 — artifact-locations matrix (Issue #1186, plan T21).
+# Synthetic minimal project: the default 23-class matrix is active, the
+# scaffold creates one .gitkeep per files-class plus docs/conclusions, and
+# Stage 14c writes the resolved data file. The companion assert checks the
+# resolved contract, the scaffold markers and the generated class table.
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- tester
+- documenter
+- git
+rules-preset: default
+artifact-locations:
+  enabled: true
+  preset: default
+  classes:
+    scratch:
+      path: .tmp
+spec-plan-workflow:
+  enabled: true
+project:
+  name: scenario-artifact-locations-matrix
+  prefix: a99
+  short: sc99
+variables:
+  PROJECT_NAME: scenario-artifact-locations-matrix
+  PROJECT_DESCRIPTION: Artifact-locations matrix end-to-end scenario.
+  PROJECT_GOAL: Verify resolver, scaffold, data file and generated class table.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-artifacts
+  GIT_MAIN_BRANCH: main

@@ -32,7 +32,7 @@ L1-SH → L1 Blackbox → L1 Whitebox → L2 Blackbox → L2 Whitebox → L3 REQ
 
 ## Output File Convention
 ```
-{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md
+SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md
 ```
 `{parent_path}` und `{FolderName}` kommen aus A2A-Payload. System-Ordner enden auf `System`, Component auf `Component`. Keine Versions- oder Iterations-Suffixe im Dateinamen (Taxonomie-Regel `se-cascade-artifact-taxonomy.md`).
 
@@ -72,7 +72,7 @@ REQ-Dateien enthalten **NUR Anforderungen** (Aussagen, Akzeptanzkriterien, exter
 
 ## ADR-Impact-Check (Issue #339 B6)
 Beim Erstellen einer neuen REQ prüfen, ob bestehende ADR-Entscheidungen berührt werden:
-1. `[SE_BASE_DIR — not available outside a full agent-meta install]/ADR/ADR-*.md` nach Titeln/Entscheidungen durchsuchen (Keyword-Matching auf REQ-Statement und Domäne, z. B. Datenbank-Wahl, Deployment-Topologie, Authentifizierungs-Mechanismus).
+1. `SE/ADR/ADR-*.md` nach Titeln/Entscheidungen durchsuchen (Keyword-Matching auf REQ-Statement und Domäne, z. B. Datenbank-Wahl, Deployment-Topologie, Authentifizierungs-Mechanismus).
 2. Treffer → ADR-ID in `open_adrs: []` des REQ-Frontmatter eintragen.
 3. Architektur-relevanter Need ohne ADR-Bezug (`arch_impact: true`) → `arch_trigger` so formulieren, dass `se-architect` einen ADR anlegen kann (siehe `se-cascade-adr-standard.md`).
 
@@ -168,7 +168,7 @@ JSON an `se-critic` (`review_target: requirements`). Notation: `se-requirements 
 Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: an `se-orchestrator` eskalieren.
 
 ## Step Persistence
-**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md`
+**Output file:** `SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md`
 **Frontmatter:** `step: requirements`, `agent: se-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus die Pflichtfelder des REQ-Frontmatter-Standards (siehe oben; `document_frontmatter`-Felder direkt in den YAML-Block übernehmen).
 **Atomic write:** write to `.tmp/se-requirements-<topic>.md` → rename → `.se-state.yaml` `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
 

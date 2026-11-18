@@ -1644,6 +1644,7 @@ function buildSidebar() {
         { route: "/project/roles",     label: "Roles", icon: "⍟" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
         { route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" },
+        { route: "/project/artifacts", label: "Artifacts", icon: "📦" },
         { route: "/project/hooks", label: "Hooks", icon: "🪝" },
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
@@ -7492,6 +7493,202 @@ async function viewProjectRepoContainment() {
   return wrap;
 }
 
+/* -------------------------------- Artifacts ------------------------------- */
+
+/**
+ * Render a read-only artifact list (legacy[] / unmanaged[]). These are
+ * framework-declared paths, not editable classes: text nodes only, with no
+ * input controls and no save button.
+ */
+function artifactReadonlyList(title, values) {
+  const panel = el("div", { class: "panel artifact-readonly" });
+  panel.appendChild(el("h3", {}, [title + " (read-only)"]));
+  const items = Array.isArray(values) ? values : [];
+  const list = el("ul");
+  for (const value of items) list.appendChild(el("li", {}, [String(value)]));
+  panel.appendChild(list);
+  if (items.length === 0) panel.appendChild(el("p", { class: "empty" }, ["(none)"]));
+  return panel;
+}
+
+/**
+ * Load the artifact status report produced by `sync.py --status-artifacts --json`.
+ * That JSON is the single source for the preview — no resolution runs in the
+ * browser. A server may expose it as /api/status-artifacts; an embedded payload
+ * (window.__ARTIFACT_STATUS_JSON__) is the documented alternative. Throws on
+ * failure so the caller can render the error state.
+ */
+async function loadArtifactStatus() {
+  if (window.__ARTIFACT_STATUS_JSON__ && typeof window.__ARTIFACT_STATUS_JSON__ === "object") {
+    return window.__ARTIFACT_STATUS_JSON__;
+  }
+  return await api.get("/api/status-artifacts");
+}
+
+/**
+ * Render the "role X writes to Y" preview from the status JSON. The state
+ * matrix is explicit: error (report missing), empty (no classes) and success
+ * (one table row per class). Loading is rendered by the caller before the
+ * status promise settles.
+ */
+function renderArtifactPreview(previewEl, report, error) {
+  previewEl.textContent = "";
+  if (error) {
+    previewEl.appendChild(el("p", { class: "empty", role: "alert" }, [
+      "Artifact status preview unavailable: " + ((error && error.message) || "unknown error") +
+      ". Run sync.py --status-artifacts --json or expose the status endpoint."
+    ]));
+    return;
+  }
+  const classes = (report && report.classes && typeof report.classes === "object")
+    ? report.classes : {};
+  const ids = Object.keys(classes).sort();
+  if (ids.length === 0) {
+    previewEl.appendChild(el("p", { class: "empty" }, [
+      "No artifact classes reported yet — run sync.py --status-artifacts --json once to populate the preview."
+    ]));
+    return;
+  }
+  const table = el("table", { class: "artifact-preview" });
+  const head = el("tr");
+  head.appendChild(el("th", {}, ["Class / role"]));
+  head.appendChild(el("th", {}, ["Writes to"]));
+  head.appendChild(el("th", {}, ["Mode"]));
+  head.appendChild(el("th", {}, ["Source"]));
+  table.appendChild(el("thead", {}, [head]));
+  const tbody = el("tbody");
+  for (const artifactId of ids) {
+    const entry = classes[artifactId] || {};
+    const target = entry.path || (
+      entry.files ? Object.values(entry.files).join(", ") : "(inline / off)"
+    );
+    const row = el("tr");
+    row.appendChild(el("td", {}, [artifactId]));
+    row.appendChild(el("td", {}, [target]));
+    row.appendChild(el("td", {}, [entry.mode || ""]));
+    row.appendChild(el("td", {}, [entry.source || ""]));
+    tbody.appendChild(row);
+  }
+  table.appendChild(tbody);
+  previewEl.appendChild(table);
+}
+
+async function viewProjectArtifacts() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Artifacts"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "One output location per artifact class. Each class has a mode (files / inline / off), " +
+    "a git treatment and an optional naming pattern. legacy[] and unmanaged[] paths are " +
+    "framework-declared and read-only. The preview is fed by sync.py --status-artifacts --json " +
+    "and never re-resolves locations in the browser."
+  ]));
+
+  const data = await loadProject();
+  const al = (data["artifact-locations"] && typeof data["artifact-locations"] === "object")
+    ? clone(data["artifact-locations"]) : {};
+  const classes = (al.classes && typeof al.classes === "object") ? al.classes : {};
+  if (typeof al.enabled !== "boolean") al.enabled = true;
+  if (typeof al.preset !== "string" || al.preset === "") al.preset = "default";
+
+  const status = el("p", {
+    id: "artifacts-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  // Preview panel with an explicit loading state while the status JSON loads.
+  const previewPanel = el("div", { class: "panel" });
+  previewPanel.appendChild(el("h2", {}, ["Preview — where each role writes"]));
+  const previewEl = el("div", {
+    class: "artifact-preview", role: "region", "aria-label": "Artifact location preview",
+  });
+  previewEl.appendChild(el("p", { class: "muted", role: "status", "aria-live": "polite" }, [
+    "Loading artifact status (sync.py --status-artifacts --json)…"
+  ]));
+  previewPanel.appendChild(previewEl);
+
+  // The status JSON is the single source for the class list and the preview.
+  let report = null;
+  let statusError = null;
+  try { report = await loadArtifactStatus(); } catch (err) { statusError = err; }
+  if (report && report.classes && typeof report.classes === "object") {
+    for (const artifactId of Object.keys(report.classes)) {
+      if (!classes[artifactId]) classes[artifactId] = {};
+    }
+  }
+
+  // ── General ────────────────────────────────────────────────────────────────
+  const genPanel = el("div", { class: "panel" });
+  genPanel.appendChild(el("h2", {}, ["General"]));
+  genPanel.appendChild(checkboxField(
+    "Enabled", al.enabled, v => { al.enabled = v; },
+    "When off, managed artifact paths fall back to the legacy behaviour."
+  ));
+  genPanel.appendChild(dropdownField(
+    "Preset", ["default", "minimal", "flat", "docs-only"], al.preset,
+    v => { al.preset = v; }, null,
+    "Base preset; the per-class values below override it."
+  ));
+  wrap.appendChild(genPanel);
+
+  // ── Classes (one row per artifact.id) ─────────────────────────────────────
+  const classPanel = el("div", { class: "panel" });
+  classPanel.appendChild(el("h2", {}, ["Artifact classes"]));
+  classPanel.appendChild(el("p", { class: "muted" }, [
+    "One row per class, keyed by artifact.id. Only values set here are written back; " +
+    "unset classes inherit the preset and schema defaults."
+  ]));
+  for (const artifactId of Object.keys(classes).sort()) {
+    const artifact = (classes[artifactId] && typeof classes[artifactId] === "object")
+      ? classes[artifactId] : {};
+    const row = el("div", { class: "field-row", "data-artifact-id": artifactId });
+    row.appendChild(el("label", { class: "field-label" }, [artifactId]));
+    const cell = el("div", { class: "artifact-class-cell" });
+    cell.appendChild(textInputEl(
+      "artifact-path-" + artifactId, artifact.path || "", "docs/… (relative)",
+      v => { if (v === "") delete artifact.path; else artifact.path = v; }
+    ));
+    cell.appendChild(dropdownField("Mode", ["files", "inline", "off"],
+      artifact.mode || "files", v => { artifact.mode = v; }, null,
+      "files = persist to the path; inline = keep in the prompt; off = disabled."
+    ));
+    cell.appendChild(dropdownField("Git", ["tracked", "ignored"],
+      artifact.git || "tracked", v => { artifact.git = v; }, null,
+      "tracked = commit the artifacts; ignored = keep them out of git."
+    ));
+    cell.appendChild(textInputEl(
+      "artifact-naming-" + artifactId, artifact.naming || "", "{date}-{slug}.md",
+      v => { if (v === "") delete artifact.naming; else artifact.naming = v; }
+    ));
+    row.appendChild(cell);
+    classPanel.appendChild(row);
+    classes[artifactId] = artifact;
+  }
+  if (Object.keys(classes).length === 0) {
+    classPanel.appendChild(el("p", { class: "empty" }, [
+      "No classes reported — run sync.py --status-artifacts --json to seed the class list."
+    ]));
+  }
+  wrap.appendChild(classPanel);
+
+  // ── Legacy / Unmanaged (read-only) ────────────────────────────────────────
+  wrap.appendChild(artifactReadonlyList("Legacy paths", al.legacy));
+  wrap.appendChild(artifactReadonlyList("Unmanaged paths", al.unmanaged));
+
+  wrap.appendChild(previewPanel);
+  renderArtifactPreview(previewEl, report, statusError);
+
+  // ── Save ───────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      if (Object.keys(classes).length > 0) al.classes = classes;
+      else delete al.classes;
+      try { await saveProjectSection("artifact-locations", al, status); } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------- Subagent Permissions -------------------------- */
 
 /** Labelled text input with placeholder support (Git / Auto-Commit views). */
@@ -11563,6 +11760,7 @@ async function init() {
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
   router.register("/project/repo-containment", viewProjectRepoContainment);
+  router.register("/project/artifacts", viewProjectArtifacts);
   router.register("/project/hooks",           viewProjectHooks);
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
@@ -11682,6 +11880,7 @@ init();
     "project/roles": "project_instance-roles",
     "project/orchestrator": "project_instance-orchestrator",
     "project/repo-containment": "project_instance-repo_containment",
+    "project/artifacts": "project_instance-artifact_locations",
 
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",

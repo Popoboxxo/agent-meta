@@ -14,6 +14,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import pytest
 
+from lib.artifact_status import RESOLVED_RELPATH as ARTIFACT_RESOLVED_RELPATH
 from lib.context import ensure_gitignore_entries
 from lib.generated_file_drift import PLATFORM_DEFAULTS_RESOLVED_REL
 from lib.gitignore import (
@@ -32,7 +33,8 @@ _PC = {"Claude": {"has_dedicated_context_file": True, "agents_dir": ".claude/age
 def test_constant_matches_drift_module():
     # Pinned instead of imported from lib.gitignore to avoid a cycle risk; the
     # drift scanner and the gitignore writer must agree on the same path.
-    assert FRAMEWORK_GENERATED_ENTRIES == (PLATFORM_DEFAULTS_RESOLVED_REL,)
+    assert FRAMEWORK_GENERATED_ENTRIES == (
+        PLATFORM_DEFAULTS_RESOLVED_REL, str(ARTIFACT_RESOLVED_RELPATH))
 
 
 @pytest.mark.parametrize("cfg", [{}, {"generated": True}, {"ignore-provider-dirs": True},
@@ -44,7 +46,8 @@ def test_platform_defaults_snapshot_in_base_entries(cfg):
 
 def test_non_dedicated_framework_baseline_contains_snapshot():
     assert framework_baseline_entries() == [
-        "sync.log", "*.sync-backup-*", PLATFORM_DEFAULTS_RESOLVED_REL]
+        "sync.log", "*.sync-backup-*", PLATFORM_DEFAULTS_RESOLVED_REL,
+        str(ARTIFACT_RESOLVED_RELPATH)]
 
 
 def test_git_check_ignore_matches_entry(tmp_path):
@@ -82,3 +85,22 @@ def test_written_managed_block_contains_and_ignores_snapshot(tmp_path):
         ["git", "check-ignore", "-q", PLATFORM_DEFAULTS_RESOLVED_REL],
         cwd=tmp_path, capture_output=True, text=True)
     assert r.returncode == 0, f"git check-ignore rc={r.returncode} out={r.stdout!r} err={r.stderr!r}\n{written}"
+
+
+def test_artifact_locations_snapshot_is_ignored(tmp_path):
+    """Issue #1186 T15: the Stage 14c data file is a gitignored runtime snapshot."""
+    rel = str(ARTIFACT_RESOLVED_RELPATH)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    entries = compute_base_gitignore_entries(["Claude"], _PC, {})
+    assert rel in entries
+    assert rel in framework_baseline_entries()
+
+    ensure_gitignore_entries(tmp_path, SyncLog(), dry_run=False, exact_entries=entries)
+    written = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    begin = written.index(GITIGNORE_BLOCK_BEGIN)
+    end = written.index(GITIGNORE_BLOCK_END)
+    assert rel in written[begin:end].splitlines(), written
+
+    r = subprocess.run(
+        ["git", "check-ignore", "-q", rel], cwd=tmp_path, capture_output=True, text=True)
+    assert r.returncode == 0, f"git check-ignore rc={r.returncode} {r.stderr!r}\n{written}"

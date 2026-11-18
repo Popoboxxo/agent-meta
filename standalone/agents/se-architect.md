@@ -44,7 +44,7 @@ Output als Envelope an `se-critic`:
 
 ## Output File Convention
 ```
-{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md
+SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md
 ```
 System-Ordner enden auf `System`, Component auf `Component`. `{parent_path}` und `{FolderName}` aus A2A-Payload. Das Final-Artefakt trägt den kanonischen Namen **ohne Suffix** — keine `.iter-N`-, `.final`- oder `.critic.*`-Kopien daneben (Issue #334).
 
@@ -54,7 +54,7 @@ Architektur-Inhalte (Systemstruktur, Sub-Component-Hierarchie, Interface-Zuordnu
 ## ADR-Standard (Issue #339 B1)
 Architekturentscheidungen mit Wirkung über eine Zelle hinaus dokumentierst du als ADR — ad-hoc-Entscheidungen ohne ADR sind ein Kaskaden-Verstoß. Verbindlicher Standard (MADR-minimal, Template + Lifecycle): `se-cascade-adr-standard.md`, Schema: `schemas/se-adr.schema.json`.
 
-- Ablageort: `{SE_BASE_DIR}/ADR/ADR-NNN_kurztitel.md` (NNN 3-stellig, monoton steigend).
+- Ablageort: `SE/ADR/ADR-NNN_kurztitel.md` (NNN 3-stellig, monoton steigend).
 - Frontmatter-Pflichtfelder: `adr_id`, `title`, `status` (`proposed | review | accepted | deprecated | superseded`), `date`, `deciders`, `affected_reqs` (mind. 1 REQ-ID), `superseded_by` (nur bei `superseded`).
 - Body: `## Kontext`, `## Alternativen` (min. 2, inkl. rejected), `## Entscheidung`, `## Konsequenzen`.
 - Lifecycle: `proposed → review → accepted | deprecated | superseded` — Review-Trigger läuft über `se-critic`; Statuswechsel dokumentierst du mit Datum + Grund.
@@ -106,10 +106,10 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: eskalieren.
 
 ## Step Persistence
 **Output file (Final-Artefakt, kanonischer Name ohne Suffix):**
-`{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md`
+`SE/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md`
 **Frontmatter:** `step: architecture`, `agent: se-architect`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus Taxonomie-Pflichtfelder (`type: ARCH`, `scope`, `status`, `date`, `author_agent: se-architect`).
 **Atomic write:** write to `.tmp/se-architect-<topic>.md` → rename → `.se-state.yaml` aktualisieren.
-**Iterations-Zustand:** läuft über den A2A-Loop mit `se-critic` (Envelopes + Review-Protokolle) — **niemals** als `*.iter-N.md`/`*.final.md`-Dateien im Zellen-Ordner (Issue #334). Stale-Intermediate älterer Läufe nach dem Final-Pass entfernen. Optionales Iterations-Audit-Trail: als Report nach `{SE_BASE_DIR}/reports/{FolderName}/` (siehe `se-cascade-artifact-taxonomy.md`), nicht neben dem Final-Artefakt.
+**Iterations-Zustand:** läuft über den A2A-Loop mit `se-critic` (Envelopes + Review-Protokolle) — **niemals** als `*.iter-N.md`/`*.final.md`-Dateien im Zellen-Ordner (Issue #334). Stale-Intermediate älterer Läufe nach dem Final-Pass entfernen. Optionales Iterations-Audit-Trail: als Report nach `SE/reports/{FolderName}/` (siehe `se-cascade-artifact-taxonomy.md`), nicht neben dem Final-Artefakt.
 
 <output_contract>
 ```

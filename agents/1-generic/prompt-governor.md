@@ -1,6 +1,6 @@
 ---
 name: template-prompt-governor
-version: "1.5.2"
+version: "1.5.3"
 description: "Prompt governance: treats prompts as source code — PromptBOM metadata (model + prompt + parameters), append-only audit trail, provenance tracking, prompt version drift detection, and banned unsafe prompting patterns (skip auth, ignore security, bypass validation). Read-only on prompts; complements prompt-engineer (design), does not replace it."
 hint: "Prompt governance: PromptBOM, audit trail, provenance, banned-pattern detection — read-only, findings via feedback"
 reference_standards:
@@ -117,7 +117,7 @@ FINDINGS: <structured list: rule_id, file:line, pattern, risk, confidence>
 ARTIFACTS: <BOM/audit-trail file paths, or "none">
 ```
 
-Long reports → write to `{{TMP_SINK_PATH}}/prompt-governor-<topic>.md`, return path only.
+Long reports → write the full report to `{{ARTIFACT_AUDITS_DIR}}/prompt-<YYYY-MM-DD>-<topic>.md` (kind: prompt), return path only. Raw evidence (logs, long tool output) stays on `{{TMP_SINK_PATH}}/`; only the report artifact moves into the matrix.
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

@@ -1,6 +1,6 @@
 ---
 name: requirements
-version: 1.9.1
+version: 1.9.2
 description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/requirements.md@1.9.1
+generated-from: 1-generic/requirements.md@1.9.2
 model: claude-haiku-4-5-20251001
 memory: project
 ---
@@ -78,7 +78,7 @@ On a changed requirement: identify affected files, tests, REQ dependencies.
 
 ## Boundary to `planner`
 
-`docs/REQUIREMENTS.md` captures WHAT is needed, never HOW/WHEN it gets implemented. Implementation plans (ordered steps, agent assignment, effort estimate) are **never** a chapter in `REQUIREMENTS.md` — they are a separate artifact owned by `planner` (`plan-<topic>.md` in the project root, or `knowledge/wiki/plans/<topic>.md` when the Knowledge Engine is active; see `planner`'s "Persist" convention). A finished requirement that needs an implementation plan → reference `planner` in text, do not draft the plan yourself.
+`docs/REQUIREMENTS.md` captures WHAT is needed, never HOW/WHEN it gets implemented. Implementation plans (ordered steps, agent assignment, effort estimate) are **never** a chapter in `REQUIREMENTS.md` — they are a separate artifact owned by `planner` (`docs/plans/plan-<YYYY-MM-DD>-<topic>.md`, or `knowledge/wiki/plans/<topic>.md` when the Knowledge Engine is active; see `planner`'s "Persist" convention). A finished requirement that needs an implementation plan → reference `planner` in text, do not draft the plan yourself.
 </context>
 
 <tools>
