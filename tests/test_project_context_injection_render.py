@@ -948,15 +948,15 @@ def test_golden_gate_file_untouched_by_this_issue():
     HEAD (which would be vacuously green after this issue's commits). Any
     change to the equivalence test or the golden fixtures anywhere on this
     branch turns the gate red instead of silently accepting a rebaseline.
-    The frozen base is Commit C (`99be710e`), rebaselined in #1186 T12
-    (2026-11-17, base `e22b0ed4` -> `99be710e`); `e22b0ed4` itself had been
-    rebaselined from `6eeeff44` after the legitimate T10 artifact-path golden
-    update. Real drift after the current base still turns the gate red.
+    The frozen base is `47e338cb`, rebaselined in #1186 (2026-11-18, base
+    `99be710e` -> `47e338cb` after the legitimate agent-meta-manager golden
+    update); `99be710e` had been rebaselined from `e22b0ed4`, itself from
+    `6eeeff44` after the legitimate T10 artifact-path golden update. Real drift after the current base still turns the gate red.
     """
     result = subprocess.run(
         [
             "git", "diff", "--name-only",
-            "99be710e6f7e12c9ed6ea591917270f53d079825..HEAD",
+            "47e338cb91d38c6d2edbc7704965a5c88c18075c..HEAD",
             "--",
             "tests/test_template_slimming_equivalence.py",
             "tests/fixtures/slimming-golden",
