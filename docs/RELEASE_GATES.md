@@ -176,7 +176,7 @@ Kein Eintrag in `project.yaml` nötig, kein `sync.py`-Lauf nötig — Datei able
 hinzufügen (s. o., issue #603), dann wird sie beim nächsten
 `bash .claude/hooks/pre-release-check.sh` automatisch mitgeführt.
 
-## Die drei eingebauten Gates
+## Die vier eingebauten Gates
 
 Jedes Gate übersprint sich **selbst graceful** (Exit 0, `[SKIP]`-Log), wenn es deaktiviert ist oder
 eine Voraussetzung im jeweiligen Projekt fehlt. Kein Gate führt zu einem Hard-Fail nur weil ein
@@ -266,6 +266,25 @@ Tag oder SHA, der eine CI-Pipeline unbemerkt bricht oder ein Supply-Chain-Risiko
 - **Volle 40-Zeichen-SHA-Pins** (`uses: actions/checkout@a1b2c3...`): Existenz via
   `gh api repos/{owner}/{repo}/commits/{sha}` prüfen (404 = Commit upstream gelöscht/rebased).
 
+### `scenario-suite` — Full Scenario Catalog Gate
+
+Läuft den **vollständigen** Szenario-Katalog des Frameworks
+(`tests/scenarios/run.sh`, Profil `release`): jede Consumer-Config mit
+dry-run + echtem Sync + vollem `sync.py --validate` + allen Content-Asserts.
+Ein `FAIL` blockiert den Release (Exit ≠ 0) — das ist der technisch harte
+Teil, den `release-checklist: strict` als Prompt-Konvention nicht leisten kann.
+
+**Voraussetzung:** ein agent-meta-Checkout mit `tests/scenarios/run.sh` —
+entweder über `AGENT_META_ROOT`, das `.agent-meta/`-Submodul des Consumer-Projekts
+oder ein Framework-Repo als `PROJECT_ROOT`. Fehlt er, überspringt sich das Gate
+mit `[SKIP]` (alte Submodule Pin-Nachzug nötig).
+
+**Wichtig:** dieses Gate setzt `SCENARIO_PROFILE=release` explizit. Der schnelle
+`dev`-Modus des Runners (Source-Scan nur einmal pro Checkout, Dry-Run optional)
+ist für lokale Iteration und PR-CI gedacht und darf nie als Release-Beweis
+dienen. Der Aspekt „identischer Katalog und identische Asserts“ bleibt in beiden
+Profilen erhalten; nur die Tiefe des Validate-Schritts unterscheidet sich.
+
 ## Konfiguration: project.yaml + DoD-Preset
 
 Ob ein eingebautes Gate standardmäßig aktiv ist, wird deklarativ über die neue, offene
@@ -278,6 +297,7 @@ release-gates:
   artifact-freshness: { enabled: true }
   docker-image-scan: { enabled: true, dockerfile: Dockerfile }
   action-pin-validation: { enabled: false }
+  scenario-suite: { enabled: true }     # voller Szenario-Katalog als Release-Gate
   my-project-custom-check: { enabled: true }   # eigener Name, kein Preset kennt ihn — geht trotzdem
 ```
 
@@ -295,17 +315,17 @@ bei `docker-image-scan`).
 3. Der `enabled_by_default`-Header des jeweiligen Gate-Scripts selbst (Fallback — greift z. B. für
    ein neues eingebautes Gate, das noch in keinem Preset gepflegt ist).
 
-DoD-Preset-Defaults für die drei eingebauten Gates (spiegelt bewusst das bestehende
+DoD-Preset-Defaults für die eingebauten Gates (spiegelt bewusst das bestehende
 `security-audit`-Muster — CVE-/Pin-Scans sind security-audit-artige Checks):
 
-| Preset | `artifact-freshness` | `docker-image-scan` | `action-pin-validation` |
-|---|---|---|---|
-| `full` | aus | aus | aus |
-| `standard` | aus | aus | aus |
-| `rapid-prototyping` | aus | aus | aus |
-| `spec-optional` | aus | aus | aus |
-| `spec-driven` | aus | aus | aus |
-| `spec-certified` | **an** | **an** | **an** |
+| Preset | `artifact-freshness` | `docker-image-scan` | `action-pin-validation` | `scenario-suite` |
+|---|---|---|---|---|
+| `full` | aus | aus | aus | aus |
+| `standard` | aus | aus | aus | aus |
+| `rapid-prototyping` | aus | aus | aus | aus |
+| `spec-optional` | aus | aus | aus | aus |
+| `spec-driven` | aus | aus | aus | aus |
+| `spec-certified` | **an** | **an** | **an** | **an** |
 
 Diese Auflösung passiert **zu `sync.py`-Build-Zeit**: `scripts/lib/dod.py::resolve_release_gates()`
 liefert die effektiven Enabled-Werte, `scripts/lib/hook_plugins.py::sync_release_gates()` schreibt sie als

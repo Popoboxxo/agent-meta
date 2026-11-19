@@ -34,6 +34,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   standard:             # tests, no REQs / overview
     req-traceability: false
@@ -50,6 +51,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   rapid-prototyping:    # minimal overhead (an explicit spec-plan-workflow.enabled still wins)
     req-traceability: false
@@ -66,6 +68,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   spec-optional:        # SE available, not mandatory
     req-traceability: false
@@ -83,6 +86,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   spec-driven:          # SE recommended for complex features
     req-traceability: true
@@ -100,6 +104,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   concept-driven:       # concept-driven-dev pipeline (#370): spec-first, tests, no REQ-formalization
     req-traceability: false
@@ -117,6 +122,7 @@ presets:
       artifact-freshness: false
       docker-image-scan: false
       action-pin-validation: false
+      scenario-suite: false
 
   spec-certified:       # regulated environments
     req-traceability: true
@@ -134,3 +140,4 @@ presets:
       artifact-freshness: true
       docker-image-scan: true
       action-pin-validation: true
+      scenario-suite: true

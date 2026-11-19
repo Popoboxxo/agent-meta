@@ -8,6 +8,11 @@ ai-providers:
 - Opencode
 - Gemini
 dod-preset: rapid-prototyping
+# The framework releases itself only after the full scenario catalog passed.
+# CI enforces the same gate on tag pushes (.github/workflows/release-gate.yml).
+release-gates:
+  scenario-suite:
+    enabled: true
 rules-preset: lazy
 systems-engineering:
   enabled: false
