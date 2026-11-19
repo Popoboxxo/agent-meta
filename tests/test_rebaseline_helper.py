@@ -1,4 +1,4 @@
-"""Unit tests for the rebaseline helper (Tasks 1-4).
+"""Unit tests for the rebaseline helper (Tasks 1-9).
 
 The runner is always injected/mocked: no test spawns a real sync.py or renders
 the full provider matrix. Scope mirrors docs/plans/2026-11-15-rebaseline-helper-plan.md.
@@ -1028,4 +1028,123 @@ def test_entry_json_fields(entry, tmp_path, monkeypatch, capsys):
 
     payload = __import__("json").loads(capsys.readouterr().out.splitlines()[-1])
     assert set(payload) == {"pre", "steps", "post", "result"}
+
+
+# --- Task 9: structure checks and provider/model agnosticism -----------------
+
+
+_RB_LIB_PATHS = tuple(
+    _SCRIPTS / "lib" / name
+    for name in ("rebaseline.py", "rebaseline_pipeline.py")
+)
+_RB_ENTRY_PATH = _SCRIPTS / "rebaseline.py"
+_LINE_CEILING = 600
+
+
+def _parse_module(path):
+    """Parse a source file into an AST (comments/docstrings stay inert)."""
+    import ast
+
+    return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _forbidden_literals():
+    """Registered provider names plus the repo's canonical model tiers.
+
+    Provider names come from config/ai-providers.yaml (single source of truth),
+    not from a hardcoded list, so a newly registered provider is covered.
+    """
+    import yaml
+
+    data = yaml.safe_load(
+        (_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8")
+    )
+    providers = set((data.get("providers") or {}).keys())
+    models = {"haiku", "sonnet", "opus"}
+    return providers | models
+
+
+def _literal_offenders(path, forbidden):
+    """String constants exactly equal to a provider/model name, with lines."""
+    import ast
+
+    found = []
+    for node in ast.walk(_parse_module(path)):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value in forbidden
+        ):
+            found.append("{}:{}: {!r}".format(path.name, node.lineno, node.value))
+    return found
+
+
+def test_rebaseline_lib_modules_within_line_ceiling():
+    """Both rebaseline lib modules stay at or below the 600-line ceiling."""
+    for path in _RB_LIB_PATHS:
+        count = len(path.read_text(encoding="utf-8").splitlines())
+        assert count <= _LINE_CEILING, "{}: {} lines > {}".format(
+            path.name, count, _LINE_CEILING
+        )
+
+
+def test_no_print_in_rebaseline_lib():
+    """No print() in lib modules — output goes through return values / log."""
+    import ast
+
+    offenders = []
+    for path in _RB_LIB_PATHS:
+        for node in ast.walk(_parse_module(path)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "print"
+            ):
+                offenders.append("{}:{}".format(path.name, node.lineno))
+    assert not offenders, "print() in lib modules: {}".format(offenders)
+
+
+def test_no_provider_or_model_literals_in_rebaseline_lib():
+    """No hardcoded provider/model name in the rebaseline lib modules."""
+    forbidden = _forbidden_literals()
+    offenders = []
+    for path in _RB_LIB_PATHS:
+        offenders.extend(_literal_offenders(path, forbidden))
+    assert not offenders, (
+        "provider/model literal(s) in lib modules:\n" + "\n".join(offenders)
+    )
+
+
+def test_rebaseline_lib_imports_stdlib_only():
+    """No new third-party dependency in lib modules (ADR 0001 allows only
+    transitive PyYAML via the importlib-loaded test module, not a direct import)."""
+    import ast
+
+    stdlib = set(getattr(sys, "stdlib_module_names", ()))
+    allowed = stdlib | {"lib", "__future__"}
+    offenders = []
+    for path in _RB_LIB_PATHS:
+        for node in ast.walk(_parse_module(path)):
+            if isinstance(node, ast.Import):
+                roots = [alias.name.split(".")[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                roots = [(node.module or "").split(".")[0]]
+            else:
+                continue
+            for root in roots:
+                if root and root not in allowed:
+                    offenders.append("{}:{}: {}".format(path.name, node.lineno, root))
+    assert not offenders, (
+        "non-stdlib import(s) in lib modules (ADR 0001: transitive PyYAML via "
+        "importlib is allowed, a direct import is not):\n" + "\n".join(offenders)
+    )
+
+
+def test_rebaseline_entrypoint_is_provider_agnostic():
+    """test_provider_agnostic_dispatch.py sweeps only scripts/lib/**; the
+    argparse entrypoint is covered here (print() is allowed there per spec C1)."""
+    offenders = _literal_offenders(_RB_ENTRY_PATH, _forbidden_literals())
+    assert not offenders, (
+        "provider/model literal(s) in entrypoint:\n" + "\n".join(offenders)
+    )
 
