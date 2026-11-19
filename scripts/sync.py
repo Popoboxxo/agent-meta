@@ -87,6 +87,7 @@ from lib.cli_commands import (
     _handle_sync,
     _handle_update_ext,
     _handle_validate,
+    _handle_validate_config_only,
     _handle_viz_cleanup,
     _handle_viz_only,
     _run_common_tail,
@@ -364,6 +365,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
                              "optionally overridden by AGENT_META_TEST_REPO env var. "
                              "Performs a full sync into the test repo and checks sync.log for errors.")
+    parser.add_argument("--validate-config-only", action="store_true",
+                        help="Like --validate, but skips the repository-wide "
+                             "consistency scan of the agent-meta sources. Use "
+                             "only after running scripts/consistency-check.py "
+                             "once for the checkout (scenario harness dev "
+                             "profile): project config, active-set and "
+                             "generated-output checks still run in full.")
     parser.add_argument("--validate-se", action="store_true",
                         help="Standalone SE-cascade validation (issue #338): read-only "
                              "checks over the project's docs/se artifacts against the "
@@ -835,6 +843,7 @@ _MODE_HANDLERS = [
     (lambda a: a.prune_backups, _handle_prune_backups),
     (lambda a: a.prune_sync_backups, _handle_prune_sync_backups),
     (lambda a: a.validate, _handle_validate),
+    (lambda a: a.validate_config_only, _handle_validate_config_only),
     (lambda a: a.validate_se, _handle_validate_se),
     (lambda a: a.validate_spec_plan, _handle_validate_spec_plan),
     (lambda a: a.rehydrate, _handle_rehydrate),

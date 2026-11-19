@@ -1515,8 +1515,14 @@ def _handle_doctor(ctx: _SyncContext) -> None:
     sys.exit(2 if write_failed else _doctor_exit_code(report, strict))
 
 
-def _handle_validate(ctx: _SyncContext) -> None:
-    """Handle --validate (may sys.exit; falls through on full success)."""
+def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
+    """Handle --validate (may sys.exit; falls through on full success).
+
+    ``source_checks=False`` implements ``--validate-config-only``: the
+    repository-wide consistency scan is identical for every project config and
+    is therefore run once per checkout by the caller instead of once per
+    scenario. All config-dependent checks below remain unchanged.
+    """
     args = ctx.args
     log = ctx.log
     agent_meta_root = ctx.agent_meta_root
@@ -1528,10 +1534,15 @@ def _handle_validate(ctx: _SyncContext) -> None:
     if args.dry_run:
         print("DRY-RUN — validation will not write files\n")
 
-    # Consistency checks always run (no test repo required). These validate
-    # agent templates, cross-references, dual-tree parity and handoff
-    # contracts against the agent-meta sources themselves.
-    consistency_errors = _run_consistency_checks(agent_meta_root)
+    if source_checks:
+        # Consistency checks always run (no test repo required). These validate
+        # agent templates, cross-references, dual-tree parity and handoff
+        # contracts against the agent-meta sources themselves.
+        consistency_errors = _run_consistency_checks(agent_meta_root)
+    else:
+        consistency_errors = 0
+        print("[INFO] source consistency checks skipped (--validate-config-only); "
+              "run 'python3 scripts/consistency-check.py' once per checkout")
 
     # Config-audit staleness check (issue #560): full-replacement
     # 2-platform overrides pin their generic base via `based-on:
@@ -1669,6 +1680,11 @@ def _handle_validate(ctx: _SyncContext) -> None:
 
     ctx.config = config
     ctx.mode = mode
+
+
+def _handle_validate_config_only(ctx: _SyncContext) -> None:
+    """--validate-config-only: same checks minus the repo-wide source scan."""
+    _handle_validate(ctx, source_checks=False)
 
 
 def _handle_sync(ctx: _SyncContext) -> None:

@@ -27,9 +27,17 @@ Diese Konvention stellt sicher, dass Framework-Änderungen durch konkrete, ausf�
 ## Ausführen
 
 ```bash
-tests/scenarios/run.sh              # alle Szenarien
+tests/scenarios/run.sh              # alle Szenarien, volles Profil (release)
+SCENARIO_PROFILE=dev tests/scenarios/run.sh 105   # schnelles Iterations-Profil
 tests/scenarios/run.sh 12 17        # nur Szenarien, deren ID mit "12" oder "17" beginnt
 ```
+
+`release` (Default) = dry-run + echter Sync + volles `--validate` + Assert —
+der einzige Modus für Release-Entscheidungen (auch im `scenario-suite`-Gate).
+`dev` = echter Sync + `--validate-config-only` pro Szenario, der identische
+Source-Scan läuft einmal pro Aufruf, der Dry-Run entfällt (optional
+`SCENARIO_KEEP_DRY_RUN=1`). Katalog, Asserts und PASS/FAIL-Semantik sind in
+beiden Profilen identisch; PR-CI nutzt `dev`, Tag-Pushes und Nightly `release`.
 
 `PASS`/`FAIL` pro Szenario; bei `FAIL` bleibt das Temp-Verzeichnis erhalten
 (Pfad wird ausgegeben) zur Fehleranalyse.
@@ -135,7 +143,8 @@ verhalten sich exakt wie bisher.
 | `101-strict-primary-opencode-v2` | Opencode (v2) | strict × `topology: primary` (POS-3) | POS-3-Regression (AC-29): `default_agent == "orchestrator"`, Agent-Frontmatter `mode: primary`, genau zwei `permissions`-Tripel (`{edit,**,deny}`, `{shell,**,deny}`) und keine v1-`permission`-Map, keine Gate-Suspendierungs-Warnung, `--validate` rc 0 |
 | `102-main-chat-derived-primary` | Opencode | `mode: main-chat`, `topology` ungesetzt (POS-1) | POS-1 + D-Q1 (AC-29/AC-34): `providers.Opencode.primary-role` leitet `primary` ab, obwohl `mode: main-chat` die Rolle nicht emittiert — kein `.opencode/agents/orchestrator.md`, kein `default_agent`, kein Gate im Dokument, genau **eine** `orchestrator-topology.main-chat-derived-primary`-WARNUNG (Kanal `consistency/topology.py`, siehe Assert-Header) und `--validate` rc 0 |
 | `103` — `blocked-103-advisory-subagent` | Opencode (v2) | advisory × `topology: subagent` + `context-profile: compact` (POS-2) | **BLOCKED (#1182)** — `context-profile: compact` bricht `advisory` ab (§12.3, D-OQ3, AC-29/AC-37). Nicht ausgeführt: der Name liegt **außerhalb** des `10*`-Matches (`run.sh` kennt kein `SKIP`), der Assert prüft nur die dokumentierten BLOCKED-Vorbedingungen. Empfehlung erst nach dem Fix von #1182 |
-| `104-claude-strict-subagent` | Claude | strict × `topology: subagent` (POS-2) | POS-2 auf dem Tier `hook` (AC-29, §12.4): Rolle wird emittiert, aber ohne Entry-Point (`default_agent` in keinem Settings-Dokument); `.claude/rules/use-orchestrator.md` trägt **genau eine** Gate-Fassung, und zwar die erzwungene (`# CRITICAL GATE` ohne Suffix + Strict-Satz), nicht die POS-3-Behauptung „Session-Einstieg"; keine Orphan-Platzhalter in generierten Agents/Rules |
+| `104-claude-strict-subagent` | Claude | strict × `topology: subagent` (POS-2) | POS-2 auf dem Tier `hook` (AC-29, §12.4): Rolle wird emittiert, aber ohne Entry-Point (`default_agent` in keinem Settings-Dokument); `.claude/rules/use-orchestrator.md` trägt **genau eine** Gate-Fassung, und zwar die erzwungene (`# CRITICAL GATE` ohne Suffix + Strict-Satz), nicht die POS-3-Behauptung „Session-Einstieg“; keine Orphan-Platzhalter in generierten Agents/Rules |
+| `105-validate-config-only` | Claude | strict (default) | `SCENARIO_PROFILE` Regression: `dev` schreibt `validate.rc=0` mit config-only-Marker (Source-Scan läuft einmal pro Aufruf), `release` mit vollem `agent-meta consistency-check`; generierte CLAUDE.md existiert in beiden Profilen |
 
 ## Bewusste Auslassungen
 
