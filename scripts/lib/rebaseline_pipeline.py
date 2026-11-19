@@ -24,6 +24,7 @@ class Preflight(NamedTuple):
     base: str
     warning: str
     dirty: List[str]
+    baseline: Tuple[str, ...] = ()
 
 
 class StepResult(NamedTuple):
@@ -112,7 +113,8 @@ def preflight(root: Path, options: Any, runner: Any = subprocess.run) -> Preflig
     root = Path(root)
     base, warning = resolve_base(root, options, runner)
     dirty: List[str] = []
-    for path in _porcelain_paths(root, runner):
+    paths = _porcelain_paths(root, runner)
+    for path in paths:
         if not any(fnmatch.fnmatch(path, pattern) for pattern in base_mod.CLASS_ALLOWLIST):
             continue
         if path == "tests/test_opencode_v2_surface.py":
@@ -120,7 +122,7 @@ def preflight(root: Path, options: Any, runner: Any = subprocess.run) -> Preflig
                 dirty.append(path)
         else:
             dirty.append(path)
-    return Preflight(base, warning, dirty)
+    return Preflight(base, warning, dirty, tuple(paths))
 
 
 def _load_test_module(root: Path, filename: str, alias: str) -> Any:
@@ -385,3 +387,212 @@ def run_steps(root: Path, options: Any, runner: Any = subprocess.run) -> List[St
     if unknown:
         raise base_mod.RebaselineError("unknown step: {}".format(", ".join(unknown)))
     return [STEP_FUNCS[name](root, options, runner) for name in names]
+
+
+# --- Task 7: pipeline, verify and idempotency --------------------------------
+
+Snapshot = base_mod.Snapshot
+_HASH_FILES = (
+    "tests/fixtures/ac01-baseline/hashes.json", ".meta-config/generated-file-hashes.json",
+    ".meta-config/context-hashes.json",
+)
+
+
+class PipelineResult(NamedTuple):
+    """Complete outcome of one rebaseline run."""
+    exit_code: int = EXIT_OK
+    pre: List[Any] = []
+    steps: List[StepResult] = []
+    post: List[Any] = []
+    residual: List[str] = []
+    changed_files: List[str] = []
+    changed_keys: List[str] = []
+    gate: str = "ok"
+    verify: str = "skipped"
+    idempotency: str = "ok"
+    log: Optional[str] = None
+    warnings: List[str] = []
+
+
+def _scratch_dir(root: Path, options: Any) -> Path:
+    """Provision the scratch directory inside the repository tmp sink."""
+    from lib.tmp_paths import resolve_tmp_paths
+    paths = resolve_tmp_paths(Path(root), (options or {}).get("config"))
+    if not paths.enabled or paths.absolute is None:
+        raise base_mod.RebaselineError(
+            "tmp sink disabled: the rebaseline helper requires an enabled .tmp sink"
+        )
+    scratch = Path(paths.absolute) / "rebaseline"
+    scratch.mkdir(parents=True, exist_ok=True)
+    return scratch
+
+
+def _json_state(root: Path) -> dict:
+    """Read the three JSON hash files as a ``{rel: {key: value}}`` mapping."""
+    state = {}
+    for rel in _HASH_FILES:
+        path = Path(root) / rel
+        if not path.is_file():
+            continue
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):  # malformed file is treated as empty
+            value = {}
+        state[rel] = value if isinstance(value, dict) else {}
+    return state
+
+
+def _changed_files(root: Path, pf: Preflight, runner: Any) -> List[str]:
+    """Files changed by this run, as a difference to the preflight baseline."""
+    baseline = set(pf.baseline)
+    return sorted(set(_porcelain_paths(root, runner)) - baseline)
+
+
+def _changed_keys(root: Path, files: Any, before: Any) -> List[str]:
+    """Hash keys added, removed or re-valued by this run."""
+    after = _json_state(root)
+    changed = set()
+    for rel in set(files or ()) & set(_HASH_FILES):
+        old = dict(before.get(rel) or {})
+        new = dict(after.get(rel) or {})
+        for key in set(old) | set(new):
+            if old.get(key) != new.get(key):
+                changed.add(key)
+    return sorted(changed)
+
+
+def _changed_sources(root: Path, pf: Preflight, runner: Any) -> List[str]:
+    """Sources changed against ``--base`` (used to derive allowed key stems)."""
+    result = _git_runner(
+        root,
+        ["git", "diff", "--name-only", "{}...HEAD".format(pf.base)],
+        runner,
+    )
+    return [Path(line).as_posix() for line in _stdout(result).splitlines() if line]
+
+
+def verify(root: Path, runner: Any = subprocess.run) -> List[PinStatus]:
+    """Run the targeted pin detectors from the registry."""
+    return base_mod.impact_report(root, runner)
+
+
+def run_pipeline(root: Path, options: Any, runner: Any = subprocess.run) -> PipelineResult:
+    """Preflight, write, re-check, verify and log in the specified order.
+
+    Exit codes follow spec C3: 2 usage/preflight, 3 gate, 4 subprocess, 5 red
+    verification, 6 residual drift; priority 5 over 6.
+    """
+    root = Path(root)
+    options = dict(options or {})
+    check_only = bool(options.get("check_only"))
+    warnings: List[str] = list(options.get("warnings") or [])
+
+    if not (root / base_mod.CONFIG_REL).is_file():
+        return PipelineResult(EXIT_USAGE, warnings=["missing project config"])
+    try:
+        options["scratch"] = _scratch_dir(root, options)
+    except Exception as exc:  # sink disabled/invalid (OF-6: exit 2)
+        return PipelineResult(EXIT_USAGE, warnings=[str(exc)])
+
+    try:
+        pf = base_mod.preflight(root, options, runner)
+    except base_mod.RebaselineError as exc:
+        return PipelineResult(EXIT_USAGE, warnings=[str(exc)])
+    if pf.warning:
+        warnings.append(pf.warning)
+    if pf.dirty:
+        return PipelineResult(
+            EXIT_USAGE, warnings=warnings + ["dirty artifacts: " + ", ".join(pf.dirty)])
+
+    pre = base_mod.impact_report(root, runner)
+    key_before = _json_state(root)
+    snap = Snapshot.take(root, base_mod.CLASS_ALLOWLIST)
+
+    try:
+        steps = base_mod.run_steps(root, options, runner)
+    except base_mod.RebaselineError as exc:
+        snap.restore()
+        return PipelineResult(EXIT_USAGE, warnings=warnings + [str(exc)])
+
+    if any(step.gate == "failed" for step in steps):
+        snap.restore()
+        return PipelineResult(
+            EXIT_SUBPROCESS, pre=list(pre), steps=list(steps), warnings=warnings)
+
+    changed_files = _changed_files(root, pf, runner)
+    changed_keys = _changed_keys(root, changed_files, key_before)
+    stems = base_mod.derive_expected_stems(_changed_sources(root, pf, runner))
+    gate_violations = base_mod.check_gate(
+        changed_files, changed_keys, options.get("expect") or (),
+        options.get("expect_key") or (), stems)
+    if gate_violations:
+        snap.restore()
+        return PipelineResult(
+            EXIT_GATE,
+            pre=list(pre),
+            steps=list(steps),
+            changed_files=changed_files,
+            changed_keys=changed_keys,
+            gate="failed",
+            warnings=warnings + gate_violations,
+        )
+
+    check_options = dict(options, check_only=True)
+    second = base_mod.run_steps(root, check_options, runner)
+    residual = [
+        "{}: {}".format(step.name, step.detail)
+        for step in second if step.wrote
+    ]
+    idempotency = "drift" if residual else "ok"
+
+    if options.get("skip_verify"):
+        post: List[PinStatus] = list(pre)
+        verify_state = "skipped"
+    else:
+        post = verify(root, runner)
+        verify_state = (
+            "failed"
+            if any(status.status == "betroffen" for status in post)
+            else "ok"
+        )
+
+    log_path = None
+    if not check_only and changed_files:
+        log_path = append_log(
+            root,
+            {
+                "reason": options.get("reason", ""),
+                "base": pf.base,
+                "head": options.get("head", ""),
+                "steps": [step.name for step in steps],
+                "changed_files": changed_files,
+                "changed_keys": changed_keys,
+                "gate": "ok",
+                "verify": verify_state,
+                "idempotency": "failed" if idempotency == "drift" else "ok",
+            },
+        )
+
+    if verify_state == "failed":
+        exit_code = EXIT_VERIFY
+    elif idempotency == "drift":
+        exit_code = EXIT_RESIDUAL
+    elif check_only and any(step.wrote for step in steps + second):
+        exit_code = EXIT_DRIFT
+    else:
+        exit_code = EXIT_OK
+
+    return PipelineResult(
+        exit_code,
+        pre=list(pre),
+        steps=list(steps),
+        post=list(post),
+        residual=residual,
+        changed_files=changed_files,
+        changed_keys=changed_keys,
+        gate="ok",
+        verify=verify_state,
+        idempotency=idempotency,
+        log=str(log_path) if log_path is not None else None,
+        warnings=warnings,
+    )

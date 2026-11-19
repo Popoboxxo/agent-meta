@@ -653,3 +653,294 @@ def test_json_report_fields(rb):
 
     assert set(report) == {"pre", "steps", "post", "result"}
 
+
+# --- Task 7: pipeline, verify and idempotency --------------------------------
+
+
+@pytest.fixture()
+def pbp():
+    """Import the pipeline module under test."""
+    if str(_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS))
+    from lib import rebaseline_pipeline
+
+    return rebaseline_pipeline
+
+
+def _patch_pipeline(rb, pbp, monkeypatch, tmp_path, **overrides):
+    """Mock every side-effecting collaborator; return shared event log."""
+    events = []
+    logs = []
+    scratch = tmp_path / ".tmp" / "rebaseline"
+    scratch.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(pbp, "_scratch_dir", lambda root, options: scratch)
+
+    dirty = overrides.get("dirty", [])
+    pf = rb.Preflight(overrides.get("base", "origin/main"), "", list(dirty))
+    monkeypatch.setattr(
+        rb, "preflight",
+        lambda root, options, runner: (events.append("preflight"), pf)[1],
+    )
+
+    def fake_impact(root, runner):
+        events.append("pre")
+        return [rb.PinStatus("AC", "artifact", "ok", "auto")]
+
+    monkeypatch.setattr(rb, "impact_report", fake_impact)
+
+    step_seq = overrides.get("steps") or [
+        [rb.StepResult("ac01", 0, "done", "ok")]
+    ]
+    counter = {"n": 0}
+
+    def fake_run_steps(root, options, runner):
+        count = counter["n"] + 1
+        counter["n"] = count
+        events.append("steps{}".format(count))
+        return list(step_seq[min(count - 1, len(step_seq) - 1)])
+
+    monkeypatch.setattr(rb, "run_steps", fake_run_steps)
+
+    statuses = overrides.get("verify") or [
+        rb.PinStatus("AC", "artifact", "ok", "auto")
+    ]
+    monkeypatch.setattr(
+        pbp, "verify",
+        lambda root, runner: (events.append("verify"), list(statuses))[1],
+    )
+    monkeypatch.setattr(
+        pbp, "_changed_files",
+        lambda root, pf, runner: list(overrides.get("changed_files", [])),
+    )
+    monkeypatch.setattr(
+        pbp, "_changed_keys",
+        lambda root, files, before: list(overrides.get("changed_keys", [])),
+    )
+
+    class FakeSnap:
+        @classmethod
+        def take(cls, root, paths):
+            events.append("snapshot")
+            return cls()
+
+        def restore(self):
+            events.append("restore")
+
+    monkeypatch.setattr(pbp, "Snapshot", FakeSnap)
+    monkeypatch.setattr(
+        pbp, "append_log",
+        lambda root, entry: (events.append("log"), logs.append(entry))[1],
+    )
+    return events, logs
+
+
+def test_pipeline_order_preflight_steps_idempotency_verify_log(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        changed_files=["tests/fixtures/ac01-baseline/hashes.json"],
+    )
+
+    result = pbp.run_pipeline(
+        root, {"base": "origin/main", "reason": "intentional rebaseline"},
+        runner=lambda *a, **k: SimpleNamespace(returncode=0, stdout=""),
+    )
+
+    assert result.exit_code == 0
+    assert events == [
+        "preflight", "pre", "snapshot", "steps1", "steps2", "verify", "log"
+    ]
+
+
+def test_pipeline_dirty_baseline_exits_two(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path, dirty=["standalone/agents/x.md"]
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 2
+    assert events == ["preflight"]
+    assert "standalone/agents/x.md" in " ".join(result.warnings)
+
+
+def test_pipeline_missing_config_exits_two(rb, pbp, tmp_path, monkeypatch):
+    root = tmp_path / "no-config"
+    root.mkdir()
+    _patch_pipeline(rb, pbp, monkeypatch, tmp_path)
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 2
+
+
+def test_pipeline_gate_violation_exits_three_and_rolls_back(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        changed_files=["src/unexpected.txt"],
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 3
+    assert "restore" in events
+    assert "verify" not in events
+    assert "log" not in events
+
+
+def test_pipeline_unexpected_key_exits_three(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        changed_keys=["alpha/agents/unknown.md"],
+    )
+
+    result = pbp.run_pipeline(
+        root, {"reason": "intentional rebaseline", "expect_key": ["alpha/known/*"]}
+    )
+
+    assert result.exit_code == 3
+    assert "restore" in events
+
+
+def test_pipeline_subprocess_failure_exits_four_and_rolls_back(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        steps=[[rb.StepResult("sync", 0, "sync failed", "failed")]],
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 4
+    assert "restore" in events
+    assert "steps2" not in events
+
+
+def test_pipeline_residual_drift_exits_six_but_verifies_and_logs(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    changed = "tests/fixtures/ac01-baseline/hashes.json"
+    events, logs = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        steps=[
+            [rb.StepResult("ac01", 1, "wrote 1", "ok")],
+            [rb.StepResult("ac01", 1, "wrote 1 again", "ok")],
+        ],
+        changed_files=[changed],
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 6
+    assert result.idempotency == "drift"
+    assert result.residual
+    assert "verify" in events and "log" in events
+    assert logs[0]["idempotency"] == "failed"
+
+
+def test_pipeline_red_pin_test_exits_five(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    changed = "tests/fixtures/ac01-baseline/hashes.json"
+    events, logs = _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        verify=[rb.PinStatus("AC", "artifact", "betroffen", "auto")],
+        changed_files=[changed],
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 5
+    assert result.verify == "failed"
+    assert logs[0]["verify"] == "failed"
+
+
+def test_pipeline_residual_and_red_verify_prefers_five(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    changed = "tests/fixtures/ac01-baseline/hashes.json"
+    _patch_pipeline(
+        rb, pbp, monkeypatch, tmp_path,
+        steps=[
+            [rb.StepResult("ac01", 1, "wrote 1", "ok")],
+            [rb.StepResult("ac01", 1, "wrote 1 again", "ok")],
+        ],
+        verify=[rb.PinStatus("AC", "artifact", "betroffen", "auto")],
+        changed_files=[changed],
+    )
+
+    result = pbp.run_pipeline(root, {"reason": "intentional rebaseline"})
+
+    assert result.exit_code == 5
+    assert result.idempotency == "drift"
+
+
+def test_pipeline_check_only_writes_nothing(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, logs = _patch_pipeline(rb, pbp, monkeypatch, tmp_path)
+
+    result = pbp.run_pipeline(root, {"check_only": True})
+
+    assert result.exit_code == 0
+    assert logs == []
+    assert "log" not in events
+
+
+def test_pipeline_skip_verify_marks_skipped(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    events, _ = _patch_pipeline(rb, pbp, monkeypatch, tmp_path)
+
+    result = pbp.run_pipeline(
+        root, {"reason": "intentional rebaseline", "skip_verify": True}
+    )
+
+    assert result.verify == "skipped"
+    assert "verify" not in events
+
+
+def test_verify_uses_impact_report(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        rb, "impact_report",
+        lambda r, runner: (calls.append(r), [
+            rb.PinStatus("AC", "artifact", "ok", "auto")
+        ])[1],
+    )
+
+    statuses = pbp.verify(root, runner=lambda *a, **k: None)
+
+    assert calls and statuses[0].status == "ok"
+
+
+def test_pipeline_allows_uncommitted_sources(rb, pbp, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+
+    def runner(argv, cwd=None, **kwargs):
+        text = " ".join(str(part) for part in argv)
+        if "rev-parse" in text:
+            return SimpleNamespace(returncode=0, stdout="origin/main")
+        if "status --porcelain" in text:
+            return SimpleNamespace(
+                returncode=0, stdout=" M agents/1-generic/developer.md\n"
+            )
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(pbp, "_scratch_dir", lambda r, o: tmp_path / ".tmp")
+    monkeypatch.setattr(rb, "impact_report", lambda r, run: [])
+    monkeypatch.setattr(
+        pbp, "verify", lambda r, run: []
+    )
+    monkeypatch.setattr(
+        rb, "run_steps",
+        lambda r, o, run: [rb.StepResult("ac01", 0, "done", "ok")],
+    )
+    monkeypatch.setattr(pbp, "_changed_files", lambda r, pf, run: [])
+    monkeypatch.setattr(pbp, "_changed_keys", lambda r, files, before: [])
+
+    result = pbp.run_pipeline(
+        root, {"reason": "intentional rebaseline"}, runner=runner
+    )
+
+    assert result.exit_code == 0
+

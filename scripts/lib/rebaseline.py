@@ -411,6 +411,7 @@ _PIPELINE_EXPORTS = frozenset(
         "EXIT_OK", "EXIT_DRIFT", "EXIT_USAGE", "EXIT_GATE",
         "EXIT_SUBPROCESS", "EXIT_VERIFY", "EXIT_RESIDUAL",
         "ceiling_repin_block", "append_log", "build_json_report",
+        "PipelineResult", "run_pipeline", "verify",
     }
 )
 
