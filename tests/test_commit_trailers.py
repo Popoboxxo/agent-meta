@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from lib.commit_trailers import (  # noqa: E402
+    check_commit_message,
     commit_violations,
     commit_warnings,
     render_commit_trailers,
@@ -149,3 +150,103 @@ def test_validate_missing_email_is_warning_only(tmp_path):
 def test_validate_duplicates_and_unknown_key_fail(tmp_path, block):
     rc, out = _validate(tmp_path, block)
     assert rc == 1 and "config-audit.commit" in out
+
+
+# --- C1 check_commit_message (#1247) ------------------------------------------
+
+AGENT = "Agent-Meta-Agent: developer"
+_BOM_ERROR = "commit message starts with a UTF-8 BOM"
+
+
+def test_check_empty_config_is_noop():
+    """AC1: no expected trailers -> never any finding, any message."""
+    for cfg in ({}, {"commit": None}, {"commit": "x"}, _cfg([])):
+        assert check_commit_message("anything", cfg) == ([], [])
+    # A BOM is also ignored when nothing is configured (fail-open default).
+    assert check_commit_message("\ufeffsubject", {}) == ([], [])
+
+
+def test_check_all_trailers_present_verbatim():
+    """AC2: every expected trailer exactly once -> no errors, no warnings."""
+    msg = "fix: thing\n\nSome body\n\n" + AGENT + "\n" + GOOD
+    assert check_commit_message(msg, _cfg([AGENT, GOOD])) == ([], [])
+
+
+def test_check_missing_token_error():
+    """AC3: expected token entirely absent -> 'missing' error."""
+    msg = "fix: thing\n\nSome body\n\n" + GOOD
+    errors, warnings = check_commit_message(msg, _cfg([AGENT]))
+    assert errors == ["commit trailer missing: " + AGENT]
+    assert warnings == []
+
+
+def test_check_duplicate_error():
+    """AC4: exact configured line more than once -> 'duplicated' error."""
+    msg = "fix: thing\n\n" + AGENT + "\n" + AGENT
+    errors, warnings = check_commit_message(msg, _cfg([AGENT]))
+    assert errors == ["commit trailer duplicated: " + AGENT]
+    assert warnings == []
+
+
+def test_check_different_value_is_warning_only():
+    """AC5: same token, different value -> warning, no error (brief override)."""
+    msg = "fix: thing\n\nAgent-Meta-Agent: some-other-value"
+    errors, warnings = check_commit_message(msg, _cfg([AGENT]))
+    assert errors == []
+    assert warnings == [
+        "commit trailer token 'Agent-Meta-Agent' has a different value "
+        "(brief override?)"
+    ]
+
+
+def test_check_trailer_in_body_not_footer_missing():
+    """AC6: token only in an earlier paragraph, not the footer -> missing."""
+    msg = "fix: thing\n\n" + AGENT + "\n\nSome closing body text"
+    errors, warnings = check_commit_message(msg, _cfg([AGENT]))
+    assert errors == ["commit trailer missing: " + AGENT]
+    assert warnings == []
+
+
+def test_check_bom_error():
+    """AC7: leading UTF-8 BOM -> error; remaining valid message adds nothing."""
+    msg = "\ufefffix: thing\n\n" + AGENT
+    errors, warnings = check_commit_message(msg, _cfg([AGENT]))
+    assert errors == [_BOM_ERROR]
+    assert warnings == []
+
+
+def test_check_crlf_and_comment_lines():
+    """CRLF is normalised and git '#' comment lines are dropped."""
+    msg = (
+        "fix: thing\r\n"
+        "\r\n"
+        "# Please enter the commit message\r\n"
+        "# Lines starting with '#' will be ignored\r\n"
+        "\r\n"
+        + AGENT + "\r\n"
+        + GOOD + "\r\n"
+    )
+    assert check_commit_message(msg, _cfg([AGENT, GOOD])) == ([], [])
+
+
+def test_check_one_liner_missing_per_trailer():
+    """A message without a footer paragraph yields one 'missing' per trailer."""
+    errors, warnings = check_commit_message("just a subject", _cfg([AGENT, GOOD]))
+    assert errors == [
+        "commit trailer missing: " + AGENT,
+        "commit trailer missing: " + GOOD,
+    ]
+    assert warnings == []
+
+
+def test_check_trailing_whitespace_ignored():
+    msg = "fix: thing\n\n" + AGENT + "   \n"
+    assert check_commit_message(msg, _cfg([AGENT])) == ([], [])
+
+
+def test_check_never_raises_on_odd_inputs():
+    """Robustness: malformed inputs never raise."""
+    assert check_commit_message(None, _cfg([AGENT]))[0]
+    assert check_commit_message(
+        "subject\n\n" + AGENT, {"commit": {"trailers": [5, AGENT]}}
+    ) == ([], [])
