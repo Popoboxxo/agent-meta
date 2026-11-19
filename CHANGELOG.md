@@ -9,6 +9,7 @@
 
 ### Fixed
 - **`speech-mode` on providers without rules support (#1300):** the schema description of `speech-mode` now states the real channel (rules file for `has_rules: true`, embedded into the context file otherwise). Resolves #1300.
+- **Sentinel scope for `gh`-only calls (#1307):** on providers with capability `hook-agent-id` (Claude Code), the `git` agent no longer requires the `#agent-meta:agent=git` sentinel line for Bash calls that run only `gh` — the extra comment line prevented user allow rules such as `Bash(gh issue *)` from matching. Calls that run `git` keep the sentinel as their first line, and providers without `hook-agent-id` (strict-mode path) keep the unconditional sentinel with byte-identical output. No hook/guard change; sentinel format and convention boundary are unchanged.
 
 ## [2.0.0-beta.9] - 2026-11-16
 

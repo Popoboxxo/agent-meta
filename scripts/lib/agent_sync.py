@@ -485,6 +485,51 @@ def _resolve_sync_targets(
         target_dir.mkdir(parents=True, exist_ok=True)
     return pc, role_map, overrides, target_dir
 
+
+# Git-sentinel scope (issue #1307, Task 1). On providers with the
+# ``hook-agent-id`` capability the guard discards a leading sentinel on the
+# main thread, so a pure ``gh`` call does not need one — the extra comment line
+# breaks user allow rules such as ``Bash(gh issue *)``. Providers WITHOUT that
+# capability keep today's text verbatim (Strict-Mode needs the sentinel on
+# every Bash call). These are module constants so the two render paths cannot
+# drift apart; the leading space on the scope value is intentional (inline
+# after a sentence, so the empty case stays byte-identical).
+_GIT_SENTINEL_SCOPE_WITH_HOOK_AGENT_ID = (
+    " Exception: for Bash calls that run only `gh` (no `git` in the call), "
+    "do NOT add the sentinel line — it is not needed for `gh`, and the extra "
+    "line makes allow rules such as `Bash(gh issue *)` not match. Run such "
+    "`gh` calls as their own Bash call; never mix `gh` and `git` in one call. "
+    "Every call that runs `git` keeps the sentinel as its first line."
+)
+_GIT_SENTINEL_SCOPE_WITHOUT_HOOK_AGENT_ID = ""
+_GIT_SENTINEL_BASH_RULE_WITH_HOOK_AGENT_ID = (
+    "`git` calls always prefixed with `#agent-meta:agent=git` as the first "
+    "line, `gh`-only calls without it (see workflow step 0)"
+)
+_GIT_SENTINEL_BASH_RULE_WITHOUT_HOOK_AGENT_ID = (
+    "always prefixed with `#agent-meta:agent=git` as the first line "
+    "(see workflow step 0)"
+)
+
+
+def _git_sentinel_scope_vars(pc: dict) -> dict:
+    """Resolve the two inline git-sentinel texts for one provider.
+
+    Pure function driven only by the ``hook-agent-id`` capability — no provider
+    names, no I/O. Consumed by :func:`_build_provider_vars` (provider-injected
+    template values) and asserted verbatim by the Task 1 regression tests.
+    """
+    if provider_has_capability(pc, "hook-agent-id"):
+        return {
+            "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITH_HOOK_AGENT_ID,
+            "GIT_SENTINEL_BASH_RULE": _GIT_SENTINEL_BASH_RULE_WITH_HOOK_AGENT_ID,
+        }
+    return {
+        "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITHOUT_HOOK_AGENT_ID,
+        "GIT_SENTINEL_BASH_RULE": _GIT_SENTINEL_BASH_RULE_WITHOUT_HOOK_AGENT_ID,
+    }
+
+
 def _build_provider_vars(
     pc: dict,
     provider: str,
@@ -538,6 +583,10 @@ def _build_provider_vars(
         # never as a crashed sync.
         'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
     }
+    # issue #1307 (Task 1): inline git-sentinel scope texts, capability-driven
+    # so gh-only calls may omit the sentinel on hook-agent-id providers while
+    # every other provider keeps the byte-identical legacy text.
+    provider_vars.update(_git_sentinel_scope_vars(pc))
     # IC-02/IC-03 (AC-30): per-provider context-profile values resolved in
     # build_variables; the core CONTEXT_PROFILE/CONTEXT_PROFILE_COMPACT values
     # are only the full/false fallback.

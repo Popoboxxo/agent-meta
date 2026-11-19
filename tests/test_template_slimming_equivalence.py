@@ -258,6 +258,13 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   have no golden, so no other golden changed. ``_GOLDEN_ROLE_COUNT`` (58), the normalization table
   and ``compact-golden`` are unchanged. AC-T4 digest ``d8c20af6…`` -> ``22ac56a9…``; diff manifest
   entry in ``tests/fixtures/slimming-golden/README.md``.
+* Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): ``git.md`` golden rebaselined in
+  exactly two lines — the sentinel paragraph gained the ``gh``-only exception sentence and the
+  ``<tools>`` Bash line now reads "``git`` calls always prefixed … ``gh``-only calls without it".
+  No version/generated-from pin, no project meta token and no normalization-table entry changed;
+  the other 57 goldens, ``_GOLDEN_ROLE_COUNT`` (58) and ``compact-golden`` are unchanged.
+  AC-T4 digest ``10f5c4c7…`` -> ``b18ac19c…``; diff manifest entry in
+  ``tests/fixtures/slimming-golden/README.md``.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

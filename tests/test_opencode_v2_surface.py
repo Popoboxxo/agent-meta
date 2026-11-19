@@ -5514,10 +5514,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ac01-baseline re-pinned (36 per-file hashes, the 4 audit roles x 9 providers, -> 090cfabe.. -> 7d92667b..); slimming-golden re-pinned (app-lifecycle-governor golden: version/generated-from 1.4.1 -> 1.4.2 + {{ARTIFACT_AUDITS_DIR}} rendered path, plus the README manifest entry -> d8c20af6.. -> 22ac56a9..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 (2026-11-18, artifact-locations rule): compact-golden re-pinned (agents-managed.md: one "Weitere Regeln als Skills" line + artifact-locations; 4ac22975.. -> ef8123cc..); ac01-baseline/slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # Issue #1300 (2026-11-18, speech-mode schema description): ac01-baseline re-pinned (9 .meta-config/project.yaml hashes, 1 per provider; e3f2cd50.. -> 9cee45b8..); slimming-golden/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
-# PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`; 9cee45b8.. -> f5802ab2..); slimming-golden/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): ac01-baseline re-pinned (1 Claude git.md hash; 9cee45b8.. -> 3e389da2..); slimming-golden re-pinned (git golden: two lines, plus README manifest entry; 10f5c4c7.. -> b18ac19c..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
+# PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`); merged AC-T4 chain 9cee45b8.. -> 3e389da2.. (main #1307) -> 08ae786f.. (final, after merging #1307 + #1309); slimming-golden (main value b18ac19c..)/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "f5802ab247bcf07a7d94c679bb01f4d484819ec7aeb09e4a54b8d29ef118f877",
-    "slimming-golden": "10f5c4c7fd14de4285735fd9a080c5f4b7254fe21477a81c32a3d29ab7fba2c0",
+    "ac01-baseline": "08ae786f0d789f9c7051b70c67aa747f59e016604ee30538c942e2a0c7aba915",
+    "slimming-golden": "b18ac19cfb98fce389708e840e8e750d53939cf142d3317ae94d6dd6ddae251b",
     "compact-golden": "ef8123cc4687f63fafb87d1a9e4a4b6a920bf6cb71fbb4a0dfeb8cb9f033aaaf",
 }
 

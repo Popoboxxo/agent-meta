@@ -121,3 +121,14 @@ clause); no project meta token touched. The other three audit roles have no
 golden; the remaining 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and the normalization
 table are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
 `tests/test_template_slimming_equivalence.py`.
+
+## Diff manifest — Issue #1307 rebaseline (2026-11-19)
+
+**Reason:** provider variables `GIT_SENTINEL_SCOPE_BLOCK` / `GIT_SENTINEL_BASH_RULE` let the
+Claude render of `git.md` (capability `hook-agent-id`) skip the sentinel line for `gh`-only Bash
+calls. Exactly one golden was rebaselined, `git.md`, in two lines: the sentinel paragraph gained
+the `gh`-only exception sentence, and the `<tools>` Bash line now reads "`git` calls always
+prefixed … `gh`-only calls without it". No version/generated-from pin, no project meta token and
+no normalization-table entry changed; the other 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and
+`compact-golden` are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
+`tests/test_template_slimming_equivalence.py`.

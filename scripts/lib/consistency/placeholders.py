@@ -151,6 +151,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # agent_sync._build_provider_vars from build_variables' provider-mapped
     # prerender (issue #264)
     "INTENT_ROUTING_TOOLS",
+    # Git-sentinel scope (issue #1307): injected per provider by
+    # agent_sync._build_provider_vars from the hook-agent-id capability.
+    # Registered here so --validate sees no unknown/unused placeholder.
+    "GIT_SENTINEL_SCOPE_BLOCK", "GIT_SENTINEL_BASH_RULE",
 
     "ROUTE_INTENT_CALLABLE",
     # Block-inlining variables loaded from snippets/agents/ by
