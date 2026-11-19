@@ -205,3 +205,30 @@ def test_age_rule_prunes_lone_old_backup_only(tmp_path):
         path.write_text("x", encoding="utf-8")
     assert select_prunable_sync_backups(tmp_path, 3, max_age_days=30) == [old]
     assert select_prunable_sync_backups(tmp_path, 3) == []  # default: count-only
+
+
+def _sync(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"),
+         "--config", str(root / ".meta-config" / "project.yaml")],
+        cwd=str(root), capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=180)
+
+
+def test_hook_backups_stay_within_keep_after_each_sync(tmp_path):
+    """#1270 (d): drift backups written after the prune must not exceed keep=3."""
+    _cli_project(tmp_path)
+    shutil_agents = tmp_path / ".claude" / "agents"
+    for p in shutil_agents.glob("*.sync-backup-*"):
+        p.unlink()
+    first = _sync(tmp_path)
+    assert first.returncode == 0, first.stdout + first.stderr
+    hooks = tmp_path / ".claude" / "hooks"
+    managed = (hooks / ".agent-meta-managed").read_text(encoding="utf-8").split()
+    target = next(hooks / n for n in managed if (hooks / n).is_file())
+    for run in range(5):
+        target.write_text(f"manual edit {run}\n", encoding="utf-8")
+        res = _sync(tmp_path)
+        assert res.returncode == 0, res.stdout + res.stderr
+        n = len(list(hooks.glob(f"{target.name}.sync-backup-*")))
+        assert n <= 3, f"run {run}: {n} backups of {target.name}"
