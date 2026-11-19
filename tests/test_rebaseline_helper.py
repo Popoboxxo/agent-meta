@@ -166,3 +166,83 @@ def test_snapshot_handles_directory_and_glob_paths(rb, tmp_path):
 
     assert kept.read_bytes() == b"keep original"
     assert not new.exists()
+
+
+# --- Task 3: diff gate -------------------------------------------------------
+
+
+def test_class_allowlist_covers_core_artifacts(rb):
+    allow = set(rb.CLASS_ALLOWLIST)
+    assert "tests/fixtures/ac01-baseline/hashes.json" in allow
+    assert ".meta-config/generated-file-hashes.json" in allow
+    assert ".meta-config/context-hashes.json" in allow
+    assert "standalone/**" in allow
+    assert "tests/test_opencode_v2_surface.py" in allow
+    assert ".meta-config/rebaseline-log.jsonl" in allow
+    assert any("a2a-delegation-gates.role-" in path for path in allow)
+
+
+def test_derive_expected_stems_from_sources(rb):
+    stems = rb.derive_expected_stems(
+        [
+            "agents/1-generic/developer.md",
+            "rules/1-generic/branch-guard.md",
+            "hooks/git-commit.sh",
+            "templates/agents/foo.md",
+        ]
+    )
+    assert stems == {"developer", "branch-guard", "git-commit", "foo"}
+
+
+def test_derive_expected_stems_fails_closed_for_config_and_lib(rb):
+    assert rb.derive_expected_stems(
+        ["config/project.yaml", "scripts/lib/config.py"]
+    ) == set()
+
+
+def test_check_gate_allowlisted_files_pass(rb):
+    violations = rb.check_gate(
+        ["tests/fixtures/ac01-baseline/hashes.json", "standalone/agents/x.md"],
+        [],
+        [],
+        [],
+        {"developer"},
+    )
+    assert violations == []
+
+
+def test_check_gate_unexpected_file_is_violation(rb):
+    violations = rb.check_gate(["src/unexpected.txt"], [], [], [], set())
+    assert violations and any("src/unexpected.txt" in item for item in violations)
+
+
+def test_check_gate_expect_glob_allows_file(rb):
+    assert rb.check_gate(["docs/extra.md"], [], ["docs/**"], [], set()) == []
+
+
+def test_check_gate_key_with_matching_stem_passes(rb):
+    violations = rb.check_gate(
+        [], ["alpha/agents/developer.md"], [], [], {"developer"}
+    )
+    assert violations == []
+
+
+def test_check_gate_foreign_key_is_violation(rb):
+    violations = rb.check_gate(
+        [], ["alpha/agents/unknown.md"], [], [], {"developer"}
+    )
+    assert violations and any("unknown" in item for item in violations)
+
+
+def test_check_gate_expect_key_glob_allows(rb):
+    assert (
+        rb.check_gate([], ["config/custom.yaml"], [], ["config/*"], set()) == []
+    )
+
+
+def test_check_gate_config_source_without_expect_key_fails_closed(rb):
+    stems = rb.derive_expected_stems(["config/project.yaml"])
+    violations = rb.check_gate(
+        [], ["alpha/agents/developer.md"], [], [], stems
+    )
+    assert violations  # no stem mapping and no --expect-key => fail closed

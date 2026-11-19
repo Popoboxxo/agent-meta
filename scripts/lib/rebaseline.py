@@ -143,3 +143,76 @@ class Snapshot:
             target = self._root / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+
+
+#: Repo-relative path globs whose changes the gate tolerates (spec "Diff-Gate",
+#: section 1). This is also the definition of "rebaseline artifacts" used by
+#: preflight; hand-patched goldens and ceiling tables are deliberately absent.
+CLASS_ALLOWLIST: Tuple[str, ...] = (
+    "tests/fixtures/ac01-baseline/hashes.json",
+    ".meta-config/generated-file-hashes.json",
+    ".meta-config/context-hashes.json",
+    "standalone/**",
+    "tests/test_opencode_v2_surface.py",
+    "tests/fixtures/topology-golden/a2a-delegation-gates.role-*.md",
+    ".meta-config/rebaseline-log.jsonl",
+    # Sync side effects (derived expectation; spec section Diff-Gate 1).
+    "CLAUDE.md",
+    "AGENTS.md",
+)
+
+_STEM_SOURCE_PREFIXES = ("agents/", "rules/", "hooks/", "templates/")
+
+
+def derive_expected_stems(changed_sources: Iterable[object]) -> Set[str]:
+    """Map changed source paths to role/rule/hook stems.
+
+    Sources without a stem mapping (``config/**``, ``scripts/lib/**``) produce
+    nothing: the caller must pass an explicit ``--expect-key`` for them, so an
+    unanticipated hash key cannot slip through the gate (fail-closed).
+    """
+    stems: Set[str] = set()
+    for source in changed_sources:
+        rel = Path(str(source)).as_posix()
+        if any(rel.startswith(prefix) for prefix in _STEM_SOURCE_PREFIXES):
+            stem = Path(rel).stem
+            if stem:
+                stems.add(stem)
+    return stems
+
+
+def check_gate(
+    changed_files: Iterable[object],
+    changed_keys: Iterable[object],
+    expect: Iterable[object],
+    expect_key: Iterable[object],
+    stems: Iterable[str],
+) -> List[str]:
+    """Return gate violations; an empty list means the diff is allowed.
+
+    File paths are matched against the class allowlist plus explicit
+    ``--expect`` globs. Hash keys are matched against explicit ``--expect-key``
+    globs plus the derived stems (``**/<stem>*``); with no stem and no glob a
+    key is always a violation.
+    """
+    violations: List[str] = []
+    file_globs = list(CLASS_ALLOWLIST) + [str(g) for g in (expect or [])]
+    key_globs = [str(g) for g in (expect_key or [])]
+    expected_stems = set(stems)
+
+    for changed in changed_files:
+        rel = Path(str(changed)).as_posix()
+        if not any(fnmatch.fnmatch(rel, pattern) for pattern in file_globs):
+            violations.append("unexpected file: {}".format(rel))
+
+    for raw_key in changed_keys:
+        key = str(raw_key)
+        allowed = any(fnmatch.fnmatch(key, pattern) for pattern in key_globs)
+        if not allowed:
+            for stem in expected_stems:
+                if fnmatch.fnmatch(key, "*/{}*".format(stem)):
+                    allowed = True
+                    break
+        if not allowed:
+            violations.append("unexpected key: {}".format(key))
+    return violations
