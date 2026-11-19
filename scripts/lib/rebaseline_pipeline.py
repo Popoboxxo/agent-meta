@@ -9,6 +9,7 @@ import fnmatch
 import json
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, NamedTuple, Optional, Tuple
 
@@ -263,9 +264,108 @@ def step_digests(root: Path, options: Any, runner: Any = subprocess.run) -> Step
     return StepResult("digests", len(changes), detail, "ok")
 
 
+EXIT_OK = 0
+EXIT_DRIFT = 1
+EXIT_USAGE = 2
+EXIT_GATE = 3
+EXIT_SUBPROCESS = 4
+EXIT_VERIFY = 5
+EXIT_RESIDUAL = 6
+
+_TOLERANCE_MIN_BYTES = 256
+_TOLERANCE_RATIO = 0.02
+_TOLERANCE_MAX_BYTES = 4096
+
+
+def _pin_value(pins: Any, provider: str, artifact: str) -> Any:
+    """Look up an Ist pin in a nested, flat or tuple-keyed pin mapping."""
+    if not pins:
+        return None
+    if (provider, artifact) in pins:
+        return pins[(provider, artifact)]
+    provider_map = pins.get(provider)
+    if isinstance(provider_map, dict):
+        return provider_map.get(artifact)
+    return pins.get("{}/{}".format(provider, artifact))
+
+
+def ceiling_repin_block(report: Any, ist_full: Any, ist_compact: Any) -> str:
+    """Render the ready-to-apply ceiling re-pin block (output only).
+
+    Artifacts whose measured value stays within the documented tolerance are
+    skipped. No file is written, so tolerance constants and ceiling tables stay
+    byte-identical (issue #1115: verification remains a human step).
+    """
+    lines: List[str] = []
+    for provider, artifacts in dict(report or {}).items():
+        for artifact, stat in dict(artifacts or {}).items():
+            measured = stat.get("bytes") if isinstance(stat, dict) else stat
+            old = _pin_value(ist_full, provider, artifact)
+            base = "full"
+            if old is None:
+                old = _pin_value(ist_compact, provider, artifact)
+                base = "compact"
+            if old is None or measured is None:
+                continue
+            tolerance = min(
+                max(_TOLERANCE_MIN_BYTES, int(_TOLERANCE_RATIO * int(old))),
+                _TOLERANCE_MAX_BYTES,
+            )
+            if abs(int(measured) - int(old)) <= tolerance:
+                continue
+            lines.append(
+                "CE {} {} {} old={} new={}".format(
+                    base, provider, artifact, old, measured
+                )
+            )
+    return "\n".join(lines)
+
+
 def step_ceilings(root: Path, options: Any, runner: Any = subprocess.run) -> StepResult:
-    """Placeholder; the ceiling report block is produced in Task 6."""
-    return StepResult("ceilings", 0, "RE-PIN-BLOCK not applied", "ok")
+    """Print the ceiling re-pin block without applying it."""
+    options = options or {}
+    block = ceiling_repin_block(
+        options.get("ceiling_report") or {},
+        options.get("ist_full") or {},
+        options.get("ist_compact") or {},
+    )
+    return StepResult(
+        "ceilings", 0, block or "RE-PIN-BLOCK not applied", "ok"
+    )
+
+
+def append_log(root: Path, entry: Any) -> Optional[Path]:
+    """Append one JSON line to the rebaseline log, only when files changed."""
+    entry = dict(entry or {})
+    if not entry.get("changed_files"):
+        return None
+    path = Path(root) / ".meta-config" / "rebaseline-log.jsonl"
+    line = {
+        "ts": entry.get("ts") or datetime.now(timezone.utc).isoformat(),
+        "reason": entry.get("reason", ""),
+        "base": entry.get("base", ""),
+        "head": entry.get("head", ""),
+        "steps": list(entry.get("steps") or []),
+        "changed_files": list(entry.get("changed_files") or []),
+        "changed_keys": list(entry.get("changed_keys") or []),
+        "gate": entry.get("gate", "ok"),
+        "verify": entry.get("verify", "skipped"),
+        "idempotency": entry.get("idempotency", "ok"),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(line, sort_keys=True) + "\n")
+    return path
+
+
+def build_json_report(pre: Any, steps: Any, post: Any, result: Any) -> dict:
+    """Machine-readable report with the four fields required by AC 14."""
+    return {
+        "pre": list(pre or []),
+        "steps": list(steps or []),
+        "post": list(post or []),
+        "result": dict(result or {}),
+    }
 
 
 STEP_FUNCS = {

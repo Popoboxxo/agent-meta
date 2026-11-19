@@ -578,3 +578,78 @@ def test_resolve_base_falls_back_to_local_main_with_warning(rb, tmp_path):
     assert base == "main"
     assert "main" in warning
 
+
+# --- Task 6: ceiling report, log and exit codes ------------------------------
+
+
+def test_ceiling_block_names_provider_artifact_old_new(rb):
+    report = {"alpha": {"entry-file": {"bytes": 900}}}
+    ist_full = {"alpha": {"entry-file": 400}}
+
+    block = rb.ceiling_repin_block(report, ist_full, {})
+
+    assert "alpha" in block
+    assert "entry-file" in block
+    assert "400" in block
+    assert "900" in block
+
+
+def test_ceiling_block_tolerance_and_file_unchanged(rb):
+    tolerance_file = _REPO_ROOT / "tests" / "test_context_budgets.py"
+    before = tolerance_file.read_bytes()
+    small = rb.ceiling_repin_block(
+        {"alpha": {"entry-file": {"bytes": 410}}},
+        {"alpha": {"entry-file": 400}},
+        {},
+    )
+
+    assert small == ""
+    assert tolerance_file.read_bytes() == before
+
+
+def test_exit_codes_cover_zero_to_six(rb):
+    assert [
+        rb.EXIT_OK, rb.EXIT_DRIFT, rb.EXIT_USAGE, rb.EXIT_GATE,
+        rb.EXIT_SUBPROCESS, rb.EXIT_VERIFY, rb.EXIT_RESIDUAL,
+    ] == [0, 1, 2, 3, 4, 5, 6]
+
+
+def test_append_log_valid_line_only_on_change(rb, tmp_path):
+    root = _step_root(tmp_path)
+    log = root / ".meta-config" / "rebaseline-log.jsonl"
+    entry = {
+        "ts": "2026-11-19T00:00:00+00:00",
+        "reason": "intentional rebaseline",
+        "base": "origin/main",
+        "head": "abc",
+        "steps": ["ac01"],
+        "changed_files": ["tests/fixtures/ac01-baseline/hashes.json"],
+        "changed_keys": ["alpha/a.md"],
+        "gate": "ok",
+        "verify": "ok",
+        "idempotency": "ok",
+    }
+
+    path = rb.append_log(root, entry)
+
+    assert path == log
+    line = log.read_text(encoding="utf-8").splitlines()
+    assert len(line) == 1
+    parsed = __import__("json").loads(line[0])
+    assert parsed["reason"] == "intentional rebaseline"
+    assert parsed["idempotency"] == "ok"
+
+    rb.append_log(root, dict(entry, changed_files=[]))
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_json_report_fields(rb):
+    report = rb.build_json_report(
+        [{"klass": "AC", "status": "ok"}],
+        [{"name": "ac01", "wrote": 1}],
+        [{"klass": "AC", "status": "ok"}],
+        {"changed": 1, "gate": "ok", "verify": "ok", "idempotent": "ok"},
+    )
+
+    assert set(report) == {"pre", "steps", "post", "result"}
+

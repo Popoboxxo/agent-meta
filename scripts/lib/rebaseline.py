@@ -408,6 +408,9 @@ _PIPELINE_EXPORTS = frozenset(
         "Preflight", "StepResult", "STEP_ORDER", "resolve_base", "preflight",
         "step_ac01", "step_standalone", "step_sync", "step_topology",
         "step_digests", "step_ceilings", "STEP_FUNCS", "run_steps",
+        "EXIT_OK", "EXIT_DRIFT", "EXIT_USAGE", "EXIT_GATE",
+        "EXIT_SUBPROCESS", "EXIT_VERIFY", "EXIT_RESIDUAL",
+        "ceiling_repin_block", "append_log", "build_json_report",
     }
 )
 
