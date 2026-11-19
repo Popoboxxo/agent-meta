@@ -19,8 +19,9 @@ concurrency:
 jobs:
   # Skips the scenario suite only for PRs whose changed files cannot affect it
   # (unit tests, docs, workflow plumbing). Main runs and schedule stay full.
-  # Rationale: the 4 scenario shards are 40 of the 45 runner-minutes of this
-  # workflow (run 42488240658: 7.6-11.6 min per shard, `validate` 0.9 min).
+  # Rationale: the 4 scenario shards were 37.6 of 38.7 runner-minutes in the
+  # measured main run 44525879087 (`validate` 0.9 min). PRs additionally use
+  # SCENARIO_PROFILE=dev; tag pushes are gated by release-gate.yml.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -69,15 +70,20 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_scenarios == 'true'
     runs-on: ubuntu-latest
-    # 88 scenarios sequentially ≈ 46 min wall clock; 4 shards ≈ 12 min each,
+    # 100 scenarios sequentially ≈ 47 min wall clock; 4 shards ≈ 12 min each,
     # in-shard parallelism (SCENARIO_JOBS) cuts that to roughly half of the
-    # per-scenario time again.
+    # per-scenario time again. PRs use the dev profile, so their shards are
+    # shorter still; main/schedule run the full profile.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
     env:
+      # PRs use the fast profile (same catalog/asserts, source scan once, no
+      # redundant dry-run). Pushes to main and the nightly schedule keep the
+      # full release-equivalent run. A tag push is gated by release-gate.yml.
+      SCENARIO_PROFILE: ${{ github.event_name == 'pull_request' && 'dev' || 'release' }}
       SCENARIO_SHARD: ${{ matrix.shard }}
       SCENARIO_TOTAL: '4'
       # Innerhalb des Shards zwei Szenarien gleichzeitig: lokal gemessen
