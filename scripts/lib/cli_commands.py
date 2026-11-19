@@ -87,6 +87,7 @@ from lib.sync_pipeline import (
     _sync_stage_external_skills_check,
     _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
+    _prune_managed_sync_backups,
     _sync_stage_generated_file_drift_resolve,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
@@ -1760,6 +1761,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
         try:
             _sync_stage_generated_file_drift_resolve(
                 ctx.project_root, drift_findings, ctx.args, ctx.log, written_paths)
+            # #1270 (d): resolve just wrote drift backups after the stage-0
+            # prune; prune again so the per-source keep limit holds per run.
+            if drift_findings:
+                _prune_managed_sync_backups(
+                    ctx.project_root, config, provider_config, ctx.args, ctx.log)
         except Exception as exc:  # noqa: BLE001 - never mask the original abort
             if all_stages_completed:
                 raise
