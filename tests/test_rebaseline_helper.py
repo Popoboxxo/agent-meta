@@ -373,3 +373,208 @@ def test_ac_t4_detector_uses_importlib_loader(rb, tmp_path, monkeypatch):
     assert Path(calls[0][1]) == tmp_path / "tests" / "test_opencode_v2_surface.py"
     assert len(ac_t4) == 1
     assert ac_t4[0].status == "ok"
+
+
+# --- Task 5: write steps and preflight ---------------------------------------
+
+
+def _step_root(root):
+    """Throw-away tree with a config and the files the steps touch."""
+    cfg = root / ".meta-config" / "project.yaml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text("dummy", encoding="utf-8")
+    manifest = root / "tests" / "fixtures" / "ac01-baseline" / "hashes.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text("{}", encoding="utf-8")
+    return root
+
+
+def _ok_runner(calls):
+    def runner(argv, cwd=None, **kwargs):
+        calls.append(" ".join(str(part) for part in argv))
+        return SimpleNamespace(returncode=0, stdout="")
+
+    return runner
+
+
+def test_step_order_recorded(rb, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    order = []
+
+    monkeypatch.setattr(
+        rb, "_render_matrix", lambda *a, **k: (order.append("ac01"), {})[1]
+    )
+    monkeypatch.setattr(
+        rb, "_render_topology", lambda *a, **k: (order.append("topology"), {})[1]
+    )
+    monkeypatch.setattr(
+        rb,
+        "_load_fixture_digester",
+        lambda r: (order.append("digests"), (lambda p: "d"), {})[1:],
+    )
+
+    def runner(argv, cwd=None, **kwargs):
+        text = " ".join(str(part) for part in argv)
+        order.append("standalone" if "--render-standalone" in text else "sync")
+        return SimpleNamespace(returncode=0, stdout="")
+
+    assert rb.STEP_ORDER == (
+        "ac01", "standalone", "sync", "topology", "digests", "ceilings"
+    )
+    results = rb.run_steps(
+        root,
+        {
+            "check_only": True,
+            "steps": ("ac01", "standalone", "sync", "topology", "digests"),
+        },
+        runner,
+    )
+
+    assert [result.name for result in results] == list(results and [
+        "ac01", "standalone", "sync", "topology", "digests"
+    ])
+    assert order == ["ac01", "standalone", "sync", "topology", "digests"]
+
+
+def test_step_ac01_writes_only_differing_keys(rb, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    manifest = root / "tests" / "fixtures" / "ac01-baseline" / "hashes.json"
+    baseline = {"alpha/a.md": "old", "alpha/b.md": "same", "alpha/c.md": "same"}
+    manifest.write_text(
+        __import__("json").dumps(baseline, indent=1, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    current = dict(baseline, **{"alpha/a.md": "new"})
+    monkeypatch.setattr(rb, "_render_matrix", lambda *a, **k: current)
+
+    result = rb.step_ac01(root, {"check_only": False}, lambda *a, **k: None)
+
+    written = __import__("json").loads(manifest.read_text(encoding="utf-8"))
+    assert written == current
+    assert result.wrote == 1
+    assert manifest.read_bytes().endswith(b"\n")
+    assert '\n "alpha/b.md": "same"' in manifest.read_text(encoding="utf-8")
+
+
+def test_step_ac01_idempotent_second_run(rb, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    manifest = root / "tests" / "fixtures" / "ac01-baseline" / "hashes.json"
+    baseline = {"alpha/a.md": "hash"}
+    manifest.write_text(
+        __import__("json").dumps(baseline, indent=1, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    before = manifest.read_bytes()
+    monkeypatch.setattr(rb, "_render_matrix", lambda *a, **k: dict(baseline))
+
+    result = rb.step_ac01(root, {"check_only": False}, lambda *a, **k: None)
+
+    assert result.wrote == 0
+    assert manifest.read_bytes() == before
+
+
+def test_step_digests_patches_only_fixture_trees_line(rb, tmp_path, monkeypatch):
+    root = _step_root(tmp_path)
+    surface = root / "tests" / "test_opencode_v2_surface.py"
+    surface.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        "# log comment line one\n"
+        "# log comment line two\n"
+        "_FIXTURE_TREES = {\n"
+        '    "ac01-baseline": "OLD_DIGEST",\n'
+        '    "compact-golden": "KEEP_DIGEST",\n'
+        "}\n"
+    )
+    surface.write_text(content, encoding="utf-8")
+    fixture = root / "tests" / "fixtures" / "ac01-baseline"
+    fixture.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        rb,
+        "_load_fixture_digester",
+        lambda r: (lambda p: "NEW_DIGEST", {"ac01-baseline": "OLD_DIGEST"}),
+    )
+
+    result = rb.step_digests(root, {"check_only": False}, lambda *a, **k: None)
+
+    after = surface.read_text(encoding="utf-8")
+    lines = after.splitlines(keepends=True)
+    assert lines[0] == "# log comment line one\n"
+    assert lines[1] == "# log comment line two\n"
+    assert lines[2] == "_FIXTURE_TREES = {\n"
+    assert lines[3] == '    "ac01-baseline": "NEW_DIGEST",\n'
+    assert lines[4] == '    "compact-golden": "KEEP_DIGEST",\n'
+    assert "OLD_DIGEST" not in after
+    assert result.wrote == 1
+
+
+def test_preflight_allows_uncommitted_sources_and_hand_goldens(rb, tmp_path):
+    root = _step_root(tmp_path)
+
+    def runner(argv, cwd=None, **kwargs):
+        text = " ".join(str(part) for part in argv)
+        if "rev-parse" in text:
+            return SimpleNamespace(returncode=0, stdout="origin/main")
+        return SimpleNamespace(
+            returncode=0,
+            stdout=" M agents/1-generic/developer.md\n M tests/fixtures/compact-golden/agents-managed.md\n",
+        )
+
+    result = rb.preflight(root, {"base": "origin/main"}, runner)
+
+    assert result.dirty == []
+    assert result.base == "origin/main"
+    assert result.warning == ""
+
+
+def test_preflight_blocks_dirty_artifact(rb, tmp_path):
+    root = _step_root(tmp_path)
+
+    def runner(argv, cwd=None, **kwargs):
+        text = " ".join(str(part) for part in argv)
+        if "rev-parse" in text:
+            return SimpleNamespace(returncode=0, stdout="origin/main")
+        return SimpleNamespace(returncode=0, stdout=" M standalone/agents/x.md\n")
+
+    result = rb.preflight(root, {"base": "origin/main"}, runner)
+
+    assert result.dirty
+
+
+def test_preflight_fixture_trees_linewise(rb, tmp_path):
+    root = _step_root(tmp_path)
+
+    def make_runner(diff_text):
+        def runner(argv, cwd=None, **kwargs):
+            text = " ".join(str(part) for part in argv)
+            if "rev-parse" in text:
+                return SimpleNamespace(returncode=0, stdout="origin/main")
+            if "status --porcelain" in text:
+                return SimpleNamespace(
+                    returncode=0, stdout=" M tests/test_opencode_v2_surface.py\n"
+                )
+            return SimpleNamespace(returncode=0, stdout=diff_text)
+
+        return runner
+
+    allowed = make_runner(
+        "@@ -5518,1 +5518,1 @@\n-    \"ac01-baseline\": \"OLD\",\n+    \"ac01-baseline\": \"NEW\",\n"
+    )
+    blocked = make_runner("@@ -10,1 +10,1 @@\n-def helper():\n+def helper2():\n")
+
+    assert rb.preflight(root, {"base": "origin/main"}, allowed).dirty == []
+    assert rb.preflight(root, {"base": "origin/main"}, blocked).dirty
+
+
+def test_resolve_base_falls_back_to_local_main_with_warning(rb, tmp_path):
+    root = _step_root(tmp_path)
+
+    def runner(argv, cwd=None, **kwargs):
+        text = " ".join(str(part) for part in argv)
+        code = 1 if "origin/main" in text else 0
+        return SimpleNamespace(returncode=code, stdout="main")
+
+    base, warning = rb.resolve_base(root, {"base": "origin/main"}, runner)
+
+    assert base == "main"
+    assert "main" in warning
+

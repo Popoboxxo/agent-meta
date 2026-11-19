@@ -10,6 +10,8 @@ from __future__ import annotations
 import fnmatch
 import glob as glob_module
 import importlib.util
+import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -383,3 +385,37 @@ def impact_report(root: Path, runner: Any = subprocess.run) -> List[PinStatus]:
             PinStatus(pin.klass, ", ".join(pin.paths), status, pin.action)
         )
     return statuses
+
+
+
+
+def _render_matrix(root: Path, scratch: Optional[Path], runner: Any) -> dict:
+    """Delegate to the pipeline implementation (lazy, avoids import cycles)."""
+    from lib import rebaseline_pipeline as pipeline
+
+    return pipeline._render_matrix(root, scratch, runner)
+
+
+def _render_topology(root: Path, scratch: Optional[Path], runner: Any) -> dict:
+    """Delegate to the pipeline implementation (lazy, avoids import cycles)."""
+    from lib import rebaseline_pipeline as pipeline
+
+    return pipeline._render_topology(root, scratch, runner)
+
+
+_PIPELINE_EXPORTS = frozenset(
+    {
+        "Preflight", "StepResult", "STEP_ORDER", "resolve_base", "preflight",
+        "step_ac01", "step_standalone", "step_sync", "step_topology",
+        "step_digests", "step_ceilings", "STEP_FUNCS", "run_steps",
+    }
+)
+
+
+def __getattr__(name: str) -> Any:
+    """Expose pipeline symbols through this module without an eager import."""
+    if name in _PIPELINE_EXPORTS:
+        from lib import rebaseline_pipeline as pipeline
+
+        return getattr(pipeline, name)
+    raise AttributeError("module '{}' has no attribute '{}'".format(__name__, name))
