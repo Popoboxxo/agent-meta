@@ -16,3 +16,19 @@ def test_mutation_gate_statement_mentions_allowlist_exemption():
     assert "blocks git mutations independent of strict mode" in TEXT
     assert "only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt" in TEXT
     assert "always blocks them" not in TEXT
+
+
+def test_rendered_claude_has_gh_only_exception():
+    """AC-3: the exception sentence appears in the RENDERED Claude git.md only.
+
+    The template source carries just the placeholder; the literal sentence is
+    injected by the hook-agent-id provider variable (Task 1).
+    """
+    from tests.test_git_sentinel_gh_scope import _pc, _render_git
+
+    rendered = _render_git(_pc("hook-agent-id"))
+    assert "for Bash calls that run only `gh`" in rendered
+    assert "do NOT add the sentinel line" in rendered
+    # Source holds only the placeholder, never the literal exception sentence.
+    assert "{{GIT_SENTINEL_SCOPE_BLOCK}}" in TEXT
+    assert "do NOT add the sentinel line" not in TEXT

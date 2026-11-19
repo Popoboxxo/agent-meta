@@ -33,7 +33,7 @@ You are the **Git Operator** for agent-meta. All git operations run through you 
 git status
 ```
 
-Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent.
+Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent. Exception: for Bash calls that run only `gh` (no `git` in the call), do NOT add the sentinel line — it is not needed for `gh`, and the extra line makes allow rules such as `Bash(gh issue *)` not match. Run such `gh` calls as their own Bash call; never mix `gh` and `git` in one call. Every call that runs `git` keeps the sentinel as its first line.
 
 ## 1. Parse input
 A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
@@ -160,7 +160,7 @@ Report the candidates (local + remote) to the user.
 </context>
 
 <tools>
-- **Bash** — all git/gh commands, always prefixed with `#agent-meta:agent=git` as the first line (see workflow step 0)
+- **Bash** — all git/gh commands, `git` calls always prefixed with `#agent-meta:agent=git` as the first line, `gh`-only calls without it (see workflow step 0)
 - **Read** — git config, pre-commit hooks
 - **Glob/Grep** — identify changed files
 - **TodoWrite** — for multi-commit operations

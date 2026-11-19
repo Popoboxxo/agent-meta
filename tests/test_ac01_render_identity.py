@@ -1063,6 +1063,15 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   added/removed**. No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the
   harness's own ``_hash_file``. AC-T4: ac01 ``e3f2cd50…`` -> ``9cee45b8…``; ``slimming-golden`` and
   ``compact-golden`` unchanged.
+- Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): the provider variables
+  ``GIT_SENTINEL_SCOPE_BLOCK`` / ``GIT_SENTINEL_BASH_RULE`` let the Claude render of ``git.md``
+  (capability ``hook-agent-id``) omit the sentinel line for `gh`-only Bash calls. Patched
+  **per entry**: exactly **1 of 1182 hashes moved** (``Claude/.claude/agents/git.md``); 0
+  added/removed, every other provider byte-identical (AC-2). Hash recomputed with the harness's
+  own ``_hash_file`` from a full ``render_matrix_hashes`` run — not via ``--write``.
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``9cee45b8…`` -> ``3e389da2…``;
+  ``slimming-golden`` re-pinned separately (git golden + README diff manifest); ``compact-golden``
+  unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
