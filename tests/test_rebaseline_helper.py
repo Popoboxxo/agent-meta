@@ -246,3 +246,130 @@ def test_check_gate_config_source_without_expect_key_fails_closed(rb):
         [], ["alpha/agents/developer.md"], [], [], stems
     )
     assert violations  # no stem mapping and no --expect-key => fail closed
+
+
+# --- Task 4: pin registry and detectors -------------------------------------
+
+
+def _make_pin_root(root):
+    """Create a throw-away tree in which every registered pin path exists."""
+    paths = [
+        "tests/fixtures/ac01-baseline/hashes.json",
+        "tests/fixtures/slimming-golden/role.md",
+        "tests/fixtures/compact-golden/agents-managed.md",
+        "tests/fixtures/topology-golden/a2a-delegation-gates.role-active.md",
+        "tests/fixtures/topology-golden/schema-property-paths.json",
+        ".meta-config/generated-file-hashes.json",
+        ".meta-config/context-hashes.json",
+        "standalone/agents/role.md",
+        "tests/test_context_budgets.py",
+        "tests/test_opencode_v2_surface.py",
+    ]
+    for rel in paths:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("fixture", encoding="utf-8")
+
+
+def _fake_ac_t4(rb, monkeypatch):
+    """Avoid importing the large real test module: inject a matching digester."""
+    monkeypatch.setattr(
+        rb,
+        "_load_fixture_digester",
+        lambda root: (
+            lambda path: "digest",
+            {"ac01-baseline": "digest"},
+        ),
+    )
+
+
+def test_pin_registry_covers_all_nine_classes(rb):
+    classes = {pin.klass for pin in rb.PINS}
+    assert classes == {"AC", "AC-T4", "SG", "CG", "TG", "H1", "H2", "SA", "CE"}
+
+
+def test_pin_registry_includes_key_fixtures(rb):
+    all_paths = {path for pin in rb.PINS for path in pin.paths}
+    assert "tests/fixtures/compact-golden/agents-managed.md" in all_paths
+    assert "tests/fixtures/topology-golden/schema-property-paths.json" in all_paths
+
+
+def test_pin_registry_actions(rb):
+    tg = [pin for pin in rb.PINS if pin.klass == "TG"]
+    assert any(pin.action == "auto" for pin in tg)
+    assert any(pin.action == "report-only" for pin in tg)
+    actions = {pin.klass: pin.action for pin in rb.PINS}
+    assert actions["AC"] == "auto"
+    assert actions["SG"] == "report-only"
+    assert actions["CE"] == "report-only"
+
+
+def test_impact_report_red_detector_is_betroffen(rb, tmp_path, monkeypatch):
+    _make_pin_root(tmp_path)
+    _fake_ac_t4(rb, monkeypatch)
+
+    statuses = rb.impact_report(
+        tmp_path,
+        runner=lambda cmd, cwd=None: SimpleNamespace(returncode=1),
+    )
+
+    assert any(status.status == "betroffen" for status in statuses)
+    assert all(status.status in {"ok", "betroffen", "n/a"} for status in statuses)
+
+
+def test_impact_report_green_detector_is_ok(rb, tmp_path, monkeypatch):
+    _make_pin_root(tmp_path)
+    _fake_ac_t4(rb, monkeypatch)
+
+    statuses = rb.impact_report(
+        tmp_path,
+        runner=lambda cmd, cwd=None: SimpleNamespace(returncode=0),
+    )
+
+    assert statuses
+    assert all(status.status == "ok" for status in statuses)
+
+
+def test_impact_report_missing_paths_are_na(rb, tmp_path, monkeypatch):
+    _fake_ac_t4(rb, monkeypatch)
+
+    statuses = rb.impact_report(
+        tmp_path,
+        runner=lambda cmd, cwd=None: SimpleNamespace(returncode=0),
+    )
+
+    assert statuses
+    assert all(status.status == "n/a" for status in statuses)
+
+
+def test_ac_t4_detector_uses_importlib_loader(rb, tmp_path, monkeypatch):
+    calls = []
+
+    class FakeLoader:
+        def exec_module(self, module):
+            module._fixture_tree_sha256 = lambda root: "digest"
+            module._FIXTURE_TREES = {"ac01-baseline": "digest"}
+
+    class FakeSpec:
+        loader = FakeLoader()
+
+    def fake_spec(name, path):
+        calls.append((name, path))
+        return FakeSpec()
+
+    monkeypatch.setattr(rb.importlib.util, "spec_from_file_location", fake_spec)
+    monkeypatch.setattr(
+        rb.importlib.util, "module_from_spec", lambda spec: SimpleNamespace()
+    )
+    _make_pin_root(tmp_path)
+
+    statuses = rb.impact_report(
+        tmp_path,
+        runner=lambda cmd, cwd=None: SimpleNamespace(returncode=0),
+    )
+    ac_t4 = [status for status in statuses if status.klass == "AC-T4"]
+
+    assert calls
+    assert Path(calls[0][1]) == tmp_path / "tests" / "test_opencode_v2_surface.py"
+    assert len(ac_t4) == 1
+    assert ac_t4[0].status == "ok"
