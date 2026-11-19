@@ -1063,6 +1063,17 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   added/removed**. No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the
   harness's own ``_hash_file``. AC-T4: ac01 ``e3f2cd50…`` -> ``9cee45b8…``; ``slimming-golden`` and
   ``compact-golden`` unchanged.
+- PR #1309 (2026-11-19, ``feat/scenario-profile-release-gate``): the new built-in ``scenario-suite``
+  release gate hook is rendered by both hook-writing providers. Re-generated via ``--write``: exactly
+  **8 drift entries; 0 removed** (1182 -> 1184 manifest keys) -- 4 per provider (Claude
+  ``.claude/hooks/release-gates``, Gemini ``.agents/hooks/release-gates``): ``.agent-meta-managed``
+  and ``.sha256-checksums`` (changed), ``scenario-suite.sh`` (added) and
+  ``.meta-config/generated-file-hashes.json`` (changed). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``9cee45b8…`` -> ``8cce5989…``;
+  ``slimming-golden`` and ``compact-golden`` unchanged. The ``scenario-suite.sh`` header comment was
+  then reworded to drop its inline ``project.yaml`` reference (the value is sync-time baked, no runtime
+  config read); re-ran ``--write`` again with still exactly **8 drift entries; 0 removed**. Final AC-T4:
+  ac01 ``8cce5989…`` -> ``f5802ab2…``; ``slimming-golden`` and ``compact-golden`` unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

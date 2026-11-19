@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/../lib/hook_common.sh" 2>/dev/null || exit 0
 
 GATE_NAME="scenario-suite"
 
-# Baked at sync-time from release-gates.scenario-suite.enabled (project.yaml)
+# Baked at sync-time from the release-gates.scenario-suite.enabled setting
 # > dod-preset default > this header's enabled_by_default. The `:=` form keeps
 # an explicit one-off `PRE_RELEASE_GATE_ENABLED=false` override working.
 : "${PRE_RELEASE_GATE_ENABLED:=true}"
