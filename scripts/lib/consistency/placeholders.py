@@ -69,6 +69,9 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Misc
     "SYSTEM_DEPENDENCIES", "SYSTEM_URLS",
     # Orchestrator (injected by build_variables)
+    # Worker-control gate (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-2):
+    # emitted by config.build_variables; register here so B2's gate resolves.
+    "WORKER_CONTROL_ENABLED",
     "ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "DIRECT_DISPATCH_SECTION", "ORCHESTRATOR_OUTCOME_CACHING",
     "ORCHESTRATOR_CACHE_TTL", "ORCHESTRATOR_CACHE_MAX_ENTRIES",
     # Orchestrator topology axis (IC-4): emitted by config.build_variables via

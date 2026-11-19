@@ -107,6 +107,17 @@
 # NO registry entry and is counted as 4 UNVERIFIED cells, never as a generic
 # default. Probe-driven upgrades change these values only through the three
 # P0-gate conditions (evidence row, verified-state change, invariant test).
+#
+# worker_control_tools (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1; #1176):
+#   list of tool names a provider uses to control a running worker (continue,
+#   stop, wait). Grants the primary role its extra tools (replaces the former
+#   `primary-role-tools` transform-spec key) and gates the worker-control prose
+#   via WORKER_CONTROL_ENABLED. Every registered provider MUST carry the key;
+#   missing/empty resolves fail-safe to `[]`/false (conservative default, no
+#   speculative tool knowledge). Names are validated against the existing
+#   config/provider-tools.yaml whitelist (unknown => WARNING, no abort).
+#   Approved mapping: Claude [SendMessage, TaskStop], Codex [send_input,
+#   close_agent, wait_agent], Gemini [send_message], all others [].
 
 capabilities:
   Claude:
@@ -123,6 +134,7 @@ capabilities:
     runtime_gate: hook                  # verified PreToolUse hook contract (hook_protocol claude-code-json)
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]
+    worker_control_tools: ["SendMessage", "TaskStop"]  # IC-1: worker control (#1176)
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
@@ -181,6 +193,7 @@ capabilities:
     runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["task"]
+    worker_control_tools: []             # IC-1: no verified worker-control tool
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
@@ -239,6 +252,7 @@ capabilities:
     runtime_gate: hook             # verified Antigravity hooks.json contract (hook_protocol antigravity-hooks-json)
     route_intent_tool: false       # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
+    worker_control_tools: ["send_message"]  # IC-1: worker control (#1176)
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
@@ -306,6 +320,7 @@ capabilities:
     runtime_gate: advisory
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
+    worker_control_tools: []             # IC-1: no verified worker-control tool
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
@@ -367,6 +382,7 @@ capabilities:
     runtime_gate: advisory
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["agent"]    # must also be listed in `tools:` when `agents:` is non-empty — issue #855, UNDERCLAIM P-6 fixed
+    worker_control_tools: []         # IC-1: no verified worker-control tool
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
@@ -436,6 +452,7 @@ capabilities:
     runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
     route_intent_tool: false        # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
+    worker_control_tools: []             # IC-1: no verified worker-control tool
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
@@ -508,6 +525,7 @@ capabilities:
     runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
+    worker_control_tools: ["send_input", "close_agent", "wait_agent"]  # IC-1: worker control (#1176)
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
@@ -581,6 +599,7 @@ capabilities:
     runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
+    worker_control_tools: []                # IC-1: no verified worker-control tool
     structured_handoff: true
     handoff_format: "yaml_text_block" # conservative until json support verified
     handoff_envelope_support: false
@@ -650,6 +669,7 @@ capabilities:
     runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
+    worker_control_tools: []                      # IC-1: no verified worker-control tool
     structured_handoff: true
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false

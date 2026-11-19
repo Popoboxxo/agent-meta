@@ -16,8 +16,8 @@ claude:
   - TodoWrite
   - WebFetch
   - WebSearch
-  - SendMessage         # continue/resume a worker (granted via primary-role-tools; whitelist is provider-wide, #1157)
-  - TaskStop            # stop a background agent/task (granted via primary-role-tools; whitelist is provider-wide, #1157)
+  - SendMessage         # continue/resume a worker (granted via worker_control_tools capability; whitelist is provider-wide, #1176)
+  - TaskStop            # stop a background agent/task (granted via worker_control_tools capability; whitelist is provider-wide, #1176)
   - mcp__*              # MCP tool prefix (wildcard)
 
 opencode:
@@ -47,6 +47,7 @@ gemini:
   - Glob                # implicit in sandbox
   - Grep                # implicit in sandbox
   - TodoWrite           # skipped silently (unsupported, keeps log clean)
+  - send_message        # worker-control capability (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1)
 
 # Known-unsupported tools for Gemini — dropped by design (INFO instead of WARNING).
 # Gemini delegation happens via the runtime (define_subagent), not via a tool.
@@ -92,6 +93,11 @@ codex:
   - WebSearch
   - Agent
   - mcp__*              # MCP tool prefix (wildcard)
+  # Worker-control capability (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1):
+  # granted to the primary role from capabilities.Codex.worker_control_tools.
+  - send_input
+  - close_agent
+  - wait_agent
 
 # Known-unsupported tools for Codex — dropped by design (INFO instead of WARNING).
 codex-silent:

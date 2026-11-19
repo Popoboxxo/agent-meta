@@ -39,7 +39,6 @@ from .providers import (
     load_provider_capabilities,
     load_providers_config,
     provider_has_capability,
-    provider_hooks_supported,
     resolve_providers,
 )
 from .provider_transform import (
@@ -557,6 +556,18 @@ def _build_provider_vars(
 
     _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     file_based = _ds_engine.has_file_based_agents(provider)
+    # SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19 (IC-2 / O4): per-provider
+    # messaging/worker-control capability, read once from the data registry.
+    # Missing/empty key -> empty list -> both gates fail-safe false. No
+    # provider-name branch, no hook coupling.
+    _declared_wc = (
+        (load_provider_capabilities(agent_meta_root).get(provider) or {})
+        .get("worker_control_tools")
+    )
+    _provider_worker_tools = (
+        [t for t in _declared_wc if isinstance(t, str) and t]
+        if isinstance(_declared_wc, list) else []
+    )
     provider_vars = {
         'EXTENSION_DIR': pc.get('extension_dir', f".{provider.lower()}/3-project"),
         'SNIPPETS_DIR': pc.get('snippets_dir', f".{provider.lower()}/snippets"),
@@ -564,12 +575,12 @@ def _build_provider_vars(
         'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
         'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
         'FILE_BASED_AGENTS': 'true' if file_based else 'false',
-        # Per-provider Tier-A gate (issue #743): the global
-        # PROGRESS_CHAT_PUSH_ENABLED from build_variables() ANDs across all
-        # active providers; here each provider's own verified hook_protocol
-        # decides, so a hook-less provider never blanks the chat-push block in
-        # a hook-capable provider's generated orchestrator.
-        'PROGRESS_CHAT_PUSH_ENABLED': 'true' if provider_hooks_supported(pc) else 'false',
+        # Per-provider worker-control gate (IC-2, #1176): derived from THIS
+        # provider's declared worker-control/messaging tools, not from hook
+        # support (O4). A tool-less provider gets a closed gate; a tool-bearing
+        # provider keeps its block regardless of hook_protocol.
+        'WORKER_CONTROL_ENABLED': 'true' if _provider_worker_tools else 'false',
+        'PROGRESS_CHAT_PUSH_ENABLED': 'true' if _provider_worker_tools else 'false',
         # ROUTE_INTENT_CALLABLE (issue #264 runtime follow-up): gates the §3
         # route_intent mandate vs. its routing-rules fallback. Fail-safe false
         # unless the harness registers route_intent as a callable tool
@@ -886,8 +897,9 @@ def _apply_content_pipeline(
     pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     content = pal_engine.apply(content, provider, log=log)
     # Evaluate {{#if}} gates against the provider-merged variables, so
-    # per-provider overrides (e.g. PROGRESS_CHAT_PUSH_ENABLED, issue #743)
-    # take effect in the rendered agent. merged_vars is a superset of
+    # per-provider overrides (e.g. WORKER_CONTROL_ENABLED / PROGRESS_CHAT_PUSH_ENABLED,
+    # SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19) take effect in the rendered agent.
+    # merged_vars is a superset of
     # `variables`, so non-overridden gates behave identically.
     content = strip_inactive_conditional_blocks(content, merged_vars)
     # Apply platform-config substitution ({{platform.*}} placeholders)

@@ -203,6 +203,9 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     # route_intent is a harness-registered callable tool with no standalone
     # counterpart — keep the §3 routing-rules fallback (issue #264).
     "ROUTE_INTENT_CALLABLE": "false",
+    # Worker-control gate (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19): standalone
+    # has no provider capability surface, so the gate stays closed (fail-safe).
+    "WORKER_CONTROL_ENABLED": "false",
     # DIRECT_DISPATCH_SECTION is a large partial loaded from
     # templates/direct-dispatch-section.md — unavailable standalone, so
     # disable the flag rather than leak a "[...not available...]" note

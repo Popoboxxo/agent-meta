@@ -89,7 +89,6 @@ from .dod import (
     resolve_spec_plan_bundle,
 )
 from .providers import (
-    all_providers_support_hooks,
     build_provider_routing,
     load_provider_capabilities,
     load_providers_config,
@@ -2604,16 +2603,33 @@ def _build_orch_variables(
     variables["CHECKPOINTING_ENABLED"] = (
         "false" if orch_config.get("checkpointing", True) is False else "true"
     )
-    # PROGRESS_CHAT_PUSH_ENABLED (design doc 2026-09-10-live-progress-channel-
-    # design.md, Architecture §1 Tier A): true only when EVERY active
-    # provider has a verified hook_protocol (providers.provider_hooks_supported)
-    # -- gates the Tier-A "also SendMessage(to:"main")" instruction in
-    # orchestrator.md §7 so hook-less providers never see an instruction
-    # they cannot follow.
-    _pcpe_provider_config = load_providers_config(agent_meta_root)
-    _pcpe_active = resolve_providers(config, _pcpe_provider_config)
+    # WORKER_CONTROL_ENABLED / PROGRESS_CHAT_PUSH_ENABLED
+    # (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-2 / O4). Both derive from
+    # the declared `worker_control_tools` capability — the provider's
+    # messaging/worker-control tool surface — never from a provider name and
+    # never from hook support. Missing/empty key resolves fail-safe to false.
+    _wcc_provider_config = load_providers_config(agent_meta_root)
+    _wcc_active = resolve_providers(config, _wcc_provider_config)
+    _wcc_caps = load_provider_capabilities(agent_meta_root)
+
+    def _declared_worker_tools(provider: str) -> list:
+        declared = (_wcc_caps.get(provider) or {}).get("worker_control_tools")
+        return (
+            [t for t in declared if isinstance(t, str) and t]
+            if isinstance(declared, list) else []
+        )
+
+    variables["WORKER_CONTROL_ENABLED"] = (
+        "true" if any(_declared_worker_tools(p) for p in _wcc_active) else "false"
+    )
+    # O4: the progress-chat push gate is the messaging-tool capability, not
+    # hooks. Keep the "all active providers" structure so a mixed set stays
+    # conservative in the global value; agent_sync refines it per provider at
+    # render time (same seam, no hook / provider-name branch).
     variables["PROGRESS_CHAT_PUSH_ENABLED"] = (
-        "true" if all_providers_support_hooks(_pcpe_active, _pcpe_provider_config) else "false"
+        "true"
+        if _wcc_active and all(_declared_worker_tools(p) for p in _wcc_active)
+        else "false"
     )
     # NATIVE_EXTENSIONS_ENABLED: exempt platform-native extension mechanisms
     # (Skills, Plugins, Lifecycle-Hooks) from the STRICT-mode orchestrator gate.
