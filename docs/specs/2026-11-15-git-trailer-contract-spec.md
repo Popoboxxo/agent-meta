@@ -10,6 +10,11 @@
 - Entscheidungen 1–5 sind getroffen (Abschnitt Offene Fragen).
 - Basis unverändert: origin/main 6853d0f8, `agents/1-generic/git.md` Version `2.1.5`, Trailer-Regel `:140` (#1168), Test `tests/test_git_template_commit_trailer_rule.py`.
 
+## Änderungen
+
+- 2026-11-19 (#1247, Amendment der APPROVED-Spec, Default d = Änderung per Amendment statt neuer ablösender Spec): Nicht-Ziel „Kein Hook-/Guard-Gate für Trailer (Prompt-Konvention).“ ersetzt durch: Kein Gate im PreToolUse-Orchestrator-Guard (`hooks/1-generic/orchestrator-guard-impl.sh` unverändert); eine opt-in Prüfung per `sync.py --check-commit-msg <datei>` (Spec `2026-11-19-1247-trailer-value-check`) ist zulässig und Convention boundary. Risiko-Zeile „Hook-Gate wäre Folgearbeit“ um Verweis auf die opt-in Prüfung ergänzt. `Status: APPROVED` bleibt unverändert (Amendment, keine Neufreigabe).
+  - Konsolidierter Rule-Override-Vermerk (bereits uncommitted im Working Tree): ~~Keine Änderung an `rules/1-generic/commit-conventions.md`.~~ Aufgehoben per User-Entscheidung 2026-11-19 (#1247): eine Trailer-Zeile wurde in die Rule aufgenommen.
+
 ## Klassifikation
 
 - Klasse **L**: ca. 20 Dateien (Quelle 6, Template 1, Admin 3, Doku 2, Tests 6, Rebaseline-Artefakte 4; Zählung siehe File-Structure-Map).
@@ -35,9 +40,9 @@
 
 ## Nicht-Ziele
 
-- Kein Hook-/Guard-Gate für Trailer (Prompt-Konvention).
+- Kein Gate im PreToolUse-Orchestrator-Guard (`hooks/1-generic/orchestrator-guard-impl.sh` unverändert). Eine opt-in Prüfung per `sync.py --check-commit-msg <datei>` (Spec `2026-11-19-1247-trailer-value-check`) ist zulässig; sie ist Convention boundary.
 - Keine dynamischen Trailer (Session-ID): `Claude-Session:` nicht per Config (Entscheidung 5).
-- Keine Änderung an `rules/1-generic/commit-conventions.md`.
+- ~~Keine Änderung an `rules/1-generic/commit-conventions.md`.~~ Aufgehoben per User-Entscheidung 2026-11-19 (#1247): eine Trailer-Zeile wurde in die Rule aufgenommen.
 - Keine Template-Edits in den 64+1 Rollen-Templates (Block wird über die bestehende Platzhalter-Kette `{{AUTO_COMMIT_BLOCK}}` erweitert).
 - Kein Provider- oder Modellname im Code oder in `agents/1-generic` (`tests/test_provider_agnostic_dispatch.py`, `test_no_provider_literal_usage_in_lib`).
 
@@ -186,7 +191,7 @@ Offen (nicht blockierend):
 
 ## Risiken
 
-- Prompt-Konvention, kein Hard-Gate: Modell kann die Rangfolge ignorieren; Hook-Gate wäre Folgearbeit.
+- Prompt-Konvention, kein Hard-Gate: Modell kann die Rangfolge ignorieren; Hook-Gate wäre Folgearbeit. Die opt-in Prüfung per `sync.py --check-commit-msg <datei>` (Spec `2026-11-19-1247-trailer-value-check`) ist ein Netz, kein Hard-Gate (Convention boundary; vgl. Nicht-Ziel und Änderungen 2026-11-19).
 - Context-Budget: mit gesetzten Trailern wächst jede der 64+1 Rollen um ca. 250–400 B; Default unberührt. Projekte mit Trailern prüfen ihr Budget selbst.
 - Config-Trailer mit festem Modellnamen veralten bei Modellwechsel; im CHANGELOG und Admin-Hinweis dokumentieren.
 - Doppelt-Trailer: `delegate` bringt Trailer im Brief, `git` hängt zusätzlich Config-Trailer an — Regel C5 (Brief gewinnt, genau 1x je Zeile) verhindert Duplikate; im Test abdecken.
