@@ -1799,6 +1799,47 @@ def _handle_sync(ctx: _SyncContext) -> None:
     ctx.mode = mode
 
 
+def _handle_check_commit_msg(ctx: _SyncContext) -> None:
+    """Handle --check-commit-msg FILE: standalone, read-only trailer gate.
+
+    Reads a commit-message file (``-`` = stdin), checks it against the
+    configured ``commit.trailers`` and exits directly with the gate contract:
+    0 ok / nothing configured / warnings only, 1 a configured trailer is
+    missing or duplicated (or the message has a BOM), 2 the message could not
+    be read. Findings go through ``log.warning`` with the severity encoded in
+    the text (``commit-msg [ERROR]/[WARN] …``). The mode writes no files and
+    never reaches the common sync tail (issue #1247, C2).
+    """
+    from lib.commit_trailers import check_commit_message, commit_violations
+
+    log = ctx.log
+    ctx.mode = "check-commit-msg"
+    ctx.read_only = True
+
+    source = ctx.args.check_commit_msg
+    try:
+        if source == "-":
+            message = sys.stdin.read()
+        else:
+            message = Path(source).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        log.error("check-commit-msg", f"cannot read commit message from {source}: {exc}")
+        sys.exit(2)
+
+    cfg = ctx.config
+    if commit_violations(cfg):
+        log.warning(
+            "commit-msg [WARN] invalid commit.trailers configuration; "
+            "use sync.py --validate to inspect"
+        )
+        sys.exit(0)
+
+    errors, warnings = check_commit_message(message, cfg)
+    for error in errors:
+        log.warning("commit-msg [ERROR] " + error)
+    for warning in warnings:
+        log.warning("commit-msg [WARN] " + warning)
+    sys.exit(1 if errors else 0)
 
 
 # ---------------------------------------------------------------------------

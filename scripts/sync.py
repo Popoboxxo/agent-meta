@@ -67,6 +67,7 @@ from lib.cli_commands import (
     _handle_apply_config_patch,
     _handle_audit_config,
     _handle_backup,
+    _handle_check_commit_msg,
     _handle_context_report,
     _handle_create_command,
     _handle_create_ext,
@@ -379,6 +380,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "format and the plan task graph. Exit 0 when clean, when no "
                              "artifacts exist, or when the workflow is disabled; exit 1 with "
                              "a findings list otherwise.")
+    parser.add_argument("--check-commit-msg", metavar="FILE", default=None,
+                        help="Standalone commit-trailer gate (issue #1247): check a commit "
+                             "message file against the configured commit.trailers ('-' reads "
+                             "stdin). Exit 0 when ok/nothing configured/warnings only, 1 when "
+                             "a trailer is missing, duplicated or the message has a BOM, 2 "
+                             "when the file cannot be read. Read-only; writes no files.")
     parser.add_argument("--rehydrate", action="store_true",
                         help="Read-only resume path: print the resume context of the "
                              "newest unfinished session (plan/task/checkpoint identity, "
@@ -837,6 +844,7 @@ _MODE_HANDLERS = [
     (lambda a: a.validate, _handle_validate),
     (lambda a: a.validate_se, _handle_validate_se),
     (lambda a: a.validate_spec_plan, _handle_validate_spec_plan),
+    (lambda a: a.check_commit_msg is not None, _handle_check_commit_msg),
     (lambda a: a.rehydrate, _handle_rehydrate),
     (lambda a: a.checkpoint, _handle_checkpoint),
     (lambda a: a.update_plan_ledger is not None, handle_update_plan_ledger),
