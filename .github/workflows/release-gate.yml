@@ -1,0 +1,98 @@
+name: Release Gate
+
+# Hard gate for a release: the FULL scenario catalog (every config, dry-run,
+# full `sync.py --validate`, every content assertion) plus the generated-file
+# drift gate. PRs may use the fast SCENARIO_PROFILE=dev; a tag never may.
+#
+# This is the CI counterpart of the built-in `scenario-suite` release gate
+# (hooks/1-generic/release-gates/scenario-suite.sh, docs/RELEASE_GATES.md).
+# `release-checklist.strict` is only a prompt convention; this workflow and
+# the gate script are the technical enforcement points.
+#
+# Measured on main b9c19cb8 (run 44525879087): 37.6 of 38.7 workflow runner
+# minutes were the 4 scenario shards. Keep the shards parallel; do not merge
+# them into one job to "save" setup time.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "release-gate-${{ github.ref }}"
+  # A release run must not be cancelled halfway by a newer push.
+  cancel-in-progress: false
+
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SCENARIO_PROFILE: release
+      SCENARIO_SHARD: ${{ matrix.shard }}
+      SCENARIO_TOTAL: '4'
+      SCENARIO_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run full scenario suite (shard ${{ matrix.shard }}/4)
+        run: bash tests/scenarios/run.sh
+
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Generate sync output
+        run: python scripts/sync.py --fail-on-p0
+      - name: Check generated files are committed (drift gate)
+        run: |
+          status="$(git status --porcelain -- . ':(exclude).meta-config')"
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "::error::Generated files are out of sync; run 'python scripts/sync.py' and commit the changes."
+            exit 1
+          fi
+      - name: Validate sync output
+        run: python scripts/sync.py --validate
+
+  # Single required check. `if: always()` is mandatory: without it a failed
+  # need makes the gate itself `skipped`, which counts as passed.
+  release-gate:
+    needs: [scenarios, validate]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
