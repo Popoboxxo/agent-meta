@@ -21,6 +21,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib.log import SyncLog
 from lib.provider_transform import transform_agent_content_for_provider
 from lib.providers import load_provider_capabilities, load_providers_config
+from lib.variables import strip_inactive_conditional_blocks
 
 _TEMPLATE = (REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
 _CONFIG = {
@@ -107,3 +108,70 @@ def test_rendered_claude_orchestrator_has_control_tools():
     text = _claude_render()
     fm = yaml.safe_load(text.split("---", 2)[1])
     assert {"SendMessage", "TaskStop"} <= set(fm["tools"]), fm["tools"]
+
+
+# --- SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19 (Task B2, AC 1/2/3) -----------
+# The worker-control prose is gated on WORKER_CONTROL_ENABLED (derived from the
+# active provider's `worker_control_tools` capability, never from a hook or a
+# provider-name branch). With the gate closed, no Claude tool literal may leak
+# into the render (O11); the stale "(where granted)" / "hook-capable" wordings
+# must be gone for every provider, including advisory-runtime ones like Codex.
+
+
+def _render_with_gate(provider: str, *, worker_control: bool) -> str:
+    """Full-ish render: conditional strip (with the worker gates) + transform."""
+    flag = "true" if worker_control else "false"
+    body = strip_inactive_conditional_blocks(
+        _TEMPLATE,
+        {"WORKER_CONTROL_ENABLED": flag, "PROGRESS_CHAT_PUSH_ENABLED": flag},
+    )
+    return transform_agent_content_for_provider(
+        body, provider, "orchestrator", "orchestrator", "desc",
+        "1-generic/orchestrator.md@0", _CONFIG, REPO_ROOT, REPO_ROOT,
+        REPO_ROOT / ".claude" / "agents" / "orchestrator.md",
+        load_providers_config(REPO_ROOT), SyncLog(),
+        provider_capabilities=load_provider_capabilities(REPO_ROOT),
+    )
+
+
+def _worker_control_prose(text: str) -> str:
+    """The two prose regions that carry worker-control instructions (§6 + §7)."""
+    return "\n".join([
+        _section(text, "**Sync-Call-Vertrag", "**Context format"),
+        _section(text, "## 7. BARRIER protocol", "## 8."),
+    ])
+
+
+def test_no_where_granted_wording():
+    assert "(where granted)" not in _TEMPLATE
+
+
+def test_no_hook_capable_provider_wording():
+    assert "hook-capable provider" not in _TEMPLATE
+
+
+def test_worker_control_sentences_are_gated_on_flag():
+    template_prose = _worker_control_prose(_TEMPLATE)
+    assert "{{#if WORKER_CONTROL_ENABLED}}" in template_prose
+    assert "{{/if}}" in template_prose
+
+
+@pytest.mark.parametrize("provider", ["Claude", "Codex", "Gemini"])
+def test_claude_tool_literals_vanish_when_worker_control_disabled(provider):
+    """O11: closed gate -> no SendMessage/TaskStop literal in the render."""
+    prose = _worker_control_prose(_render_with_gate(provider, worker_control=False))
+    assert "SendMessage" not in prose, prose
+    assert "TaskStop" not in prose, prose
+
+
+def test_tool_mentions_subset_of_active_provider_frontmatter():
+    """AC 1/2: prose tool names ⊆ the active provider's FM tools, gated."""
+    # Structural half (AC 3): the prose must actually be gated.
+    assert "{{#if WORKER_CONTROL_ENABLED}}" in _worker_control_prose(_TEMPLATE)
+    # Semantic half (AC 1): with the gate open on Claude, every worker-control
+    # tool name named in the prose is granted in the frontmatter.
+    text = _render_with_gate("Claude", worker_control=True)
+    fm = yaml.safe_load(text.split("---", 2)[1])
+    mentioned = {t for t in ("SendMessage", "TaskStop") if t in _worker_control_prose(text)}
+    assert mentioned, "gated worker-control prose must name its tools"
+    assert mentioned <= set(fm["tools"]), (mentioned, fm["tools"])
