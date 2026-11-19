@@ -182,9 +182,10 @@ def step_ac01(root: Path, options: Any, runner: Any = subprocess.run) -> StepRes
 
 def step_standalone(root: Path, options: Any, runner: Any = subprocess.run) -> StepResult:
     """Render standalone artifacts via ``sync.py --render-standalone``."""
-    result = base_mod.run_step(
-        base_mod.build_sync_cmd(root, "--render-standalone"), root, runner=runner
-    )
+    flags = ["--render-standalone"]
+    if (options or {}).get("check_only"):
+        flags.append("--check")
+    result = base_mod.run_step(base_mod.build_sync_cmd(root, *flags), root, runner=runner)
     failed = base_mod._is_failure(result)
     return StepResult(
         "standalone",
@@ -196,7 +197,8 @@ def step_standalone(root: Path, options: Any, runner: Any = subprocess.run) -> S
 
 def step_sync(root: Path, options: Any, runner: Any = subprocess.run) -> StepResult:
     """Regenerate generated-file-hashes.json and context-hashes.json via sync."""
-    result = base_mod.run_step(base_mod.build_sync_cmd(root), root, runner=runner)
+    flags = ["--dry-run"] if (options or {}).get("check_only") else []
+    result = base_mod.run_step(base_mod.build_sync_cmd(root, *flags), root, runner=runner)
     failed = base_mod._is_failure(result)
     return StepResult(
         "sync", 0 if failed else 1, "sync", "failed" if failed else "ok"

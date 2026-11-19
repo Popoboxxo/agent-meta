@@ -944,3 +944,88 @@ def test_pipeline_allows_uncommitted_sources(rb, pbp, tmp_path, monkeypatch):
 
     assert result.exit_code == 0
 
+
+# --- Task 8: entrypoint and CLI ----------------------------------------------
+
+
+@pytest.fixture()
+def entry():
+    """Load the entrypoint script as a module (fresh per test)."""
+    import importlib.util
+
+    if str(_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS))
+    path = _SCRIPTS / "rebaseline.py"
+    spec = importlib.util.spec_from_file_location("rebaseline_entry", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_entry_help_via_subprocess():
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "rebaseline.py"), "--help"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    for flag in ("--reason", "--expect", "--expect-key", "--base", "--check-only",
+                 "--dry-run", "--root", "--steps", "--skip-verify", "--json"):
+        assert flag in result.stdout
+
+
+def test_entry_missing_reason_exits_two(entry, tmp_path):
+    assert entry.main(["--root", str(tmp_path)]) == 2
+
+
+def test_entry_unknown_step_exits_two(entry, tmp_path):
+    assert (
+        entry.main(
+            ["--root", str(tmp_path), "--reason", "intentional rebaseline",
+             "--steps", "ac01,nope"]
+        )
+        == 2
+    )
+
+
+def test_entry_check_only_exit_codes_with_mocked_pipeline(entry, tmp_path, monkeypatch, capsys):
+    rb = pytest.importorskip("lib.rebaseline")
+    pbp = pytest.importorskip("lib.rebaseline_pipeline")
+    seen = []
+
+    def fake_pipeline(root, options, runner=None):
+        seen.append(options)
+        code = rb.EXIT_DRIFT if options.get("_drift") else rb.EXIT_OK
+        return pbp.PipelineResult(exit_code=code, pre=[], steps=[], post=[])
+
+    monkeypatch.setattr(entry.pipeline, "run_pipeline", fake_pipeline)
+
+    assert entry.main(["--check-only", "--root", str(tmp_path)]) == 0
+    assert "RESULT" in capsys.readouterr().out
+    assert seen[0]["check_only"] is True
+
+    monkeypatch.setattr(
+        entry.pipeline, "run_pipeline",
+        lambda root, options, runner=None: pbp.PipelineResult(
+            exit_code=rb.EXIT_DRIFT, pre=[], steps=[], post=[]),
+    )
+    assert entry.main(["--dry-run", "--root", str(tmp_path)]) == 1
+
+
+def test_entry_json_fields(entry, tmp_path, monkeypatch, capsys):
+    pbp = pytest.importorskip("lib.rebaseline_pipeline")
+    monkeypatch.setattr(
+        entry.pipeline, "run_pipeline",
+        lambda root, options, runner=None: pbp.PipelineResult(
+            exit_code=0, pre=[{"klass": "AC", "status": "ok"}], steps=[],
+            post=[{"klass": "AC", "status": "ok"}], changed_files=[]),
+    )
+
+    entry.main(["--check-only", "--json", "--root", str(tmp_path)])
+
+    payload = __import__("json").loads(capsys.readouterr().out.splitlines()[-1])
+    assert set(payload) == {"pre", "steps", "post", "result"}
+
