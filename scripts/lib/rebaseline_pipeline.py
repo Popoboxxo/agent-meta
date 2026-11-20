@@ -6,6 +6,7 @@ under the 600-line limit. Every subprocess goes through the injected runner.
 from __future__ import annotations
 
 import fnmatch
+import importlib.util
 import json
 import re
 import subprocess
