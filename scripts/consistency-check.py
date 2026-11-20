@@ -52,6 +52,7 @@ from lib.consistency.crossrefs import (
     check_role_defaults_has_generic_source,
     check_schema_refs,
 )
+from lib.consistency.depth_coherence import check_depth_coherence
 from lib.consistency.docs import (
     check_readme_docs_index,
     check_sync_cli_docs,
@@ -292,6 +293,10 @@ def run_checks(
         # AC-7/AC-14/AC-16/AC-20): WARNING-only, one finding per check ID and
         # provider. A project without orchestrator.topology yields nothing.
         findings.extend(check_orchestrator_topology(root, project_config))
+
+        # Depth coherence (PR 0.3 / E-05, O10): WARNING-only cross-check of
+        # delegation.max_depth / required_depth / emitted subagent depth.
+        findings.extend(check_depth_coherence(root, project_config))
 
         # Changelog check: only meaningful when checking changed/new files
         new_files = get_new_files_vs_main(root)
