@@ -306,7 +306,7 @@ invoke_subagent("<agent_2>", "<task_2>")
 
 **Communication:** before "[task] → [agent] (reason)"; after "[agent]: [result]. Next: [...]". FANOUT>4 → confirmation.
 
-**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification. Steht es in deiner Tool-Liste: Worker mit `SendMessage` (an seine Agent-ID) fortsetzen, hängenden Hintergrund-Worker mit `TaskStop` beenden.
+**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification. Worker-Control (issue #1176): Deine Worker-Control-Tools sind `send_message`. Nutze sie, um einen Worker fortzusetzen und einen hängenden Hintergrund-Worker zu beenden.
 **Hinweis (laut Plattform-Doku, in diesem Repo nicht verifiziert):** Subagenten können je nach Harness standardmäßig im Hintergrund starten — für den Sync-Vertrag `run_in_background: false` daher immer explizit setzen.
 
 **Context format (mandatory):**
@@ -350,13 +350,13 @@ der gesamten Pipeline/Session.
   während des laufenden Batches, kein Duplikat.
 
 
-**Tier-A chat push (live-progress-channel design, 2026-09-10):** on this hook-capable provider, additionally call `SendMessage(to:"main", content:<the status table above>)` once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
+**Tier-A chat push (live-progress-channel design, 2026-09-10):** where the active provider declares a messaging tool (`send_message`), additionally push the status table above to `main` through that tool once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
 
-**Merge (#1172):** main chat -> `git` directly; #783.
+**Merge (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout `TaskStop` it (where granted): `status: timeout` / `STATUS: failed`, §10.
+**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout, stop it with your declared worker-control tool (`send_message`): `status: timeout` / `STATUS: failed`, §10.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.

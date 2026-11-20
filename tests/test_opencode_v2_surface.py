@@ -5517,9 +5517,9 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): ac01-baseline re-pinned (1 Claude git.md hash; 9cee45b8.. -> 3e389da2..); slimming-golden re-pinned (git golden: two lines, plus README manifest entry; 10f5c4c7.. -> b18ac19c..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`); merged AC-T4 chain 9cee45b8.. -> 3e389da2.. (main #1307) -> 08ae786f.. (final, after merging #1307 + #1309); slimming-golden (main value b18ac19c..)/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "08ae786f0d789f9c7051b70c67aa747f59e016604ee30538c942e2a0c7aba915",
-    "slimming-golden": "b18ac19cfb98fce389708e840e8e750d53939cf142d3317ae94d6dd6ddae251b",
-    "compact-golden": "ef8123cc4687f63fafb87d1a9e4a4b6a920bf6cb71fbb4a0dfeb8cb9f033aaaf",
+    "ac01-baseline": "9cc299210e42599eabcbcda2cdf159ac83ed5ad08aededf8471a00e2942d6cf6",
+    "slimming-golden": "4af3df4071f5050b60971d7bc820379e28ed29a5258ee888b5fc7fa02fc2310e",
+    "compact-golden": "52ab2682978d3b151f30da422e84b345b45a3d3f5b88fceb906ee0cede60334f",
 }
 
 

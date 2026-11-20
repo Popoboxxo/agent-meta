@@ -226,7 +226,7 @@ trace:
   ausschließlich um das vierte Klassifizierer-Feld (`all_git`), die Vier-Feld-Validierung und das
   Grant-Sentinel-Gate ergänzt (Spec §3.3.1). Der Sentinel-/Mutations-Pfad für `git`,
   `orchestrator` und native `direct`-Rollen bleibt byte-gleich; `# version:` wird
-  `1.11.0 → 1.12.0` gebumpt (`hook_drift.py` liest die Zeile).
+  `1.11.0 → 1.13.0` gebumpt (`hook_drift.py` liest die Zeile).
 - **Ein Hook-Prädikat:** Die Guard-Aktivierung wird **nirgends** neu implementiert;
   `hook_state.resolve_hook_enabled` ist die einzige Quelle, `hooks.sync_hooks` und
   `auto_commit` konsumieren sie.
@@ -286,7 +286,7 @@ Whitelist-Ableitung (`PROJECT_WRITABLE_SECTIONS` aus #1186 AC-7) zuletzt. Szenar
 | `scripts/lib/auto_commit.py` | ändern | `_KEYS` (`:164`), `ALLOWLIST_VERSION` 1→2 (`:31`), `normalize_authority_overrides`, `authority_override_violations` (+Enforcement), `authority_override_notices`, `effective_commit_authority`, `is_role_eligible`-Erweiterung (`:146-153`), `resolve_auto_commit_config` (`:251-298`), `resolve_commit_grant`, `render_auto_commit_block(..., *, role=None)` (`:322`) | T1, T2, T3, T4, T5, T6 |
 | `scripts/lib/config.py` | ändern | `_AUTO_COMMIT_RESOLVED` trägt `authority_overrides` (Fail-Safe + Normalfall, normalisiert) **und** der Fail-Safe prüft `authority_override_violations` (`:1792-1848`, K-13) | T7 |
 | `scripts/lib/agent_sync.py` | ändern | `_apply_role_auto_commit_overrides` (Provider-/Guard-Gate, Grant-Logs, Rückgabe `render_bash`) (`:92-123`), `_finalize_agent_content(..., extra_tools=…)` **vor** dem Transform (`:1010`), Aufrufstelle im Rollenloop (`:1457-1468`) | T8 |
-| `hooks/1-generic/orchestrator-guard-impl.sh` | ändern | Grant-Zweig (Spec §3.3.1): viertes Klassifizierer-Feld `all_git` (`:1282-1326`), Vier-Feld-Validierung (`:1336`), Grant-Sentinel-Gate neben `:1535`; `# version: 1.11.0 → 1.12.0` | T16 |
+| `hooks/1-generic/orchestrator-guard-impl.sh` | ändern | Grant-Zweig (Spec §3.3.1): viertes Klassifizierer-Feld `all_git` (`:1282-1326`), Vier-Feld-Validierung (`:1336`), Grant-Sentinel-Gate neben `:1535`; `# version: 1.11.0 → 1.13.0` | T16 |
 | `scripts/lib/provider_transform.py` | **nicht ändern** | Nur Lese-Anker: v1-Permission-Map `:1069-1092`, v2-Builder `:937-972`; Tool-Liste kommt aus dem Content (`:1027`, `:1319-1325`); der tote Gemini-Mapper `:854-870` bleibt unangetastet (F-4) | — |
 | `scripts/lib/roles.py` | **nicht ändern** | Präzedenz-Anker `permission-mode-overrides` (`:565-577`) — orthogonal, Doku-Pflicht in T11 | — |
 | `scripts/lib/sync_pipeline.py` | ändern | Stage 14 (`:1893-1924`): Schrumpf-Vergleich, Grant-/Skip-Logs, Dry-Run-Vorziehen | T9 |
@@ -1187,7 +1187,7 @@ v2-Artefakt aus T9 (`authority_overrides`-Map) und die bestehende Sentinel-Eleva
   Punkt 2). Das steht als Kommentar am Gate, damit es niemand als Fehler „repariert“.
   **D18:** Der Kommentar hält außerdem fest, dass das Gate **nur Sentinel-tragende** Kommandos
   erfasst und damit keine Security-Boundary gegen Injection ist (Attributionslücke **#1210**).
-- [ ] Step 5: `# version: 1.11.0` → `1.12.0` (`:2`) plus Changelog-Satz in derselben Zeile
+- [ ] Step 5: `# version: 1.11.0` → `1.13.0` (`:2`) plus Changelog-Satz in derselben Zeile
   (Konvention wie `:3`).
 - [ ] Step 6: Verifikation: **grün — 8 passed**; Regression
   `python3 -m pytest tests/test_orchestrator_guard_hook.py --basetemp="$PYTEST_BASETEMP" -q`
@@ -1457,7 +1457,7 @@ Damit sind AC-1…AC-4 und N-1/N-3 **einmal** end-to-end belegt, nicht nur in Un
    Hook `:459-464`); die Grant-Zeile verschwindet mit dem Block.
 3. Vollständiger Code-Rollback: `rev-parse` auf `aaed14c2`; die geschriebene Allowlist v2 bleibt
    für den älteren Code lesbar (nur unbekannter Zusatzschlüssel, `sort_keys`-stabil). Der
-   Hook-Rollback ist unabhängig (`# version:` 1.12.0 → 1.11.0); `hook_state.py` kann bleiben
+   Hook-Rollback ist unabhängig (`# version:` 1.13.0 → 1.11.0); `hook_state.py` kann bleiben
    (additives Modul ohne Aufrufer im alten Code).
 
 ## 10. Risiken

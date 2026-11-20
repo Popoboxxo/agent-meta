@@ -394,11 +394,13 @@ def _apply_agent_transform(
                                          `native_agent_tools` capability; gated
                                          on the capability
                                          `subagent_allowlist_required`
-      primary-role-tools: [name, ...]  — extra tools appended to the tool list
+      worker_control_tools (capability, config/provider-capabilities.yaml)
+                                       — extra tools appended to the tool list
                                          of the provider's primary role only
                                          (before validation; must be
                                          whitelisted, e.g. Claude
-                                         SendMessage/TaskStop, #1157)
+                                         SendMessage/TaskStop, #1176). Replaces
+                                         the former `primary-role-tools` spec key.
       allowed-fields: [name, ...]      — frontmatter allow-list (validated by
                                          artifact_validate; Task-1)
       reject-fields: [name, ...]       — frontmatter deny-list (validated by
@@ -738,9 +740,11 @@ def _apply_agent_transform(
         _fm = _parse_frontmatter_yaml(content)
         _tools = _fm.get('tools')
         if isinstance(_tools, list) and role == _primary_role:
-            # Data-declared extra tools of the primary role (e.g. Claude
-            # SendMessage/TaskStop, #1157); validated like template tools.
-            _tools = _with_native_tools(_tools, spec.get('primary-role-tools'))
+            # Capability-declared worker-control tools of the primary role
+            # (IC-1, #1176; e.g. Claude SendMessage/TaskStop). Data-driven from
+            # provider-capabilities.yaml — never a provider-name branch — and
+            # validated like template tools (unknown names => WARNING).
+            _tools = _with_native_tools(_tools, _caps.get('worker_control_tools'))
         if isinstance(_tools, list):
             _valid = _validate_tools_against_whitelist(
                 _tools, provider, agent_meta_root, log, role,

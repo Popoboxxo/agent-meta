@@ -133,8 +133,9 @@ providers:
       tools: keep
       tools-format: keep
       tool-name-map: {}
-      # Orchestrator worker control (#1157): continue a worker / stop a
-      # background agent. Primary role only; whitelisted in provider-tools.yaml.
+      # DEPRECATED (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1): primary-role
+      # extra tools now come from the `worker_control_tools` capability in
+      # config/provider-capabilities.yaml. Kept as data for legacy readers only.
       primary-role-tools: [SendMessage, TaskStop]
       reject-fields: []
   Gemini:

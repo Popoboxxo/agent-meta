@@ -34,7 +34,11 @@ def test_orchestrator_section_7_documents_tier_a_chat_push():
     section_8_start = content.index("## 8. Reflection loop")
     section_7 = content[section_7_start:section_8_start]
     assert "PROGRESS_CHAT_PUSH_ENABLED" in section_7
-    assert 'SendMessage(to:"main"' in section_7
+    # Provider-agnostic worker-control form: the literal SendMessage(to:"main"
+    # ...) call was replaced by the declared tool placeholder (issue #1176).
+    assert "{{WORKER_CONTROL_TOOLS}}" in section_7
+    assert "push the status table above to `main` through that tool" in section_7
+    assert 'SendMessage(to:"main"' not in section_7
 
 
 def test_configurable_paths_are_documented():

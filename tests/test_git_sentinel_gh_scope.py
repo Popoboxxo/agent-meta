@@ -213,11 +213,12 @@ def test_render_without_capability_is_byte_identical_to_pre_change():
     assert _PRE_CHANGE_PARAGRAPH_END in rendered_after
     assert "Exception: for Bash calls" not in rendered_after
 
-    # AC-2 (full render): compare against the genuine pre-change template pinned
-    # to the Task 1 commit (6fcf1f32), not a reconstruction of the modified
-    # template. Pinning the commit keeps this check meaningful after Task 2 lands.
+    # AC-2 (full render): compare against the template pinned to the worker-control
+    # rebaseline commit (aee986c8), not a reconstruction of the modified template.
+    # The merge-sentence rephrasing is part of that single rebaseline, so the pin
+    # must follow it; pinning a commit keeps this check meaningful afterwards.
     pre_change = subprocess.run(
-        ["git", "show", "6fcf1f32:agents/1-generic/git.md"],
+        ["git", "show", "aee986c8:agents/1-generic/git.md"],
         cwd=_REPO_ROOT, capture_output=True, text=True, check=True,
     ).stdout
     rendered_pre = _render_git(_pc(), template=pre_change)

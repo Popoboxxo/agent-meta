@@ -8,7 +8,7 @@ roles:
   orchestrator:
     model: balanced
     memory: ''
-    permission_mode: plan
+    permission_mode: default
     workflow_tier: required
     description: Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen
       Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation

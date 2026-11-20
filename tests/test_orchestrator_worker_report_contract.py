@@ -21,6 +21,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib.log import SyncLog
 from lib.provider_transform import transform_agent_content_for_provider
 from lib.providers import load_provider_capabilities, load_providers_config
+from lib.variables import strip_inactive_conditional_blocks
 
 _TEMPLATE = (REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
 _CONFIG = {
@@ -83,14 +84,16 @@ def test_dispatch_context_tells_worker_to_end_with_report(source):
 
 
 @pytest.mark.parametrize("source", sorted(_SOURCES))
-def test_worker_control_text_names_send_message_and_task_stop(source):
+def test_worker_control_prose_uses_provider_tool_placeholder(source):
+    """The gated prose names the active provider's tools via the injected
+    list, never a hard-coded Claude/Codex/Gemini literal (IC-3, AC 1/2)."""
     text = _SOURCES[source]()
     sec6 = _section(text, "**Sync-Call-Vertrag", "**Context format")
     assert "explizites Polling" not in sec6
-    assert "`SendMessage`" in sec6 and "`TaskStop`" in sec6
+    assert "{{WORKER_CONTROL_TOOLS}}" in sec6
     sec7 = _section(text, "## 7. BARRIER protocol", "## 8.")
     assert "no separate kill signal" not in sec7
-    assert "`TaskStop`" in sec7
+    assert "{{WORKER_CONTROL_TOOLS}}" in sec7
 
 
 @pytest.mark.parametrize("source", sorted(_SOURCES))
@@ -98,7 +101,7 @@ def test_orchestrator_documents_single_async_wait_strategy(source):
     sec7 = _section(_SOURCES[source](), "## 7. BARRIER protocol", "## 8.")
     assert sec7.count("Wait strategy") == 1, sec7
     para = next(p for p in sec7.split("\n\n") if "Wait strategy" in p)
-    assert "`TaskStop`" in para and "STATUS: failed" in para and "timeout" in para
+    assert "{{WORKER_CONTROL_TOOLS}}" in para and "STATUS: failed" in para and "timeout" in para
     assert "end your turn" in para and "run_in_background" in para
     assert "Monitor" not in sec7
 
@@ -107,3 +110,107 @@ def test_rendered_claude_orchestrator_has_control_tools():
     text = _claude_render()
     fm = yaml.safe_load(text.split("---", 2)[1])
     assert {"SendMessage", "TaskStop"} <= set(fm["tools"]), fm["tools"]
+
+
+# --- SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19 (Task B2, AC 1/2/3) -----------
+# The worker-control prose is gated on WORKER_CONTROL_ENABLED (derived from the
+# active provider's `worker_control_tools` capability, never from a hook or a
+# provider-name branch). With the gate closed, no Claude tool literal may leak
+# into the render (O11); the stale "(where granted)" / "hook-capable" wordings
+# must be gone for every provider, including advisory-runtime ones like Codex.
+
+
+def _worker_control_tools(provider: str) -> list[str]:
+    """Expected tool names, read straight from the capability registry.
+
+    Test-side oracle: independent of the syncer's variable derivation so the
+    test can fail for the right reason (wrong tool names in the prose) rather
+    than on a missing helper.
+    """
+    caps = load_provider_capabilities(REPO_ROOT)
+    declared = (caps.get(provider) or {}).get("worker_control_tools") or []
+    return [t for t in declared if isinstance(t, str) and t]
+
+
+def _worker_control_tools_markup(provider: str) -> str:
+    """The backtick list the active provider's tools render to in the prose."""
+    return ", ".join(f"`{t}`" for t in _worker_control_tools(provider))
+
+
+_ALL_WORKER_CONTROL_TOOLS = frozenset({
+    "SendMessage", "TaskStop", "send_input", "close_agent", "wait_agent",
+    "send_message",
+})
+
+
+def _render_with_gate(provider: str, *, worker_control: bool) -> str:
+    """Full-ish render: conditional strip + tool-list substitution + transform."""
+    flag = "true" if worker_control else "false"
+    body = strip_inactive_conditional_blocks(
+        _TEMPLATE,
+        {"WORKER_CONTROL_ENABLED": flag, "PROGRESS_CHAT_PUSH_ENABLED": flag},
+    )
+    body = body.replace(
+        "{{WORKER_CONTROL_TOOLS}}", _worker_control_tools_markup(provider)
+    )
+    return transform_agent_content_for_provider(
+        body, provider, "orchestrator", "orchestrator", "desc",
+        "1-generic/orchestrator.md@0", _CONFIG, REPO_ROOT, REPO_ROOT,
+        REPO_ROOT / ".claude" / "agents" / "orchestrator.md",
+        load_providers_config(REPO_ROOT), SyncLog(),
+        provider_capabilities=load_provider_capabilities(REPO_ROOT),
+    )
+
+
+def _worker_control_prose(text: str) -> str:
+    """The two prose regions that carry worker-control instructions (§6 + §7)."""
+    return "\n".join([
+        _section(text, "**Sync-Call-Vertrag", "**Context format"),
+        _section(text, "## 7. BARRIER protocol", "## 8."),
+    ])
+
+
+def test_no_where_granted_wording():
+    assert "(where granted)" not in _TEMPLATE
+
+
+def test_no_hook_capable_provider_wording():
+    assert "hook-capable provider" not in _TEMPLATE
+
+
+def test_worker_control_sentences_are_gated_on_flag():
+    template_prose = _worker_control_prose(_TEMPLATE)
+    assert "{{#if WORKER_CONTROL_ENABLED}}" in template_prose
+    assert "{{/if}}" in template_prose
+
+
+@pytest.mark.parametrize("provider", ["Claude", "Codex", "Gemini"])
+def test_claude_tool_literals_vanish_when_worker_control_disabled(provider):
+    """O11: closed gate -> no SendMessage/TaskStop literal in the render."""
+    prose = _worker_control_prose(_render_with_gate(provider, worker_control=False))
+    assert "SendMessage" not in prose, prose
+    assert "TaskStop" not in prose, prose
+
+
+def test_tool_mentions_subset_of_active_provider_frontmatter():
+    """AC 1/2: prose tool names ⊆ the active provider's FM tools, gated."""
+    # Structural half (AC 3): the prose must actually be gated.
+    assert "{{#if WORKER_CONTROL_ENABLED}}" in _worker_control_prose(_TEMPLATE)
+    # Semantic half (AC 1): with the gate open on Claude, every worker-control
+    # tool name named in the prose is granted in the frontmatter.
+    text = _render_with_gate("Claude", worker_control=True)
+    fm = yaml.safe_load(text.split("---", 2)[1])
+    mentioned = {t for t in ("SendMessage", "TaskStop") if t in _worker_control_prose(text)}
+    assert mentioned, "gated worker-control prose must name its tools"
+    assert mentioned <= set(fm["tools"]), (mentioned, fm["tools"])
+
+
+@pytest.mark.parametrize("provider", ["Claude", "Codex", "Gemini"])
+def test_worker_control_prose_names_only_active_provider_tools(provider):
+    """AC 1/2: gated prose names exactly the active provider's tool names —
+    never a foreign provider's Claude/Codex/Gemini literal."""
+    expected = set(_worker_control_tools(provider))
+    prose = _worker_control_prose(_render_with_gate(provider, worker_control=True))
+    mentioned = {t for t in _ALL_WORKER_CONTROL_TOOLS if t in prose}
+    assert mentioned <= expected, (provider, "forbidden", mentioned - expected, prose)
+    assert expected <= mentioned, (provider, "missing", expected - mentioned, prose)

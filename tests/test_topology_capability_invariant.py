@@ -297,3 +297,56 @@ def test_no_speculative_yes_cell():
     assert speculative == [], (
         f"speculative yes cells without evidence: {speculative} (AC-15/AC-16)"
     )
+
+
+# --- SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1 / AC 1, 2 -------------
+# Worker-control tools: the capability that grants the primary role its
+# worker-control/messaging tools (replaces the former `primary-role-tools`
+# transform-spec key). Every registered provider MUST carry the key explicitly
+# with the approved mapping; conservative empty default for the rest.
+_WORKER_CONTROL_MAPPING: dict[str, list[str]] = {
+    "Claude": ["SendMessage", "TaskStop"],
+    "Codex": ["send_input", "close_agent", "wait_agent"],
+    "Gemini": ["send_message"],
+}
+_TOOLS_CONFIG = _ROOT / "config" / "provider-tools.yaml"
+
+
+def test_every_provider_declares_worker_control_tools():
+    """IC-1: every registered provider carries the key explicitly; a missing
+    key is an invariant finding (fail-safe empty default is not enough)."""
+    missing = [
+        p for p in _REGISTERED
+        if "worker_control_tools" not in (_CAPS.get(p) or {})
+    ]
+    assert not missing, (
+        f"missing worker_control_tools capability for {missing} — every "
+        "registered provider must declare the key explicitly (IC-1)"
+    )
+
+
+@pytest.mark.parametrize("provider", _REGISTERED)
+def test_worker_control_tools_exact_mapping(provider):
+    """IC-1: approved mapping Claude/Codex/Gemini, empty for all others."""
+    declared = (_CAPS.get(provider) or {}).get("worker_control_tools")
+    assert isinstance(declared, list), (
+        f"{provider}: worker_control_tools must be a list, got {declared!r}"
+    )
+    expected = _WORKER_CONTROL_MAPPING.get(provider, [])
+    assert declared == expected, (
+        f"{provider}: worker_control_tools {declared!r} != approved {expected!r}"
+    )
+
+
+@pytest.mark.parametrize("provider", sorted(_WORKER_CONTROL_MAPPING))
+def test_worker_control_tools_are_whitelisted(provider):
+    """AC 1/2 risk mitigation: every declared tool name is in the provider's
+    provider-tools.yaml whitelist (unknown names warn and are dropped)."""
+    tools_cfg = _load(_TOOLS_CONFIG)
+    whitelist = tools_cfg.get(provider.lower()) or []
+    declared = (_CAPS.get(provider) or {}).get("worker_control_tools") or []
+    assert declared, f"{provider}: expected a non-empty tool mapping"
+    missing = [t for t in declared if t not in whitelist]
+    assert not missing, (
+        f"{provider}: {missing} not in config/provider-tools.yaml whitelist"
+    )
