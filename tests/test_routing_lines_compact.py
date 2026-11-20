@@ -15,8 +15,9 @@ the ``compact`` branch of
   (AC-31),
 - pipeline lines ``pipeline:<name>|<signal_keywords>``,
 - one ``name-only: <agent> (<reason>); …`` summary line,
-- the branch is opt-in: without ``context-profile: compact`` every render stays
-  byte-identical (AC-01/AC-35).
+- since PR 4.1 the compact block is the DEFAULT (routing-overrides.format=auto),
+  independent of ``context-profile``; ``format: json`` restores the legacy tool
+  envelope (AC-R1/AC-R2).
 
 Deliberate deviation (C2 precedence, plan Task 2b.1): there is deliberately NO
 compact branch for ``PIPELINE_MATCH_TABLE`` — the §2 pipeline table stays
@@ -215,18 +216,27 @@ def test_compact_lines_select_language_but_keep_keywords(tmp_path):
 # compact branch of build_routing_tool_definitions_for_providers
 # ---------------------------------------------------------------------------
 
-def test_full_path_without_opt_in_is_byte_identical():
+def test_default_renders_compact_lines_and_format_json_restores_tool():
     config = {"roles": ["developer", "tester"]}
-    definition = build_routing_tool_definition(_AGENT_META_ROOT, config, dict(_BASE_VARIABLES))
     rendered = build_routing_tool_definitions_for_providers(
         _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"]
     )
-    assert rendered["Claude"] == render_routing_tool_definition(definition, "json")
-    assert rendered["Continue"] == render_routing_tool_definition(definition, "yaml_text_block")
+    for provider in ("Claude", "Continue"):
+        assert not rendered[provider].lstrip().startswith("{"), f"{provider}: default is compact"
+    # The rollback path still produces the exact legacy tool definition.
+    legacy_config = dict(config, **{"routing-overrides": {"format": "json"}})
+    legacy = build_routing_tool_definitions_for_providers(
+        _AGENT_META_ROOT, legacy_config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"]
+    )
+    definition = build_routing_tool_definition(_AGENT_META_ROOT, legacy_config, dict(_BASE_VARIABLES))
+    assert legacy["Claude"] == render_routing_tool_definition(
+        definition, "json", roster_in_harness=True
+    )
+    assert legacy["Continue"] == render_routing_tool_definition(definition, "yaml_text_block")
 
 
-def test_compact_opt_in_renders_lines_instead_of_tool_json():
-    config = {"roles": ["developer", "tester"], "context-profile": "compact"}
+def test_compact_default_renders_lines_instead_of_tool_json():
+    config = {"roles": ["developer", "tester"]}
     body = build_routing_tool_definitions_for_providers(
         _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude"]
     )["Claude"]
@@ -245,27 +255,31 @@ def test_compact_not_active_when_route_intent_is_callable(monkeypatch):
     monkeypatch.setattr(
         DelegationSyntaxEngine, "has_route_intent_tool", lambda self, _provider: True
     )
-    config = {"roles": ["developer", "tester"], "context-profile": "compact"}
+    config = {"roles": ["developer", "tester"]}
     body = build_routing_tool_definitions_for_providers(
         _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude"]
     )["Claude"]
-    # ROUTE_INTENT_CALLABLE=true keeps the tool{} definition (IC-04).
+    # A callable route_intent tool keeps the tool{} definition (capability gate).
     assert json.loads(body)["tool"]["name"] == ROUTING_TOOL_NAME
 
 
-def test_compact_branch_is_scoped_per_provider_override(tmp_path):
+def test_compact_format_is_scoped_per_provider_override(tmp_path):
     _write_roles(tmp_path, _DE_EN_ROLES)
     config = {
-        "provider-overrides": {"Claude": {"context-profile": "compact"}},
+        "routing-overrides": {"format": "json"},
+        "provider-overrides": {
+            "Claude": {"routing-overrides": {"format": "compact"}},
+        },
     }
     rendered = build_routing_tool_definitions_for_providers(
-        tmp_path, config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"],
+        tmp_path, config, dict(_BASE_VARIABLES), providers=["Claude", "Gemini"],
         template_roles={"dev-role"},
     )
-    # Claude is compact → line form; Continue stays full → YAML tool definition.
+    # Claude overrides to compact → line form; Gemini (json format, no roster
+    # override) keeps the legacy tool envelope.
     assert not rendered["Claude"].lstrip().startswith("{")
     assert rendered["Claude"].split("|")[0] == "dev-role"
-    assert "tool:" in rendered["Continue"], "the full YAML render is unchanged"
+    assert json.loads(rendered["Gemini"])["tool"]["name"] == ROUTING_TOOL_NAME
 
 
 def test_compact_lines_include_name_only_summary(tmp_path):
@@ -289,10 +303,10 @@ def test_compact_lines_include_name_only_summary(tmp_path):
         "      addressability: name_only\n"
         "      name_only_reason: Nur per Name erreichbar.\n",
     )
-    config = {"context-profile": "compact"}
     body = build_routing_tool_definitions_for_providers(
-        tmp_path, config, dict(_BASE_VARIABLES), providers=["Claude"],
+        tmp_path, {}, dict(_BASE_VARIABLES), providers=["Gemini"],
         template_roles={"kw-role", "named-role"},
-    )["Claude"]
+    )["Gemini"]
     assert "kw-role|req|Keyword-A|Beispiel A" in body
+    # Gemini has roster_in_harness=false → reduced one-line name_index (E2).
     assert "name-only: named-role (Nur per Name erreichbar.)" in body

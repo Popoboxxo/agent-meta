@@ -1529,6 +1529,24 @@ def _sync_stage_per_provider(
                 project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,
             )
 
+        # PR 4.1 / P26 (E-23): lazy routing detail file. One provider-agnostic
+        # companion holding every deferred routing field (intents, all examples,
+        # priority, size_class, contracts). The orchestrator prompt references
+        # it with exactly one pointer line (ROUTING_DETAILS_PATH). Registered in
+        # generated-file-hashes.json so --check detects drift.
+        if str(variables.get("ROUTING_DETAILS_ENABLED", "true")).lower() == "true":
+            from .intent_routing import (
+                render_routing_detail, resolve_routing_detail_path,
+            )
+            routing_rules = variables.get("_ROUTING_MODEL_RULES") or []
+            detail_doc = render_routing_detail(routing_rules, root=agent_meta_root)
+            detail_rel = resolve_routing_detail_path(pc, provider)
+            detail_path = project_root / detail_rel
+            if not args.dry_run:
+                detail_path.parent.mkdir(parents=True, exist_ok=True)
+                detail_path.write_text(detail_doc, encoding="utf-8")
+            log.note("routing-detail", f"wrote {detail_rel}")
+
         sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                  log, args.dry_run, provider, provider_config,
                                  platform_vars=platform_vars,

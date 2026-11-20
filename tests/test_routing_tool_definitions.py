@@ -355,17 +355,26 @@ def test_render_unknown_format_fails_closed():
 # ---------------------------------------------------------------------------
 
 def test_build_for_providers_follows_handoff_format_capability():
+    # format: json pins the legacy tool-envelope path this test is about
+    # (compact is the default since PR 4.1).
     rendered = build_routing_tool_definitions_for_providers(
         _AGENT_META_ROOT,
-        {"roles": ["developer", "tester"]},
+        {"roles": ["developer", "tester"], "routing-overrides": {"format": "json"}},
         dict(_BASE_VARIABLES),
         providers=["Claude", "Continue", "Codex", "KimiCode"],
     )
     definition = _sample_definition()
-    assert json.loads(rendered["Claude"]) == definition       # handoff_format: json
-    assert json.loads(rendered["Codex"]) == definition        # handoff_format: json
-    assert yaml.safe_load(rendered["Continue"]) == definition  # yaml_text_block
-    assert yaml.safe_load(rendered["KimiCode"]) == definition
+
+    def _without_name_index(payload):
+        return {**payload, "routing": {
+            k: v for k, v in payload["routing"].items() if k != "name_index"
+        }}
+
+    # roster_in_harness=true → name_index dropped (AC-R3); false → full.
+    assert json.loads(rendered["Claude"]) == _without_name_index(definition)
+    assert json.loads(rendered["Codex"]) == _without_name_index(definition)
+    assert yaml.safe_load(rendered["Continue"]) == definition
+    assert yaml.safe_load(rendered["KimiCode"]) == _without_name_index(definition)
     # Format differences come from config only — same payload, different envelope.
     assert rendered["Claude"] != rendered["Continue"]
 
@@ -397,14 +406,17 @@ def test_compact_profile_swaps_the_tool_envelope_for_routing_lines():
 
 
 def test_full_prerender_stays_the_tool_definition():
-    """Without the opt-in the per-provider render is byte-identical to the
-    serialized tool definition (AC-01/AC-35)."""
-    config = {"roles": ["developer", "tester"]}
+    """With format: json the per-provider render is byte-identical to the
+    serialized tool definition (legacy rollback, AC-R1)."""
+    config = {"roles": ["developer", "tester"], "routing-overrides": {"format": "json"}}
     definition = build_routing_tool_definition(_AGENT_META_ROOT, config, dict(_BASE_VARIABLES))
     rendered = build_routing_tool_definitions_for_providers(
         _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"]
     )
-    assert json.loads(rendered["Claude"]) == definition
+    # Claude has roster_in_harness=true → name_index dropped (AC-R3).
+    assert json.loads(rendered["Claude"]) == {**definition, "routing": {
+        k: v for k, v in definition["routing"].items() if k != "name_index"
+    }}
     assert yaml.safe_load(rendered["Continue"]) == definition
 
 
@@ -420,6 +432,9 @@ def test_build_variables_prerenders_intent_routing_tools_per_provider():
     from scripts.lib.config import build_variables, load_config
 
     config = load_config(_AGENT_META_ROOT / ".meta-config" / "project.yaml")
+    # Pin the legacy envelope so the prerender is parseable JSON (compact is
+    # the default since PR 4.1).
+    config["routing-overrides"] = {"format": "json"}
     variables, unmapped = build_variables(config, _AGENT_META_ROOT, _AGENT_META_ROOT)
     assert unmapped == []
     prerender = variables["_INTENT_ROUTING_TOOL_DEFS"]
@@ -494,6 +509,9 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
     from scripts.lib.log import SyncLog
 
     config = load_config(_AGENT_META_ROOT / ".meta-config" / "project.yaml")
+    # Parseable tool envelope for the format-dispatch assertions (the compact
+    # default is covered in test_routing_compact_default.py).
+    config["routing-overrides"] = {"format": "json"}
     variables, _ = build_variables(config, _AGENT_META_ROOT, _AGENT_META_ROOT)
     template = (_AGENT_META_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(
         encoding="utf-8"
