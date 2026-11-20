@@ -193,7 +193,9 @@ def test_mcp_and_tool_sections_leave_block_on_file_channel(env):
                  "Details/Registrierung: `config/external-tools-registry.yaml`."):
         assert gone not in block, f"MCP/tool section still embedded: {gone}"
     assert "# MCP Hard Prohibitions" in block
-    assert "- **reqogniloom:** `workspace.close`" in block  # anchor survives
+    # E-11 disabled honcho/reqogniloom in the self-hosted config; playwright is
+    # the remaining active server with a blocked list, so its line is the anchor.
+    assert "- **playwright:** `browser_run_code_unsafe`" in block  # anchor survives
     assert "## Übrige Regeln (Lazy-Load)" in block
 
 
@@ -208,7 +210,7 @@ def test_mcp_and_tool_sections_embed_without_file_channel(env):
         project_root=REPO_ROOT,
         active_set=frozenset(),
     )
-    assert "# MCP: honcho" in block
+    assert "# MCP: playwright" in block
     assert "## Erlaubte Tools" in block
     assert "# External Tool: graphify" in block
     assert "## Übrige Regeln (Lazy-Load)" not in block
@@ -226,7 +228,7 @@ def test_mcp_artifacts_written_for_opencode(env, tmp_path):
         REPO_ROOT, tmp_path, config, env["provider_config"], env["log"],
         dry_run=False, provider="Opencode", rules_dir=None,
     )
-    for server in ("honcho", "playwright", "reqogniloom", "viz-logger"):
+    for server in ("playwright", "viz-logger"):
         skill = tmp_path / ".opencode" / "skills" / f"mcp-{server}" / "SKILL.md"
         assert skill.exists(), f"mcp-{server}: SKILL.md missing"
         text = skill.read_text(encoding="utf-8")
@@ -262,8 +264,8 @@ def test_mcp_artifacts_for_unread_rules_dir_provider(env, tmp_path):
         REPO_ROOT, tmp_path, env["config"], provider_config, env["log"],
         dry_run=False, provider="Gemini", rules_dir=".gemini/rules",
     )
-    assert (tmp_path / ".gemini" / "rules" / "mcp-honcho.md").exists()
-    assert (tmp_path / ".gemini" / "skills" / "mcp-honcho" / "SKILL.md").exists()
+    assert (tmp_path / ".gemini" / "rules" / "mcp-playwright.md").exists()
+    assert (tmp_path / ".gemini" / "skills" / "mcp-playwright" / "SKILL.md").exists()
 
 
 # ---------------------------------------------------------------------------

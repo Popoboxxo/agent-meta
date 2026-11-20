@@ -208,7 +208,9 @@ def test_build_gate_card_extracts_verbatim_rule_sections(
     assert isinstance(card, str) and card.strip()
     for marker in _GATE_CARD_MARKERS:
         assert marker in card, f"gate card lost {marker!r}"
-    assert "delete_conclusion" in card, "gate card lost the MCP deny list"
+    # E-11 disabled honcho/reqogniloom; playwright is the remaining active
+    # server with blocked tools and therefore the guardrail anchor.
+    assert "browser_run_code_unsafe" in card, "gate card lost the MCP deny list"
 
 
 def test_gate_card_sections_are_registered_in_the_registry():

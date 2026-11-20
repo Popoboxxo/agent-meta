@@ -1650,6 +1650,26 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
     # Gitignored checkpoint/progress dirs (#1000): WARNING only, exit code unchanged.
     from lib.consistency.checkpoint_tracking import check_checkpoint_dir_ignored
     _strict_findings += check_checkpoint_dir_ignored(project_root, config)
+    # #1263: every blocked tool of an active MCP server must have a native
+    # permission deny rule where the provider declares the capability.
+    # WARNING only: prompt convention remains the documented fallback.
+    from lib.mcp import load_mcp_registry, resolve_active_mcp_servers
+    from lib.mcp_deny import validate_mcp_deny
+    from lib.deactivation import is_provider_active
+    _mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    _mcp_active = resolve_active_mcp_servers(
+        config, agent_meta_root, project_root, registry=_mcp_registry)
+    for _provider in _provider_config:
+        if not is_provider_active(config, _provider):
+            continue
+        for _message in validate_mcp_deny(
+            project_root, _provider, _provider_config, _mcp_registry, _mcp_active,
+            agent_meta_root=agent_meta_root,
+        ):
+            _strict_findings.append(Finding(
+                Severity.WARNING, "mcp-deny.missing-rule", Path(config_path).name,
+                _message,
+            ))
     _strict_exit_code = 0
     if _strict_findings:
         _strict_exit_code = print_report(_strict_findings, project_root, changed_only=False)
