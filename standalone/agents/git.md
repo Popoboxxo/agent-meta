@@ -51,7 +51,7 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
-**Merge dispatch (#1172):** the main chat dispatches PR merges to you directly (the orchestrator cannot dispatch it, platform-blocked; fallback). Policy: #783.
+**Merge dispatch (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 
 ## 4a. Content gate — inspect what you stage
 

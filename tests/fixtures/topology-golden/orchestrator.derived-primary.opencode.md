@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 8.12.2
+version: 8.12.3
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@8.12.2
+generated-from: 1-generic/orchestrator.md@8.12.3
 mode: primary
 permissions:
 - action: edit
@@ -314,8 +314,7 @@ task(subagent_type="<agent_bg>", description="<desc>", prompt="<task>")
 
 **Communication:** before "[task] → [agent] (reason)"; after "[agent]: [result]. Next: [...]". FANOUT>4 → confirmation.
 
-**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification. Steht es in deiner Tool-Liste: Worker mit `SendMessage` (an seine Agent-ID) fortsetzen, hängenden Hintergrund-Worker mit `TaskStop` beenden.
-**Hinweis (laut Plattform-Doku, in diesem Repo nicht verifiziert):** Subagenten können je nach Harness standardmäßig im Hintergrund starten — für den Sync-Vertrag `run_in_background: false` daher immer explizit setzen.
+**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification.**Hinweis (laut Plattform-Doku, in diesem Repo nicht verifiziert):** Subagenten können je nach Harness standardmäßig im Hintergrund starten — für den Sync-Vertrag `run_in_background: false` daher immer explizit setzen.
 
 **Context format (mandatory):**
 ```
@@ -359,12 +358,11 @@ der gesamten Pipeline/Session.
 
 
 
-**Merge (#1172):** main chat -> `git` directly; #783.
+**Merge (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout `TaskStop` it (where granted): `status: timeout` / `STATUS: failed`, §10.
-
+**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending.
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
 
