@@ -42,7 +42,7 @@ STEP_ORDER: Tuple[str, ...] = (
 
 
 def _git_runner(root: Path, argv: List[str], runner: Any) -> Any:
-    return runner(argv, cwd=str(root), capture_output=True, text=True)
+    return runner(argv, cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def _stdout(result: Any) -> str:
