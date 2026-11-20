@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from lib import agent_report  # noqa: E402 -- per-role measurement (Task 1.1)
 from lib.context_report import (  # noqa: E402 -- shared measurement function (IC-11)
     count_text_stats,
     measure_artifacts,
@@ -31,6 +32,9 @@ from lib.context_report import (  # noqa: E402 -- shared measurement function (I
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PROVIDERS_CONFIG = "config/ai-providers.yaml"
+
+#: Default rendered agent directory for ``--per-agent`` (OQ-4).
+AUTO_AGENTS_DIR = ".claude/agents"
 
 CONTEXT_FILE_PATTERN = re.compile(r"^\s*context_file:\s*[\"']?([^\s\"'#]+)", re.MULTILINE)
 
@@ -221,6 +225,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "(same function as sync.py --context-report)",
     )
     parser.add_argument(
+        "--per-agent",
+        action="store_true",
+        help="measure rendered agent roles per provider "
+        "(requires --project; reads <project>/" + AUTO_AGENTS_DIR + ")",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="emit machine-readable JSON instead of a table",
@@ -254,6 +264,90 @@ def run_project_report(project: Path, as_json: bool) -> int:
     return 0
 
 
+def _empty_stat() -> dict:
+    return {"bytes": 0, "lines": 0, "tokens_est": 0}
+
+
+def _add_file(acc: dict, path: Path) -> None:
+    if path.is_file():
+        stats = count_text_stats(path.read_bytes())
+        for key in acc:
+            acc[key] += stats[key]
+
+
+def _to_approx(acc: dict) -> dict:
+    return {
+        "bytes": acc["bytes"],
+        "lines": acc["lines"],
+        "tokens_approx": acc["bytes"] // 4,
+    }
+
+
+def _measure_always_on(agents_dir: Path) -> dict:
+    """Measure the three always-on components (OQ-3), provider-agnostically.
+
+    ``entry-file`` comes from the context files discovered in the project root;
+    ``rules`` from the sibling ``rules/`` directory; ``descriptions`` from the
+    frontmatter description lines of the rendered role files. No provider name
+    is branched on.
+    """
+    root = agents_dir.resolve()
+    project_root = root.parent.parent
+    entry = _empty_stat()
+    for relative in discover_context_files(project_root):
+        _add_file(entry, resolve_path(project_root, relative))
+
+    rules = _empty_stat()
+    rules_dir = root.parent / "rules"
+    if rules_dir.is_dir():
+        for path in sorted(rules_dir.rglob("*")):
+            _add_file(rules, path)
+
+    descriptions = _empty_stat()
+    for path in sorted(root.glob("*/*.md")):
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            if line.lstrip().startswith("description:"):
+                raw = line.encode("utf-8")
+                descriptions["bytes"] += len(raw)
+                descriptions["lines"] += 1
+                descriptions["tokens_est"] += len(raw) // 4
+
+    return {
+        "entry-file": _to_approx(entry),
+        "rules": _to_approx(rules),
+        "descriptions": _to_approx(descriptions),
+    }
+
+
+def run_agent_report(agents_dir: str | Path = AUTO_AGENTS_DIR,
+                     as_json: bool = False) -> int:
+    """Report per-role sizes of *agents_dir* plus a top-level session sum (OQ-2).
+
+    Providers are discovered as the immediate subdirectories of *agents_dir*,
+    so behaviour is driven by data rather than hardcoded provider names.
+    """
+    root = Path(agents_dir)
+    if not root.is_dir():
+        print(f"error: agents dir not found: {root}", file=sys.stderr)
+        return 1
+    providers = sorted(child.name for child in root.iterdir() if child.is_dir())
+    if not providers:
+        print("error: no agent roles found", file=sys.stderr)
+        return 1
+    try:
+        agents = agent_report.measure_agents(root, providers)
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    report = agent_report.build_agent_report(agents, _measure_always_on(root))
+    print(json.dumps(report, indent=2) if as_json
+          else agent_report.render_agent_table(report))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the measurement and print the report.
 
@@ -262,9 +356,15 @@ def main(argv: list[str] | None = None) -> int:
 
     Returns:
         Process exit code: 0 on success, 1 when no context file was found or
-        the extra target does not exist.
+        the extra target does not exist, 2 on invalid flag combinations.
     """
     args = parse_args(argv)
+    if args.per_agent:
+        if args.project is None:
+            print("error: --per-agent requires --project", file=sys.stderr)
+            return 2
+        agents_dir = Path(args.project) / AUTO_AGENTS_DIR
+        return run_agent_report(agents_dir, args.json)
     if args.project is not None:
         return run_project_report(Path(args.project), args.json)
     try:

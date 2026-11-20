@@ -153,6 +153,45 @@ Hängt `content` an das Ende des Dokuments an. Kein `anchor` erforderlich.
 
 ---
 
+## Standard-Sektionsschema (Worker)
+
+Alle Worker-Templates in `agents/1-generic/**` verwenden dieselben kanonischen Sektionsnamen.
+Die Reihenfolge ist zugleich das Cache-Präfix: **stabil → variabel**. Eine Umbenennung oder
+Verschiebung einer Sektion verändert dieses Präfix und damit den Cache-Key.
+
+| Nr. | Kanonischer Name (EN) |
+|-----|----------------------|
+| 1 | `Purpose` |
+| 2 | `Boundaries` |
+| 3 | `Parse input` |
+| 4 | `Workflow` |
+| 5 | `Output contract` |
+| 6 | `Don'ts` |
+| 7 | `Escalation` |
+| 8 | `Project context` |
+| 9 | `Language` |
+
+Block-Reihenfolge im Template: `frontmatter` → `> Extension` → `<persona>` (`Purpose`,
+`Boundaries`, Does-not) → `<workflow>` (`Parse input`, Steps, `Output contract`) →
+`<rules>` (`Don'ts`, `Escalation`) → `<context>` (`Project context`, `Language`) →
+Blöcke (Closing summary, Auto-commit, Output guard).
+
+**Migrationsliste alt → neu:**
+
+| Alt | Neu |
+|-----|-----|
+| `Sprache` | `Language` |
+| `Projektkontext` | `Project context` |
+| `Return`, `JSON Output Schema`, `Output schema`, `Output` | `Output contract` |
+
+**`patches`-Anker nachziehen:** Ein `patches`-Eintrag in `2-platform/**` referenziert den
+Heading-Text exakt (siehe [Anchor-Syntax](#anchor-syntax)). Wenn eine Sektion umbenannt wird,
+muss der zugehörige `anchor`-Wert im Override mitgeändert werden — andernfalls gibt sync.py
+nur eine `[WARN]` aus und der Patch wird stillschweigend nicht angewendet. Siehe auch
+[Dependency Map](#dependency-map).
+
+---
+
 ## Anchor-Syntax
 
 Der `anchor`-Wert muss **exakt dem Heading-Text** im Base-Template entsprechen — inkl. `#`-Präfix.
