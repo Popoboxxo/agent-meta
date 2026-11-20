@@ -6,6 +6,7 @@ pipeline_stages:
 # Implementierungsplan — Konfigurierbare Progress-/Checkpoint-Pfade
 
 > Status: geplant
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status geplant, Feature (progress.dir / checkpoint-dir) aber bereits ausgeliefert — Status veraltet (CHANGELOG :1744-1747, v1.2.0-beta.2).
 
 **Spec:** `docs/specs/2026-09-13-progress-paths-config-design.md`
 

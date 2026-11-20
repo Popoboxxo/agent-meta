@@ -1,6 +1,6 @@
 # Tmp-Sink-Pin vs. System-Temp-Root (Issue #1189) — Spec
 
-> Status: **APPROVED (2026-11-09)** — durch den User freigegeben. Der Approval-Marker
+> Status: **done (2026-11-20)** — durch den User freigegeben. — Umsetzung verifiziert 2026-11-20 (PRs #1225/#1227/#1230/#1233/#1235 MERGED, issue #1189 CLOSED). Der Approval-Marker
 > `Status: APPROVED (Datum)` wird ausschließlich vom User gesetzt, nie vom Spec-Autor.
 > Revision: 4
 > Datum: 2026-11-08

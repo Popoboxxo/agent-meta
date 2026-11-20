@@ -16,6 +16,8 @@ trace:
   - pr-1067
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** teils umgesetzt — P1 DONE (PR #1103), P2a–P6 offen; Status Entwurf veraltet.
+
 # Welle 4 — Fortsetzungsplan (Tracking)
 
 > **Status: Entwurf (Fortsetzungsplan).**

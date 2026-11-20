@@ -1,6 +1,7 @@
 # Project-Context-Injection Scope — Implementation Plan
 
 > **Status:** APPROVED — Approved: 2026-11-09 (User-Freigabe via main_chat)
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status APPROVED, Feature ausgeliefert — Plan nicht nachgezogen (CHANGELOG :8, #1187).
 > **Issue:** [#1187](https://github.com/Popoboxxo/agent-meta/issues/1187) — feat(config): project-context-injection scope (core | +orchestrator | +whitelist | all)
 > **Revision:** 3 (Entscheidungen D5–D8 eingearbeitet, 2026-11-09)
 > **Spec:** `docs/specs/2026-11-09-project-context-injection-scope-spec.md` (spec-id `SPEC-project-context-injection-scope-2026-11-09`, Revision 4, **Status: APPROVED** — approved 2026-11-09)

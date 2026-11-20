@@ -9,6 +9,8 @@ klasse: L
 branch: feat/git-trailer-contract
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** teilweise umgesetzt (PR #1282, Commit 2fdf2817) — Rest: Task 10 (Gesamtverifikation) nicht belegt. Feature selbst im CHANGELOG (:17, #1282, beta.9).
+
 # Git-Trailer-Vertrag Implementation Plan
 
 > Status: teilweise umgesetzt (PR #1282, Commit 2fdf2817) — Spec APPROVED (User, 2026-11-15); Task 10 (Gesamtverifikation) nicht belegt

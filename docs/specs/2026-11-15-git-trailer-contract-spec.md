@@ -1,5 +1,6 @@
 # Git-Trailer-Vertrag — Spec
 > Status: APPROVED (User, 2026-11-15, mit Änderungen: auto_commit-Rollen und Admin-UI im selben PR)
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Spec APPROVED; zugehöriger Plan nur teilumgesetzt → Spec nicht als DONE markieren.
 > Datum: 2026-11-15 | Entscheidung: E-19 | Roadmap: `docs/plans/2026-11-15-master-roadmap.md` P37 / PR 0.9 | Issues: #1168, #1247 | Design: `.tmp/plans/2026-11-15-git-trailer-contract-design.md`
 > Klasse: L (siehe Abschnitt Klassifikation)
 

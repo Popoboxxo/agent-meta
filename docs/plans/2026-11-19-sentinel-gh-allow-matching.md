@@ -9,6 +9,8 @@ klasse: M
 branch: fix/sentinel-gh-allow-matching
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status APPROVED (19.11.), aber Umsetzung bereits im CHANGELOG — Status veraltet (CHANGELOG :12, #1307, Unreleased).
+
 # Sentinel-Präfix verhindert Allow-Matching für reine gh-Aufrufe — Spec + Plan
 
 > Status: APPROVED — vom Nutzer am 2026-11-19 freigegeben.

@@ -2,6 +2,7 @@
 
 > **Ergebnis: PASSED / VERIFIED**  
 > **Abschlussentscheidung: Task 17 bleibt bis zum separaten Ledger-Update uncompleted.**
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Abschlussentscheidung: Task 17 bleibt bis separatem Ledger-Update uncompleted.
 
 ## Status
 
