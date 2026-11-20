@@ -274,7 +274,7 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 {{/if}}
 
 {{#if ROLE_GIT_ACTIVE}}
-**Merge (#1172):** main chat -> `git` directly; #783.
+**Merge (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; Pfad orchestrator → git wurde 2026-11-06 vom Claude-Code-Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 {{/if}}
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
