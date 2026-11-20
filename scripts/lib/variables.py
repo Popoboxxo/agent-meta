@@ -34,6 +34,27 @@ if TYPE_CHECKING:  # topology stays a lazy runtime import (see __doc__)
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
 
+#: Empty-string fallback for the per-provider worker-control tool list
+#: (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-3). The enclosing
+#: ``{{#if WORKER_CONTROL_ENABLED}}`` gate is closed whenever the provider
+#: declares no tools, so this value only reaches output for a tool-bearing
+#: provider; standalone and other non-render paths use the empty fallback.
+WORKER_CONTROL_TOOLS_FALLBACK: str = ""
+
+
+def render_worker_control_tools(tools) -> str:
+    """Render declared worker-control tool names as a backtick prose list.
+
+    Pure and provider-name-free: the caller passes the tool names read from
+    ``capabilities.<provider>.worker_control_tools`` (config / agent_sync),
+    so every provider is rendered through the same capability seam. Empty or
+    malformed input resolves to the empty-string fallback (IC-3 fail-safe).
+    """
+    return ", ".join(
+        f"`{tool}`" for tool in tools
+        if isinstance(tool, str) and tool
+    ) or WORKER_CONTROL_TOOLS_FALLBACK
+
 #: The ONE source of the legacy default (D1b). ``config/project-config.schema.json``
 #: declares ``orchestrator.mode`` default ``strict``; the legacy ``enabled``/
 #: ``strict`` fallback must resolve to exactly the same mode, otherwise the

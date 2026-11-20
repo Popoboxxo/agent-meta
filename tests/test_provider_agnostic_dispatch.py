@@ -846,6 +846,27 @@ def test_per_provider_worker_control_override_is_capability_driven():
         )
 
 
+def test_worker_control_tools_variable_is_provider_scoped():
+    """IC-3 / AC 1/2: WORKER_CONTROL_TOOLS carries exactly the active
+    provider's declared tool names as a backtick list — empty for a tool-less
+    provider. Derived from the capability key, never a provider-name branch."""
+    from lib.agent_sync import _build_provider_vars
+    from lib.providers import load_provider_capabilities, load_providers_config
+
+    pc = load_providers_config(_REPO_ROOT)
+    caps = load_provider_capabilities(_REPO_ROOT)
+    for provider in ("Claude", "Codex", "Gemini", "Opencode"):
+        merged = _build_provider_vars(
+            pc.get(provider) or {}, provider, {}, _REPO_ROOT,
+            active_set=frozenset(),
+        )
+        declared = (caps.get(provider) or {}).get("worker_control_tools") or []
+        expected = ", ".join(f"`{t}`" for t in declared)
+        assert merged["WORKER_CONTROL_TOOLS"] == expected, (
+            f"{provider}: per-provider WORKER_CONTROL_TOOLS override"
+        )
+
+
 def test_worker_control_placeholder_is_registered():
     """IC-2 fail-safe: the new gate must be a known placeholder, otherwise
     B2's {{#if WORKER_CONTROL_ENABLED}} gate raises an unknown-placeholder

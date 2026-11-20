@@ -53,7 +53,11 @@ from .rule_index import (
     read_managed_index,
     write_managed_index,
 )
-from .variables import strip_inactive_conditional_blocks, substitute
+from .variables import (
+    render_worker_control_tools,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 
 if TYPE_CHECKING:
     from .active_set import ActiveSet
@@ -580,6 +584,10 @@ def _build_provider_vars(
         # support (O4). A tool-less provider gets a closed gate; a tool-bearing
         # provider keeps its block regardless of hook_protocol.
         'WORKER_CONTROL_ENABLED': 'true' if _provider_worker_tools else 'false',
+        # IC-3: the exact tool names this provider declares, rendered as a
+        # backtick list for the gated prose. Derived from the same capability
+        # list as the gate — no provider-name branch, no foreign literal.
+        'WORKER_CONTROL_TOOLS': render_worker_control_tools(_provider_worker_tools),
         'PROGRESS_CHAT_PUSH_ENABLED': 'true' if _provider_worker_tools else 'false',
         # ROUTE_INTENT_CALLABLE (issue #264 runtime follow-up): gates the §3
         # route_intent mandate vs. its routing-rules fallback. Fail-safe false

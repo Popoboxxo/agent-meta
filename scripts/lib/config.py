@@ -46,6 +46,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     _VALID_SUBAGENT_PERMISSION_MODES,
     derive_agent_meta_repo,
     normalize_subagent_permission_mode,
+    render_worker_control_tools,
     repo_containment_variables,
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
@@ -2622,6 +2623,16 @@ def _build_orch_variables(
     variables["WORKER_CONTROL_ENABLED"] = (
         "true" if any(_declared_worker_tools(p) for p in _wcc_active) else "false"
     )
+    # IC-3: the provider-less basis for the prose tool list. Union of all
+    # active providers' declared tools, order-preserving + deduplicated; the
+    # per-provider override in agent_sync._build_provider_vars is authoritative
+    # at render time, so no mixed-provider render can leak a foreign literal.
+    _wcc_global_tools: list[str] = []
+    for _wcc_provider in _wcc_active:
+        for _wcc_tool in _declared_worker_tools(_wcc_provider):
+            if _wcc_tool not in _wcc_global_tools:
+                _wcc_global_tools.append(_wcc_tool)
+    variables["WORKER_CONTROL_TOOLS"] = render_worker_control_tools(_wcc_global_tools)
     # O4: the progress-chat push gate is the messaging-tool capability, not
     # hooks. Keep the "all active providers" structure so a mixed set stays
     # conservative in the global value; agent_sync refines it per provider at
