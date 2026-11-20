@@ -1,6 +1,6 @@
 # Dynamic Routing + Template Slimming — Spec
 
-> Status: APPROVED (2026-09-19)
+> Status: done (2026-09-19) — Umsetzung verifiziert 2026-11-20 (PR #833 MERGED 3c46920a)
 > Klasse: XL / Architectural
 > Vorgelagertes Systemdesign: Kernentscheidungen liegen vor (Concept-Architect)
 > Revision: 5 (Amendment zum Code-Review Runde 2 — RVW-22-Norm in §3.7 und AK B2a

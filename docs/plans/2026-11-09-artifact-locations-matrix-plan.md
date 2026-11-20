@@ -15,6 +15,8 @@ trace:
   - issue-1186
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status APPROVED, Feature ausgeliefert — Plan-Abschlussvermerk/Checkboxen fehlen (CHANGELOG :7, #1186).
+
 # Artifact-Locations-Matrix für alle Artefakt-Klassen (Issue #1186) — Implementation Plan
 
 > **Status: APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat). Dieser Plan ist der

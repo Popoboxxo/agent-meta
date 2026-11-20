@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
-status: APPROVED
+status: done
 revision: 1.8
 amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth); B3 (2026-10-23, Agent-Ebene nutzt permission_deny_required + active_set am Einstiegspunkt); B4 (2026-10-23, AC-C16(a) auf Tier permission begrenzt — kein default_agent-Abgleich bei Tier plugin)
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
@@ -13,7 +13,7 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 # Opencode v2-Support (Phasen B-D) — Spec
 
-> Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Amendment B1 (2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert diesen Approval-Status nicht.
+> Status: done (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Amendment B1 (2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert diesen Approval-Status nicht. — Umsetzung verifiziert 2026-11-20 (PRs #1011, #1012, #1013, #1015, #1016, #1017, #1018, #1019 MERGED)
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
 >
 > Revision 1.8 (2026-10-23): **Amendment B4** — Vertragspräzisierung aus dem C3-Review (QA-D-02). AC-C16(a) wird auf den Geltungsbereich zugeschnitten, den die ausgelieferte Registry tatsächlich hat: Der `default_agent`-Managed-Merge (State `default-agent`, User-Wert-Warnung, Rollback) läuft auf Tier `permission` (v1 und v2 vor C3). Auf Tier `plugin` (v2 ab C3) schreibt `settings-init` den Wert einmalig, `reconcile_opencode_surface_gate` **prüft** nur den Einstiegspunkt, und es findet keine weitere Abstimmung statt. Das Verhalten bleibt unverändert (OQ-B12: „Eigenprüfung genügt (kein Eingriff in Spec A)“); nur die AC-Formulierung war nie auf diesen Bereich zugeschnitten. Details: „Amendment B4 (2026-10-23)“.

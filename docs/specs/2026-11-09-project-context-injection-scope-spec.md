@@ -1,6 +1,6 @@
 # Project-Context-Injection Scope — Spec
 
-> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat)
+> Status: **done** — Approved: 2026-11-09 (User-Freigabe via main_chat) — Umsetzung verifiziert 2026-11-20 (PR #1299 MERGED 136f79b1, issue #1187 CLOSED)
 > Revision: 2 (Review-Auflösung 2026-11-09)
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 eingearbeitet (`unmanaged` statt
 > `project-state`); K2–K8 geprüft und für dieses Dokument nicht betroffen (§12.1).

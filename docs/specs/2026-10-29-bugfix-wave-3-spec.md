@@ -1,6 +1,6 @@
 # Bugfix-Welle 3 — Spec (Rest-Welle)
 
-> Status: APPROVED (2026-10-29)
+> Status: done (2026-10-29) — Umsetzung verifiziert 2026-11-20 (PRs #1047 6f52326a, #1048 3294c7e5 MERGED)
 >
 > spec-id: SPEC-bugfix-wave-3
 >

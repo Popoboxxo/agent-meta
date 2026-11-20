@@ -1,6 +1,6 @@
 # Artifact-Locations-Matrix für alle Artefakt-Klassen (Issue #1186) — Spec
 
-> Status: **APPROVED** — Approved: 2026-11-09 (User-Freigabe via main_chat).
+> Status: **done** — Approved: 2026-11-09 (User-Freigabe via main_chat). — Umsetzung verifiziert 2026-11-20 (PR #1301 MERGED e136382b, issue #1186 CLOSED)
 > Datum: 2026-11-09
 > Revision: 2 (Review-Auflösung 2026-11-09)
 > Revision: 3 (Szenario-Konflikte K1–K8, 2026-11-09) — K1 (`unmanaged` statt `project-state`),

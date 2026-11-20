@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-RELEASE-CHECKLIST-2026-10-31
 title: Strukturierte Release-Checkliste (off|advisory|strict) mit Dry-Check
-status: APPROVED
+status: done
 revision: 1.2
 klasse: L (Bounded, mit Review-Loop) — zusätzlich Architectural-Kriterium F7 (neuer öffentlicher Config-Contract + Schema)
 related-spec: SPEC-TEST-ENVIRONMENTS-2026-10-31
@@ -10,7 +10,7 @@ quellen: .tmp/recon-release.md (Datei:Zeile-Belege dort), .tmp/spec-builder-chec
 
 # Strukturierte Release-Checkliste — Spec
 
-> Status: APPROVED (2026-10-31, Freigabe durch Nutzer). Der Approval-Marker `Status: APPROVED` wird
+> Status: done (2026-10-31, Freigabe durch Nutzer) — Umsetzung verifiziert 2026-11-20 (PR #1089 MERGED 91f4afd1, CHANGELOG beta.7). Der Approval-Marker `Status: APPROVED` wird
 > ausschließlich vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Autor. Diese Datei enthält
 > Interface-Contracts und Akzeptanzkriterien, keine Implementierung und keinen Plan.
 > Trace-Anker: `spec-id: SPEC-RELEASE-CHECKLIST-2026-10-31`.

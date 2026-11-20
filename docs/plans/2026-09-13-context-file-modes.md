@@ -6,6 +6,7 @@ pipeline_stages:
 # Implementierungsplan — Context-File Modes (Phase 1 / Phase 2)
 
 > Status: **Phase 1 (Tasks 1–6) implementiert** — Stand 2026-09-14 im Arbeitsbaum (Branch `feat/spec-plan-workflow`). **Phase 2 (Tasks 8–15) ist geplant/zurückgestellt.**
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Phase 1 (Tasks 1–6) implementiert, Phase 2 (Tasks 8–15) geplant/zurückgestellt.
 >
 > **Revision / Status (2026-09-14):**
 > (a) Tasks 1–6 sind implementiert: Schema/Defaults (`context_file.topology`/`core_file`/`provider-overrides`), Resolver `context_topology` + Legacy-Filename-Regel, Adapter-Capability-Registry, F-RULESLOC, `per-provider`-Kern-/Adapter-Render + Dispatch, Rollback auf `unified`. Die zugehörigen Schritte sind unten abgehakt.
