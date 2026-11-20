@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -138,6 +139,18 @@ except ImportError:
 #: by ``maxLength`` in ``schemas/a2a-handoff.schema.json`` and
 #: ``schemas/handoffs/task-spec.schema.json`` (a test locks the values together).
 DEFAULT_A2A_T_SIZE_LIMIT = 300
+
+#: Content-based dedupe for the ``! Config validation warnings`` block.
+#: Sync validation runs the config check more than once (issue #321), so the
+#: *identical* warnings must appear at most once. Unlike a boolean latch, this
+#: is keyed to the exact (config path, warning signature): a different config
+#: or a different error set still emits its warnings. This matters for
+#: long-lived processes (admin-server, multi-project sync in one interpreter)
+#: where a global "already emitted" flag would silently drop all later
+#: diagnostics. The lock makes the check-then-add atomic for concurrent
+#: ``load_config`` callers.
+_EMITTED_VALIDATION_WARNINGS: set = set()
+_VALIDATION_WARNINGS_LOCK = threading.Lock()
 
 
 def resolve_a2a_t_size_limit(config: dict) -> int:
@@ -938,6 +951,18 @@ def _validate_config(config: dict, config_path: Path) -> None:
         validator = _jsonschema.Draft7Validator(schema)
         errors = sorted(validator.iter_errors(config), key=lambda e: list(e.path))
         if errors:
+            # Dedupe by the *content* of this run's warnings, not a process-level
+            # boolean latch. A second config with different errors must still
+            # emit its own warnings (issue #321 / long-lived processes).
+            signature = tuple(
+                (".".join(str(p) for p in err.path) or "(root)", err.message)
+                for err in errors
+            )
+            key = (str(config_path), signature)
+            with _VALIDATION_WARNINGS_LOCK:
+                if key in _EMITTED_VALIDATION_WARNINGS:
+                    return
+                _EMITTED_VALIDATION_WARNINGS.add(key)
             # The hint must NOT read like jsonschema enables suppression: this
             # branch only runs when jsonschema IS installed (the unavailable
             # case returned above), so installing it produces the warnings, not
