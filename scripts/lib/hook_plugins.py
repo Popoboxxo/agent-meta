@@ -288,7 +288,10 @@ def sync_hook_lib(
     hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
 
     platforms = config.get("platforms", [])
-    sources = collect_hook_sources(agent_meta_root, platforms, subdir=HOOK_LIB_SUBDIR)
+    # #1169/#1238: the lib also ships importable Python helper modules
+    # (hook_json_many.py) that the thin shell shim loads at runtime.
+    sources = collect_hook_sources(
+        agent_meta_root, platforms, subdir=HOOK_LIB_SUBDIR, include_py=True)
     # See sync_hooks() (issue #630): no verified hook_protocol -> nothing
     # sources this lib anymore, clean up any previously-deployed copy. Only
     # gated when a real provider_config was supplied -- see sync_release_gates()
@@ -334,7 +337,7 @@ def sync_hook_lib(
     # Remove stale shipped lib files — never touches project-owned files
     # dropped directly into <hooks_dir>/lib/ (not tracked here).
     if target_dir.exists():
-        for existing in sorted(target_dir.glob("*.sh")):
+        for existing in sorted([*target_dir.glob("*.sh"), *target_dir.glob("*.py")]):
             if existing.name not in now_managed and existing.name in previously_managed:
                 log.action("DELETE", str(existing.relative_to(project_root)),
                            "hook lib file removed from agent-meta sources")

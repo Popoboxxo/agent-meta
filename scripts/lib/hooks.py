@@ -79,7 +79,8 @@ def parse_hook_metadata(script_content: str) -> dict:
 
 
 def collect_hook_sources(
-    agent_meta_root: Path, platforms: list[str], subdir: str = ""
+    agent_meta_root: Path, platforms: list[str], subdir: str = "",
+    include_py: bool = False,
 ) -> list[tuple[Path, str]]:
     """Collect hook scripts from 0-external, 1-generic and 2-platform layers.
 
@@ -92,8 +93,13 @@ def collect_hook_sources(
     itself is non-recursive (`*.sh`, not `**/*.sh`), so the default (no
     subdir) never picks up files that live in a subdirectory — release-gate
     scripts are never double-collected as regular top-level hooks.
+
+    ``include_py``: also collect ``*.py`` helper modules from the same layer
+    dir (used by ``sync_hook_lib`` for the importable hook_json_many.py core,
+    issues #1169/#1238). They are plain lib files, never registered as hooks.
     """
     seen: dict[str, Path] = {}
+    patterns = ("*.sh", "*.py") if include_py else ("*.sh",)
 
     def _layer_dir(layer: str) -> Path:
         base = agent_meta_root / HOOKS_DIR / layer
@@ -102,22 +108,25 @@ def collect_hook_sources(
     # 0-external
     ext_dir = _layer_dir("0-external")
     if ext_dir.exists():
-        for f in sorted(ext_dir.glob("*.sh")):
-            seen[f.name] = f
+        for pattern in patterns:
+            for f in sorted(ext_dir.glob(pattern)):
+                seen[f.name] = f
 
     # 1-generic
     generic_dir = _layer_dir("1-generic")
     if generic_dir.exists():
-        for f in sorted(generic_dir.glob("*.sh")):
-            seen[f.name] = f
+        for pattern in patterns:
+            for f in sorted(generic_dir.glob(pattern)):
+                seen[f.name] = f
 
     # 2-platform (strip platform prefix, e.g. sharkord-dod-push-check.sh → dod-push-check.sh)
     platform_dir = _layer_dir("2-platform")
     if platform_dir.exists():
         for platform in platforms:
-            for f in sorted(platform_dir.glob(f"{platform}-*.sh")):
-                output_name = f.name[len(platform) + 1:]
-                seen[output_name] = f
+            for pattern in patterns:
+                for f in sorted(platform_dir.glob(f"{platform}-{pattern}")):
+                    output_name = f.name[len(platform) + 1:]
+                    seen[output_name] = f
 
     return [(src, name) for name, src in seen.items()]
 
@@ -560,6 +569,12 @@ def sync_hooks(
         source_content = source_content.replace(
             "{{AGENT_META_HOOK_AGENT_ID}}",
             "true" if provider_has_capability(pc, "hook-agent-id") else "false")
+        # Issue #1210: harness-set role field (`agent_type`) capability. The
+        # guard only cross-checks a self-declared sentinel when this is "true";
+        # config-driven, never a provider-name branch (provider-agnostic).
+        source_content = source_content.replace(
+            "{{AGENT_META_HOOK_ROLE_FIELD}}",
+            "true" if provider_has_capability(pc, "hook-role-field") else "false")
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
         hook_stem = Path(output_name).stem

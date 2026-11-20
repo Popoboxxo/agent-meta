@@ -67,6 +67,12 @@ providers:
     # is then discarded (issue #1151 F6-05). Providers without it keep the
     # sentinel as their only delegate signal.
     - hook-agent-id
+    # PreToolUse payload carries a harness-set role name (`agent_type`, present
+    # when the session uses --agent or the hook fires inside a subagent).
+    # Baked into orchestrator-guard via the AGENT_META_HOOK_ROLE_FIELD
+    # placeholder: a sentinel that contradicts this role is rejected (issue
+    # #1210). Providers without it keep the sentinel-only convention boundary.
+    - hook-role-field
     # channel: skill support (issue #751) — see the rationale comment next
     # to provider_supports_skill_channel() in scripts/lib/skill_channel.py.
     - native-skill-channel
