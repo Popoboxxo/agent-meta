@@ -203,6 +203,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
 
 
 
+Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read .codex/routing-details.md`.
 Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Routing-Regel:
 1. **Pipeline-Treffer** (Signal-Keywords): §2-Bestätigung einholen (NO auto-run), dann Pipeline-Route — Stage-Detail aus §2a.
 2. **Rollen-Treffer** (keywords/examples): `target_agent` aus der Tool-Definition bzw. der Routing-Regel dispatchen — Tier via §4, dann §5 Self-Validation.
