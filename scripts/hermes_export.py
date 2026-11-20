@@ -76,11 +76,13 @@ Tier sources (abstract only):
   only an existing entry with an empty/unknown ``model`` warns.
 
 The manifest and skill frontmatter are serialized by a small stdlib emitter
-(no PyYAML dependency) so output is byte-stable regardless of the
-environment. ``--export-config`` parsing uses PyYAML when available (JSON
-configs work without it). The export is additive-only: it never deletes
-pre-existing files in the output directory; regenerate into a fresh
-directory to get an exact snapshot.
+so output is byte-stable regardless of the environment. The skill-pack export
+itself reads role metadata through :func:`scripts.lib.roles.load_roles_config`,
+which is PyYAML-backed, so it fails closed with an install hint when PyYAML
+is unavailable. ``--export-config`` parsing likewise uses PyYAML when
+available (JSON configs work without it). The export is additive-only: it
+never deletes pre-existing files in the output directory; regenerate into a
+fresh directory to get an exact snapshot.
 """
 from __future__ import annotations
 
@@ -506,9 +508,15 @@ def export_skill_pack(
         map) and the rendered ``manifest`` string.
 
     Raises:
+        RuntimeError: If PyYAML is not available (fail-closed export).
         ValueError: On invalid tier overrides (non-abstract tier values).
         FileNotFoundError: If agent_meta_root has no agents/1-generic dir.
     """
+    if not _YAML_AVAILABLE:
+        raise RuntimeError(
+            "PyYAML required for hermes skill-pack export (not installed). "
+            "Install PyYAML and retry."
+        )
     generic_dir = agent_meta_root / "agents" / "1-generic"
     if not generic_dir.is_dir():
         raise FileNotFoundError(

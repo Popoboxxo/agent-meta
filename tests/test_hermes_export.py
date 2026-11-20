@@ -489,6 +489,13 @@ class TestExportSkillPackMiniRepo:
         with pytest.raises(FileNotFoundError, match="agents/1-generic"):
             hermes_export.export_skill_pack(tmp_path / "nope", tmp_path / "pack")
 
+    def test_missing_pyyaml_fails_closed(
+        self, monkeypatch: pytest.MonkeyPatch, mini_meta: Path, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(hermes_export, "_YAML_AVAILABLE", False)
+        with pytest.raises(RuntimeError, match="PyYAML required"):
+            hermes_export.export_skill_pack(mini_meta, tmp_path / "pack")
+
 
 # ===========================================================================
 # Export config loading
@@ -624,6 +631,16 @@ class TestCli:
         code = self._run_main(
             monkeypatch,
             ["--root", str(tmp_path / "void"), "--output", str(tmp_path / "pack")],
+        )
+        assert code == 1
+
+    def test_main_exits_nonzero_without_pyyaml(
+        self, monkeypatch: pytest.MonkeyPatch, mini_meta: Path, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(hermes_export, "_YAML_AVAILABLE", False)
+        code = self._run_main(
+            monkeypatch,
+            ["--root", str(mini_meta), "--output", str(tmp_path / "pack")],
         )
         assert code == 1
 
