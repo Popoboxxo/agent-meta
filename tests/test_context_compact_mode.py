@@ -15,8 +15,9 @@ Phase B adds end-to-end coverage for the compression itself:
     (the core safety contract of the whole feature)
   - compact mode must shrink AGENTS.md while every mandatory instruction
     anchor survives (CRITICAL GATE, Branch-Guard, Commit-Konventionen,
-    Sprachregeln, MCP prohibition lists incl. honcho/playwright/reqogniloom
-    core bans, short-form bootstrap, keywords directory table)
+    Sprachregeln, the still-active MCP prohibition core bans, short-form
+    bootstrap, keywords directory table). Honcho/reqogniloom bans moved to
+    native provider deny surfaces (#1322) and are no longer embedded here.
 """
 
 from __future__ import annotations
@@ -494,11 +495,10 @@ _MANDATORY_ANCHORS = (
     "# Commit-Konventionen",         # commit conventions section survives
     "Conventional Commits (feat, fix, chore)",  # concrete convention statement
     "# Sprachregeln",
-    "`delete_conclusion`",           # honcho prohibitions
-    "`set_config`",                  # honcho prohibitions
-    "`browser_run_code_unsafe`",     # playwright prohibitions
-    "`browser_evaluate`",            # playwright prohibitions
-    "`workspace.delete`",            # reqogniloom prohibitions
+    "`browser_run_code_unsafe`",     # playwright prohibitions (no native deny)
+    "`browser_evaluate`",            # playwright prohibitions (no native deny)
+    # honcho / reqogniloom deny tokens moved to native provider surfaces
+    # (#1322) and are no longer embedded in the managed block.
 )
 
 
@@ -642,8 +642,10 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
         "content leaked back into the always-on block instead of the file channel"
     )
     # And the always-on MCP hard prohibitions stay present as one-liners.
+    # Only servers without a native deny surface remain embedded (#1322):
+    # playwright stays, honcho/reqogniloom are handled natively per provider.
     assert "# MCP Hard Prohibitions" in compact
-    assert "- **honcho:**" in compact
+    assert "- **playwright:**" in compact
 
 
 # ---------------------------------------------------------------------------
