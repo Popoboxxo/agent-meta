@@ -214,3 +214,55 @@ def test_worker_control_prose_names_only_active_provider_tools(provider):
     mentioned = {t for t in _ALL_WORKER_CONTROL_TOOLS if t in prose}
     assert mentioned <= expected, (provider, "forbidden", mentioned - expected, prose)
     assert expected <= mentioned, (provider, "missing", expected - mentioned, prose)
+
+
+# --- O15 (PR D / P11): tool-mention ⊆ frontmatter for ALL providers ---------
+# The worker-control invariant above only covered Claude/Codex/Gemini. O15
+# closes the 6-provider gap: for every registered provider, every tool name
+# named in the rendered orchestrator prompt must be granted in that provider's
+# frontmatter tools. Tool-less surfaces (Codex TOML, Copilot/Mammouth/ZCode
+# `tools: skip`, Continue `tools: remove`) have no FM `tools` field — for those
+# the check reduces to "no foreign tool literal leaks into the prose", which
+# is the strongest claim their format can carry.
+
+_ALL_PROVIDERS = (
+    "Claude", "Gemini", "Opencode", "Continue", "Copilot",
+    "Mammouth", "Codex", "ZCode", "KimiCode",
+)
+
+
+def _frontmatter_tools(provider: str, text: str) -> set[str] | None:
+    """FM tools of a rendered agent, or None when the format has no tools key.
+
+    Codex renders a native TOML document (``frontmatter-mechanism:
+    codex-toml``) with no ``tools`` field; YAML-frontmatter providers expose
+    ``tools`` only when their transform spec keeps it.
+    """
+    if provider == "Codex":
+        return None
+    fm = yaml.safe_load(text.split("---", 2)[1])
+    return set(fm.get("tools") or [])
+
+
+@pytest.mark.parametrize("provider", _ALL_PROVIDERS)
+def test_all_providers_tool_mentions_subset_of_frontmatter(provider):
+    """O15: named worker-control tools ⊆ declared capability ⊆ FM tools.
+
+    The rendered prose may only name the active provider's own tools, and
+    wherever the provider declares a ``tools`` field each named tool must be
+    granted there. Providers without a tools field are covered by the
+    no-foreign-literal half alone.
+    """
+    text = _render_with_gate(provider, worker_control=True)
+    prose = _worker_control_prose(text)
+    declared = set(_worker_control_tools(provider))
+    mentioned = {t for t in _ALL_WORKER_CONTROL_TOOLS if t in prose}
+
+    # No tool literal from a foreign provider leaks into this render.
+    assert mentioned <= declared, (provider, "foreign", mentioned - declared, prose)
+    # An active provider actually names the tools it declares.
+    assert declared <= mentioned, (provider, "missing", declared - mentioned, prose)
+
+    fm_tools = _frontmatter_tools(provider, text)
+    if fm_tools is not None:
+        assert mentioned <= fm_tools, (provider, "not granted", mentioned - fm_tools, fm_tools)
