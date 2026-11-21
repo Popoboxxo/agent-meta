@@ -375,6 +375,13 @@ def _iter_managed_files(
                     if nested_candidate.is_file():
                         files.append(nested_candidate)
 
+    # PR 4.1 / P26 (E-23): the lazy routing detail file is a generated artifact
+    # (sibling of agents_dir). Register it so --check detects drift.
+    from .intent_routing import resolve_routing_detail_path
+    detail_path = project_root / resolve_routing_detail_path(pc, provider)
+    if detail_path.is_file():
+        files.append(detail_path)
+
     adapter_file = _adapter_file_for_provider(config, provider, pc)
     if adapter_file:
         adapter_path = project_root / adapter_file

@@ -365,6 +365,13 @@ def test_qg2_name_only_list_and_reasons_equality(matrix, provider):
 
     _rules, _pipelines, line = _parse_routing_lines(
         _rendered_routing(matrix[(provider, "compact")], provider))
+    if _ROSTER_IN_HARNESS[provider]:
+        # E-23: the name_index collapses to a single name-only line only when
+        # the roster is NOT already in the harness; otherwise it is dropped.
+        assert line is None, (
+            "%s: compact render must omit the name-only line when "
+            "roster_in_harness=true" % provider)
+        return
     assert line is not None, "%s: compact render has no name-only line" % provider
     expected = "; ".join("%s (%s)" % (agent, reason) for agent, reason in entries)
     assert line == expected, "name-only line mismatch:\n%s\n%s" % (expected, line)
@@ -623,7 +630,14 @@ def test_provider_override_scopes_compact_to_one_provider(tmp_path):
 
     overridden = _orchestrator_file(project, override_target).read_text(encoding="utf-8")
     assert "<pipeline>.md" in overridden, "overridden provider must render compact §2a"
-    assert re.search(r"^name-only: ", overridden, re.M)
+    if _ROSTER_IN_HARNESS[override_target]:
+        # E-23: the name_index line is dropped when the roster already lives in
+        # the harness; the provider still renders the compact routing table.
+        assert not re.search(r"^name-only: ", overridden, re.M), (
+            "%s: compact render must omit name_index when roster_in_harness=true"
+            % override_target)
+    else:
+        assert re.search(r"^name-only: ", overridden, re.M)
 
     untouched = _orchestrator_file(project, other).read_text(encoding="utf-8")
     assert "<pipeline>.md" not in untouched, "the override must not leak to other sharers"

@@ -557,6 +557,7 @@ def _build_provider_vars(
     used (AC-30), so it is never resolved or defaulted here.
     """
     from .delegation_syntax import DelegationSyntaxEngine
+    from .intent_routing import resolve_routing_detail_path
 
     _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     file_based = _ds_engine.has_file_based_agents(provider)
@@ -601,6 +602,12 @@ def _build_provider_vars(
         # missing placeholder wiring surfaces via the consistency checks,
         # never as a crashed sync.
         'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
+        # PR 4.1 / P26 (E-23): provider-agnostic pointer to the lazy routing
+        # detail file. The path is derived from the provider's agents_dir (data
+        # from ai-providers.yaml), never a hardcoded provider name in a template
+        # (provider-agnostic policy). One pointer line in the orchestrator.
+        'ROUTING_DETAILS_PATH': resolve_routing_detail_path(pc, provider)
+        if str(variables.get('ROUTING_DETAILS_ENABLED', 'true')).lower() == 'true' else '',
     }
     # issue #1307 (Task 1): inline git-sentinel scope texts, capability-driven
     # so gh-only calls may omit the sentinel on hook-agent-id providers while

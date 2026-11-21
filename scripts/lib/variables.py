@@ -707,6 +707,9 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # compact agent table (orchestrator template). Default-off: only an explicit
     # "true" omits the roster, so an unwired render keeps the names list.
     conditional_vars.update({"ROSTER_IN_HARNESS"})
+    # PR 4.1 / P26: the lazy routing detail-file pointer is gated by
+    # routing-overrides.detail-file; register so {{#if}} strips cleanly.
+    conditional_vars.update({"ROUTING_DETAILS_ENABLED"})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
     # IC-4: the topology axis. The prefix catches every present builder value;
     # the static set keeps the four boolean flags resolvable even when the

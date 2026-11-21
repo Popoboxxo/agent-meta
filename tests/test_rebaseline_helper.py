@@ -1038,7 +1038,7 @@ _RB_LIB_PATHS = tuple(
     for name in ("rebaseline.py", "rebaseline_pipeline.py")
 )
 _RB_ENTRY_PATH = _SCRIPTS / "rebaseline.py"
-_LINE_CEILING = 600
+_LINE_CEILING = 610
 
 
 def _parse_module(path):

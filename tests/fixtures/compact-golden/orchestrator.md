@@ -164,9 +164,9 @@ pipeline:docs-update|Dokumentation;README;Docs;Doku
 pipeline:feature-lifecycle|Feature implementieren;Feature bauen;neues Feature;Funktion bauen;Feature Lifecycle;komplexes Feature;Feature Pipeline
 pipeline:quick-fix|Bug fixen;Bug beheben;Triage;schneller Fix;Hotfix
 pipeline:refactor|Refactoring;aufräumen;Cleanup;Code verbessern
-name-only: intern-developer (Easter-egg gag role with no real routing surface; reachable only via explicit name dispatch.); principal-developer (Last-resort escalation tier; reached only via explicit name dispatch from the orchestrator, never via keyword routing.)
 
 
+Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read .claude/routing-details.md`.
 Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Routing-Regel:
 1. **Pipeline-Treffer** (Signal-Keywords): §2-Bestätigung einholen (NO auto-run), dann Pipeline-Route — Stage-Detail aus §2a.
 2. **Rollen-Treffer** (keywords/examples): `target_agent` aus der Tool-Definition bzw. der Routing-Regel dispatchen — Tier via §4, dann §5 Self-Validation.

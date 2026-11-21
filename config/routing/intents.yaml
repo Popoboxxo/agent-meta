@@ -1,0 +1,55 @@
+# Intent-Taxonomie (PR 4.1 / P26, E-07/E3).
+# 16 informative Intents. Anteile sind KOLL ABLEITBAR: `intents` ist Pflichtfeld
+# und Anzeige (Lint: RL-MISSING-INTENT / RL-UNKNOWN-INTENT), aber KEIN
+# Routing-Entscheidungsmerkmal — die Route bleibt Trigger + Example.
+# `default_size_class` ist die Mindestklasse, wenn eine Rolle keinen eigenen
+# `routing.size_class` angibt. Keine externen Abhängigkeiten.
+intents:
+  implement:
+    zweck: Feature-Implementierung
+    default_size_class: M
+  fix:
+    zweck: Bugfix
+    default_size_class: M
+  review:
+    zweck: Review-Auftrag
+    default_size_class: M
+  test:
+    zweck: Test-Auftrag
+    default_size_class: M
+  spec:
+    zweck: Spec schreiben
+    default_size_class: M
+  plan:
+    zweck: Umsetzungsplanung
+    default_size_class: M
+  design:
+    zweck: Konzept / Systemdesign
+    default_size_class: XL
+  docs:
+    zweck: Dokumentation
+    default_size_class: S
+  git:
+    zweck: Git-Operationen
+    default_size_class: S
+  meta:
+    zweck: agent-meta-Selbstverwaltung
+    default_size_class: M
+  ops:
+    zweck: Betrieb / Infrastruktur
+    default_size_class: M
+  security:
+    zweck: Sicherheitsprüfung
+    default_size_class: L
+  data:
+    zweck: Daten / ETL
+    default_size_class: L
+  knowledge:
+    zweck: Knowledge-Engine
+    default_size_class: M
+  estimate:
+    zweck: Aufwandsschätzung
+    default_size_class: S
+  triage:
+    zweck: Issue-Triage
+    default_size_class: S

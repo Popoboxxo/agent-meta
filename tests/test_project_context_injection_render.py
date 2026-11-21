@@ -948,7 +948,9 @@ def test_golden_gate_file_untouched_by_this_issue():
     HEAD (which would be vacuously green after this issue's commits). Any
     change to the equivalence test or the golden fixtures anywhere on this
     branch turns the gate red instead of silently accepting a rebaseline.
-    The frozen base is `aee986c8`, rebaselined for the worker-control PR
+    The frozen base is `14efcb23`, rebaselined for the PR 4.1 compact-routing
+    rebaseline (`aee986c8` -> `14efcb23` after the legitimate golden rebaseline
+    that shipped the compact routing model); `aee986c8` had been rebaselined for the worker-control PR
     (`6fde198b` -> `aee986c8` after the legitimate golden rebaseline that
     completed the single rebaseline commit); `6fde198b` had been rebaselined
     in #1307 (`47e338cb` -> `6fde198b` after the legitimate Claude `git.md`
@@ -961,7 +963,7 @@ def test_golden_gate_file_untouched_by_this_issue():
     result = subprocess.run(
         [
             "git", "diff", "--name-only",
-            "aee986c8d927c1897d2b5d29c7a87084c6e81c51..HEAD",
+            "14efcb23d6832e254cfc8e2c470508a5a596a21c..HEAD",
             "--",
             "tests/test_template_slimming_equivalence.py",
             "tests/fixtures/slimming-golden",
