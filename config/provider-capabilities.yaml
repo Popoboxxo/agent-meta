@@ -54,6 +54,12 @@
 # (partial — no delegation provenance), `advisory` prompt-only. Never claim a
 # stronger tier than the flags support.
 #
+# supports-permission-deny (issue #1263): whether the provider has a native
+# permission deny surface for MCP tools (``mcp__<server>__<tool>`` strings in
+# the Claude-style settings file). TRUE only where the deny format is verified;
+# an absent or false value keeps the prompt-convention guardrail (fail-safe).
+# Never derive this from a provider name — use the declared capability.
+#
 # route_intent_tool (issue #264 runtime follow-up): whether the harness registers
 # the generated `route_intent` definition as a CALLABLE tool. The definition is
 # rendered into the orchestrator prompt ({{INTENT_ROUTING_TOOLS}}), but rendering
@@ -132,6 +138,7 @@ capabilities:
     hooks: true
     commands: true
     runtime_gate: hook                  # verified PreToolUse hook contract (hook_protocol claude-code-json)
+    supports-permission-deny: true  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]
     worker_control_tools: ["SendMessage", "TaskStop"]  # IC-1: worker control (#1176)
@@ -191,6 +198,7 @@ capabilities:
     hooks: false
     commands: true
     runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["task"]
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -250,6 +258,7 @@ capabilities:
     hooks: true                    # Antigravity hooks.json contract verified (issue #674 Phase 3.1) — mirrored via hook_protocol antigravity-hooks-json + translating adapter
     commands: true                 # .gemini/commands/*.toml (commands_dir/commands_ext/commands_format in ai-providers.yaml)
     runtime_gate: hook             # verified Antigravity hooks.json contract (hook_protocol antigravity-hooks-json)
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false       # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     worker_control_tools: ["send_message"]  # IC-1: worker control (#1176)
@@ -318,6 +327,7 @@ capabilities:
     hooks: false
     commands: true
     runtime_gate: advisory
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -380,6 +390,7 @@ capabilities:
     hooks: false
     commands: true                  # .github/prompts/*.prompt.md (VS Code / GitHub Copilot prompt files, `/name`) — issue #807, UNDERCLAIM P-6 fixed
     runtime_gate: advisory
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["agent"]    # must also be listed in `tools:` when `agents:` is non-empty — issue #855, UNDERCLAIM P-6 fixed
     worker_control_tools: []         # IC-1: no verified worker-control tool
@@ -450,6 +461,7 @@ capabilities:
     hooks: false
     commands: true                  # .mammouth/commands/*.md — Mammouth (OpenCode fork) runtime binary: "Add .md files to .mammouth/commands/ for reusable prompts" (issue #807)
     runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false        # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -523,6 +535,7 @@ capabilities:
     hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
     commands: false                   # verified decision (issue #807): Codex custom prompts are user-global (${CODEX_HOME}/prompts) + deprecated in favor of skills; no project-scoped prompt surface (openai/codex #9848 open)
     runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
     worker_control_tools: ["send_input", "close_agent", "wait_agent"]  # IC-1: worker control (#1176)
@@ -597,6 +610,7 @@ capabilities:
     hooks: false                      # project-level hooks are completely ignored by the harness (V2)
     commands: true                    # .zcode/commands/*.md workspace command surface (zcode.z.ai/en/docs/commands) — issue #807, UNDERCLAIM ZC-2 fixed
     runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
     worker_control_tools: []                # IC-1: no verified worker-control tool
@@ -667,6 +681,7 @@ capabilities:
     hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
     commands: false                   # verified decision (issue #807): Kimi exposes slash commands as built-ins + Active Skills (/skill:<name>), no project custom-command dir; the synced .kimi-code/skills/ tree is the command surface
     runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
+    supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
     worker_control_tools: []                      # IC-1: no verified worker-control tool

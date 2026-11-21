@@ -47,10 +47,6 @@ knowledge-engine:
       - stale-index
       - orphaned-pages
       - duplicate-concepts
-  migration:
-    auto-detect-sources: true
-    clean-duplicates: false
-    preserve-originals: true
   search:
     engine: index-only
     mcp-server: ''
@@ -86,11 +82,11 @@ platforms:
 - agent-meta
 plugins:
   honcho:
-    enabled: true
+    enabled: false
   playwright:
     enabled: true
   reqogniloom:
-    enabled: true
+    enabled: false
   graphify:
     enabled: true
   viz-logger:
@@ -167,19 +163,12 @@ hooks:
   graphify-search-guard:
     enabled: true
 provider-options:
-  Claude: {}
-  Gemini: {}
   Continue:
     generate-prompts: true
     prompt-mode: slim
-  Copilot: {}
-  Mammouth: {}
   Opencode:
     surface-version: v2
     experimental-subagent-depth: 3
-  Codex: {}
-  KimiCode: {}
-  ZCode: {}
 speech-mode: short
 variables:
   PROJECT_NAME: agent-meta
@@ -283,16 +272,11 @@ variables:
   GH_ASSETS: ''
   REQUIRED_BINARIES_SECTION: Keine externen Binaries erforderlich.
   BINARY_INSTALL_STEPS: ''
-  ORCHESTRATOR_STRICT: true
-  UNKNOWN_FALLBACK_META_FEEDBACK: true
-  UNKNOWN_FALLBACK_MAIN_CHAT: true
-  UNKNOWN_FALLBACK_ASK_USER: false
   REQUIRED_BINARY_NAMES: (keine)
   BUILD_SYSTEM_NOTES: sync.py generiert .claude/agents/ im Zielprojekt — kein Build-Artifact
     im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: 'Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md
     aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag.'
-  SE_BASE_DIR: SE
 se-export:
   type: markdown
   output_dir: docs/se

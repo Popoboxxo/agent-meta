@@ -69,9 +69,22 @@ def _fixture(name: str) -> str:
 
 
 def _self_hosted_text() -> str:
-    """The repo's own ``.meta-config/project.yaml``, sink redirected into the fixture."""
+    """The repo's own config, sink redirected, with the derived keys re-injected.
+
+    PR 1.4 removed the five derived duplicates from the real project.yaml
+    (config.py re-derives them), but AC-54 pins the optimizer's ``no-effect``
+    detection against exactly those keys. Keep them in this synthetic fixture
+    so the candidate contract stays covered independently of config hygiene.
+    """
     data = yaml.safe_load((REPO_ROOT / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
     data["repo_containment"]["tmp-sink"]["path"] = "scratch/out"
+    data.setdefault("variables", {}).update({
+        "ORCHESTRATOR_STRICT": True,
+        "UNKNOWN_FALLBACK_META_FEEDBACK": True,
+        "UNKNOWN_FALLBACK_MAIN_CHAT": True,
+        "UNKNOWN_FALLBACK_ASK_USER": False,
+        "SE_BASE_DIR": "SE",
+    })
     return yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
 
 

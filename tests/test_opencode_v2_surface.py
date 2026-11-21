@@ -5519,7 +5519,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 _FIXTURE_TREES = {
     "ac01-baseline": "1462acad57e8306cfe55d561682dafb6124dfbda579df97daf4fbddfbdcee53e",
     "slimming-golden": "7aabd546171209120fce87d0585e255dc29f7cd18c5b32433f443ecca8ebaf67",
-    "compact-golden": "ff39439d96e9f10a27db1f0a9a00ca089ffb0277e29ce873847ca5cc81dceafc",
+    "compact-golden": "4ed867bf15b467ea87108f097193c66958d802634ff6cb11acd6d894fdd7035b",
 }
 
 

@@ -89,9 +89,7 @@ Pflicht: Code komplett, Konventionen & Conv. Commits eingehalten, keine Regressi
 > Kurzfassung der harten Tool-Verbote aktiver MCP-Server. Vollständige Tool-Listen und
 > Hinweise: pro Provider in `.gemini/skills bzw. .opencode/skills` — jeweils `mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
 
-- **honcho:** `delete_conclusion`, `set_config` — absolut verboten.
 - **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
-- **reqogniloom:** `workspace.close`, `workspace.reactivate`, `workspace.delete`, `permissions.set_rule`, `permissions.list`, `permissions.revoke`, `permissions.check`, `admin.backup_create`, `admin.backup_list`, `admin.restore`, `audit.query`, `audit.ai_review`, `events.dlq_list`, `events.dlq_replay`, `user.create`, `user.assign_role`, `user.list`, `user.deactivate` — absolut verboten.
 
 
 
@@ -129,8 +127,6 @@ Kerngrenzen: Indirektion (`eval`, `bash -c`, `xargs`, Interpreter, Variablen-Zie
 | lifecycle-tasks | Session-Start, pending-tasks.md vorhanden |
 | session-conclusion | Feature-Abschluss |
 | provider-agnostic | agents/1-generic editieren |
-| mcp-reqogniloom | ReqogniLoom-MCP-Tools |
-| mcp-honcho | Honcho-MCP-Memory-Tools |
 | mcp-playwright | Playwright-MCP-Browser-Tools |
 | tool-graphify | Architektur-/Datei-Fragen mit graphify |
 | se-cascade-adr-standard | ADRs in aktiver SE-Kaskade |

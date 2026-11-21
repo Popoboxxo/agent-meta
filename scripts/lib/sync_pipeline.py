@@ -99,6 +99,7 @@ from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.mcp_deny import sync_mcp_deny
 from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
@@ -1593,6 +1594,15 @@ def _sync_stage_per_provider(
         for entry in mcp_extras:
             if entry not in mcp_gitignore_extras:
                 mcp_gitignore_extras.append(entry)
+        # #1263: project each active server's blocked tools into the provider's
+        # native permission deny surface. Capability-gated inside the helper —
+        # providers without it keep the prompt convention and are logged.
+        from lib.mcp import resolve_active_mcp_servers
+        sync_mcp_deny(
+            project_root, provider, provider_config, mcp_registry,
+            resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry),
+            log, args.dry_run, agent_meta_root=agent_meta_root,
+        )
         # External tools: generate rule files for active locally-installed CLI tools
         try:
             generate_external_tool_artifacts(
