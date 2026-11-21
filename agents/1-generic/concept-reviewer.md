@@ -1,7 +1,7 @@
 ---
 name: template-concept-reviewer
 version: "1.9.3"
-description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
+description: "Structural review of concepts and design docs before requirements: completeness, logic, assumptions, risks, feasibility, threat model."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
 tools:

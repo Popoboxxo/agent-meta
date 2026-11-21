@@ -1,7 +1,7 @@
 ---
 name: template-context-engineer
 version: "1.0.0"
-description: "Context budget engineering for agent prompts: measures always-loaded instruction overhead per role template, fixes the instruction hierarchy (which layer wins on conflict), decides progressive disclosure (always inline vs. loaded on demand), and sets compaction rules (what may be summarized, what never). Read-only on templates; budget findings go to prompt-governor."
+description: "Context budget engineering: measures always-loaded prompt overhead, fixes instruction hierarchy, decides progressive disclosure and compaction rules. Read-only."
 hint: "Context budget: instruction overhead per template, rule hierarchy, progressive disclosure, compaction rules — what fits in the window, not prompt wording"
 reference_standards:
   - "A Common Sense Guide to AI Engineering"

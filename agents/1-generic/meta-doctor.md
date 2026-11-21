@@ -1,7 +1,7 @@
 ---
 name: template-meta-doctor
 version: "1.0.0"
-description: "Installation doctor: runs `sync.py --doctor`, deduplicates and prioritizes known-issue findings of this agent-meta installation, and hands fixes to agent-meta-manager — never repairs anything and writes reports only to the configured tmp-sink."
+description: "Installation doctor: runs `sync.py --doctor`, dedupes/prioritizes findings, hands fixes to agent-meta-manager — never repairs anything; reports to tmp-sink."
 hint: "Diagnoses the agent-meta installation (reports only to the tmp-sink)"
 reference_standards:
   - "Clean Code: separation of concerns"

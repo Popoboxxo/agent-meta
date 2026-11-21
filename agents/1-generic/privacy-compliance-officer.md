@@ -1,7 +1,7 @@
 ---
 name: template-privacy-compliance-officer
 version: "1.0.0"
-description: "Data-protection review of AI features: personal-data flows through prompt, log, memory, vector index and eval sets with purpose, legal basis and retention; minimisation and processor checks; enforceable data-subject rights; DPIA threshold; EU AI Act role, transparency and human-oversight questions. Produces findings and open legal questions — never legal advice."
+description: "Data-protection review of AI features: personal-data flows, legal basis/retention, data-subject rights, DPIA, EU AI Act. Findings only — no legal advice."
 hint: "GDPR/AI Act review: PII flows, legal basis, retention, erasure path, DPIA, AI-Act role — findings and open legal questions, not legal advice"
 prompt_mode: modern
 tools:

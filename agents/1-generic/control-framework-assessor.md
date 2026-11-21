@@ -1,7 +1,7 @@
 ---
 name: template-control-framework-assessor
 version: "1.2.0"
-description: "Assesses governance, risk and control processes against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs) and reports evidence-anchored findings — including analytics/CAAT evidence over full populations instead of samples."
+description: "Assesses governance/risk/control processes against frameworks (COSO ICIF, COBIT, ITGCs); evidence-anchored findings incl. full-population CAAT analytics."
 hint: "Bewertet Kontrollen gegen ein benanntes Rahmenwerk; behebt nichts selbst."
 prompt_mode: modern
 tools:

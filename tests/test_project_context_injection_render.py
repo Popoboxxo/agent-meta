@@ -5,7 +5,7 @@ later tasks can append without disturbing existing tests.
 """
 from __future__ import annotations
 
-import subprocess
+import hashlib
 import sys
 from pathlib import Path
 
@@ -941,36 +941,47 @@ def test_all_prose_matches_golden(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_golden_gate_file_untouched_by_this_issue():
-    """AC2 evidence: the golden test and its fixtures did not drift in #1187.
+#: Frozen SHA-256 over the golden corpus: the equivalence gate itself plus
+#: every golden fixture, keyed by repo-relative path and raw bytes. AC2 pins
+#: this content, not a commit-ancestry range: in squashed rebaseline bundles
+#: the legitimate rebaseline lands in the same commit as the change that
+#: causes it, so a `base..HEAD` diff cannot distinguish an approved rebaseline
+#: from later drift. A content pin keeps the guard meaningful in both layouts.
+_GOLDEN_CORPUS_SHA256 = "6f480a6f76a07c6cdcf7f0d6bfcbfba7270293bb3971cfb52472398da1f5cf5f"
 
-    The guard compares against the frozen branch-point base hash, not bare
-    HEAD (which would be vacuously green after this issue's commits). Any
-    change to the equivalence test or the golden fixtures anywhere on this
-    branch turns the gate red instead of silently accepting a rebaseline.
-    The frozen base is `14efcb23`, rebaselined for the PR 4.1 compact-routing
-    rebaseline (`aee986c8` -> `14efcb23` after the legitimate golden rebaseline
-    that shipped the compact routing model); `aee986c8` had been rebaselined for the worker-control PR
-    (`6fde198b` -> `aee986c8` after the legitimate golden rebaseline that
-    completed the single rebaseline commit); `6fde198b` had been rebaselined
-    in #1307 (`47e338cb` -> `6fde198b` after the legitimate Claude `git.md`
-    golden rebaseline following the gh-only sentinel scope change); `47e338cb` had been
-    rebaselined in #1186 (2026-11-18, from `99be710e` after the legitimate
-    agent-meta-manager golden update); `99be710e` from `e22b0ed4`, itself
-    from `6eeeff44` after the legitimate T10 artifact-path golden update.
-    Real drift after the current base still turns the gate red.
+
+def _golden_corpus_paths():
+    return [
+        Path("tests/test_template_slimming_equivalence.py"),
+        *sorted(Path("tests/fixtures/slimming-golden").rglob("*.md")),
+    ]
+
+
+def _golden_corpus_digest() -> str:
+    digest = hashlib.sha256()
+    for path in _golden_corpus_paths():
+        digest.update(path.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update((_ROOT / path).read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def test_golden_gate_file_untouched_by_this_issue():
+    """AC2 evidence: the golden gate and its fixtures match the frozen corpus.
+
+    Any edit to the equivalence test or the golden fixtures — committed or
+    only in the working tree — turns this gate red instead of silently
+    accepting a rebaseline. Legitimate rebaselines are recorded by advancing
+    ``_GOLDEN_CORPUS_SHA256`` in a reviewed change (the historical commit-base
+    pins were advanced the same way: ``6eeeff44`` -> ``e22b0ed4`` ->
+    ``99be710e`` -> ``47e338cb`` -> ``6fde198b`` -> ``aee986c8`` ->
+    ``14efcb23``; the 6.1/6.x bundle's single-line closing-summary rebaseline
+    is the current pin). Unapproved drift still fails loudly.
     """
-    result = subprocess.run(
-        [
-            "git", "diff", "--name-only",
-            "14efcb23d6832e254cfc8e2c470508a5a596a21c..HEAD",
-            "--",
-            "tests/test_template_slimming_equivalence.py",
-            "tests/fixtures/slimming-golden",
-        ],
-        cwd=_ROOT, capture_output=True, text=True, check=True,
-    )
-    assert result.stdout.strip() == "", (
-        "golden gate drifted — AC2 forbids rebaselining:\n" + result.stdout
+    actual = _golden_corpus_digest()
+    assert actual == _GOLDEN_CORPUS_SHA256, (
+        "golden gate drifted — AC2 forbids rebaselining: "
+        f"expected {_GOLDEN_CORPUS_SHA256}, got {actual}"
     )
 

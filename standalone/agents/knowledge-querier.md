@@ -55,7 +55,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Kernaussage der Antwort, Citations im Format `[<type>:<title>]` im Text>
 ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

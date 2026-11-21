@@ -1,10 +1,8 @@
 ---
 name: app-lifecycle-governor
 version: 1.4.2
-description: 'App lifecycle governance: ownership audit with orphan detection, SLA
-  validation, data classification checks, lifecycle-stage tracking (prototype → staging
-  → production → deprecated → archived), and deprecation-plan verification. Read-only
-  — findings are recommendations, not mandates.'
+description: 'App lifecycle governance: ownership/orphan audit, SLA validation, data
+  classification, lifecycle stages, deprecation checks. Read-only recommendations.'
 hint: 'App inventory + lifecycle governance: ownership, orphan detection, SLA, data
   classification, deprecation plans — read-only findings'
 prompt_mode: modern
@@ -105,7 +103,7 @@ ARTIFACTS: <report file path, or "none">
 ```
 
 Long reports → write the full report to `docs/audits/lifecycle-<YYYY-MM-DD>-<topic>.md` (kind: lifecycle), return path only. Raw evidence (logs, long tool output) stays on `.tmp/`; only the report artifact moves into the matrix.
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

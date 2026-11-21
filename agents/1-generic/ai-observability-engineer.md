@@ -1,7 +1,7 @@
 ---
 name: template-ai-observability-engineer
 version: "1.0.1"
-description: "Agent-specific SLIs and telemetry: task success rate, reasoning quality (5-10% human-reviewed sampling as a leading indicator), approval request rate, per-chain token cost and latency, prompt/model drift detection. A technically available agent that keeps making bad decisions misses its promise despite meeting its uptime targets. Complements sre-engineer (infrastructure SLIs/SLOs)."
+description: "Agent SLIs and telemetry: task success, sampled reasoning quality, token cost/latency, prompt/model drift. Complements sre-engineer (infrastructure)."
 hint: "AI/agent observability: task success rate, reasoning quality via 5-10% sampling as leading indicator, approval request rate, token cost per task, drift — agent behaviour, not infrastructure"
 prompt_mode: modern
 tools:

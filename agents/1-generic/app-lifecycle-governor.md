@@ -1,7 +1,7 @@
 ---
 name: template-app-lifecycle-governor
 version: "1.4.2"
-description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
+description: "App lifecycle governance: ownership/orphan audit, SLA validation, data classification, lifecycle stages, deprecation checks. Read-only recommendations."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
 tools:

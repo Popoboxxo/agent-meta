@@ -1,9 +1,8 @@
 ---
 name: feedback
 version: 1.8.1
-description: Standardizes bug reports, feature requests, and improvement suggestions
-  for the deployed project — categorized, prepared, and submitted directly as a GitHub
-  issue.
+description: Standardizes bug reports, feature requests and improvements for the deployed
+  project; files them as GitHub issues.
 hint: 'Project feedback: submit bugs, features, improvements as standardized GitHub
   issues — always before git'
 prompt_mode: modern
@@ -110,7 +109,7 @@ TITLE: <prefix> <description>
 LABELS: [bug, ...]
 ARTIFACTS: <ISSUE_URL + related files>
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

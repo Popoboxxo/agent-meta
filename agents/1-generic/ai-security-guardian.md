@@ -1,7 +1,7 @@
 ---
 name: template-ai-security-guardian
 version: "1.4.2"
-description: "AI-specific security risk detection: hallucinated dependencies (slopsquatting), fabricated IAM actions, insecure AI defaults (debug mode, permissive CORS, default credentials), brittle conditional security checks, phantom API endpoints, leaked training-data patterns — read-only, complements security-auditor (OWASP) and dependency-auditor (supply chain)."
+description: "AI security risks: slopsquatting, fabricated IAM actions, insecure defaults, phantom endpoints, leaked training data. Read-only; complements security-auditor."
 hint: "AI security review: hallucinated deps, fabricated IAM, insecure defaults, brittle logic, phantom endpoints — static detection of AI-generated risk patterns, read-only"
 reference_standards:
   - "OWASP GenAI Security Project (LLM Top 10)"

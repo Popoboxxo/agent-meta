@@ -1,7 +1,7 @@
 ---
 name: template-frontend-reviewer
 version: "1.4.0"
-description: "Domain code review for frontend code: component design, state management, SSR/hydration, browser APIs, render performance — two-pass evidence-based review with rules index."
+description: "Frontend code review: component design, state management, SSR/hydration, browser APIs, render performance. Two-pass evidence-based review with rules index."
 hint: "Frontend review: components, state, SSR/hydration, browser APIs — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
 tools:

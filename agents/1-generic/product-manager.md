@@ -1,7 +1,7 @@
 ---
 name: template-product-manager
 version: "0.4.1"
-description: "Strategic, business-oriented backlog and roadmap ownership: user stories, sprint planning, prioritization frameworks (RICE, MoSCoW), KPI/metrics definition and stakeholder communication. Distinct from requirements' technical REQ-ID traceability."
+description: "Strategic backlog and roadmap ownership: user stories, sprint planning, RICE/MoSCoW prioritization, KPIs, stakeholders. Not technical REQ traceability."
 hint: "Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPIs, Stakeholder — strategisch/geschäftsorientiert"
 prompt_mode: modern
 tools:
