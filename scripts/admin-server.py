@@ -249,6 +249,10 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
     "context_file", "context-profile", "project-context-injection", "plugins",
     "repo_containment",
+    # Roadmap PR 5.4 / P27 (E-27): framework-default routing overrides. Written
+    # through the existing PUT /api/config/project/section route and guarded by
+    # _guard_routing_overrides_write (schema + IC-29 overlap, fail-closed).
+    "routing-overrides",
     # Test environments (issue #1089): validated by
     # _guard_test_environments_write so a bad payload never reaches disk.
     "test-environments",
@@ -298,6 +302,38 @@ def resolve_asset(root: Path, *parts: str) -> Path:
     if fallback.exists():
         return fallback
     return primary
+
+
+# --------------------------------------------------------------------------- #
+# Routing overlap helpers (PR 5.4 / P27, decision 3)                          #
+# --------------------------------------------------------------------------- #
+
+# check_keyword_overlap resolves ``lib.roles.load_roles_config`` at call time;
+# admin requests are threaded, so serialize the injection of the effective
+# (framework + override) roles view. No new lint module / RL-* codes: the
+# existing IC-29 validator is the single source of overlap semantics.
+_ROUTING_OVERLAP_LOCK = threading.Lock()
+
+
+def _routing_overlap_findings(roles: dict, routable: frozenset, root: Path) -> list:
+    """Run the existing IC-29 overlap validator against an injected roles view."""
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from lib import roles as roles_lib
+    from lib.consistency import active_set_refs
+
+    injected = {"roles": roles}
+    with _ROUTING_OVERLAP_LOCK, patch.object(
+        roles_lib, "load_roles_config", lambda _root: injected
+    ):
+        return active_set_refs.check_keyword_overlap(
+            root, [], {}, SimpleNamespace(routable=routable))
+
+
+def _routing_overlap_tokens(roles: dict, routable: frozenset, root: Path) -> set:
+    """Normalized overlap tokens reported by the existing IC-29 validator."""
+    return {f.message.split("'")[1] for f in _routing_overlap_findings(roles, routable, root)}
 
 
 def _ensure_scripts_on_path(root: Path) -> None:
@@ -2219,6 +2255,155 @@ class _NullDeactivationLog:
     def error(self, *a: Any) -> None: ...
 
 
+class RoutingService:
+    """Read-only routing model + server-side preview (PR 5.4 / P27, E-27).
+
+    Both entry points reuse the *existing* P26 render pipeline
+    (``build_variables`` → ``compute_active_set`` →
+    ``build_routing_tool_definitions_for_providers``) so the preview is the
+    same bytes sync.py would emit — no JavaScript renderer duplicate. All
+    provider decisions are capability/config driven; there is no provider
+    literal or ``if provider ==`` branch (provider-agnostic policy).
+    """
+
+    _TOP_FIELDS = ("format", "detail-file", "table-in-orchestrator")
+    _ROLE_FIELDS = (
+        "addressability", "intents", "triggers", "size_class", "priority",
+        "direct_dispatch", "orchestrator_only", "parallel",
+    )
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def _roles_and_overrides(self) -> tuple[dict, dict, Path]:
+        from lib.roles import load_roles_config
+
+        root = self._ctx.agent_meta_root()
+        project = self._ctx.config_manager.read("project")
+        raw = project.get("routing-overrides") or {}
+        overrides = raw if isinstance(raw, dict) else {}
+        return load_roles_config(root).get("roles", {}), overrides, root
+
+    @staticmethod
+    def _field(role: str, field: str, fallback, changes: dict, source: dict):
+        source[f"roles.{role}.{field}"] = "override" if field in changes else "default"
+        return changes[field] if field in changes else fallback
+
+    def get_model(self) -> dict:
+        """Effective routing model with a per-field ``default``/``override`` map."""
+        from lib.io import load_yaml_file
+
+        framework, overrides, framework_root = self._roles_and_overrides()
+        source = {field: "override" if field in overrides else "default"
+                  for field in self._TOP_FIELDS}
+        role_overrides = overrides.get("roles") or {}
+        if not isinstance(role_overrides, dict):
+            role_overrides = {}
+        roles: dict = {}
+        for name, info in framework.items():
+            routing = info.get("routing") or {}
+            patterns = info.get("routing_patterns") or {}
+            changes = role_overrides.get(name) or {}
+            if not isinstance(changes, dict):
+                changes = {}
+            addressability = routing.get("addressability") or (
+                "keyword" if patterns.get("keywords") else "name_only")
+            triggers = list(routing.get("triggers") or patterns.get("keywords") or [])
+            defaults = {
+                "addressability": addressability,
+                "intents": list(routing.get("intents") or []),
+                "triggers": triggers,
+                "size_class": routing.get("size_class") or "M",
+                "priority": routing.get("priority"),
+                "direct_dispatch": bool(routing.get("direct_dispatch", False)),
+                "orchestrator_only": bool(routing.get("orchestrator_only", False)),
+                "parallel": bool(routing.get("parallel", False)),
+            }
+            roles[name] = {
+                field: self._field(name, field, defaults[field], changes, source)
+                for field in self._ROLE_FIELDS
+            }
+            roles[name]["examples"] = list(
+                routing.get("examples") or patterns.get("examples") or [])
+            roles[name]["description"] = str(info.get("description") or "")
+
+        # Framework quality pipelines with override signal_keywords applied.
+        defaults_data = load_yaml_file(resolve_asset(
+            framework_root, "config", "role-defaults.yaml")) or {}
+        pipelines = copy.deepcopy(defaults_data.get("quality_pipelines") or {})
+        pipeline_overrides = overrides.get("pipelines") or {}
+        if isinstance(pipelines, dict) and isinstance(pipeline_overrides, dict):
+            for pname, pchanges in pipeline_overrides.items():
+                if pname in pipelines and isinstance(pchanges, dict) and "signal_keywords" in pchanges:
+                    pipelines[pname] = dict(pipelines[pname],
+                                            signal_keywords=pchanges["signal_keywords"])
+                    source[f"pipelines.{pname}.signal_keywords"] = "override"
+
+        return {
+            "format": overrides.get("format", "auto"),
+            "detail-file": overrides.get("detail-file", True),
+            "table-in-orchestrator": overrides.get("table-in-orchestrator", "auto"),
+            "roles": roles,
+            "pipelines": pipelines,
+            "source": source,
+            "overrides": overrides,
+        }
+
+    def get_preview(self, provider: str) -> dict:
+        """Render the routing block for ``provider`` with bytes/tokens/lint."""
+        from lib.active_set import compute_active_set
+        from lib.agents import build_routing_tool_definitions_for_providers
+        from lib.config import build_variables
+        from lib.context_report import count_text_stats
+        from lib.delegation_syntax import DelegationSyntaxEngine
+        from lib.intent_routing import resolve_routing_format
+        from lib.providers import load_providers_config, resolve_providers
+
+        if not provider:
+            raise ValueError("routing preview requires a 'provider' query parameter")
+        root = self._ctx.agent_meta_root()
+        project_root = self._ctx.root
+        project = self._ctx.config_manager.read("project")
+        warn: list = []
+        active = compute_active_set(project, root, project_root, warn_sink=warn)
+        variables, _pre = build_variables(project, root, project_root, active_set=active)
+        available = resolve_providers(project, load_providers_config(root))
+        engine = DelegationSyntaxEngine()
+        fmt = resolve_routing_format(
+            project, provider,
+            route_intent_tool=engine.has_route_intent_tool(provider))
+        if provider not in available:
+            # Unknown/disabled provider: fail-soft, same empty-render semantics
+            # as the sync pipeline. Never a provider-name branch.
+            block = ""
+        else:
+            rendered = build_routing_tool_definitions_for_providers(
+                root, project, variables, [provider], active_set=active,
+                warn_sink=warn)
+            block = rendered.get(provider, "")
+        stats = count_text_stats(block.encode("utf-8"))
+
+        # Lint = the existing IC-29 validator over the effective roles view.
+        framework, overrides, _ = self._roles_and_overrides()
+        effective = copy.deepcopy(framework)
+        for name, changes in (overrides.get("roles") or {}).items():
+            if name in effective and isinstance(changes, dict) and "triggers" in changes:
+                effective[name].setdefault("routing_patterns", {})["keywords"] = changes["triggers"]
+        findings = _routing_overlap_findings(effective, frozenset(effective), root)
+        lint = [{"severity": f.severity.value, "check": f.check, "message": f.message}
+                for f in findings]
+        return {
+            "provider": provider,
+            "format": fmt,
+            "block": block,
+            "bytes": stats["bytes"],
+            "lines": stats["lines"],
+            "tokens_est": stats["tokens_est"],
+            "token_basis": "bytes/4 (proxy)",
+            "lint": lint,
+        }
+
+
 class TemplateService:
     """Agent-template discovery, resolution, reading and writing — the template
     business domain extracted from :class:`AdminRequestHandler` (issue #572).
@@ -3758,6 +3943,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _models_service(self) -> ModelsService:
         return ModelsService(self._service_context())
 
+    def _routing_service(self) -> "RoutingService":
+        return RoutingService(self._service_context())
+
     # ------------------------------------------------------------------ #
     # CSRF / DNS-rebinding protection                                    #
     # ------------------------------------------------------------------ #
@@ -4010,6 +4198,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         "/api/submodule-protection": "_route_get_submodule_protection",
         "/api/environments": "_route_get_environments",
         "/api/environments/scripts": "_route_get_env_scripts",
+        # Roadmap PR 5.4 / P27 (E-27): read-only routing model + server-side
+        # preview. Both are GETs so they inherit the existing token/origin
+        # protection of the admin handler (decision 4: no POST alias).
+        "/api/routing/model": "_route_get_routing_model",
+        "/api/routing/preview": "_route_get_routing_preview",
     }
     _GET_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
         ("/api/config/", "_route_get_config"),
@@ -4201,6 +4394,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _route_get_provider_deactivation_status(self) -> None:
         return self._send_json(self._audit_service().deactivation_status())
+
+    def _route_get_routing_model(self) -> None:
+        """Effective routing model (framework defaults + project overrides)."""
+        return self._send_json(self._routing_service().get_model())
+
+    def _route_get_routing_preview(self) -> None:
+        """Server-side render preview for ``?provider=<name>`` (no JS duplicate)."""
+        provider = (parse_qs(urlparse(self.path).query).get("provider") or [""])[0]
+        return self._send_json(self._routing_service().get_preview(provider))
 
     def _route_get_submodule_protection(self) -> None:
         return self._send_json(self._get_submodule_protection_status())
@@ -5662,6 +5864,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._guard_test_environments_write(section, data, existing)
         data = self._guard_release_checklist_write(section, data)
         self._guard_commit_write({section: data})
+        self._guard_routing_overrides_write(section, data, existing)
         # Issue #1186 (T18): validate the artifact-location matrix before the
         # disk write so a bad payload is rejected with HTTP 400 (ValueError)
         # and leaves project.yaml byte-identical (AC-06).
@@ -5677,6 +5880,70 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         errors = commit_violations(cfg)
         if errors:
             raise ValueError("invalid 'commit': " + "; ".join(errors))
+
+    def _guard_routing_overrides_write(self, section: str, data: Any, _existing: dict) -> None:
+        """Fail-closed guard for ``routing-overrides`` (PR 5.4 / P27, AC-R5).
+
+        Decision 3 (21.11.): no new ``routing_lint.py`` / ``RL-*`` codes. Reuse
+        (1) the schema's ``additionalProperties: false`` via the stdlib subset
+        validator for unknown keys/enums and (2) the existing IC-29
+        ``check_keyword_overlap`` validator for NEW trigger collisions. Any
+        violation raises ``ValueError`` -> HTTP 400 before the disk write, so
+        ``project.yaml`` stays byte-identical.
+        """
+        if section != "routing-overrides":
+            return
+        if not isinstance(data, dict):
+            raise ValueError("routing-overrides: expected a mapping")
+        from lib.doctor_formats import validate_schema_subset
+
+        schema_path = resolve_asset(self.root, "config", "project-config.schema.json")
+        if schema_path.exists():
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            sub_schema = (schema.get("properties") or {}).get("routing-overrides")
+            if isinstance(sub_schema, dict):
+                errors = validate_schema_subset(data, sub_schema, "routing-overrides")
+                if errors:
+                    raise ValueError("invalid 'routing-overrides': " + "; ".join(errors))
+                # The subset validator walks named properties only. Role/pipeline
+                # keys are dynamic, so validate each entry against the schema's
+                # ``additionalProperties`` sub-schema to keep fail-closed
+                # behaviour for unknown nested keys (e.g. roles.x.typo).
+                props = sub_schema.get("properties") or {}
+                for group in ("roles", "pipelines"):
+                    group_schema = (props.get(group) or {}).get("additionalProperties")
+                    entries = data.get(group) or {}
+                    if not isinstance(group_schema, dict) or not isinstance(entries, dict):
+                        continue
+                    for name, changes in entries.items():
+                        if isinstance(changes, dict):
+                            errors = validate_schema_subset(
+                                changes, group_schema, f"routing-overrides.{group}.{name}")
+                            if errors:
+                                raise ValueError("invalid 'routing-overrides': " + "; ".join(errors))
+
+        from lib.roles import load_roles_config
+
+        root = self._service_context().agent_meta_root()
+        framework = load_roles_config(root).get("roles", {})
+        role_overrides = data.get("roles") or {}
+        if not isinstance(role_overrides, dict):
+            raise ValueError("routing-overrides.roles: expected a mapping")
+        for name in role_overrides:
+            if name not in framework:
+                raise ValueError(f"routing-overrides.roles: unknown role '{name}'")
+
+        effective = copy.deepcopy(framework)
+        for name, changes in role_overrides.items():
+            if isinstance(changes, dict) and "triggers" in changes:
+                effective[name].setdefault("routing_patterns", {})["keywords"] = changes["triggers"]
+        baseline = _routing_overlap_tokens(framework, frozenset(framework), root)
+        after = _routing_overlap_tokens(effective, frozenset(effective), root)
+        introduced = after - baseline
+        if introduced:
+            raise ValueError(
+                "routing-overrides: keyword overlap introduced by routing.triggers: "
+                + ", ".join(sorted(introduced)))
 
     def _guard_artifact_locations_write(self, section: str, data: Any) -> None:
         """Reject an ``artifact-locations`` write that would break sync (HTTP 400).

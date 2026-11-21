@@ -118,6 +118,12 @@ Toggle whether this specific sub-agent is active in your project. You can comple
 <!-- author: Agent Meta Admin -->
 The Orchestrator is the apex agent (`orchestrator.md`) responsible for interpreting the user's initial prompt and dynamically delegating work to specialized sub-agents. These settings define its cognitive boundaries.
 
+### Routing
+<!-- help-id: project_instance-routing -->
+<!-- last-updated: 2026-11-21 -->
+<!-- author: Agent Meta Admin -->
+The Routing view edits `routing-overrides` in `project.yaml` (Roadmap PR 5.4 / P27). It shows every active role with its effective intents, triggers, addressability, size class, priority and direct-dispatch flag, and marks each field as **Default** (framework value from `config/role-defaults.yaml`) or **Override** (set in the project). **Reset to default** removes only the override key — the framework default is never written to `project.yaml`. The preview panel calls `GET /api/routing/preview?provider=<name>` for each active provider and renders the server-side routing block together with its byte count, a `bytes/4` token proxy and the lint findings from the existing consistency validators. Saves go through `PUT /api/config/project/section` and fail closed on schema violations or newly introduced keyword overlaps; a sync is required afterwards for the change to reach generated prompts.
+
 #### Field: Routing mode
 <!-- help-id: field-routing_mode -->
 <!-- last-updated: 2026-07-23 -->
