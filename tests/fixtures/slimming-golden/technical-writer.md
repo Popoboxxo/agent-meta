@@ -1,9 +1,8 @@
 ---
 name: technical-writer
 version: 0.4.1
-description: 'External developer- and user-facing documentation: API references, getting-started
-  guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy.
-  Distinct from internal team docs owned by documenter.'
+description: 'External developer- and user-facing docs: API references, getting-started
+  guides, SDK docs, tutorials, CLI help, release notes. Not internal team docs.'
 hint: 'Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help,
   User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer'
 prompt_mode: modern
@@ -112,7 +111,8 @@ ARTIFACTS: <created/changed doc files>
 DOC_OUTPUT: <external-doc-v1: type, audience, verified examples>
 NEXT: [Review | Developer change | Documenter (internal)]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
+<!-- provenance: issue #267 -->
 
 </output_contract>
 

@@ -1,7 +1,7 @@
 ---
 name: template-prompt-governor
 version: "1.5.3"
-description: "Prompt governance: treats prompts as source code — PromptBOM metadata (model + prompt + parameters), append-only audit trail, provenance tracking, prompt version drift detection, and banned unsafe prompting patterns (skip auth, ignore security, bypass validation). Read-only on prompts; complements prompt-engineer (design), does not replace it."
+description: "Prompt governance: prompts as source code — PromptBOM, audit trail, provenance, version drift, banned patterns. Read-only; complements prompt-engineer."
 hint: "Prompt governance: PromptBOM, audit trail, provenance, banned-pattern detection — read-only, findings via feedback"
 reference_standards:
   - "{{CONTEXT_FILE}}"

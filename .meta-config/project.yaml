@@ -10,6 +10,7 @@ ai-providers:
 dod-preset: rapid-prototyping
 # The framework releases itself only after the full scenario catalog passed.
 # CI enforces the same gate on tag pushes (.github/workflows/release-gate.yml).
+# Volle Suite nur direkt vor einem PR oder in CI; waehrend der Implementierung nur betroffene Testdateien + sync.py --validate.
 release-gates:
   scenario-suite:
     enabled: true

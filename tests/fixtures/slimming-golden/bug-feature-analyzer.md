@@ -129,7 +129,8 @@ ARTIFACTS: <persisted triage report path, empty if returned inline>
 - OUT-OF-SCOPE → "No delegation. Reply to the user with: <rejection>"
 - UNCLEAR → "Ask the user the following questions: <list>"
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
+<!-- provenance: issue #267 -->
 
 </output_contract>
 

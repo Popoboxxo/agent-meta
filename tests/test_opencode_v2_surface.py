@@ -5518,8 +5518,8 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`); merged AC-T4 chain 9cee45b8.. -> 3e389da2.. (main #1307) -> 08ae786f.. (final, after merging #1307 + #1309); slimming-golden (main value b18ac19c..)/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # PR #1326 (2026-11-21, AC-01 golden re-pin to the authoritative v2.0.0 AGENTS.md state): the 6 provider AGENTS.md hashes (Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode) were pinned against beta.9 (PR base eea8aa7b); re-pinned to the v2.0.0 version-line values -- the only content diff vs. main's AGENTS.md (honcho/reqogniloom lines and mcp-* lazy rows stay removed). Merged origin/main into the branch (VERSION 2.0.0) and re-generated the AC-01 manifest via --write (1195 keys): 6 AGENTS.md hashes now match main's v2.0.0 values; the PR's hook feature entries are retained. AC-T4 ac01-baseline re-frozen from the final fixture bytes: c245a393.. -> 4e699ef6..; slimming-golden -> 7aabd546.. and compact-golden -> 4ed867bf.. follow main's fixture trees.
 _FIXTURE_TREES = {
-    "ac01-baseline": "4e699ef6e1c21bb40c93777d39f95b3d8f4381de2fbee46d4f53aaf406f18fea",
-    "slimming-golden": "7aabd546171209120fce87d0585e255dc29f7cd18c5b32433f443ecca8ebaf67",
+    "ac01-baseline": "a2cf4f8882e86713b5fb99334cc1d0f8ddb6d6bfd033a1113b46298c56b13528",
+    "slimming-golden": "4da5101b9d6d0f35aac2df60dea4f8281981ea74fc2630849c107974629a8394",
     "compact-golden": "4ed867bf15b467ea87108f097193c66958d802634ff6cb11acd6d894fdd7035b",
 }
 

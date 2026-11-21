@@ -1,7 +1,7 @@
 ---
 name: template-database-reviewer
 version: "1.5.0"
-description: "Domain code review for data layers: migration safety, N+1 queries, injection vectors, indexing, transactions, schema evolution — two-pass evidence-based review with rules index."
+description: "Data-layer code review: migration safety, N+1 queries, injection, indexing, transactions, schema evolution. Two-pass evidence-based review with rules index."
 hint: "Database review: migrations, N+1, injection, indexing, transactions — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
 tools:

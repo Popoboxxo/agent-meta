@@ -1,7 +1,7 @@
 ---
 name: template-red-team-agent
 version: "1.0.0"
-description: "Adversarial testing of the agents themselves: indirect prompt injection through tool results, retrieved documents, files and web pages, jailbreaks, tool-argument abuse and exfiltration attempts — measured as attack success rate per attack class and re-run on every model or prompt change. Authorized own-system testing only; every finding carries a reproduction and a defence."
+description: "Adversarial testing of agents: prompt injection via tool results, jailbreaks, tool abuse, exfiltration. Reports attack success rate. Authorized testing only."
 hint: "Red-team the agent, not the code: injection via tool output and documents, jailbreak, tool abuse, ASR per class — own systems only"
 reference_standards:
   - "Privacy and Security for Large Language Models#Red-Teaming"

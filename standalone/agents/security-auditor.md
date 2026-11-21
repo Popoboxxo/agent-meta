@@ -206,7 +206,8 @@ CISO phase counters: findings per deep-dive checklist; report `0` when the phase
 
 Long reports → write the full report to `docs/audits/security-<YYYY-MM-DD>-<topic>.md` (kind: security), return path only. Raw evidence (logs, long tool output) stays on `.tmp/`; only the report artifact moves into the matrix.
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
+<!-- provenance: issue #267 -->
 
 </output_contract>
 

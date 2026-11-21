@@ -1,7 +1,7 @@
 ---
 name: template-incident-responder
 version: "1.6.1"
-description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
+description: "Live incident coordination: correlates logs/metrics, runs runbooks, drives RCA (5-Whys, Fishbone), classifies severity, produces report and hotfix list."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 reference_standards:
   - "Google SRE Book#Managing-Incidents"

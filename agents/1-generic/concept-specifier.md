@@ -1,7 +1,7 @@
 ---
 name: template-concept-specifier
 version: "1.4.2"
-description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
+description: "Turns a concept or idea into a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
 reference_standards:
   - "ADR (adr.github.io)"

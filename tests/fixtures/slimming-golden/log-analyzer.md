@@ -1,9 +1,8 @@
 ---
 name: log-analyzer
 version: 1.6.1
-description: 'Analyzes system and application logs: frequency clustering, severity
-  classification (RFC 5424), log-quality checks, baseline-vs-anomaly comparison, trace/metric
-  correlation, and structured findings with delegation routing.'
+description: 'Analyzes system/application logs: frequency clustering, severity classification,
+  anomaly detection, trace/metric correlation, structured findings.'
 hint: 'Log analysis: cluster errors, classify severity (RFC 5424), delegate findings
   as issues or tasks'
 prompt_mode: modern
@@ -133,7 +132,8 @@ ARTIFACTS: <persisted report path, empty if returned inline>
 ---
 **Summary:** total findings, highest severity, top-3 patterns
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
+<!-- provenance: issue #267 -->
 
 </output_contract>
 

@@ -1,7 +1,7 @@
 ---
 name: template-refactoring-specialist
 version: "0.5.1"
-description: "Systematic large-scale code transformation with safety nets: Strangler Fig pattern, incremental refactoring, code smell detection, legacy modernization and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces refactoring plan, transformation sequence, rollback strategy and compatibility matrix."
+description: "Large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization, feature-flag rewrites with compatibility."
 hint: "Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung, Feature-Flag-Rewrites — braucht exklusiven Zugriff auf betroffene Module"
 prompt_mode: modern
 tools:

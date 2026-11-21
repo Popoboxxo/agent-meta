@@ -1,7 +1,7 @@
 ---
 name: template-technical-writer
 version: "0.4.1"
-description: "External developer- and user-facing documentation: API references, getting-started guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy. Distinct from internal team docs owned by documenter."
+description: "External developer- and user-facing docs: API references, getting-started guides, SDK docs, tutorials, CLI help, release notes. Not internal team docs."
 hint: "Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer"
 prompt_mode: modern
 reference_standards:
