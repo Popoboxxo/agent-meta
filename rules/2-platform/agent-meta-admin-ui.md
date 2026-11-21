@@ -29,6 +29,7 @@ MCP-SSE-Server, sofern nicht `--no-viz`); `stop` reißt alle drei gemeinsam ab.
 
 | Flag | Default | Bedeutung |
 |------|---------|-----------|
+| `--mode local\|network` | `local` (Verhalten) | Startmodus (Issue #896): `local` = Loopback, kein Token; `network` = `0.0.0.0`, Zufalls-Token (nicht persistiert), erreichbare URLs + Firewall-Hinweis |
 | `--port PORT` | `7420` | Admin-UI-Port |
 | `--host HOST` | `127.0.0.1` | Bind-Adresse; non-loopback erzwingt Token |
 | `--admin-token TOKEN` | — | Auth-Token für Remote-Zugriff (Pflicht bei non-loopback) |
@@ -39,11 +40,40 @@ MCP-SSE-Server, sofern nicht `--no-viz`); `stop` reißt alle drei gemeinsam ab.
 
 ## Port-Matrix
 
-| Dienst | Default-Port |
-|--------|--------------|
-| Admin UI | `7420` |
-| Viz-Dashboard | `8765` |
-| MCP-SSE-Server | `9090` |
+| Dienst | Default-Port | Bind (Ist-Stand Code) | Netzweit konfigurierbar? |
+|--------|--------------|------------------------|---------------------------|
+| Admin UI | `7420` | `--host` (Default `127.0.0.1`) | ja — `--mode network` / `--host 0.0.0.0` + Token |
+| Viz-Dashboard (`viz-report.py --serve`) | `8765` | hart `127.0.0.1` (`viz-report.py:912`) | nein (siehe Entscheidung 31) |
+| MCP-SSE-Server (`viz-logger.py --http`) | `9090` | hart `127.0.0.1` (`viz-logger.py:580`) | nein (siehe Entscheidung 31) |
+
+## Startmodus `local` / `network` (Issue #896)
+
+- `local` (Default, verhaltensidentisch zu früher): bindet `127.0.0.1`, **kein Token**. Ein
+  explizites `--host` mit non-loopback wird im local-Modus mit `ValueError` abgewiesen —
+  `local` kann den Server nie netzweit exponieren.
+- `network`: bindet `0.0.0.0` (bzw. ein explizites non-loopback `--host` / konfiguriertes
+  `admin-ui.bind-host`). Das Token wird vor der Fail-closed-Prüfung erzeugt, **nur in der
+  Startausgabe** ausgegeben und **nicht persistiert** (keine Token-Datei, kein Config-/Env-Write).
+  Rotation = Neustart. Ausgabe: erreichbare URLs (`http://<ip>:7420/?token=<T>`), `Token: <T>`,
+  Firewall-Hinweis und Sicherheitswarnung. `--allowed-hosts` für Writes von anderen Maschinen.
+- Token-Transport zum Child-Prozess ausschließlich über Env `ADMIN_UI_TOKEN` — **nie** in argv
+  (`ps`) und **nie** in `.meta-viz/admin-server.log`.
+- **Firewall:** Allow inbound TCP `7420` only from trusted networks (Host-Firewall / Security
+  Group). Port `7420` nicht öffentlich freigeben.
+- **Sicherheitswarnung (network):** netzweiter Zugriff — Token wie ein Passwort behandeln,
+  TLS / Reverse-Proxy verwenden, Exposure über `--allowed-hosts` begrenzen. Alternative: im
+  local-Modus bleiben und per SSH-Tunnel (`ssh -L 7420:127.0.0.1:7420 user@host`) zugreifen.
+
+## Bindeverhalten 8765/9090 bei `--host 0.0.0.0` — Entscheidung 31
+
+- **Ist-Stand (code-verifiziert):** Viz-Dashboard `8765` bindet hart `127.0.0.1`
+  (`scripts/viz-report.py:912`); MCP-SSE `9090` bindet hart `127.0.0.1`
+  (`scripts/viz-logger.py:580`, `--http` ohne Host-Option). Beide bleiben auch bei
+  `--host 0.0.0.0` des Admin-UI lokal.
+- **Verbindliche Roadmap-Entscheidung 31 (N12):** beide Dienste netzweit konfigurierbar, je
+  eigene Option mit sicherem Default. Die heutige Härtung auf Loopback ist die sichere
+  Default-Variante; die netzweite Konfigurierbarkeit ist eine **offene Umsetzungslücke**
+  (eigene Spec), keine neue Entscheidung dieses Starts. Keine `scripts/viz-*.py` ändern.
 
 ## Host-Bindung + Token-Regeln
 
@@ -104,7 +134,8 @@ admin-ui:
 ## Troubleshooting
 
 - **ERR_CONNECTION_REFUSED** → Server bindet loopback-only (`127.0.0.1`).
-  Remote-/Container-Zugriff braucht `--host 0.0.0.0` (+ Token).
+  Remote-/Container-Zugriff braucht `--mode network` (setzt `0.0.0.0` + Token
+  und gibt die erreichbare URL aus) oder manuell `--host 0.0.0.0` (+ Token).
 - **HTTP 401** → Token fehlt oder ungültig (`Authorization: Bearer <T>` bzw.
   `?token=<T>` setzen).
 - **Port-Kollision** → Port ist belegt; der detached Start schlägt fehl

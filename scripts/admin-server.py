@@ -46,6 +46,7 @@ import logging
 import os
 import queue
 import re
+import secrets
 import socket
 import stat
 import subprocess
@@ -592,7 +593,10 @@ def _load_admin_ui_config(root: Path) -> dict:
             "enabled":       bool(admin_cfg.get("enabled", True)),
             "port":          int(admin_cfg.get("port", DEFAULT_PORT)),
         }
-    except Exception:
+    # lib.config.load_config aborts via sys.exit(1) on a malformed project.yaml.
+    # As a runtime config reader this helper must degrade to defaults instead —
+    # the detached start's _tmp_sink_env still reports the real parse error.
+    except (Exception, SystemExit):
         return {
             "bind_host":     DEFAULT_HOST,
             "token":         None,
@@ -601,6 +605,35 @@ def _load_admin_ui_config(root: Path) -> dict:
             "enabled":       True,
             "port":          DEFAULT_PORT,
         }
+
+
+def _resolve_bind_mode(
+    *,
+    mode: str | None,
+    cli_host: str | None,
+    cfg_bind_host: str,
+) -> str:
+    """Resolve the effective bind host from the requested start mode.
+
+    ``local`` (issue #896) always binds loopback and refuses a non-loopback
+    ``--host`` override so a "local" start can never expose the server.
+    ``network`` prefers an explicit non-loopback ``--host``, then a configured
+    non-loopback ``admin-ui.bind-host``, and finally falls back to the wildcard
+    address. ``None`` preserves the historic ``--host``-wins behaviour.
+    """
+    if mode == "local":
+        if cli_host and cli_host not in LOOPBACK_HOSTS:
+            raise ValueError(
+                f"--mode local requires a loopback --host, got {cli_host!r}"
+            )
+        return "127.0.0.1"
+    if mode == "network":
+        if cli_host and cli_host not in LOOPBACK_HOSTS:
+            return cli_host
+        if cfg_bind_host and cfg_bind_host not in LOOPBACK_HOSTS:
+            return cfg_bind_host
+        return "0.0.0.0"
+    return cli_host or cfg_bind_host
 
 
 def _pid_cmdline(pid: int) -> str | None:
@@ -1138,6 +1171,19 @@ def _verify_token(provided: str | None, expected: str | None) -> bool:
         provided.encode("utf-8"),
         expected.encode("utf-8"),
     )
+
+
+def _ensure_network_token(resolved: str | None) -> tuple[str, bool]:
+    """Return ``(token, generated)`` for a network-mode start (issue #896).
+
+    An already-resolved token (CLI / env / config) is reused. Otherwise an
+    ephemeral URL-safe token is generated. Nothing is written to disk, config
+    or the environment — the token lives only in this process and is printed
+    once by the parent at start time (rotation == restart).
+    """
+    if resolved:
+        return resolved, False
+    return secrets.token_urlsafe(32), True
 
 
 def _resolve_admin_token(
@@ -6331,6 +6377,72 @@ class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+def _local_ips() -> tuple[str, ...]:
+    """Best-effort list of non-loopback local IPv4 addresses (stdlib only)."""
+    try:
+        return tuple(sorted({
+            addr for addr in socket.gethostbyname_ex(socket.gethostname())[2]
+            if not addr.startswith("127.")
+        }))
+    except OSError:
+        return ()
+
+
+def _reachable_urls(bind_host: str, port: int, local_ips: tuple[str, ...]) -> list[str]:
+    """URLs a browser can actually open for *bind_host* (issue #896).
+
+    A wildcard bind names no reachable address, so it expands to one URL per
+    discovered local IP plus loopback. A concrete bind yields exactly one URL.
+    No token is embedded here — the parent adds it in :func:`_network_banner`.
+    """
+    if bind_host in WILDCARD_HOSTS:
+        urls = [f"http://{ip}:{port}/" for ip in local_ips]
+        urls.append(f"http://127.0.0.1:{port}/")
+        return list(dict.fromkeys(urls))
+    return [f"http://{bind_host}:{port}/"]
+
+
+def _network_banner(urls: list[str], token: str, port: int) -> list[str]:
+    """Startup banner lines for network mode (printed by the parent only).
+
+    Includes the token-bearing deep links, the token itself, a firewall rule
+    hint and an explicit security warning. The child never prints these lines
+    because its stdout is redirected to a user-readable log file.
+    """
+    lines = ["  * Reachable URLs (network mode):"]
+    for url in urls:
+        sep = "&" if "?" in url else "?"
+        lines.append(f"    {url}{sep}token={token}")
+    lines.append(f"    Token: {token}")
+    lines.append(
+        f"  ! Allow inbound TCP {port} only from trusted networks "
+        f"(host firewall / security group)."
+    )
+    lines.append(
+        "  ! Network mode: this Admin UI is reachable from other machines. "
+        "Treat the token like a password; use TLS / a reverse proxy and "
+        "restrict exposure with --allowed-hosts."
+    )
+    lines.append(
+        "  ! The token is generated per start and NOT persisted — "
+        "restarting rotates it."
+    )
+    lines.append(
+        f"  i  Alternative: stay in local mode and tunnel: "
+        f"ssh -L {port}:127.0.0.1:{port} user@host"
+    )
+    return lines
+
+
+def _print_start_urls(host: str, port: int, token: str | None) -> None:
+    """Print either the token-bearing network banner or the plain local URL."""
+    if token:
+        for line in _network_banner(_reachable_urls(host, port, _local_ips()), token, port):
+            print(line)
+    else:
+        print(f"  i  URL:  http://{host}:{port}")
+
+
 class AdminServer:
     """Container that owns the HTTP server and optional watcher thread."""
 
@@ -6344,6 +6456,7 @@ class AdminServer:
         admin_token: str | None = None,
         admin_token_file: str | None = None,
         allowed_hosts: tuple[str, ...] | None = None,
+        mode: str | None = None,
     ) -> None:
         # Load admin-ui config from project.yaml (token, allowed-hosts, bind-host)
         admin_cfg = _load_admin_ui_config(root)
@@ -6353,6 +6466,11 @@ class AdminServer:
             config_token=admin_cfg["token"],
             config_token_file=admin_token_file or admin_cfg["token_file"],
         )
+        # Issue #896: network mode always has a token. Generate it here, before
+        # the fail-closed guard below, so a wildcard bind never starts without
+        # authentication. Nothing is persisted; local/legacy paths are untouched.
+        if mode == "network":
+            effective_token, _generated = _ensure_network_token(effective_token)
         # Allowed hosts: CLI > config > default loopback
         effective_allowed_hosts = tuple(allowed_hosts) if allowed_hosts else tuple(admin_cfg["allowed_hosts"])
         # --- Fail-closed: non-loopback requires token ---
@@ -6441,7 +6559,11 @@ class AdminServer:
         print("  i  agent-meta Admin UI")
         print(f"  i  Mode:    {self.mode}")
         print(f"  i  Version: {AdminRequestHandler.version}")
-        print(f"  i  URL:     http://{self.host}:{self.port}")
+        if self.host in WILDCARD_HOSTS:
+            urls = _reachable_urls(self.host, self.port, _local_ips())
+            print(f"  i  URL:     {' | '.join(urls)}")
+        else:
+            print(f"  i  URL:     http://{self.host}:{self.port}")
         print(f"  i  Root:    {self.root}")
         if self.enable_watcher:
             print("  i  Watcher: enabled (.meta-viz/events.jsonl)")
@@ -6483,12 +6605,18 @@ def _log_tail(log_file: Path, lines: int = 20) -> list[str]:
     return text.splitlines()[-lines:]
 
 
-def _admin_start_detached(args: argparse.Namespace) -> None:
+def _admin_start_detached(
+    args: argparse.Namespace, network_token: str | None = None,
+) -> None:
     """Start the admin server detached and verify the child (#1189, IC-8).
 
     Order: already-running check, bind pre-flight (deterministic, before any
     spawn), pin env (``TmpSinkError`` aborts before the spawn), spawn, PID file
     immediately, heuristic child verification, success message.
+
+    Issue #896: ``network_token`` (or any CLI token) is transported to the child
+    exclusively through the ``ADMIN_UI_TOKEN`` environment variable — never in
+    argv (process listings) and never into the child log file.
 
     Limit (AC-1189-17b): the verification is a heuristic over the child
     lifetime. If a failure only surfaces after the confirm window, this parent
@@ -6498,11 +6626,15 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
     root = Path(args.root).resolve()
     pid_file = root / ADMIN_PID_FILE
     log_file = root / ADMIN_LOG_FILE
+    # Issue #896: the effective token is the freshly generated network token
+    # when present, otherwise the CLI token. It is passed to the child via env
+    # only — argv is visible in `ps` and the log is user-readable.
+    effective_token = network_token if network_token is not None else args.admin_token
 
     existing_pid = _read_pid(pid_file)
     if _is_pid_running(existing_pid):
         print(f"  -  Admin UI already running (PID: {existing_pid})")
-        print(f"  i  URL: http://{args.host}:{args.port}")
+        _print_start_urls(args.host, args.port, effective_token)
         return
 
     ok, reason = _probe_port_bindable(args.host, args.port)
@@ -6512,7 +6644,9 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     try:
-        child_env = _tmp_sink_env(root)
+        # Always pin the tmp-sink env for the detached child; the #896 token
+        # is transported env-only and never embedded in the pin itself.
+        spawn_env = _tmp_sink_env(root)
     except _tmp_sink_error_class(root) as exc:
         print(f"  !  tmp-sink pin unavailable: {exc}")
         print("  i  Reparatur: python scripts/sync.py --validate")
@@ -6525,12 +6659,14 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
         except PermissionError:
             pass
 
+    if effective_token:
+        spawn_env = dict(os.environ if spawn_env is None else spawn_env)
+        spawn_env["ADMIN_UI_TOKEN"] = effective_token
+
     # Re-invoke this script with the same flags but no subcommand, so the
     # child runs the historic blocking `serve_forever()` path.
     cmd = [sys.executable, str(Path(__file__).resolve()),
            "--port", str(args.port), "--host", args.host, "--root", str(root)]
-    if args.admin_token:
-        cmd += ["--admin-token", args.admin_token]
     if args.allowed_hosts:
         cmd += ["--allowed-hosts", *args.allowed_hosts]
     if args.watch:
@@ -6549,13 +6685,13 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 cwd=str(root),
-                env=child_env,
+                env=spawn_env,
             )
         else:
             proc = subprocess.Popen(
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 start_new_session=True, cwd=str(root),
-                env=child_env,
+                env=spawn_env,
             )
 
     # Written at once so status/stop/second start work during verification.
@@ -6565,7 +6701,7 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
     # child reads admin-ui.token-file itself, so resolve it here too.
     admin_cfg = _load_admin_ui_config(root)
     token_configured = _resolve_admin_token(
-        cli_token=args.admin_token,
+        cli_token=effective_token or args.admin_token,
         config_token=admin_cfg["token"],
         config_token_file=admin_cfg["token_file"],
     ) is not None
@@ -6576,7 +6712,7 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
     if verified:
         print(f"  +  Admin UI started (PID: {proc.pid})")
         print("  i  Child alive after the confirm window; port answers as expected")
-        print(f"  i  URL:  http://{args.host}:{args.port}")
+        _print_start_urls(args.host, args.port, effective_token)
         print(f"  i  Logs: {log_file}")
         return
 
@@ -6633,7 +6769,11 @@ def _admin_status(args: argparse.Namespace) -> None:
     admin_running = _is_pid_running(admin_pid)
     print(f"  Admin UI      (port {args.port}): {'RUNNING' if admin_running else 'STOPPED'}")
     if admin_running:
-        print(f"    PID: {admin_pid}  |  http://{args.host}:{args.port}")
+        if args.host in WILDCARD_HOSTS:
+            urls = _reachable_urls(args.host, args.port, _local_ips())
+            print(f"    PID: {admin_pid}  |  {' | '.join(urls)}")
+        else:
+            print(f"    PID: {admin_pid}  |  http://{args.host}:{args.port}")
 
     status = VizManager(root).status()
     viz = status["viz"]
@@ -6660,6 +6800,10 @@ def main() -> None:
                         help="start: launch detached in the background (default when omitted: "
                              "run in the foreground until Ctrl+C). stop: terminate Admin UI + "
                              "Viz + MCP. status: show running state. restart: stop then start.")
+    parser.add_argument("--mode", choices=("local", "network"), default=None,
+                        help="Start mode (issue #896): 'local' binds loopback with no token "
+                             "(default behaviour); 'network' binds all interfaces with a "
+                             "generated, non-persisted token and prints reachable URLs.")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT,
                         help=f"Server port (default: {DEFAULT_PORT})")
     parser.add_argument("--host", default=DEFAULT_HOST,
@@ -6695,19 +6839,41 @@ def main() -> None:
         print(f"  !  root directory does not exist: {root}", file=sys.stderr)
         sys.exit(1)
 
+    # Issue #896: resolve the bind host from the explicit start mode before any
+    # command runs. With --mode unset this is a no-op (historic --host value).
+    cfg = _load_admin_ui_config(root)
+    try:
+        args.host = _resolve_bind_mode(
+            mode=args.mode, cli_host=args.host, cfg_bind_host=cfg["bind_host"],
+        )
+    except ValueError as exc:
+        print(f"  !  {exc}", file=sys.stderr)
+        sys.exit(1)
+
     if args.command == "stop":
         _admin_stop(args)
         return
     if args.command == "status":
         _admin_status(args)
         return
+
+    # Issue #896: network mode always carries a token. Generate it here (once)
+    # so both the detached parent and the foreground server use the same value.
+    network_token = None
+    if args.mode == "network":
+        network_token, _ = _ensure_network_token(
+            _resolve_admin_token(
+                args.admin_token, cfg["token"], cfg["token_file"],
+            )
+        )
+
     if args.command == "start":
-        _admin_start_detached(args)
+        _admin_start_detached(args, network_token=network_token)
         return
     if args.command == "restart":
         _admin_stop(args)
         time.sleep(1)
-        _admin_start_detached(args)
+        _admin_start_detached(args, network_token=network_token)
         return
 
     server = AdminServer(
@@ -6716,8 +6882,9 @@ def main() -> None:
         port=args.port,
         enable_watcher=args.watch,
         enable_viz=not args.no_viz,
-        admin_token=args.admin_token,
+        admin_token=network_token or args.admin_token,
         allowed_hosts=tuple(args.allowed_hosts) if args.allowed_hosts else None,
+        mode=args.mode,
     )
     server.start()
 

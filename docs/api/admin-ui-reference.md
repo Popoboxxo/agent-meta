@@ -232,6 +232,39 @@ The port the Admin Server binds to (default: `7420`). Modify this if you experie
 <!-- author: Agent Meta Admin -->
 When enabled, the D3.js Viz Dashboard will establish a WebSocket connection and automatically re-render the agent graph the moment a `sync.py` compilation completes, providing immediate visual feedback on architectural changes.
 
+### Admin UI start modes and port matrix (issue #896)
+
+`scripts/admin-server.py` accepts an explicit start mode (issue #896):
+
+| Mode | Bind | Token | Reachability |
+|---|---|---|---|
+| `local` (default) | `127.0.0.1` | none | loopback only; never exposed to the network |
+| `network` | `0.0.0.0` (or explicit non-loopback `--host`) | generated random token, **not persisted** (rotation = restart) | prints reachable URLs `http://<ip>:7420/?token=<T>` plus firewall and security guidance |
+
+The generated network token is printed **once** by the start command and is
+transported to the child process via `ADMIN_UI_TOKEN` only — never in argv
+(`ps`) and never in `.meta-viz/admin-server.log`. `local` stays behaviourally
+identical (loopback, no token). `*?token=` deep links are ingested by the UI
+and scrubbed from the URL after loading (`docs/ui/admin-ui.html`).
+
+| Port | Service | Configured by | Bind (current code) |
+|---|---|---|---|
+| `7420` | Admin UI (`admin-server.py`) | `--port` / `admin-ui.port` | `--mode network` / `--host` |
+| `8765` | Viz dashboard (`viz-report.py --serve`) | `viz.server.port` | hard `127.0.0.1` (`viz-report.py:912`) |
+| `9090` | MCP SSE (`viz-logger.py --http`) | `viz.mcp.port` | hard `127.0.0.1` (`viz-logger.py:580`) |
+
+Firewall: allow inbound TCP `7420` only from trusted networks (host firewall /
+security group). Security warning for network mode: the token is a shared
+secret (treat it like a password), terminate TLS / use a reverse proxy and
+restrict exposure with `--allowed-hosts`; alternatively stay in `local` mode
+and tunnel (`ssh -L 7420:127.0.0.1:7420 user@host`).
+
+**Entscheidung 31 (N12)** — the documented roadmap decision for the open
+8765/9090 question: both sub-servers are to become network-configurable, each
+with its own option and a safe default. The current loopback hard-bind is the
+safe default; the missing network options are an open implementation item, not
+a new decision here.
+
 ### Provider Tier Overrides
 <!-- help-id: project_instance-tier_overrides -->
 <!-- last-updated: 2026-07-19 -->
