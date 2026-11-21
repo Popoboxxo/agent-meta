@@ -29,6 +29,8 @@ Beschreibungssprache: `Englisch`
 Max 72 Zeichen in erster Zeile. Imperativ.
 Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 
+Trailer: Die per `commit.trailers` (Projekt-Config) konfigurierten Trailer stehen wörtlich (verbatim, je Zeile genau einmal) im Footer der Commit-Message. Vorrang: expliziter Auftrag > Projekt-Config > Harness-Attribution (siehe `git`-Agent, Abschnitt Commit trailers).
+
 # Sprachregeln
 
 | Kontext | Sprache |

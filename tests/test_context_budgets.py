@@ -583,16 +583,33 @@ def test_ac07_missing_ceiling_is_a_violation():
 # the tolerance: rules +71 B, orchestrator +20 B, harness-roster +519..+564 B, roster
 # always-loaded +845..+1,192 B; the multi-provider AGENTS.md stays 12,519 B.
 # RE-PIN (2026-11-10, #1190 G1 primary gate text + T8/T10/T18 wording): Opencode entry-file 3,807 -> 4,724 B (Opencode is the only provider that derives `primary`).
+# RE-PIN (2026-11-19, issue #1247 commit trailer rule line): measured with
+# `render_into_work_dir(..., profile="compact")` + `measure_artifacts`, not derived
+# arithmetically. The new trailer line in `rules/1-generic/commit-conventions.md`
+# is embedded in the six shared AGENTS.md entry files and grows each by 376-441 B
+# (the exact delta is provider-dependent after placeholder substitution).
+# Exactly the seven failing entries are re-pinned (old Ist -> measured Ist):
+#   * Codex/entry-file 3,739 -> 4,174 (+435)
+#   * Gemini/entry-file 11,274 -> 11,715 (+441); Gemini/always-loaded is the same
+#     artifact (its rules are embedded), 11,274 -> 11,715 (+441).
+#   * KimiCode/entry-file 3,749 -> 4,184 (+435)
+#   * Mammouth/entry-file 3,747 -> 4,182 (+435)
+#   * Opencode/entry-file 4,724 -> 5,100 (+376)
+#   * ZCode/entry-file 4,652 -> 5,087 (+435)
+# Left inside the existing tolerance on purpose (pins unchanged): Claude/entry-file
+# 2,459, Copilot/entry-file 10,915, Continue/full-profile artifacts and every
+# orchestrator/rules/harness-roster entry (the trailer rule is not part of them).
+# AC-26 targets are unchanged; `compact` stays opt-in/unverified (IC-36).
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
     "Claude": {"always-loaded": 656608, "entry-file": 2461, "harness-roster": 633459, "orchestrator": 34792, "rules": 20690},
-    "Codex": {"always-loaded": 630218, "entry-file": 3739, "harness-roster": 622221, "orchestrator": 34283},
+    "Codex": {"always-loaded": 630218, "entry-file": 4174, "harness-roster": 622221, "orchestrator": 34283},
     "Continue": {"always-loaded": 24058, "entry-file": 358, "orchestrator": 35357, "rules": 23700},
     "Copilot": {"always-loaded": 34415, "entry-file": 10887, "orchestrator": 35231, "rules": 23500},
-    "Gemini": {"always-loaded": 11274, "entry-file": 11274, "orchestrator": 36105},
-    "KimiCode": {"always-loaded": 638391, "entry-file": 3749, "harness-roster": 634479, "orchestrator": 35659},
-    "Mammouth": {"always-loaded": 633653, "entry-file": 3747, "harness-roster": 625651, "orchestrator": 34072},
-    "Opencode": {"always-loaded": 634355, "entry-file": 4724, "harness-roster": 629527, "orchestrator": 34428},
-    "ZCode": {"always-loaded": 636264, "entry-file": 4652, "harness-roster": 631449, "orchestrator": 34298},
+    "Gemini": {"always-loaded": 11715, "entry-file": 11715, "orchestrator": 36105},
+    "KimiCode": {"always-loaded": 638391, "entry-file": 4184, "harness-roster": 634479, "orchestrator": 35659},
+    "Mammouth": {"always-loaded": 633653, "entry-file": 4182, "harness-roster": 625651, "orchestrator": 34072},
+    "Opencode": {"always-loaded": 634355, "entry-file": 5100, "harness-roster": 629527, "orchestrator": 34428},
+    "ZCode": {"always-loaded": 636264, "entry-file": 5087, "harness-roster": 631449, "orchestrator": 34298},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -608,7 +625,11 @@ _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "
 # does not enter this shared entry file. Main's 11,257 B predates the #1015 roles.
 # MERGE RE-PIN (main #1151 G1 into #1157, 2026-11-07): measured 12,519 B (+326 = the
 # #1157 a2a gate-3 sentence +76 and the G1 `use-orchestrator` strict/worker-git sentences +250).
-_IST_COMPACT_MULTI_AGENTS_MD = 12519
+# RE-PIN (2026-11-19, issue #1247): measured 12,960 B (+441) with the shared
+# `render_into_work_dir(..., profile="compact")` seam; the embedded trailer rule line
+# grows the shared AGENTS.md. The single-provider compact entry-file pins above
+# follow the same cause. The 32,768 B hard cap is untouched and still holds.
+_IST_COMPACT_MULTI_AGENTS_MD = 12960
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
 # ESTIMATES (Spec section 11): goals, not measurements. `compact` ships

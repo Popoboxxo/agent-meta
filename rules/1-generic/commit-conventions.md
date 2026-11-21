@@ -8,3 +8,5 @@ Format: `<type>(REQ-xxx): <beschreibung>` (Bsp: `feat(REQ-123): ...`)
 {{else}}
 Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 {{/if}}
+
+Trailer: Die per `commit.trailers` (Projekt-Config) konfigurierten Trailer stehen wörtlich (verbatim, je Zeile genau einmal) im Footer der Commit-Message. Vorrang: expliziter Auftrag > Projekt-Config > Harness-Attribution (siehe `git`-Agent, Abschnitt Commit trailers).
