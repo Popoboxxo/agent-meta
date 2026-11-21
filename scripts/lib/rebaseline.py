@@ -12,6 +12,7 @@ import glob as glob_module
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,26 @@ from typing import Any, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 CONFIG_REL = Path(".meta-config") / "project.yaml"
 SYNC_REL = Path("scripts") / "sync.py"
+
+
+def _load_test_module(root: Path, filename: str, alias: str) -> Any:
+    """Load a test module by path without going through pytest collection."""
+    path = Path(root) / "tests" / filename
+    spec = importlib.util.spec_from_file_location(alias, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def scratch_root(root: Path, scratch: Optional[Path]) -> Path:
+    """Mock-project root for topology rendering; never the repository root."""
+    return Path(scratch) if scratch is not None else Path(root)
+
+
+def reset_scratch(scratch: Optional[Path]) -> None:
+    """Clear the scratch sink between render passes."""
+    if scratch is not None:
+        shutil.rmtree(Path(scratch), ignore_errors=True)
 
 
 class RebaselineError(Exception):
@@ -319,18 +340,22 @@ def _load_fixture_digester(root: Path) -> Tuple[Any, Any]:
     so add it for the duration of the load and restore it afterwards.
     """
     module_path = Path(root) / "tests" / "test_opencode_v2_surface.py"
+    spec = importlib.util.spec_from_file_location(
+        "_rebaseline_ac_t4_surface", module_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    # The test module imports `tests.changelog_sections`, so the repository
+    # root must be importable when it is loaded by path (the CLI only adds
+    # scripts/ to sys.path). Restore sys.path afterwards to keep this helper
+    # side-effect free for its callers.
     root_str = str(Path(root))
-    added = root_str not in sys.path
-    if added:
+    added_root = root_str not in sys.path
+    if added_root:
         sys.path.insert(0, root_str)
     try:
-        spec = importlib.util.spec_from_file_location(
-            "_rebaseline_ac_t4_surface", module_path
-        )
-        module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     finally:
-        if added:
+        if added_root:
             sys.path.remove(root_str)
     return module._fixture_tree_sha256, module._FIXTURE_TREES
 

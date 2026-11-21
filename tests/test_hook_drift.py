@@ -184,6 +184,7 @@ def test_sync_time_placeholders_only_appear_on_their_assignment_lines():
     placeholders = {
         "{{AGENT_META_PROVIDER}}": 'AGENT_META_PROVIDER="{{AGENT_META_PROVIDER}}"',
         "{{AGENT_META_HOOK_AGENT_ID}}": 'HOOK_AGENT_ID_RELIABLE="{{AGENT_META_HOOK_AGENT_ID}}"',
+        "{{AGENT_META_HOOK_ROLE_FIELD}}": 'HOOK_ROLE_FIELD_RELIABLE="{{AGENT_META_HOOK_ROLE_FIELD}}"',
     }
     offenders = []
     for path in sorted((REPO_ROOT / "hooks").rglob("*.sh")):

@@ -170,8 +170,15 @@ def _rendered_guard(tmp_path, agent_id_capability: str) -> Path:
     (hooks_dir / "lib").mkdir(parents=True)
     shutil.copy(_HOOK_PATH, hooks_dir / _HOOK_PATH.name)
     shutil.copy(_IMPL_PATH.parent / "lib" / "hook_common.sh", hooks_dir / "lib" / "hook_common.sh")
-    impl = _IMPL_PATH.read_text(encoding="utf-8").replace(
-        "{{AGENT_META_HOOK_AGENT_ID}}", agent_id_capability)
+    # #1169/#1238: the shell shim loads the importable parser module from the
+    # same lib/ directory — sync.py deploys it next to hook_common.sh.
+    shutil.copy(
+        _IMPL_PATH.parent / "lib" / "hook_json_many.py",
+        hooks_dir / "lib" / "hook_json_many.py",
+    )
+    impl = (_IMPL_PATH.read_text(encoding="utf-8")
+            .replace("{{AGENT_META_HOOK_AGENT_ID}}", agent_id_capability)
+            .replace("{{AGENT_META_HOOK_ROLE_FIELD}}", "false"))
     (hooks_dir / _IMPL_PATH.name).write_text(impl, encoding="utf-8")
     return hooks_dir / _HOOK_PATH.name
 

@@ -127,18 +127,9 @@ def preflight(root: Path, options: Any, runner: Any = subprocess.run) -> Preflig
     return Preflight(base, warning, dirty, tuple(paths))
 
 
-def _load_test_module(root: Path, filename: str, alias: str) -> Any:
-    """Load a test module by path without going through pytest collection."""
-    path = Path(root) / "tests" / filename
-    module_spec = importlib.util.spec_from_file_location(alias, path)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    return module
-
-
 def _render_matrix(root: Path, scratch: Optional[Path], runner: Any) -> dict:
     """Render the AC-01 provider matrix into the scratch sink."""
-    module = _load_test_module(
+    module = base_mod._load_test_module(
         root, "test_ac01_render_identity.py", "_rebaseline_ac01"
     )
     fixture_root = scratch or (Path(root) / "tests" / "fixtures" / "ac01-baseline")
@@ -147,13 +138,14 @@ def _render_matrix(root: Path, scratch: Optional[Path], runner: Any) -> dict:
 
 def _render_topology(root: Path, scratch: Optional[Path], runner: Any) -> dict:
     """Render the a2a topology fixtures (``auto`` action, schema paths stay manual)."""
-    module = _load_test_module(
+    module = base_mod._load_test_module(
         root, "test_ac01_render_identity.py", "_rebaseline_topology"
     )
     prefix = "tests/fixtures/topology-golden/a2a-delegation-gates.role-"
+    render_root = base_mod.scratch_root(root, scratch)
     return {
-        "{}active.md".format(prefix): module.render_topology_rule(True, Path(root)),
-        "{}inactive.md".format(prefix): module.render_topology_rule(False, Path(root)),
+        "{}active.md".format(prefix): module.render_topology_rule(True, render_root),
+        "{}inactive.md".format(prefix): module.render_topology_rule(False, render_root),
     }
 
 
@@ -546,6 +538,7 @@ def run_pipeline(root: Path, options: Any, runner: Any = subprocess.run) -> Pipe
         )
 
     check_options = dict(options, check_only=True)
+    base_mod.reset_scratch(options.get("scratch"))
     second = base_mod.run_steps(root, check_options, runner)
     residual = [
         "{}: {}".format(step.name, step.detail)
