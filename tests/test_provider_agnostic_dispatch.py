@@ -893,3 +893,27 @@ def test_worker_control_resolver_sites_are_capability_driven():
     ):
         source = (_REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "worker_control_tools" in source, rel
+
+
+# --- Task 22 (F-PA1): provider-neutral gate function names ----------------
+
+
+def test_isolation_exports_neutral_names():
+    """F-PA1: the runtime/surface gate functions must carry provider-neutral
+    names in the generic library."""
+    from lib import isolation
+
+    for name in (
+        "sync_runtime_gate",
+        "rollback_runtime_gate",
+        "reconcile_surface_gate",
+    ):
+        assert hasattr(isolation, name), name
+
+
+def test_no_opencode_named_gate_functions_in_generic_loop():
+    """F-PA1: the generic dispatch loop must not name provider-specific gates."""
+    for rel in ("scripts/lib/cli_commands.py", "scripts/lib/sync_pipeline.py"):
+        source = (_REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert "opencode_runtime_gate" not in source, rel
+        assert "opencode_surface_gate" not in source, rel

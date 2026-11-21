@@ -131,7 +131,7 @@ def _run_per_provider(
 
     if record_writer:
         monkeypatch.setattr(
-            sync_pipeline, "_sync_opencode_runtime_gate",
+            sync_pipeline, "sync_runtime_gate",
             lambda *a, **k: writer_calls.append((a, k)),
         )
     if plugin_calls is not None:
