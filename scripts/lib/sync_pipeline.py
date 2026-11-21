@@ -1013,6 +1013,11 @@ def _managed_dirs_for_prune(
             specs.append(pc.get("rules_dir", ".claude/rules"))
         if pc.get("has_commands", False):
             specs.append(pc.get("commands_dir", ".claude/commands"))
+        # #1161 Pkt 4: backups written next to the context file live in its
+        # parent directory, which may not be any of the managed dirs above
+        # (e.g. a context file under docs/ or a provider-specific subdir).
+        if pc.get("context_file"):
+            specs.append(str(Path(pc["context_file"]).parent))
         specs.append(resolve_pipeline_details_dir(pc, provider))
         for rel in specs:
             if not rel:

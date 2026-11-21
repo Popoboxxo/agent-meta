@@ -638,6 +638,64 @@ def test_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert list(project_root.rglob("*.sync-backup-*")) == []
 
 
+def test_prune_includes_context_file_dir(tmp_path: Path) -> None:
+    """Task 7 (#1161 Pkt 4): backups next to a context file in a subdirectory
+    are pruned; a context file outside the managed agent/rules dirs must be
+    covered by the prune dir set too.
+    """
+    import argparse
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from lib.sync_pipeline import _prune_managed_sync_backups  # noqa: E402
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    context_dir = project_root / "docs"
+    context_dir.mkdir(parents=True)
+    context_file = context_dir / "CONTEXT.md"
+    context_file.write_text("current", encoding="utf-8")
+    base = datetime.now().replace(microsecond=0) - timedelta(days=1)
+    for index in range(5):
+        stamp = (base + timedelta(seconds=index)).strftime("%Y%m%d-%H%M%S")
+        (context_dir / f"CONTEXT.md.sync-backup-{stamp}").write_text(
+            "old", encoding="utf-8"
+        )
+
+    provider_config = {
+        "Claude": {"context_file": "docs/CONTEXT.md", "agents_dir": ".claude/agents"}
+    }
+    _prune_managed_sync_backups(
+        project_root, {}, provider_config, argparse.Namespace(dry_run=False), SyncLog()
+    )
+
+    remaining = [p for p in context_dir.iterdir() if ".sync-backup-" in p.name]
+    assert len(remaining) == 3
+    assert context_file.read_text(encoding="utf-8") == "current"
+
+
+def test_prune_keeps_non_backup_files(tmp_path: Path) -> None:
+    """Non-backup files are never candidates, including next to a context file."""
+    import argparse
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from lib.sync_pipeline import _prune_managed_sync_backups  # noqa: E402
+    from scripts.lib.log import SyncLog
+
+    project_root = tmp_path / "project"
+    context_dir = project_root / "docs"
+    context_dir.mkdir(parents=True)
+    (context_dir / "notes.md").write_text("keep", encoding="utf-8")
+    provider_config = {
+        "Claude": {"context_file": "docs/CONTEXT.md", "agents_dir": ".claude/agents"}
+    }
+    _prune_managed_sync_backups(
+        project_root, {}, provider_config, argparse.Namespace(dry_run=False), SyncLog()
+    )
+    assert (context_dir / "notes.md").read_text(encoding="utf-8") == "keep"
+
+
 def test_resolve_treats_unreadable_file_as_real(tmp_path: Path) -> None:
     """Fail-safe: an unreadable file cannot prove the writer overwrote the
     edit, so it stays a real finding instead of being silently dropped."""
