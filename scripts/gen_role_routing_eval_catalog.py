@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Generate the role-routing eval corpus (IC-13, AC-03, AC-62 corpus part).
 
-Reads ``config/role-defaults.yaml`` (keywords + examples per role) and emits:
+Reads ``config/role-defaults.yaml`` (``routing.triggers`` / ``routing.examples``
+per role — P26's model — with a legacy ``routing_patterns`` fallback while the
+framework data migration is pending) and emits:
 
 * ``tests/routing-llm-eval/roles/catalog.generated.yaml`` -- literal positive
   cases for every keyword/example, one EN case per pattern role, collision
@@ -81,8 +83,22 @@ def _expected(roles: dict, target: str) -> dict:
 
 
 def _patterns(info: dict) -> tuple:
-    patterns = info.get("routing_patterns") or {}
-    return list(patterns.get("keywords") or []), list(patterns.get("examples") or [])
+    """Return ``(triggers, examples)`` from P26's ``routing.*`` model.
+
+    Decision 2 (21.11.): ``routing.triggers`` is the primary data source. The
+    legacy ``routing_patterns`` block remains a fallback only because the
+    framework ``role-defaults.yaml`` migration is not part of P27; both spellings
+    yield the same cases today, so the committed catalog stays stable.
+    """
+    routing = info.get("routing") or {}
+    legacy = info.get("routing_patterns") or {}
+    triggers = routing.get("triggers")
+    if triggers is None:
+        triggers = legacy.get("keywords") or []
+    examples = routing.get("examples")
+    if examples is None:
+        examples = legacy.get("examples") or []
+    return list(triggers), list(examples)
 
 
 def _addressability(info: dict) -> str:
@@ -168,6 +184,30 @@ def generate_catalog(agent_meta_root: Path) -> dict:
             f"Kümmere dich um: {token}.", "ASK", overlap_token=token)
 
     return {"cases": cases}
+
+
+def collision_report(catalog: dict) -> list:
+    """Explicit collision check (decision 2): one entry per overlap token.
+
+    Every overlap token reported here already has an ``ASK`` case plus one
+    disambiguated case per owner role in the generated catalog. The report is
+    emitted to stderr on generation so a data-source switch (triggers vs.
+    legacy keywords) can be reviewed without running an LLM.
+    """
+    cases = catalog["cases"] if isinstance(catalog, dict) else catalog
+    by_token: dict = {}
+    for case in cases:
+        token = case.get("overlap_token")
+        if not token:
+            continue
+        entry = by_token.setdefault(token, {"token": token, "owners": set(), "case_ids": []})
+        if case.get("category") == "collision" and case.get("role") not in (None, "orchestrator"):
+            entry["owners"].add(case["role"])
+        entry["case_ids"].append(case["id"])
+    return [
+        {"token": token, "owners": sorted(entry["owners"]), "case_ids": sorted(entry["case_ids"])}
+        for token, entry in sorted(by_token.items())
+    ]
 
 
 def render_catalog(catalog: dict) -> str:
@@ -264,11 +304,29 @@ def main(argv: list = None) -> int:
     parser.add_argument("--check", action="store_true", help="Exit 1 if files are stale.")
     parser.add_argument("--print-hash", action="store_true",
                         help="Print corpus sha256 (generated + manual cases) and exit.")
+    parser.add_argument("--report-collisions", action="store_true",
+                        help="Print the trigger-overlap collision report and exit (no writes).")
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir)
     # The manual catalog is an input: when writing to a foreign dir, read the repo copy.
     manual_src = out_dir if (out_dir / MANUAL_NAME).exists() else DEFAULT_OUT_DIR
+    generated = generate_catalog(_REPO_ROOT)
+    collisions = collision_report(generated)
+
+    if args.report_collisions:
+        for entry in collisions:
+            print(f"{entry['token']}: {', '.join(entry['owners'])} "
+                  f"({len(entry['case_ids'])} cases)")
+        print(f"[gen-role-routing-eval] {len(collisions)} collision tokens, "
+              f"{sum(len(e['case_ids']) for e in collisions)} collision cases")
+        return 0
+
     outputs = render_outputs(_REPO_ROOT, manual_src)
+
+    # Decision 2: always report the collision check when generating/checking,
+    # so a data-source change is visible without an LLM run.
+    print(f"[gen-role-routing-eval] collision check: {len(collisions)} overlap tokens "
+          f"({sum(len(e['case_ids']) for e in collisions)} cases)", file=sys.stderr)
 
     if args.print_hash:
         print(corpus_hash_of(generate_catalog(_REPO_ROOT)["cases"],

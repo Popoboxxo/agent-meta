@@ -2226,14 +2226,16 @@ class TestArtifactLocationsWhitelist(unittest.TestCase):
             self.assertEqual(persisted["artifact-locations"], {"enabled": True})
 
     def test_whitelist_size_increased_by_one(self) -> None:
+        # T17 added `artifact-locations`; PR 5.4 / P27 added `routing-overrides`
+        # (both go through the same PUT section route). No section was removed.
         added = (admin_server.PROJECT_WRITABLE_SECTIONS
                  - self._PRE_T17_WRITABLE_SECTIONS)
         removed = (self._PRE_T17_WRITABLE_SECTIONS
                    - admin_server.PROJECT_WRITABLE_SECTIONS)
-        self.assertEqual(added, {"artifact-locations"})
+        self.assertEqual(added, {"artifact-locations", "routing-overrides"})
         self.assertEqual(removed, set())
         self.assertEqual(len(admin_server.PROJECT_WRITABLE_SECTIONS),
-                         len(self._PRE_T17_WRITABLE_SECTIONS) + 1)
+                         len(self._PRE_T17_WRITABLE_SECTIONS) + 2)
 
     def test_no_derivation_in_this_task(self) -> None:
         tree = ast.parse(_ADMIN_SERVER_PATH.read_text(encoding="utf-8"))

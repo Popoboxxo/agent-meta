@@ -1643,6 +1643,7 @@ function buildSidebar() {
         { route: "/project/backup", label: "Backup Settings", icon: "💾" },
         { route: "/project/roles",     label: "Roles", icon: "⍟" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
+        { route: "/project/routing",     label: "Routing", icon: "⇄" },
         { route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" },
         { route: "/project/artifacts", label: "Artifacts", icon: "📦" },
         { route: "/project/hooks", label: "Hooks", icon: "🪝" },
@@ -8267,6 +8268,260 @@ async function viewProjectCommit() {
   return wrap;
 }
 
+/* --------------------------- Routing (PR 5.4 / P27) ----------------------- */
+/**
+ * Routing overrides editor (Roadmap 5.4 / P27, AC-R9).
+ *
+ * The framework defaults stay read-only (submodule protection); this view
+ * edits only `project.yaml → routing-overrides`. Default-vs-override state is
+ * derived from the server's `source` map, never guessed in JavaScript. The
+ * preview is rendered server-side by the same pipeline sync.py uses — the
+ * browser only displays bytes, the bytes/4 token proxy and lint findings.
+ */
+async function viewProjectRouting() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Routing"]));
+  const status = el("div", { class: "muted", role: "status", "aria-live": "polite" },
+    ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  let model;
+  let providersPayload = [];
+  try {
+    [model, providersPayload] = await Promise.all([
+      api.get("/api/routing/model"),
+      api.get("/api/providers").catch(() => []),
+    ]);
+  } catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  const availableProviders = (Array.isArray(providersPayload) ? providersPayload : []).map(x =>
+    typeof x === "string" ? x : (x.name || x.id || x.provider || ""));
+
+  const overrides = clone(model.overrides || {});
+  const source = model.source || {};
+  const roles = model.roles || {};
+  const sourceBadge = (key) =>
+    el("span", { class: "badge" }, [source[key] === "override" ? "Override" : "Default"]);
+
+  // ── Header: global routing fields ───────────────────────────────────────
+  const head = el("div", { class: "panel" });
+  head.appendChild(el("h2", {}, ["Format & rendering"]));
+  let previewTimer = null;
+  const schedulePreview = () => {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const provider = providerSel.value;
+      if (!provider) { previewOut.textContent = "(no provider selected)"; return; }
+      try {
+        const r = await api.get(
+          `/api/routing/preview?provider=${encodeURIComponent(provider)}`);
+        previewOut.textContent = r.block || "(empty routing block)";
+        previewMeta.textContent =
+          `${r.bytes} bytes · ${r.tokens_est} tokens (${r.token_basis}) · format: ${r.format}`;
+        lintOut.textContent = (r.lint || []).length
+          ? (r.lint || []).map(f => `${f.severity} ${f.check}: ${f.message}`).join("\n")
+          : "No lint findings.";
+      } catch (err) { previewOut.textContent = `Preview failed: ${err.message}`; }
+    }, 400);
+  };
+
+  const fmtSel = el("select", { id: "routing-format", class: "select" });
+  for (const v of ["auto", "compact", "json", "off"]) {
+    const o = el("option", { value: v }, [v]);
+    if ((overrides.format || "auto") === v) o.setAttribute("selected", "");
+    fmtSel.appendChild(o);
+  }
+  fmtSel.addEventListener("change", () => {
+    if (fmtSel.value === "auto") delete overrides.format;
+    else overrides.format = fmtSel.value;
+    schedulePreview();
+  });
+  const fmtField = a11yField({
+    id: "routing-format", label: "Format",
+    help: "auto = capability-gated compact block; json = legacy tool definition; off = no block.",
+    control: fmtSel,
+  });
+  fmtField.appendChild(sourceBadge("format"));
+  head.appendChild(fmtField);
+
+  const detailCb = el("input", { id: "routing-detail-file", type: "checkbox" });
+  detailCb.checked = overrides["detail-file"] !== false;
+  detailCb.addEventListener("change", () => {
+    if (detailCb.checked) delete overrides["detail-file"];
+    else overrides["detail-file"] = false;
+    schedulePreview();
+  });
+  const detailField = a11yField({
+    id: "routing-detail-file", label: "Lazy detail file",
+    help: "Render the full routing-details.md companion (framework default: on).",
+    control: detailCb,
+  });
+  detailField.appendChild(sourceBadge("detail-file"));
+  head.appendChild(detailField);
+
+  const tableSel = el("select", { id: "routing-table", class: "select" });
+  for (const v of ["auto", "always", "never"]) {
+    const o = el("option", { value: v }, [v]);
+    if ((overrides["table-in-orchestrator"] || "auto") === v) o.setAttribute("selected", "");
+    tableSel.appendChild(o);
+  }
+  tableSel.addEventListener("change", () => {
+    if (tableSel.value === "auto") delete overrides["table-in-orchestrator"];
+    else overrides["table-in-orchestrator"] = tableSel.value;
+    schedulePreview();
+  });
+  const tableField = a11yField({
+    id: "routing-table", label: "Table in orchestrator",
+    help: "auto suppresses the agent table when the harness already carries the roster.",
+    control: tableSel,
+  });
+  tableField.appendChild(sourceBadge("table-in-orchestrator"));
+  head.appendChild(tableField);
+  head.appendChild(el("div", { class: "muted", style: "font-size:11px;" },
+    ["Token counts are a bytes/4 proxy, not a real tokenizer."]));
+  wrap.appendChild(head);
+
+  // ── Two-column body: role table + server-side preview ───────────────────
+  const grid = el("div", { class: "panel", style: "display:grid; grid-template-columns:minmax(0,3fr) minmax(280px,2fr); gap:var(--space-4);" });
+  const left = el("div");
+  left.appendChild(el("h2", {}, ["Roles"]));
+  const table = el("table", { class: "table", style: "width:100%; border-collapse:collapse;" });
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const h of ["Role", "State", "Intents", "Triggers", "Addressability", "Size", "Priority", "Direct dispatch", "Reset"]) {
+    hrow.appendChild(el("th", { scope: "col" }, [h]));
+  }
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const tbody = el("tbody");
+  table.appendChild(tbody);
+  left.appendChild(table);
+
+  const renderTable = () => {
+    tbody.innerHTML = "";
+    for (const name of Object.keys(roles).sort()) {
+      const info = roles[name];
+      const row = el("tr");
+      row.appendChild(el("td", {}, [name]));
+      row.appendChild(el("td", {}, [sourceBadge(`roles.${name}.triggers`)]));
+      row.appendChild(el("td", {}, [(info.intents || []).join(", ") || "—"]));
+
+      const trigCell = el("td");
+      trigCell.appendChild(tagEditorField(
+        `Triggers — ${name}`, info.triggers || [], (values) => {
+          if (!overrides.roles) overrides.roles = {};
+          overrides.roles[name] = { ...(overrides.roles[name] || {}), triggers: values };
+          schedulePreview();
+        }, "Keyword triggers; leaving this at the framework default keeps the badge on Default."));
+      row.appendChild(trigCell);
+
+      const addrSel = el("select", { class: "select" });
+      for (const v of ["keyword", "name_only", "excluded"]) {
+        const o = el("option", { value: v }, [v]);
+        if ((info.addressability || "keyword") === v) o.setAttribute("selected", "");
+        addrSel.appendChild(o);
+      }
+      addrSel.addEventListener("change", () => {
+        if (!overrides.roles) overrides.roles = {};
+        overrides.roles[name] = { ...(overrides.roles[name] || {}), addressability: addrSel.value };
+        schedulePreview();
+      });
+      const addrCell = el("td");
+      addrCell.appendChild(addrSel);
+      addrCell.appendChild(sourceBadge(`roles.${name}.addressability`));
+      row.appendChild(addrCell);
+
+      const sizeSel = el("select", { class: "select" });
+      for (const v of ["S", "M", "L", "XL"]) {
+        const o = el("option", { value: v }, [v]);
+        if ((info.size_class || "M") === v) o.setAttribute("selected", "");
+        sizeSel.appendChild(o);
+      }
+      sizeSel.addEventListener("change", () => {
+        if (!overrides.roles) overrides.roles = {};
+        overrides.roles[name] = { ...(overrides.roles[name] || {}), size_class: sizeSel.value };
+        schedulePreview();
+      });
+      const sizeCell = el("td");
+      sizeCell.appendChild(sizeSel);
+      sizeCell.appendChild(sourceBadge(`roles.${name}.size_class`));
+      row.appendChild(sizeCell);
+
+      const prio = el("input", { type: "number", class: "input", style: "width:70px;",
+        value: info.priority === null || info.priority === undefined ? "" : String(info.priority) });
+      prio.addEventListener("change", () => {
+        if (!overrides.roles) overrides.roles = {};
+        if (prio.value === "") delete (overrides.roles[name] || {}).priority;
+        else overrides.roles[name] = { ...(overrides.roles[name] || {}), priority: Number(prio.value) };
+        schedulePreview();
+      });
+      const prioCell = el("td");
+      prioCell.appendChild(prio);
+      prioCell.appendChild(sourceBadge(`roles.${name}.priority`));
+      row.appendChild(prioCell);
+
+      const ddCb = el("input", { type: "checkbox" });
+      ddCb.checked = !!info.direct_dispatch;
+      ddCb.addEventListener("change", () => {
+        if (!overrides.roles) overrides.roles = {};
+        overrides.roles[name] = { ...(overrides.roles[name] || {}), direct_dispatch: ddCb.checked };
+        schedulePreview();
+      });
+      const ddCell = el("td");
+      ddCell.appendChild(ddCb);
+      ddCell.appendChild(sourceBadge(`roles.${name}.direct_dispatch`));
+      row.appendChild(ddCell);
+
+      row.appendChild(el("td", {}, [
+        el("button", { class: "btn btn-ghost", title: "Reset to default", onclick: () => {
+          if (overrides.roles) {
+            delete overrides.roles[name];
+            if (!Object.keys(overrides.roles).length) delete overrides.roles;
+          }
+          status.textContent = `Reset ${name} to default.`;
+          renderTable();
+          schedulePreview();
+        } }, ["Reset to default"]),
+      ]));
+      tbody.appendChild(row);
+    }
+  };
+  renderTable();
+  left.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try { await saveProjectSection("routing-overrides", overrides, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  grid.appendChild(left);
+
+  const right = el("div");
+  right.appendChild(el("h2", {}, ["Preview"]));
+  const providerSel = el("select", { id: "routing-preview-provider", class: "select" });
+  for (const p of availableProviders) {
+    if (!p) continue;
+    const o = el("option", { value: p }, [p]);
+    providerSel.appendChild(o);
+  }
+  providerSel.addEventListener("change", schedulePreview);
+  right.appendChild(a11yField({
+    id: "routing-preview-provider", label: "Provider",
+    help: "Renders with the selected provider's capabilities (no provider-specific JS).",
+    control: providerSel,
+  }));
+  const previewMeta = el("div", { class: "muted" }, ["(no preview yet)"]);
+  const previewOut = el("pre", { class: "monospace",
+    style: "max-height:340px; overflow:auto; white-space:pre-wrap;" }, ["(no preview yet)"]);
+  const lintOut = el("div", { role: "status", "aria-live": "polite",
+    class: "muted", style: "white-space:pre-wrap; font-size:11px;" }, [""]);
+  right.appendChild(previewMeta);
+  right.appendChild(previewOut);
+  right.appendChild(lintOut);
+  grid.appendChild(right);
+  wrap.appendChild(grid);
+  if (availableProviders.length) schedulePreview();
+  return wrap;
+}
+
 /* --------------------------- Release Checklist --------------------------- */
 async function viewProjectReleaseChecklist() {
   const wrap = el("div");
@@ -11759,6 +12014,7 @@ async function init() {
   router.register("/project/backup", viewProjectBackup);
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
+  router.register("/project/routing",         viewProjectRouting);
   router.register("/project/repo-containment", viewProjectRepoContainment);
   router.register("/project/artifacts", viewProjectArtifacts);
   router.register("/project/hooks",           viewProjectHooks);
@@ -11879,6 +12135,7 @@ init();
     "project/backups": "project_instance-backups",
     "project/roles": "project_instance-roles",
     "project/orchestrator": "project_instance-orchestrator",
+    "project/routing": "project_instance-routing",
     "project/repo-containment": "project_instance-repo_containment",
     "project/artifacts": "project_instance-artifact_locations",
 
