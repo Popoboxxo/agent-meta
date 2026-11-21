@@ -151,9 +151,13 @@ def _render_topology(root: Path, scratch: Optional[Path], runner: Any) -> dict:
         root, "test_ac01_render_identity.py", "_rebaseline_topology"
     )
     prefix = "tests/fixtures/topology-golden/a2a-delegation-gates.role-"
+    # render_topology_rule creates <root>/role-(in)active mock projects. Use
+    # the scratch sink (not the repository root) so repeated passes do not
+    # collide and no stray directories leak into the working tree.
+    render_root = Path(scratch) if scratch is not None else Path(root)
     return {
-        "{}active.md".format(prefix): module.render_topology_rule(True, Path(root)),
-        "{}inactive.md".format(prefix): module.render_topology_rule(False, Path(root)),
+        "{}active.md".format(prefix): module.render_topology_rule(True, render_root),
+        "{}inactive.md".format(prefix): module.render_topology_rule(False, render_root),
     }
 
 
