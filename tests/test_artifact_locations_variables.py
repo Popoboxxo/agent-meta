@@ -1,10 +1,11 @@
 """Variable-export tests for the artifact-locations matrix (Issue #1186, T6).
 
-``build_variables`` exports exactly 54 ``ARTIFACT_*`` names from the resolved
+``build_variables`` exports exactly 100 ``ARTIFACT_*`` names from the resolved
 matrix (Spec §3.4, RVW-1186-02): 22 ``_DIR`` (13 non-SE + 9 SE cell classes),
-4 derived SE projections, ``ARTIFACT_SE_ROOT``, 4 file-set ``_FILE`` names and
-23 ``_MODE`` values. ``SE_BASE_DIR`` is an alias of ``ARTIFACT_SE_ROOT``, and
-standalone personas receive the same 54 names with framework defaults.
+4 derived SE projections, ``ARTIFACT_SE_ROOT``, 4 file-set ``_FILE`` names,
+23 ``_MODE`` values and 46 #1209 template-gate flags (2 per class).
+``SE_BASE_DIR`` is an alias of ``ARTIFACT_SE_ROOT``, and standalone personas
+receive the same 100 names with framework defaults.
 
 Run: export PYTEST_BASETEMP=.tmp/pytest-1186-t6
      python3 -m pytest tests/test_artifact_locations_variables.py \
@@ -52,11 +53,14 @@ def _class_stem(name: str) -> str:
 
 
 def _expected_names() -> set[str]:
-    """The closed 54-name set, derived from the same registry as the builder."""
+    """The closed 100-name set, derived from the same registry as the builder."""
     names: set[str] = set()
     for class_name, spec in CLASS_REGISTRY.items():
         stem = _class_stem(class_name)
         names.add(f"ARTIFACT_{stem}_MODE")
+        # #1209: two derived gate flags per class (Decision 56).
+        names.add(f"ARTIFACT_{stem}_MODE_FILES")
+        names.add(f"ARTIFACT_{stem}_MODE_INLINE")
         if spec.form != "file-set":
             names.add(f"ARTIFACT_{stem}_DIR")
     names.add("ARTIFACT_SE_ROOT")
@@ -78,9 +82,9 @@ def _artifact_names(variables: dict) -> set[str]:
 # --- 1. exact count -------------------------------------------------------
 
 
-def test_artifact_variable_count_is_54():
+def test_artifact_variable_count_is_100():
     names = _artifact_names(_built_variables())
-    assert len(names) == 54
+    assert len(names) == 100
     assert names == _expected_names()
 
 
@@ -171,7 +175,7 @@ def test_builder_is_total_on_empty_config():
     variables: dict = {}
     config_module._build_artifact_variables(variables, {}, _AM_ROOT, None)
     assert _artifact_names(variables) == _expected_names()
-    assert len(_artifact_names(variables)) == 54
+    assert len(_artifact_names(variables)) == 100
 
 
 # --- 9. standalone fallbacks ---------------------------------------------

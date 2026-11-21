@@ -20,6 +20,7 @@ from .agents import (
 from .artifact_locations import (
     ArtifactLocationsError,
     CLASS_REGISTRY,
+    artifact_mode_flags,
     load_presets,
     resolve_artifact_locations,
     resolve_se_projection,
@@ -2897,8 +2898,8 @@ def _build_platform_variables(
 
 # --- Artifact-location variables (Issue #1186, T6) ------------------------
 #: Closed project-docs file-set mapping (key -> variable stem, framework
-#: default). Iterating this map keeps the exported set at exactly 54 names even
-#: when a project overrides ``classes.project-docs.files``.
+#: default). Iterating this map keeps the core 54-name set stable even when a
+#: project overrides ``classes.project-docs.files``.
 _ARTIFACT_FILE_KEYS: tuple[tuple[str, str, str], ...] = (
     ("architecture", "ARCHITECTURE", "docs/ARCHITECTURE.md"),
     ("codebase-overview", "CODEBASE_OVERVIEW", "docs/CODEBASE_OVERVIEW.md"),
@@ -2919,14 +2920,17 @@ def _build_artifact_variables(
     variables: dict, config: dict, agent_meta_root: Path,
     project_root: Path | None = None,
 ) -> None:
-    """Export the 54 ``ARTIFACT_*`` names from the resolved matrix (Spec §3.4).
+    """Export the ``ARTIFACT_*`` names from the resolved matrix (Spec §3.4).
+
+    The core #1186 set is 54 names; #1209 adds two template-gate flags per
+    class (``_MODE_FILES`` / ``_MODE_INLINE``), derived from the resolved mode.
 
     Parameter contract:
         variables: mutated in place — receives 22 ``_DIR`` (13 non-SE + 9 SE
             cell classes), 4 derived SE projection ``_DIR``, ``ARTIFACT_SE_ROOT``,
-            4 file-set ``_FILE`` and 23 ``_MODE`` values. ``SE_BASE_DIR`` is
-            overwritten with the resolved SE root so the legacy alias and the
-            matrix variable share exactly one source.
+            4 file-set ``_FILE``, 23 ``_MODE`` values and 46 derived ``_MODE_*``
+            gate flags. ``SE_BASE_DIR`` is overwritten with the resolved SE root
+            so the legacy alias and the matrix variable share exactly one source.
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for the preset file).
         project_root: consuming project's root; may be ``None`` because
@@ -2957,16 +2961,24 @@ def _build_artifact_variables(
     variables["SE_BASE_DIR"] = variables["ARTIFACT_SE_ROOT"]
 
     # Four file-set variables from project-docs.files with framework defaults,
-    # so the closed 54-name set stays stable under project overrides.
+    # so the core 54-name set stays stable under project overrides.
     resolved_files = classes["project-docs"].files
     for key, stem, default in _ARTIFACT_FILE_KEYS:
         variables[f"ARTIFACT_{stem}_FILE"] = resolved_files.get(key, default)
 
     # 23 _MODE variables, one per class. Scratch/state have no schema mode
     # field, so their resolver value stays the constant "files" (K-1).
+    # #1209: derive the two template-gate flags from each resolved mode
+    # (SPEC-artifact-mode-gating-2026-11-20 §3.1, Entscheidung 56). Absent
+    # config resolves to "files", so the FILES flag stays "true" and today's
+    # output is reproduced byte-identically (Issue-AC 1).
     for class_name in CLASS_REGISTRY:
         stem = class_name.upper().replace("-", "_")
-        variables[f"ARTIFACT_{stem}_MODE"] = classes[class_name].mode
+        mode = classes[class_name].mode
+        variables[f"ARTIFACT_{stem}_MODE"] = mode
+        mode_files, mode_inline = artifact_mode_flags(mode)
+        variables[f"ARTIFACT_{stem}_MODE_FILES"] = mode_files
+        variables[f"ARTIFACT_{stem}_MODE_INLINE"] = mode_inline
 
 
 def _artifact_deprecation_warnings(

@@ -199,10 +199,10 @@ def test_artifact_locations_end_to_end() -> None:
         assert len(empty_matrix.classes) == 23
         assert empty_matrix.classes["specs"].path == "docs/specs"
 
-        # Variable export: exactly 54 ARTIFACT_* names with the expected aliases.
+        # Variable export: 100 ARTIFACT_* names (core 54 + 46 #1209 gates).
         variables, _ = config_module.build_variables({}, _REPO_ROOT)
         artifact_names = {key for key in variables if key.startswith("ARTIFACT_")}
-        assert len(artifact_names) == 54
+        assert len(artifact_names) == 100
         assert variables["ARTIFACT_SPECS_DIR"] == "docs/specs"
         assert variables["SE_BASE_DIR"] == variables["ARTIFACT_SE_ROOT"]
         assert variables["TMP_SINK_PATH"] == variables["ARTIFACT_SCRATCH_DIR"]
