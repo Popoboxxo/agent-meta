@@ -264,5 +264,7 @@ def test_compact_omits_roster_when_provider_keeps_it_in_harness(rendered):
     )
 
     full = rendered["full"]
+    # E-23 / AC-R3: roster_in_harness=true drops the name_index AND the agent
+    # table in both profiles (the compact line format is the default now).
     assert _NAMES_LINE not in full
-    assert _TABLE_HEADER in full, "the full render must keep the agent table"
+    assert _TABLE_HEADER not in full, "roster_in_harness=true must omit the agent table"

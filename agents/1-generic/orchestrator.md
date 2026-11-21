@@ -107,6 +107,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
 
 {{INTENT_ROUTING_TOOLS}}
 
+{{#if ROUTING_DETAILS_ENABLED}}Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read {{ROUTING_DETAILS_PATH}}`.{{/if}}
 Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Routing-Regel:
 1. **Pipeline-Treffer** (Signal-Keywords): §2-Bestätigung einholen (NO auto-run), dann Pipeline-Route — Stage-Detail aus §2a.
 2. **Rollen-Treffer** (keywords/examples): `target_agent` aus der Tool-Definition bzw. der Routing-Regel dispatchen — Tier via §4, dann §5 Self-Validation.
@@ -340,13 +341,13 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 {{#if CONTEXT_PROFILE_COMPACT}}{{#unless ROSTER_IN_HARNESS}}
 **Agent table (names only):** {{ACTIVE_ROLES}}
-{{/unless}}{{else}}
+{{/unless}}{{else}}{{#unless ROSTER_IN_HARNESS}}
 **Agent table:**
 <!-- agent-meta:managed-begin -->
 {{AGENT_DELEGATION_TABLE}}
 Parallel: max {{MAX_PARALLEL_AGENTS}}. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
-{{/if}}
+{{/unless}}{{/if}}
 
 {{PROJECT_SPECIFIC_AGENTS}}
 

@@ -1,6 +1,6 @@
 # agent-meta
 
-[![agent-meta v2.0.0-beta.9](https://img.shields.io/badge/agent--meta-v2.0.0--beta.9-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0-beta.9)
+[![agent-meta v2.0.0](https://img.shields.io/badge/agent--meta-v2.0.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0)
 [![Version](https://img.shields.io/badge/version-2.0.0--beta.9-blue.svg)](CHANGELOG.md)
 [![Code health](https://api.repowise.dev/badge/health/popoboxxo/agent-meta.svg)](https://repowise.dev/repo/popoboxxo/agent-meta)
 [![Python](https://img.shields.io/badge/python-3.9%2B-green.svg)]()

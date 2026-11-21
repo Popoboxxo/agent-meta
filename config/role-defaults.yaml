@@ -422,6 +422,12 @@ roles:
       addressability: keyword
       parallel: true
       orchestrator_only: false
+      intents: [docs]
+      size_class: M
+      direct_dispatch: true
+      direct_dispatch_order: 4
+      direct_dispatch_operation: Session-Erkenntnisse speichern
+      direct_dispatch_condition: Nur bei Session-Ende
     routing_patterns:
       keywords:
       - Dokumentation
@@ -593,6 +599,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [meta]
+      size_class: M
+      direct_dispatch: true
+      direct_dispatch_order: 2
+      direct_dispatch_operation: Sync, Upgrade, Meta-Konfiguration
+      direct_dispatch_condition: Reine agent-meta-Operation
     routing_patterns:
       keywords:
       - Meta-Fragen
@@ -632,6 +644,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [git]
+      size_class: S
+      direct_dispatch: true
+      direct_dispatch_order: 1
+      direct_dispatch_operation: Commit, Push, Branch, Tag, PR
+      direct_dispatch_condition: Einzelner Git-Befehl
     routing_patterns:
       keywords:
       - Git
@@ -742,6 +760,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [meta, triage]
+      size_class: S
+      direct_dispatch: true
+      direct_dispatch_order: 3
+      direct_dispatch_operation: Bug/Feature/Verbesserung melden
+      direct_dispatch_condition: Issue-Erstellung
     routing_patterns:
       keywords:
       - Feedback

@@ -2606,19 +2606,28 @@ def _build_orch_variables(
     variables["A2A_PROTOCOL_ENABLED"] = (
         "false" if str(_handoff_protocol).lower() in ("none", "false", "off", "") else "true"
     )
-    # DIRECT_DISPATCH_SECTION: loaded from central template file; empty when direct dispatch is disabled
+    # DIRECT_DISPATCH_SECTION (PR 4.1 / P26, AC-R7): generated from the
+    # framework routing model instead of the static config copy. Only active
+    # roles carrying `routing.direct_dispatch: true` become rows; the generator
+    # emits the exact legacy template format (golden text-identical).
+    from .intent_routing import build_direct_dispatch_section
+
     _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
     if _dd_enabled:
-        _dd_template = agent_meta_root / "templates" / "direct-dispatch-section.md"
-        # IC-18 no. 7: each row sits under {{#if ROLE_<ROLE>_ACTIVE}}; resolve
-        # against the ActiveSet here so the value is final for every consumer.
-        variables["DIRECT_DISPATCH_SECTION"] = (
-            strip_inactive_conditional_blocks(
-                _dd_template.read_text(encoding="utf-8"), active_set_variables(active_set))
-            if _dd_template.exists() else ""
+        _active_role_names = set(active_set.roles) if active_set is not None else set()
+        variables["DIRECT_DISPATCH_SECTION"] = build_direct_dispatch_section(
+            agent_meta_root, _active_role_names
         )
     else:
         variables["DIRECT_DISPATCH_SECTION"] = ""
+    # PR 4.1: lazy routing detail file switch (routing-overrides.detail-file).
+    _routing_overrides = config.get("routing-overrides") or {}
+    variables["ROUTING_DETAILS_ENABLED"] = (
+        "true" if (
+            _routing_overrides.get("detail-file", True)
+            if isinstance(_routing_overrides, dict) else True
+        ) else "false"
+    )
     # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml
     oc_config = config.get("outcome-caching", {})
     variables["ORCHESTRATOR_OUTCOME_CACHING"] = "true" if oc_config.get("enabled", False) else "false"
@@ -3571,6 +3580,19 @@ def build_variables(
         info_sink=routing_info,
         active_set=active_set,
     )
+    # PR 4.1: the routing model rules are the single source for the lazy detail
+    # file (rendered per provider in sync_pipeline). Same resolver call, same
+    # activation/language filtering as the inline block — no second source.
+    from .agents import build_routing_tool_definition
+    variables["_ROUTING_MODEL_RULES"] = build_routing_tool_definition(
+        agent_meta_root,
+        config,
+        variables,
+        pipelines=effective,
+        warn_sink=unmapped,
+        info_sink=routing_info,
+        active_set=active_set,
+    )["routing"]["rules"]
     # IC-29: INFO lines (e.g. routing.examples-language-fallback) collected during
     # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
     variables["_ROUTING_INFO"] = routing_info

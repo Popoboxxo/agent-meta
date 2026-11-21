@@ -6,8 +6,10 @@ under the 600-line limit. Every subprocess goes through the injected runner.
 from __future__ import annotations
 
 import fnmatch
+import importlib
 import json
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -417,6 +419,10 @@ def _scratch_dir(root: Path, options: Any) -> Path:
             "tmp sink disabled: the rebaseline helper requires an enabled .tmp sink"
         )
     scratch = Path(paths.absolute) / "rebaseline"
+    # A prior run (including check-only) leaves per-provider project trees here.
+    # _make_project() creates .meta-config without exist_ok, so stale scratch
+    # makes the next run fail with FileExistsError. Start from a clean sink.
+    shutil.rmtree(scratch, ignore_errors=True)
     scratch.mkdir(parents=True, exist_ok=True)
     return scratch
 

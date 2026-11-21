@@ -155,6 +155,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # agent_sync._build_provider_vars from build_variables' provider-mapped
     # prerender (issue #264)
     "INTENT_ROUTING_TOOLS",
+    # PR 4.1 / P26 (E-23): lazy routing detail-file pointer + switch. The path
+    # is provider data (agents_dir sibling), resolved in agent_sync; no provider
+    # literal lives in the template.
+    "ROUTING_DETAILS_PATH", "ROUTING_DETAILS_ENABLED",
     # Git-sentinel scope (issue #1307): injected per provider by
     # agent_sync._build_provider_vars from the hook-agent-id capability.
     # Registered here so --validate sees no unknown/unused placeholder.

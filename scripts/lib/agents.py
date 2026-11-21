@@ -440,15 +440,20 @@ def _guard_routing_keyword(target: str, keyword: str) -> None:
 
 
 def render_routing_lines(
-    rules: list[dict], pipelines: list[dict], name_only: list[dict]
+    rules: list[dict],
+    pipelines: list[dict],
+    name_only: list[dict],
+    *,
+    roster_in_harness: bool = False,
 ) -> str:
-    """Render the IC-04 compact routing line block (opt-in ``compact`` profile).
+    """Render the compact routing line block (DEFAULT since PR 4.1).
 
     Line forms, deterministic and sorted by name (byte-stability):
 
     - ``<agent>|<flags>|<kw1>;<kw2>|<example>[/<example>]`` per keyword rule,
     - ``pipeline:<name>|<signal_keywords>`` per pipeline route,
-    - one ``name-only: <agent> (<reason>); …`` line for the name-only roles.
+    - one reduced ``name-only: <agent> (<reason>); …`` line (E2), dropped
+      entirely when ``roster_in_harness`` is true (AC-R3).
 
     Returns "" when there is nothing to render.
 
@@ -456,6 +461,8 @@ def render_routing_lines(
         SyncError: when a keyword contains ``;`` or ``|`` (the message names the
             role / pipeline and the offending keyword — AC-31).
     """
+    from .intent_routing import render_routing_name_index_line
+
     name_only_agents = {str(entry.get("agent", "")) for entry in name_only}
     lines: list[str] = []
     for rule in sorted(rules, key=lambda entry: str(entry.get("agent", ""))):
@@ -477,41 +484,49 @@ def render_routing_lines(
         for keyword in keywords:
             _guard_routing_keyword(f"pipeline '{name}'", keyword)
         lines.append(f"pipeline:{name}|{';'.join(keywords)}")
-    if name_only:
-        entries = sorted(
-            (
-                str(entry.get("agent", "")),
-                str(entry.get("reason") or entry.get("name_only_reason") or ""),
-            )
-            for entry in name_only
-        )
-        lines.append(
-            "name-only: " + "; ".join(f"{agent} ({reason})" for agent, reason in entries)
-        )
+    # Reduced name_index (E2): agent + reason only, and gone entirely when the
+    # harness already carries the roster (AC-R3). `name_only` arrives as
+    # {"agent", "reason"} from `_routing_name_only_entries` — map back to the
+    # `addressability` shape the shared renderer reads.
+    reduced_index = [
+        {"agent": entry.get("agent", ""), "addressability": "name_only",
+         "name_only_reason": entry.get("reason") or entry.get("name_only_reason") or ""}
+        for entry in name_only
+    ]
+    reduced_line = render_routing_name_index_line(
+        reduced_index, roster_in_harness=roster_in_harness
+    )
+    if reduced_line:
+        lines.append(reduced_line)
     return "\n".join(lines) + "\n" if lines else ""
 
 
 def _render_compact_routing(
     config: dict, provider: str, engine: "DelegationSyntaxEngine"
 ) -> bool:
-    """IC-04 activation gate: compact profile AND no callable ``route_intent``.
+    """PR 4.1 activation gate: compact routing is the DEFAULT (E-23).
 
-    Both facts are config/capability driven. An out-of-enum ``context-profile``
-    is reported as SyncError ``context-profile.invalid`` by the IC-01 validation
-    in ``build_variables``; here it degrades to the full render so the routing
-    render never raises earlier than that gate.
+    The gate is config/capability driven through ``routing-overrides.format``
+    (``auto`` → compact unless a callable ``route_intent`` tool exists). It is
+    deliberately decoupled from the global ``context-profile`` (W1/E-29): no
+    global compact profile is activated here. An invalid format fails closed in
+    :func:`resolve_routing_format`; here it degrades to the legacy render so the
+    routing render never raises earlier than the config validation gate.
     """
-    if engine.has_route_intent_tool(provider):
-        return False
-    from .context_profile import resolve_context_profile
+    from .intent_routing import resolve_routing_format
 
     try:
-        return resolve_context_profile(config, provider).profile == "compact"
-    except ValueError:
+        fmt = resolve_routing_format(
+            config, provider, route_intent_tool=engine.has_route_intent_tool(provider)
+        )
+    except Exception:  # fail-soft here; validation reports the real error
         return False
+    return fmt == "compact"
 
 
-def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
+def render_routing_tool_definition(
+    definition: dict, tool_format: str, *, roster_in_harness: bool = False
+) -> str:
     """Serialize a routing tool definition in a provider's native format.
 
     Format dispatch is mechanism-keyed: ``tool_format`` uses the same value
@@ -533,12 +548,23 @@ def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
         ValueError: on an unknown format key (never silently falsifies a
             provider's format); the message lists known keys only.
     """
+    payload = definition
+    if roster_in_harness and isinstance(definition.get("routing"), dict):
+        # AC-R3: the harness already carries the roster, so the name_index
+        # fallback is dropped in both the compact and json render paths.
+        payload = {
+            **definition,
+            "routing": {
+                key: value for key, value in definition["routing"].items()
+                if key != "name_index"
+            },
+        }
     if tool_format == "json":
         # Compact separators (G7, #1161): pure token cost for the model, the
         # data is identical; the block becomes one long line.
         # Limit: one ~31-40 KB line; line-wise file readers may truncate it (system prompt unaffected); json.loads consumers fine.
         return json.dumps(
-            definition, ensure_ascii=False, separators=(",", ":")
+            payload, ensure_ascii=False, separators=(",", ":")
         ) + "\n"
     if tool_format == "yaml_text_block":
         if _yaml is None:
@@ -547,7 +573,7 @@ def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
                 "(pip install pyyaml)"
             )
         return _yaml.safe_dump(
-            definition,
+            payload,
             allow_unicode=True,
             sort_keys=False,
             default_flow_style=False,
@@ -610,16 +636,23 @@ def build_routing_tool_definitions_for_providers(
     for provider in providers:
         caps = engine.get_capabilities(provider)
         tool_format = str(caps.get("handoff_format") or "")
+        # IC-09 / AC-R3: provider-agnostic capability flag (never a provider
+        # name branch). With the roster already in the harness, the name_index
+        # is dropped from both render forms.
+        roster_in_harness = bool(caps.get("roster_in_harness", False))
         if not tool_format:
             rendered[provider] = ""
         elif _render_compact_routing(config, provider, engine):
-            # IC-04: the compact line block replaces the json/yaml_text_block
-            # render only under the active opt-in AND the non-callable fallback.
+            # PR 4.1: the compact line block is the DEFAULT for providers
+            # without a callable route_intent tool (capability-gated).
             rendered[provider] = render_routing_lines(
                 definition["routing"]["rules"],
                 definition["routing"]["pipelines"],
                 name_only,
+                roster_in_harness=roster_in_harness,
             )
         else:
-            rendered[provider] = render_routing_tool_definition(definition, tool_format)
+            rendered[provider] = render_routing_tool_definition(
+                definition, tool_format, roster_in_harness=roster_in_harness
+            )
     return rendered

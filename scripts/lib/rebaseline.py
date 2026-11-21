@@ -333,7 +333,12 @@ class PinStatus(NamedTuple):
 
 
 def _load_fixture_digester(root: Path) -> Tuple[Any, Any]:
-    """Load the AC-T4 digest helpers from the existing test module."""
+    """Load the AC-T4 digest helpers from the existing test module.
+
+    The fixture module uses ``from tests.changelog_sections import ...``; under
+    a plain importlib load (no pytest) the repo root is not on ``sys.path``,
+    so add it for the duration of the load and restore it afterwards.
+    """
     module_path = Path(root) / "tests" / "test_opencode_v2_surface.py"
     spec = importlib.util.spec_from_file_location(
         "_rebaseline_ac_t4_surface", module_path
