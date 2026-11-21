@@ -2,9 +2,9 @@
 
 SPEC-orchestrator-mode-topology-2026-11-09, Task 14.
 
-The defect this module pins: ``_sync_opencode_runtime_gate`` (Spec A) already
+The defect this module pins: ``sync_runtime_gate`` (Spec A) already
 passes ``topology=`` to the single entry-point source, but the two v2 actors
-``reconcile_opencode_surface_gate`` and ``_opencode_v2_gate_permissions`` were
+``reconcile_surface_gate`` and ``_opencode_v2_gate_permissions`` were
 topology-blind. On v2 + ``strict`` + ``subagent`` that produced a
 ``permissions[]`` deny that the surface cannot back with an entry point, plus a
 "set ``default_agent``" remedy that contradicts the resolved position.
@@ -136,7 +136,7 @@ def test_v2_subagent_writes_no_permission_triples(tmp_path):
     assert resolution.effective == "subagent"
 
     log = SyncLog()
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, log, False,
         active_set=AS, topology=resolution,
     )
@@ -152,7 +152,7 @@ def test_v2_subagent_emits_exactly_one_log_warning(tmp_path):
     )
 
     log = SyncLog()
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, log, False,
         active_set=AS, topology=resolution,
     )
@@ -188,7 +188,7 @@ def test_v1_subagent_counts_per_channel(tmp_path):
     )
 
     log = SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, log, False,
         active_set=AS,
     )
@@ -219,7 +219,7 @@ def test_v2_primary_still_writes_the_triples(tmp_path):
     assert resolution.effective == "primary"
 
     log = SyncLog()
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, log, False,
         active_set=AS, topology=resolution,
     )
@@ -274,9 +274,9 @@ def test_all_three_entry_point_calls_pass_topology():
 def test_both_reconcile_callers_pass_topology():
     calls = (
         _calls(_REPO_ROOT / "scripts" / "lib" / "sync_pipeline.py",
-               "reconcile_opencode_surface_gate")
+               "reconcile_surface_gate")
         + _calls(_REPO_ROOT / "scripts" / "lib" / "cli_commands.py",
-                 "reconcile_opencode_surface_gate")
+                 "reconcile_surface_gate")
     )
     assert len(calls) == 2, [call.lineno for call in calls]
     for call in calls:
@@ -307,7 +307,7 @@ def test_reconcile_passes_the_resolved_object_downstream(tmp_path, monkeypatch):
     monkeypatch.setattr(isolation, "_opencode_entry_point", entry_stub)
     monkeypatch.setattr(isolation, "_opencode_v2_gate_permissions", v2_stub)
 
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, SyncLog(), False,
         active_set=AS, topology=resolution,
     )
@@ -327,7 +327,7 @@ def test_row_six_warning_is_cause_aware(tmp_path):
     )
 
     log = SyncLog()
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         tmp_path, config, PROVIDER, provider_config, _REPO_ROOT, log, False,
         active_set=AS, topology=resolution,
     )

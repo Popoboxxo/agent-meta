@@ -199,7 +199,7 @@ def test_scalar_permission_family_tolerated(tmp_path):
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
     log = SyncLog()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
@@ -232,7 +232,7 @@ def test_prior_user_value_recorded_and_restored(tmp_path):
     provider_config = {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}}
     log = SyncLog()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
@@ -253,7 +253,7 @@ def test_prior_user_value_recorded_and_restored(tmp_path):
     }
 
     # strict -> non-strict restores the pre-existing user value exactly.
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "advisory"}},
         "Opencode",
@@ -284,13 +284,13 @@ def test_second_strict_sync_is_idempotent_and_byte_identical(tmp_path):
     config = {"orchestrator": {"mode": "strict"}}
     log = SyncLog()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root, config, "Opencode", provider_config, framework, log, dry_run=False
     )
     first_json = (project_root / "opencode.json").read_bytes()
     first_state = (project_root / _STATE_FILE).read_bytes()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root, config, "Opencode", provider_config, framework, log, dry_run=False
     )
 
@@ -323,7 +323,7 @@ def test_isolation_and_runtime_gate_coexist(tmp_path):
 
     def full_sync() -> None:
         # Stage 6 (A2) before stages 8+9 (isolation) — IC-09 writer ordering.
-        isolation._sync_opencode_runtime_gate(
+        isolation.sync_runtime_gate(
             project_root, config, "Opencode", provider_config, framework, log,
             dry_run=False,
         )
@@ -357,7 +357,7 @@ def test_dry_run_never_writes(tmp_path):
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
     log = SyncLog()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
@@ -379,7 +379,7 @@ def test_absent_config_is_created_with_managed_block(tmp_path):
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
     log = SyncLog()
 
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
@@ -510,7 +510,7 @@ def _pc(primary: bool = True) -> dict:
 
 def _sync(project_root, framework, config, pc, log, active_set=None,
           dry_run: bool = False) -> None:
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root, config, "Opencode", pc, framework, log,
         dry_run=dry_run, active_set=active_set,
     )
@@ -1143,7 +1143,7 @@ def test_unusable_default_agent_value_suspends_gate(tmp_path):
 # ---------------------------------------------------------------------------
 #
 # The v2 deny is a list of ``{action, resource, effect}`` triples written by
-# ``reconcile_opencode_surface_gate``. Before this guard the triples were
+# ``reconcile_surface_gate``. Before this guard the triples were
 # written without ever validating the ``default_agent`` in the document, so a
 # deleted managed key produced the #1006 lockout in the other list form.
 
@@ -1178,7 +1178,7 @@ _V2_STRICT = {"orchestrator": {"mode": "strict"}}
 
 
 def _reconcile_v2(project_root, framework, log, provider_config=None, dry_run=False):
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         project_root,
         _V2_STRICT,
         "Opencode",
@@ -1299,7 +1299,7 @@ def test_m1_v2_user_default_agent_value_keeps_the_triples(tmp_path):
 def test_m1_v2_planned_entry_point_merge_is_not_a_suspension(tmp_path):
     """D1a on v2 + tier ``permission``: the same-run Spec-A merge counts.
 
-    On that tier ``_sync_opencode_runtime_gate`` runs first and writes the
+    On that tier ``sync_runtime_gate`` runs first and writes the
     ``default_agent``; a dry run does not persist it. Reconcile must not report
     a suspension that the real run never produces (one decision, no reader/
     writer drift).

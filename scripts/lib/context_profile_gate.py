@@ -71,12 +71,29 @@ def _as_candidate(doc: Mapping) -> Optional[dict]:
             )
             for metric, values in metrics.items()
         }
-    return {
+    candidate = {
         "status": doc.get("status"),
         "corpus_hash": doc.get("corpus_hash"),
         "model_ids": doc.get("model_ids"),
         "model_classes": collapsed,
     }
+    per_case_raw = doc.get("per_case")
+    if isinstance(per_case_raw, Mapping):
+        per_case = {}
+        for model_class, cases in per_case_raw.items():
+            if not isinstance(cases, Mapping):
+                continue
+            collapsed_cases = {}
+            for case_id, values in cases.items():
+                if isinstance(values, (list, tuple)) and values:
+                    collapsed_cases[case_id] = 1 if sum(values) * 2 > len(values) else 0
+                elif type(values) is int and values in (0, 1):
+                    collapsed_cases[case_id] = values
+            if collapsed_cases:
+                per_case[model_class] = collapsed_cases
+        if per_case:
+            candidate["per_case"] = per_case
+    return candidate
 
 
 def context_profile_gate_state(agent_meta_root: Path) -> GateState:

@@ -1,6 +1,6 @@
 """#1020: roll back the managed runtime gate on tier change / provider removal.
 
-The managed merge (``isolation._sync_opencode_runtime_gate``) used to run ONLY
+The managed merge (``isolation.sync_runtime_gate``) used to run ONLY
 while ``provider_runtime_gate_tier(...) == "permission"``. Two consequences:
 
 (a) a tier change away from ``permission`` skipped the rollback branch, leaving
@@ -101,7 +101,7 @@ def _project_with_user_values(tmp_path: Path) -> tuple[Path, dict]:
 
 def _strict_sync(project_root: Path, framework: Path, provider_config: dict,
                  log: SyncLog) -> None:
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         {"orchestrator": {"mode": "strict"}},
         PROVIDER,
@@ -220,7 +220,7 @@ def test_advisory_sync_without_gate_state_still_skips_the_writer(tmp_path, monke
     advisory_root = _framework_root(tmp_path, "fw-advisory", "advisory")
     calls: list = []
     monkeypatch.setattr(
-        sync_pipeline, "_sync_opencode_runtime_gate",
+        sync_pipeline, "sync_runtime_gate",
         lambda *a, **k: calls.append((a, k)),
     )
 
@@ -344,7 +344,7 @@ def test_rollback_helper_is_idempotent_without_state(tmp_path):
     project_root.mkdir()
     log = SyncLog()
 
-    isolation.rollback_opencode_runtime_gate(
+    isolation.rollback_runtime_gate(
         project_root, PROVIDER, _provider_config(), log, False, config={},
     )
 
@@ -401,7 +401,7 @@ def test_isolation_rollback_keeps_a_user_changed_glob(tmp_path):
         isolation._STATE_ISOLATION_KEY: ["**/.claude/**"],
     }, indent=2) + "\n", encoding="utf-8")
 
-    isolation.rollback_opencode_runtime_gate(
+    isolation.rollback_runtime_gate(
         project_root, PROVIDER, _provider_config(), SyncLog(), False,
         config={}, include_isolation_deny=True,
     )

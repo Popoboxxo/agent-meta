@@ -264,11 +264,11 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.hook_plugins import sync_hook_lib, sync_release_gates
     from lib.hooks import sync_hooks
     from lib.isolation import (
-        _sync_opencode_runtime_gate,
+        sync_runtime_gate,
         gate_state_present,
         owns_gate_surface,
-        reconcile_opencode_surface_gate,
-        rollback_opencode_runtime_gate,
+        reconcile_surface_gate,
+        rollback_runtime_gate,
     )
     from lib.providers import (
         load_provider_capabilities,
@@ -350,7 +350,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 provider, provider_config,
             )
         if provider_runtime_gate_tier(pc, caps) == "permission":
-            _sync_opencode_runtime_gate(
+            sync_runtime_gate(
                 test_repo_path, config, provider, provider_config,
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
@@ -363,7 +363,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             # #1020 (a): same decoupled rollback as the production stage — the
             # test repo must match a normal sync after a tier change away from
             # ``permission`` (v2 documents roll back via the surface reconcile).
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 test_repo_path, provider, provider_config, log, dry_run,
                 config=config,
             )
@@ -395,7 +395,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             # Mirrors the production stage and the Spec-A writer: no active-set
             # information ⇒ keep the historic emission (AC-6 byte identity).
             topology = None
-        reconcile_opencode_surface_gate(
+        reconcile_surface_gate(
             test_repo_path, config, provider, provider_config,
             agent_meta_root, log, dry_run,
             active_set=active_set, topology=topology,

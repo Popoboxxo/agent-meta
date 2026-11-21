@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
 
 import eval_gate as eg  # noqa: E402
@@ -266,3 +268,79 @@ def test_unknown_metric_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+# --- Task 1: exact McNemar test (IC-36 "preferred") -----------------------
+
+
+def test_mcnemar_no_discordant_pairs():
+    assert eg.mcnemar_exact(0, 0) == 1.0
+
+
+def test_mcnemar_symmetric():
+    assert eg.mcnemar_exact(3, 3) == 1.0
+
+
+def test_mcnemar_known_value():
+    assert abs(eg.mcnemar_exact(0, 8) - 2 * 0.5**8) < 1e-12
+
+
+def test_mcnemar_is_symmetric_in_arguments():
+    assert eg.mcnemar_exact(2, 9) == eg.mcnemar_exact(9, 2)
+
+
+def test_mcnemar_rejects_negative():
+    with pytest.raises(ValueError):
+        eg.mcnemar_exact(-1, 2)
+
+
+# --- Task 2: paired per-case path in evaluate_gate ------------------------
+
+
+def _per_case_fixture(n_cases=12, regressions=10, improvements=0):
+    """Baseline/candidate with aggregates inside tau but a paired signal."""
+    case_ids = [f"c{i}" for i in range(n_cases)]
+    base_pc, cand_pc = {}, {}
+    for cls in ("a", "b"):
+        base_pc[cls], cand_pc[cls] = {}, {}
+        for idx, cid in enumerate(case_ids):
+            if idx < regressions:
+                base_pc[cls][cid], cand_pc[cls][cid] = [1, 1, 1], 0
+            elif idx < regressions + improvements:
+                base_pc[cls][cid], cand_pc[cls][cid] = [0, 0, 0], 1
+            else:
+                base_pc[cls][cid], cand_pc[cls][cid] = [1, 1, 1], 1
+    base = _baseline(runs=(90.0, 90.0, 90.0))
+    base["per_case"] = base_pc
+    cand = _cand(89.5)  # within tau (mean 90 - tau 1 = 89)
+    cand["per_case"] = cand_pc
+    return base, cand
+
+
+def test_per_case_absent_is_unchanged():
+    base = _baseline(runs=(90.0, 90.0, 90.0))
+    assert "per_case" not in base
+    assert eg.evaluate_gate(base, _cand(90)) == eg.PASSED
+
+
+def test_mcnemar_significant_regression_fails():
+    base, cand = _per_case_fixture(regressions=10, improvements=0)
+    assert eg.evaluate_gate(base, cand) == eg.FAILED
+
+
+def test_mcnemar_insignificant_stays_passed():
+    base, cand = _per_case_fixture(regressions=3, improvements=0)
+    assert eg.evaluate_gate(base, cand) == eg.PASSED
+
+
+def test_per_case_corpus_mismatch_is_not_evidenced():
+    base, cand = _per_case_fixture()
+    cand["per_case"]["a"].pop("c0")
+    assert eg.evaluate_gate(base, cand) == eg.NOT_EVIDENCED
+
+
+def test_per_case_invalid_value_is_not_evidenced():
+    for bad in (2, True):
+        base, cand = _per_case_fixture()
+        cand["per_case"]["a"]["c0"] = bad
+        assert eg.evaluate_gate(base, cand) == eg.NOT_EVIDENCED

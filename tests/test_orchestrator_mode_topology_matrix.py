@@ -423,7 +423,7 @@ def test_deny_form(
 
     log = SyncLog()
     if surface == "v2":
-        isolation.reconcile_opencode_surface_gate(
+        isolation.reconcile_surface_gate(
             tmp_path,
             cell.config,
             cell.provider,
@@ -435,7 +435,7 @@ def test_deny_form(
             topology=cell.resolution,
         )
     else:
-        isolation._sync_opencode_runtime_gate(
+        isolation.sync_runtime_gate(
             tmp_path,
             cell.config,
             cell.provider,

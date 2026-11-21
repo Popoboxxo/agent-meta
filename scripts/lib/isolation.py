@@ -753,7 +753,7 @@ def _warn_user_owned_default_agent(
     the consistency checker (IC-5); this is the emitter-side counterpart.
 
     Shared by both ``default_agent`` owners — the Spec-A merge
-    (``_sync_opencode_runtime_gate``) and the v2 reconcile
+    (``sync_runtime_gate``) and the v2 reconcile
     (``_reconcile_v2_default_agent``) — so a position cannot be reported with
     two different verdicts depending on the surface. Pure: log only.
     """
@@ -793,7 +793,7 @@ def _warn_user_owned_default_agent(
             )
 
 
-def _sync_opencode_runtime_gate(
+def sync_runtime_gate(
     project_root: Path,
     config: dict,
     provider: str,
@@ -877,7 +877,7 @@ def _sync_opencode_runtime_gate(
 
     # v2 surface (#1007/Amendment B1): Spec-A step 4 (the ``permission`` map
     # merge including its rollback branch) does NOT run here. On a v2 document
-    # the tier-independent ``reconcile_opencode_surface_gate`` is the single
+    # the tier-independent ``reconcile_surface_gate`` is the single
     # actor for ``permissions[]``; writing the v1 map next to it would produce
     # a key the v2 schema does not carry (and vice versa on rollback). Steps 1-3
     # and 5 — entry point, the coupling warning, ``default_agent`` — keep running
@@ -1037,7 +1037,7 @@ def _sync_opencode_runtime_gate(
     #
     # v2 surfaces are excluded here: their deny lives in ``permissions[]``, not
     # in this map. The same D1a invariant is enforced there by
-    # ``reconcile_opencode_surface_gate`` itself, which validates the written
+    # ``reconcile_surface_gate`` itself, which validates the written
     # document's ``default_agent`` before it lets a triple through (M1) — so a
     # v2 gate is never half-active and this v1-only branch cannot lie about it.
     invariant_suspended = False
@@ -1201,7 +1201,7 @@ def _rollback_opencode_isolation_deny(
     _write_state(state_path, [], dry_run)
 
 
-def rollback_opencode_runtime_gate(
+def rollback_runtime_gate(
     project_root: Path,
     provider: str,
     provider_config: dict,
@@ -1247,7 +1247,7 @@ def rollback_opencode_runtime_gate(
 
     if include_isolation_deny:
         _rollback_opencode_isolation_deny(project_root, log, dry_run)
-    _sync_opencode_runtime_gate(
+    sync_runtime_gate(
         Path(project_root), config or {}, provider, provider_config, None, log,
         dry_run, rollback_only=True,
     )
@@ -1492,7 +1492,7 @@ def _opencode_v2_gate_permissions(
     lock every agent (Spec A IC-6 step 2).
 
     ``active_set`` is a required keyword and must be the *same* value the Spec-A
-    writer receives (``_sync_opencode_runtime_gate(..., active_set=...)``): the
+    writer receives (``sync_runtime_gate(..., active_set=...)``): the
     entry-point predicate is "explicit AND generated", so a role that is only
     declared but not part of the active set never yields triples (QA-C-01). It
     is deliberately not defaulted to ``None`` — that fail-open made this builder
@@ -1739,7 +1739,7 @@ def _rollback_opencode_v1_gate_map(
 ) -> None:
     """Take back the Spec-A ``permission`` map after a v1 → v2 surface switch.
 
-    Mirrors the else-branch of Spec A step 4 (``_sync_opencode_runtime_gate``)
+    Mirrors the else-branch of Spec A step 4 (``sync_runtime_gate``)
     without touching that frozen function: the ``**`` deny is removed only while
     it still carries the managed decision, the recorded ``prior`` value is
     restored, the family entry is dropped, empty containers are pruned and the
@@ -1840,7 +1840,7 @@ def _reconcile_v2_default_agent(
     AC-34): a position that withholds the entry point must not leave a
     sync-written ``default_agent`` behind, and a user-owned one must be reported
     exactly once. The ``default_agent`` merge lives in the Spec-A writer
-    (``_sync_opencode_runtime_gate``), whose dispatch condition is the
+    (``sync_runtime_gate``), whose dispatch condition is the
     ``permission`` tier — a v2 project resolves to ``plugin`` and would never
     reach it. This is the v2 counterpart, called with the SAME resolved
     ``entry`` and active set.
@@ -1912,7 +1912,7 @@ def _reconcile_v2_default_agent(
         _write_state(state_path, new_da_state, dry_run, _STATE_DEFAULT_AGENT_KEY)
 
 
-def reconcile_opencode_surface_gate(
+def reconcile_surface_gate(
     project_root: Path,
     config: dict,
     provider: str,
@@ -1933,7 +1933,7 @@ def reconcile_opencode_surface_gate(
 
     ``active_set`` is a required keyword (QA-C-01): both production call sites
     pass the same per-sync active set as the Spec-A writer
-    (``_sync_opencode_runtime_gate``), so the "explicit AND generated primary
+    (``sync_runtime_gate``), so the "explicit AND generated primary
     role" predicate (``_opencode_entry_point``) is evaluated identically in both
     writers. A fail-open default (``None``) is not acceptable here — it made
     this function write deny triples for a declared-but-not-generated role while

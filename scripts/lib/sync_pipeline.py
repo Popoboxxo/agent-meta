@@ -88,11 +88,11 @@ from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, safe_path, write_atomic
 from lib.isolation import (
-    _sync_opencode_runtime_gate,
+    sync_runtime_gate,
     gate_state_present,
     owns_gate_surface,
-    reconcile_opencode_surface_gate,
-    rollback_opencode_runtime_gate,
+    reconcile_surface_gate,
+    rollback_runtime_gate,
     sync_provider_isolation,
 )
 from lib.knowledge import sync_knowledge_engine
@@ -919,7 +919,7 @@ def _sync_stage_legacy_cleanup(
             # back BEFORE the provider directory is pruned. Ownership-guarded
             # and state-guarded: a foreign provider and a provider without gate
             # state are no-ops.
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 project_root, prov, provider_config, log, args.dry_run,
                 config=config, include_isolation_deny=True,
             )
@@ -1013,6 +1013,11 @@ def _managed_dirs_for_prune(
             specs.append(pc.get("rules_dir", ".claude/rules"))
         if pc.get("has_commands", False):
             specs.append(pc.get("commands_dir", ".claude/commands"))
+        # #1161 Pkt 4: backups written next to the context file live in its
+        # parent directory, which may not be any of the managed dirs above
+        # (e.g. a context file under docs/ or a provider-specific subdir).
+        if pc.get("context_file"):
+            specs.append(str(Path(pc["context_file"]).parent))
         specs.append(resolve_pipeline_details_dir(pc, provider))
         for rel in specs:
             if not rel:
@@ -1671,7 +1676,7 @@ def _sync_stage_per_provider(
                 provider, provider_config,
             )
         if provider_runtime_gate_tier(pc, caps) == "permission":
-            _sync_opencode_runtime_gate(
+            sync_runtime_gate(
                 project_root, config, provider, provider_config,
                 agent_meta_root, log, args.dry_run,
                 active_set=active_set,
@@ -1685,9 +1690,9 @@ def _sync_stage_per_provider(
             # tier, so a tier change away from it skipped the writer and left
             # the recorded deny + ``default_agent`` behind. A v1 document with a
             # pending gate record is rolled back here; v2 documents keep their
-            # tier-independent ``reconcile_opencode_surface_gate`` path (below)
+            # tier-independent ``reconcile_surface_gate`` path (below)
             # and are excluded so their entry point is never taken back.
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 project_root, provider, provider_config, log, args.dry_run,
                 config=config,
             )
@@ -1709,12 +1714,12 @@ def _sync_stage_per_provider(
             active_set=active_set,
         )
         if not topology_explicit(config, provider) and active_set is None:
-            # Same guard as the Spec-A writer (``_sync_opencode_runtime_gate``):
+            # Same guard as the Spec-A writer (``sync_runtime_gate``):
             # without active-set information the derivation can only fall back
             # to ``subagent``, which would silently withhold an entry point the
             # caller had no information about (AC-6 byte identity).
             topology = None
-        reconcile_opencode_surface_gate(
+        reconcile_surface_gate(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
             active_set=active_set, topology=topology,
