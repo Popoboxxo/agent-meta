@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Artifact-locations migration notes:** the `artifact-locations` matrix lists former write locations via additive, read-only `legacy[]` entries; set `artifact-locations.enabled: false` to restore the exact legacy behaviour immediately; run `sync.py --migrate-artifact-aliases --write` to move the scratch-path alias into the matrix. ADR filenames use the `ADR-{nnn}_{slug}.md` canon (former `NNNN-…`/`ADR-NNN-…` names stay readable through `legacy[]`).
+
 ## [2.0.0] - 2026-11-20
 
 ### Added
