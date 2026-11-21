@@ -6644,7 +6644,9 @@ def _admin_start_detached(
         sys.exit(1)
 
     try:
-        child_env = _tmp_sink_env(root)
+        # Always pin the tmp-sink env for the detached child; the #896 token
+        # is transported env-only and never embedded in the pin itself.
+        spawn_env = _tmp_sink_env(root)
     except _tmp_sink_error_class(root) as exc:
         print(f"  !  tmp-sink pin unavailable: {exc}")
         print("  i  Reparatur: python scripts/sync.py --validate")
@@ -6657,9 +6659,8 @@ def _admin_start_detached(
         except PermissionError:
             pass
 
-    spawn_env = None
     if effective_token:
-        spawn_env = dict(os.environ if child_env is None else child_env)
+        spawn_env = dict(os.environ if spawn_env is None else spawn_env)
         spawn_env["ADMIN_UI_TOKEN"] = effective_token
 
     # Re-invoke this script with the same flags but no subcommand, so the
