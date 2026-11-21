@@ -17,9 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "meta-doctor.md"
 
 _H4_DESCRIPTION = (
-    "Installation doctor: runs `sync.py --doctor`, deduplicates and prioritizes known-issue "
-    "findings of this agent-meta installation, and hands fixes to agent-meta-manager "
-    "— never repairs anything and writes reports only to the configured tmp-sink."
+    "Installation doctor: runs `sync.py --doctor`, dedupes/prioritizes findings, "
+    "hands fixes to agent-meta-manager — never repairs anything; reports to tmp-sink."
 )
 _H4_SHORT_DESC = "Diagnoses the agent-meta installation (reports only to the tmp-sink)"
 _H4_NAME_ONLY_REASON = (

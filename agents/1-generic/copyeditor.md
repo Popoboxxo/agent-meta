@@ -1,7 +1,7 @@
 ---
 name: template-copyeditor
 version: "0.5.2"
-description: "Copyediting: style, sentence structure, word repetition, narrative/argumentative flow, and content consistency on top of a clean text. Assumes proofreading-level correctness or delegates that pass first. Produces a categorized markdown findings report, does not silently rewrite the source."
+description: "Copyediting: style, sentence structure, word repetition, flow and consistency on clean text. Reports categorized findings; never silently rewrites the source."
 hint: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz"
 reference_standards:
   - "ISO 24495-1:2023 Plain Language"

@@ -1,7 +1,7 @@
 ---
 name: template-ui-reviewer
 version: "1.4.0"
-description: "Domain review for UI consistency and UX completeness: design-token conformance, layout/breakpoints, interaction states, i18n readiness — two-pass evidence-based review; delegates WCAG depth to accessibility-specialist."
+description: "UI review: design-token conformance, layout, interaction states, i18n readiness. Two-pass evidence-based review; WCAG depth goes to accessibility-specialist."
 hint: "UI review: design tokens, layout consistency, loading/error/empty states, i18n readiness"
 prompt_mode: modern
 tools:

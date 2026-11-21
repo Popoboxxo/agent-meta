@@ -1,7 +1,7 @@
 ---
 name: template-backend-reviewer
 version: "1.4.0"
-description: "Domain code review for backend/server code: API contracts, silent-failure hunting, concurrency pitfalls, middleware chains, boundary validation — two-pass evidence-based review with rules index."
+description: "Backend code review: API contracts, silent failures, concurrency, middleware, boundary validation. Two-pass evidence-based review with rules index."
 hint: "Backend review: API contracts, silent failures, concurrency, middleware — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
 tools:

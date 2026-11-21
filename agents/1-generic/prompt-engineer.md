@@ -1,7 +1,7 @@
 ---
 name: template-prompt-engineer
 version: "1.11.0"
-description: "The ultimate expert for prompt engineering. Designs, reviews, and optimizes agent definitions based on best practices (OpenAI, Lakera), with secure-prompting guidelines and banned-pattern awareness."
+description: "Prompt engineering expert: designs, reviews and optimizes agent definitions against best practices and secure-prompting guidelines; flags banned patterns."
 hint: "Design or review prompts and agents"
 reference_standards:
   - "OpenAI Prompt Engineering Guide"

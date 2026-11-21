@@ -1,7 +1,7 @@
 ---
 name: template-devops-engineer
 version: "1.8.0"
-description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, security best practices, staging validation, MTTG (commit-to-security-feedback) tracking, and environment classification."
+description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, staging validation and environment classification."
 hint: "Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks."
 reference_standards:
   - "DORA Software Delivery Metrics"

@@ -1,9 +1,8 @@
 ---
 name: principal-developer
 version: 1.6.0
-description: Last-resort escalation tier. Invoked only after senior-developer has
-  failed repeatedly on a task. Root-cause diagnosis before a single line of code.
-  Maximum thoroughness, maximum cost.
+description: Last-resort escalation tier after repeated senior-developer failures.
+  Root-cause diagnosis before code changes. Maximum thoroughness, maximum cost.
 hint: 'Last-resort developer: only after senior-developer failed multiple times —
   root-cause analysis, systemic reasoning, no symptom fixes. The most expensive call
   in the system.'
@@ -183,7 +182,7 @@ DE_ESCALATION_HINT: <tier> (if this should not have reached principal tier)
 REMAINING_HINTS: <open corrections>
 NEXT: [Review | Tests | Commit]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

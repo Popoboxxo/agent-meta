@@ -1,10 +1,8 @@
 ---
 name: frontend-component-engineer
 version: 0.6.1
-description: Builds production-ready UI components from a screen spec (ui-ux-designer)
-  plus a token/variant contract (design-system-architect) — props contract, mandatory
-  state handling, and a built-in accessibility baseline. No design-system authoring,
-  no WCAG audit.
+description: 'Builds production-ready UI components from a screen spec and token/variant
+  contract: props, state handling, accessibility baseline. No WCAG audit.'
 hint: 'Screen-Spec + Token-/Variant-Contract → produktionsreife UI-Komponenten: Props-Contract,
   State-Matrix (loading/error/empty/success), A11y-Baseline (kein Audit), Motion aus
   Tokens, Mobile-first, Test-Grundgerüst.'
@@ -101,7 +99,7 @@ Delegation:
 - WCAG audit → `accessibility-specialist`
 - Code quality → `code-reviewer`
 - Test expansion beyond scaffold → `tester` / `e2e-tester`
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

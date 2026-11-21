@@ -4,7 +4,7 @@ version: 2.2.4
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 - "ISO/IEC/IEEE 15288:2023"
-description: Elicits stakeholder needs and captures multi-level requirements. Enforces architecture boundary via arch_impact flag. Fills the standardized REQ frontmatter block.
+description: "Elicits stakeholder needs into multi-level requirements; enforces the architecture boundary via arch_impact; fills the standardized REQ frontmatter block."
 hint: Use this agent to clarify requirements and start the SE cascade.
 tools:
 - Read

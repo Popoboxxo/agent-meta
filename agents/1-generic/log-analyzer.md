@@ -1,7 +1,7 @@
 ---
 name: template-log-analyzer
 version: "1.6.1"
-description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), log-quality checks, baseline-vs-anomaly comparison, trace/metric correlation, and structured findings with delegation routing."
+description: "Analyzes system/application logs: frequency clustering, severity classification, anomaly detection, trace/metric correlation, structured findings."
 hint: "Log analysis: cluster errors, classify severity (RFC 5424), delegate findings as issues or tasks"
 reference_standards:
   - "RFC 5424"

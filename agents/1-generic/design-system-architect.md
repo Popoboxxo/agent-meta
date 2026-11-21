@@ -1,7 +1,7 @@
 ---
 name: template-design-system-architect
 version: "0.6.1"
-description: "Translates a UI design-system schema into real, project-bound design-token artifacts (CSS custom properties / Tailwind config) plus the underlying systematics: color-harmony rules, a design-time contrast gate, spacing/breakpoint methodology, component-variant contracts, and motion tokens."
+description: "Turns a UI design-system schema into project-bound token artifacts (CSS/Tailwind) plus color harmony, contrast gate, spacing, variants and motion tokens."
 hint: "Design-System-Schema → echte Token-Artefakte: Primitive/Semantic/Component-Ebenen, Farbharmonie + Kontrast-Gate (Design-time, kein WCAG-Audit), Spacing/Breakpoint-Methodik, Variant-Contracts, Motion-Tokens."
 reference_standards:
   - "Design Tokens Format (DTCG/W3C Community Group)"

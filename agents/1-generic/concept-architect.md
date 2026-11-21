@@ -1,7 +1,7 @@
 ---
 name: template-concept-architect
 version: "1.4.1"
-description: "Use when a complex change (XL, >20 files) or cross-cutting change — public interfaces/contracts, data model/schema, more than one subsystem boundary — needs a system design before implementation: components, interfaces, trade-off analysis. Does not implement."
+description: "System design for complex/cross-cutting changes (public interfaces, data models, multiple subsystems): components, interfaces, trade-offs. Does not implement."
 hint: "System design for complex changes: components, interfaces, trade-offs — never implements"
 reference_standards:
   - "Martin Fowler: Microservice Trade-offs"

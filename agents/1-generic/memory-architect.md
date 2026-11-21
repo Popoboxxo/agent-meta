@@ -1,7 +1,7 @@
 ---
 name: template-memory-architect
 version: "1.0.0"
-description: "Agent memory architecture: decides what an agent keeps beyond a single run — working memory vs. explicit long-term memory, write triggers with provenance/validity/confidence, consolidation and conflict rules, TTL/decay and deletion paths, and the policy for which memory may enter a prompt. Designs the write path and its policies; rag-engineer owns the retrieval index."
+description: "Agent memory architecture: working vs. long-term memory, write triggers, consolidation, TTL/decay and prompt-admission policy. rag-engineer owns retrieval."
 hint: "Agent memory: working vs long-term, write triggers, consolidation, decay/forgetting, deletion path — policies for what an agent keeps, not the vector index"
 reference_standards:
   - "Enterprise Guide for Implementing Generative AI and Agentic AI"

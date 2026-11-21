@@ -1,7 +1,7 @@
 ---
 name: template-sre-engineer
 version: "0.7.1"
-description: "Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbook creation and pre-deployment reliability reviews. Produces SLO documents, error budget reports, runbooks and post-mortem templates."
+description: "Proactive reliability: SLI/SLOs, error budgets, capacity planning, toil reduction, runbooks, pre-deployment reviews. Produces SLOs, runbooks, post-mortems."
 hint: "Reliability proaktiv: SLI/SLO, Error-Budgets, Capacity-Planning, Toil-Reduktion, Runbooks, Reliability-Review vor Deploy — Runbook an documenter, Fix an developer"
 reference_standards:
   - "Google SRE Book#Service-Level-Objectives"

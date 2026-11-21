@@ -3,7 +3,7 @@ name: se-critic
 version: 2.2.3
 reference_standards:
 - "IEEE 1028-2008"
-description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
+description: "Audits requirements and architecture against generic laws; enforces role boundaries; persists review protocols with RVW-IDs and propagates suspect marks."
 hint: Validate requirements before architecture; audit decompositions.
 tools:
 - Read

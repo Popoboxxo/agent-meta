@@ -1,7 +1,7 @@
 ---
 name: template-proofreader
 version: "0.5.2"
-description: "Proofreading: pure correctness pass on existing text — spelling, grammar, punctuation. No style, structure, or content changes. Produces a categorized markdown findings report, does not silently rewrite the source."
+description: "Proofreading: correctness-only pass on existing text — spelling, grammar, punctuation. No style or content changes. Reports findings; never silently rewrites."
 hint: "Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung — keine Stil-/Strukturänderungen"
 reference_standards:
   - "Rat für deutsche Rechtschreibung (amtliches Regelwerk)"

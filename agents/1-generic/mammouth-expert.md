@@ -1,7 +1,7 @@
 ---
 name: template-mammouth-expert
 version: "2.0.0"
-description: "Absolute analysis expert for an AI provider platform: how the target platform works, its configuration directory, and best practices for optimally adapting agent-meta. Provider-specific facts come from the active platform override (2-platform/agent-meta-<provider>-expert.md) and the provider registries — never from a hardcoded provider name."
+description: "Analysis expert for an AI provider platform: config and adaptation best practices from the active platform override and registries — no hardcoded provider name."
 hint: "Provider expert: how the target platform works, configuration directory, best practices for optimal agent-meta adaptation"
 tools:
   - Bash

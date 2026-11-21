@@ -1,7 +1,7 @@
 ---
 name: template-secrets-manager
 version: "1.0.0"
-description: "Secret and credential lifecycle: inventory of what exists where, storage decision, rotation cadence per credential class, short-lived and dynamic credentials instead of static tokens, revocation and a leak-response path — with proof (owner, location, last rotation) and references only, never secret values. security-auditor detects, this role retires."
+description: "Secret and credential lifecycle: inventory, storage, rotation, short-lived credentials, revocation, leak response — proof only, never values."
 hint: "Secrets lifecycle: inventory, storage, rotation cadence, revocation, leak response, ownership proof — names, never values"
 reference_standards:
   - "Kubernetes Security and Observability#Secret-Rotation"

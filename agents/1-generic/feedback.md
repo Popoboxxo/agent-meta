@@ -1,7 +1,7 @@
 ---
 name: template-feedback
 version: "1.8.1"
-description: "Standardizes bug reports, feature requests, and improvement suggestions for the deployed project — categorized, prepared, and submitted directly as a GitHub issue."
+description: "Standardizes bug reports, feature requests and improvements for the deployed project; files them as GitHub issues."
 hint: "Project feedback: submit bugs, features, improvements as standardized GitHub issues — always before git"
 prompt_mode: modern
 tools:

@@ -1,7 +1,7 @@
 ---
 name: template-security-auditor
 version: "2.8.1"
-description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, cryptographic weaknesses, plus CISO audit domains (frontend security, data-access control, auth policy, DIY crypto detection, AI-generated code risks) — read-only, no code execution."
+description: "Static security analysis: OWASP Top 10, secrets, dependency and supply-chain risks, crypto weaknesses, CISO audit domains. Read-only, no code execution."
 hint: "Security audit: OWASP, secrets, dependencies, supply chain, frontend security, auth policy, RLS validation, DIY crypto, AI code risks — static analysis without code execution"
 reference_standards:
   - "OWASP ASVS 5.0#L1"

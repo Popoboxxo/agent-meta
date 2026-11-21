@@ -1,7 +1,7 @@
 ---
 name: template-database-engineer
 version: "1.4.1"
-description: "Relational schema design, database migrations, query optimization and index strategy. Produces backwards-compatible migration scripts with rollback paths and hands a schema contract to the developer."
+description: "Relational schema design, migrations, query optimization, index strategy. Produces backwards-compatible migrations with rollback and a schema contract."
 hint: "Database design: schema, migrations (Alembic/Flyway style), query optimization, index strategy — hands a schema contract to developer"
 reference_standards:
   - "PostgreSQL Indexes (official docs)"
