@@ -9,6 +9,7 @@ import fnmatch
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -541,6 +542,11 @@ def run_pipeline(root: Path, options: Any, runner: Any = subprocess.run) -> Pipe
         )
 
     check_options = dict(options, check_only=True)
+    # The idempotency pass renders into the same scratch sink; clear it first
+    # so render_matrix_hashes can recreate its provider subdirectories.
+    scratch = options.get("scratch")
+    if scratch is not None:
+        shutil.rmtree(Path(scratch), ignore_errors=True)
     second = base_mod.run_steps(root, check_options, runner)
     residual = [
         "{}: {}".format(step.name, step.detail)
