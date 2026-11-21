@@ -1086,6 +1086,17 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   now reflects the merged state (Issue #1307 + PR #1309); see the merged AC-T4 chain in
   ``tests/test_opencode_v2_surface.py``.
 
+- Bundle 2 (admin-ui start mode, 2026-11-21): rebaseline after merging main ``fe768556`` into
+  ``feat/wave7-phase-i-bundle``. The only render change is the edited ``commands/1-generic/admin.md``:
+  exactly the 7 admin command renders drifted (Claude, Continue, Copilot, Gemini, Mammouth, Opencode,
+  ZCode; ``admin.prompt.md``/``admin.toml`` provider suffixes) -- 7 of 1195 hashes; 0 added/removed.
+  No agent/rule artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``d2b5268c…`` -> ``c0253e8b…``;
+  ``slimming-golden`` and ``compact-golden`` unchanged. The repo's own
+  ``.meta-config/generated-file-hashes.json`` was rebaselined minimally (6 admin keys only); its
+  remaining 153 stale keys are a pre-existing main follow-up, documented/excluded in
+  ``.github/workflows/validate.yml``.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

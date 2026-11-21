@@ -117,8 +117,9 @@
 
 > Sortierung: Status-Gruppen **Offen/In Arbeit → Pausiert/Blockiert/Entwurf → Done**, innerhalb der Gruppen neueste zuerst (undatierte am Gruppenende). Quelle: `docs/plans/` + `knowledge/wiki/plans/` (Source of Truth). Dieser Abschnitt katalogisiert **externe Source-of-Truth-Dokumente — kein OKF-Page-Katalog**: die verlinkten Dateien sind keine Wiki-Seiten mit OKF-Frontmatter. Nicht indiziert: `archive/**`, `-status.md`-Begleitdateien, Audits/Reports, Preflight-, Diff-Manifest-, Stacking- und Baseline-Dokumente.
 
-### Offen / In Arbeit (20)
+### Offen / In Arbeit (21)
 
+- [Phase-I #896 — Admin-UI Startmodus local/network](plans/am-phase-i-896-admin-ui-startmodus.md) — Explizite Modi `local`/`network`, nicht persistiertes Zufalls-Token, Port-Matrix 7420/8765/9090, Firewall/Sicherheit. Status: **geplant** (W7-Bundle, APPROVED-Concept 20.11.). #896 `plan`
 - [Fleet-Server F2 (Schreibpfad, Phase 3+4)](../../docs/plans/2026-10-23-fleet-server-f2-plan.md) — Schreibpfad des Fleet-Servers: Registry, Enrollment, Heartbeat und Audit. Status: **geplant** (Spec-Approval offen). `plan`
 - [Fleet-Server F1 (Read-Only-Dashboard + Config-Ansicht)](../../docs/plans/2026-10-23-fleet-server-f1-plan.md) — Read-only Fleet-Dashboard und Config-Ansicht (Phase 1+2). Status: **geplant** (Spec-Approval offen). `plan`
 - [Context Profiles — Phase 2 (Profil `compact`, Config-Optimizer)](../../docs/plans/2026-10-17-context-profiles-phase2-plan.md) — Profil `compact`, Config-Optimizer, Applier und Rolle `meta-optimizer`. Status: **APPROVED**; 2a–2e umgesetzt, 2f gated. #977 `plan`
@@ -140,8 +141,9 @@
 - [Plan: Issue #456 – Admin UI Remote Access](plans/am-issue-456-remote-admin-auth.md) — Konfigurierbarer Bind-Host, Token-Auth und Host-Allowlist für den Admin-UI-Server (8 Schritte). Status: **planned** (2026-08-10). #456 `plan`
 - [Plan: Planner-Pipeline-Integration — 3 Bugs](plans/am-fix-planner-pipeline-ghost-entries.md) — Fix für Ghost-Entries, `plan_ref`-Validierung und deklarative Planner↔Pipeline-Kopplung via `produces` (5 Schritte). Status: **planned** (2026-08-10). `plan`
 
-### Pausiert / Blockiert / Entwurf (3)
+### Pausiert / Blockiert / Entwurf (4)
 
+- [Phase-I #681 — Liveness Verification (ENTSCHEIDUNGSGATE I-N7)](plans/am-phase-i-681-liveness-verification.md) — I-N7-unabhängige Content-Spezifikation (6 AKs) + Decision Gate; keine Ablageort-/Schwellwert-Wahl. Status: **BLOCKED — User-Entscheidung I-N7** (W7-Bundle, APPROVED-Concept 20.11.). #681 `plan`
 - [Welle 4 — Fortsetzungsplan (Tracking)](../../docs/plans/2026-10-30-wave-4-continuation-plan.md) — Tracking der offenen Welle-4-Punkte (Test-Hygiene) mit Ist-Stand, nächster Aktion und Gate. Status: **Entwurf**. #945, #1050, #1051, #971, #192 `plan`
 - [Admin-UI Network-Mode + Status #899/#855](../../docs/plans/2026-10-07-admin-ui-network-and-manager-plan.md) — Kombinierte Spec + Implementierungsplan für Network-Mode und Manager. Status: **DRAFT** (wartet auf Nutzerfreigabe). #897, #896 `plan`
 - [Design: Vereinheitlichter Plugin-Katalog](../../docs/plans/2026-09-05-plugin-catalog-unification.md) — Zusammenführung von External-Tools- und MCP-Registry zu einem Plugin-Katalog. Status: **DRAFT** (wartet auf User-Review). `plan`

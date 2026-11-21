@@ -56,6 +56,7 @@ The server accepts the following flags (verified against the built-in `--help`):
 | Flag | Type / Default | Semantics |
 |---|---|---|
 | `command` | `start` \| `stop` \| `status` \| `restart` | Detached lifecycle commands. Omitted → foreground mode until `Ctrl+C`. |
+| `--mode local\|network` | `local` (behaviour) | Start mode (issue #896). `local` = loopback, no token; `network` = `0.0.0.0`, generated token, reachable URLs + firewall guidance. |
 | `--port PORT` | int, default `7420` | TCP port the Admin UI binds to. |
 | `--host HOST` | default `127.0.0.1` | Bind address. **Non-loopback addresses (e.g. `0.0.0.0`) require `--admin-token` or the `ADMIN_UI_TOKEN` env var.** |
 | `--admin-token TOKEN` | default none | Authentication token for remote access. Required when `--host` is non-loopback. Equivalent to the `ADMIN_UI_TOKEN` env var or `admin-ui.token` in `project.yaml`. |
@@ -88,6 +89,11 @@ Remote users reach only the Admin UI (`http://<host>:7420/`). The Viz dashboard
 and MCP SSE endpoint stay local; if you need them on another machine, tunnel
 them (see [Troubleshooting](#9-troubleshooting)).
 
+> **Entscheidung 31 (N12):** both sub-servers are to become network-configurable,
+> each with its own option and a safe default. Today `viz-report.py:912` and
+> `viz-logger.py:580` hard-bind `127.0.0.1`; that gap is a documented, open
+> implementation item — no new option is introduced by the start-mode change.
+
 ---
 
 ## 4. Bind behavior
@@ -116,6 +122,29 @@ Minimal remote launch:
 ```bash
 python3 scripts/admin-server.py --host 0.0.0.0 --admin-token '<your-token>'
 ```
+
+### Quick start: `--mode network` (guided remote start)
+
+The explicit start mode removes the manual flag combination:
+
+```bash
+python3 scripts/admin-server.py start --mode network --allowed-hosts <your-hostname>
+```
+
+`network` binds `0.0.0.0`, generates a random token and prints the reachable
+URLs (`http://<ip>:7420/?token=<T>`), the token, a **firewall** rule
+("Allow inbound TCP 7420 only from trusted networks") and a security warning.
+The generated token is **not persisted** — there is no token file, no config
+write and no environment write by the helper. It exists only for this process;
+a restart generates a new one (rotation = restart). The token is transported to
+the child process via `ADMIN_UI_TOKEN` only — never in argv (`ps`) and never in
+`.meta-viz/admin-server.log`. `local` (the default) binds loopback, needs no
+token and behaves exactly as before.
+
+Security: the token is a shared secret — treat it like a password, terminate
+TLS in front of the server, restrict exposure with `--allowed-hosts` and a
+host firewall/security group. If you do not need network access, stay in
+`local` mode and tunnel instead: `ssh -L 7420:127.0.0.1:7420 user@host`.
 
 ---
 
@@ -273,7 +302,10 @@ connection-refused error even though the server is running on the host.
 
 - Verify the bind: `python3 scripts/admin-server.py status` prints the URL the
   server actually bound to.
-- Fix (requires token): bind to all interfaces —
+- Fix (guided): use `--mode network` — it binds to all interfaces, generates a
+  token and prints the reachable URL:
+  `python3 scripts/admin-server.py start --mode network --allowed-hosts <host>`.
+- Fix (manual, requires token): bind to all interfaces —
   `python3 scripts/admin-server.py --host 0.0.0.0 --admin-token '<token>'`.
 - Or keep loopback and tunnel: `ssh -L 7420:127.0.0.1:7420 user@host`, then
   open `http://127.0.0.1:7420/` locally (no token needed on the loopback side).
