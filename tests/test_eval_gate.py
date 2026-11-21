@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
 
 import eval_gate as eg  # noqa: E402
@@ -266,3 +268,27 @@ def test_unknown_metric_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+# --- Task 1: exact McNemar test (IC-36 "preferred") -----------------------
+
+
+def test_mcnemar_no_discordant_pairs():
+    assert eg.mcnemar_exact(0, 0) == 1.0
+
+
+def test_mcnemar_symmetric():
+    assert eg.mcnemar_exact(3, 3) == 1.0
+
+
+def test_mcnemar_known_value():
+    assert abs(eg.mcnemar_exact(0, 8) - 2 * 0.5**8) < 1e-12
+
+
+def test_mcnemar_is_symmetric_in_arguments():
+    assert eg.mcnemar_exact(2, 9) == eg.mcnemar_exact(9, 2)
+
+
+def test_mcnemar_rejects_negative():
+    with pytest.raises(ValueError):
+        eg.mcnemar_exact(-1, 2)

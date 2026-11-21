@@ -80,6 +80,25 @@ DEFAULT_MAX_PRICE_AGE_DAYS = 90
 SKIP_RECORD_DIR = "tests/routing-llm-eval/roles/runs"
 
 
+def mcnemar_exact(b: int, c: int) -> float:
+    """Two-sided exact binomial p-value for paired McNemar discordant counts.
+
+    ``c`` counts cases where the baseline was correct and the candidate wrong
+    (regressions); ``b`` counts the reverse (improvements). Under the null
+    hypothesis the discordant pairs are binomially distributed with p=0.5, so
+    the two-sided p-value is ``2 * P(X <= min(b, c))`` for ``X ~ Bin(n=b+c, 0.5)``.
+    A significant regression requires ``c > b`` *and* ``p < alpha``.
+    """
+    if b < 0 or c < 0:
+        raise ValueError("discordant counts must be non-negative")
+    n = b + c
+    if n == 0:
+        return 1.0
+    k = min(b, c)
+    p = 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2**n
+    return min(1.0, p)
+
+
 def _context_tokens(report: Mapping) -> int:
     """Largest per-provider ``always-loaded`` + ``orchestrator`` tokens.
 
