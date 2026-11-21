@@ -118,8 +118,7 @@ EVIDENCE:      <input contracts used, per risk or control>
 ARTIFACTS:     <written file paths: RCM, audit programme, planning memo>
 OPEN:          <what the inputs do not establish>
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

@@ -46,9 +46,8 @@ TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "meta-optimizer.md"
 _RELEASE = "2.0.0-beta.2"
 
 _H4_DESCRIPTION = (
-    "Read-only config optimizer: reads a `sync.py --optimize-config` proposal and "
-    "presents token-compact, evidence-backed variants of the project config with "
-    "mandatory warnings — never edits or applies anything."
+    "Read-only config optimizer: reads `sync.py --optimize-config` proposals and "
+    "presents token-compact variants with warnings — never edits or applies."
 )
 _H4_SHORT_DESC = "Proposes compact project-config variants (proposal only)"
 _H4_NAME_ONLY_REASON = (

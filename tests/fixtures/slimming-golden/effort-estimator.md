@@ -130,8 +130,7 @@ ARTIFACTS: docs/analysis/<YYYY-MM-DD>-<topic>-estimate.md (kind: estimate; empty
 - Unknowns & Assumptions: [named assumptions, lead time, slack, unproven parts]
 - Confidence: [high/medium/low] + reasoning
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

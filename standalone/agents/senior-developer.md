@@ -117,8 +117,7 @@ On last-resort escalation (2+ verified failures, see workflow step 7):
 RECOMMENDED_TIER for this tier: principal-developer
 TASK_SUMMARY: <task in 1-2 sentences>
 FAILURE_LOG: <attempt n approach + failure reason>
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

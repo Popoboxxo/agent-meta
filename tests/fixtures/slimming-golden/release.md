@@ -147,8 +147,7 @@ TAG: vX.Y.Z
 RELEASE_URL: https://github.com/.../releases/tag/vX.Y.Z
 ARTIFACTS: [list of attached files]
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

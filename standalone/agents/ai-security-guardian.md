@@ -94,8 +94,7 @@ ARTIFACTS: <report file path, or "none">
 ```
 
 Long reports → write the full report to `docs/audits/ai-security-<YYYY-MM-DD>-<topic>.md` (kind: ai-security), return path only. Raw evidence (logs, long tool output) stays on `.tmp/`; only the report artifact moves into the matrix.
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

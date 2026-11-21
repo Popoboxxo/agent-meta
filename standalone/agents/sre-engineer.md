@@ -109,8 +109,7 @@ ARTIFACTS: <SLO document, runbook, post-mortem template files>
 SLO_REPORT: <slo-report-v1: SLI, SLO, error budget, burn-rate alerts, risks>
 NEXT: [Review | Developer fix | Documenter]
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

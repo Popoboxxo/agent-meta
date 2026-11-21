@@ -113,8 +113,7 @@ RESULT: <overall impression in 1 sentence + N findings by category>
 ARTIFACTS: <path to *.copyedit.md>
 NEXT: [Author review | proofreader pass if prerequisite missing | no further steps]
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

@@ -272,9 +272,8 @@ roles:
     model: fast
     memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
-    description: 'Installation doctor: runs `sync.py --doctor`, deduplicates and prioritizes
-      known-issue findings of this agent-meta installation, and hands fixes to agent-meta-manager
-      — never repairs anything and writes reports only to the configured tmp-sink.'
+    description: 'Installation doctor: runs `sync.py --doctor`, dedupes/prioritizes findings,
+      hands fixes to agent-meta-manager — never repairs anything; reports to tmp-sink.'
     routing:
       addressability: name_only
       name_only_reason: Diagnostic meta role; invoked explicitly by name (e.g. 'run
@@ -293,9 +292,8 @@ roles:
     model: balanced
     memory: ''
     workflow_tier: optional
-    description: 'Read-only config optimizer: reads a `sync.py --optimize-config` proposal
-      and presents token-compact, evidence-backed variants of the project config
-      with mandatory warnings — never edits or applies anything.'
+    description: 'Read-only config optimizer: reads `sync.py --optimize-config` proposals
+      and presents token-compact variants with warnings — never edits or applies.'
     routing:
       addressability: name_only
       name_only_reason: Config optimization meta role; produces proposals only and is

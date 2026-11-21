@@ -220,8 +220,7 @@ STATUS: done|partial|failed|escalate
 RESULT: <1 Satz Ergebnis-Zusammenfassung>
 ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 ```
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

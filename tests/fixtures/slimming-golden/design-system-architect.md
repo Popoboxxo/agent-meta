@@ -117,8 +117,7 @@ Delegation:
 - Component implementation → `frontend-component-engineer`
 - Contrast-gate failure → back to `ui-ux-designer` (schema change), never a unilateral color swap
 - Binding WCAG verdict on rendered components → `accessibility-specialist`
-**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS.
-<!-- provenance: issue #267 -->
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 
