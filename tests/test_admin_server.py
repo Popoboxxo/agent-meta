@@ -3435,8 +3435,11 @@ def start_env(monkeypatch, tmp_path):
     """Spawn faked: Popen yields a ``_SpawnProc`` and never runs a child."""
     monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
     monkeypatch.setattr(admin_server, "_probe_port_bindable", lambda h, p: (True, ""))
-    # Host-independent: without this stub _write_pid reads the real /proc/4242/stat.
+    # Host-independent: without these stubs the fake spawn PID (4242) can be a
+    # real live process on the CI host, making the second start short-circuit as
+    # "already running" before _wait_for_admin is reached.
     monkeypatch.setattr(admin_server, "_pid_starttime", lambda p: None)
+    monkeypatch.setattr(admin_server, "_is_pid_running", lambda p: False)
     state = {"proc": _SpawnProc(pid=4242), "popen_calls": 0}
 
     def fake_popen(cmd, **kw):
