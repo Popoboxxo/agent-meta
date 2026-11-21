@@ -18,4 +18,4 @@ blockiert (fail closed); die Meldung nennt Submodul, Ziel und Ausweg (ohne
 ## Bekannte Grenzen
 
 Erkennung per Tokenizer, kein Shell-Parser — Indirektion (`eval`, `$(...)`, `xargs`) bleibt unerkannt.
-Lücken-Liste (#551/#592/#809), Guard-Einstufung: `docs/concepts/branch-guard-known-limits.md`.
+Lücken-Liste (#551/#592/#809), Guard-Einstufung: `AGENTS.md#bekannte-grenzen`.
