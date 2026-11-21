@@ -69,8 +69,7 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 {{INTENT_ROUTING_TABLE}}
 
 Volle Stage-Details (Agent/Modus je Stage, Loop/Fallback/Approval-Gate) einer gematchten Pipeline bei Bedarf: `Read {{PIPELINE_DETAILS_DIR}}/<pipeline-name>.md`.
-{{#if ROUTING_DETAILS_ENABLED}}Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read {{ROUTING_DETAILS_PATH}}`.
-{{/if}}
+{{#if ROUTING_DETAILS_ENABLED}}Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read {{ROUTING_DETAILS_PATH}}`.{{/if}}
 
 ## A2A Delegation
 {{A2A_HANDOFF_BLOCK}}

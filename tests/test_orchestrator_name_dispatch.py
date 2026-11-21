@@ -39,8 +39,27 @@ def _active_provider() -> str:
 
 def _build_variables() -> dict:
     config = load_config(_AGENT_META_ROOT / ".meta-config" / "project.yaml")
+    # PR 4.1 renders compact routing lines by default; pin the legacy tool
+    # envelope so the structured payload assertions below remain parseable.
+    config["routing-overrides"] = {"format": "json"}
     variables, _ = build_variables(config, _AGENT_META_ROOT, _AGENT_META_ROOT)
     return variables
+
+
+def _provider_with_name_index() -> str:
+    """Active provider whose roster is not in the harness (name_index survives)."""
+    config = load_config(_AGENT_META_ROOT / ".meta-config" / "project.yaml")
+    provider_config = load_providers_config(_AGENT_META_ROOT)
+    active = resolve_providers(config, provider_config)
+    capabilities = yaml.safe_load(
+        (_AGENT_META_ROOT / "config" / "provider-capabilities.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["capabilities"]
+    for provider in active:
+        if not capabilities[provider].get("roster_in_harness"):
+            return provider
+    pytest.fail("no active provider without roster_in_harness")
 
 
 def _render_section3(provider: str) -> str:
@@ -99,7 +118,7 @@ def test_fallback_branch_mandates_name_index_dispatch():
 def test_intent_routing_payload_carries_name_only_entries():
     """The generated routing payload contains the ``name_only`` entries that the
     fallback contract routes through — sorted by ``agent`` and with a reason."""
-    provider = _active_provider()
+    provider = _provider_with_name_index()
     parsed = _rendered_routing_payload(provider)
 
     name_index = parsed["routing"]["name_index"]

@@ -4,6 +4,7 @@
 
 ### Changed
 - **Artifact-locations migration notes:** the `artifact-locations` matrix lists former write locations via additive, read-only `legacy[]` entries; set `artifact-locations.enabled: false` to restore the exact legacy behaviour immediately; run `sync.py --migrate-artifact-aliases --write` to move the scratch-path alias into the matrix. ADR filenames use the `ADR-{nnn}_{slug}.md` canon (former `NNNN-…`/`ADR-NNN-…` names stay readable through `legacy[]`).
+- **Project context injection (#1187):** optional `project.yaml` section controlling whether the embedded project-context paragraph reaches generated roles; documented in the changelog of the release that shipped it.
 
 ## [2.0.0] - 2026-11-20
 
