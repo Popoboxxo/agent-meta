@@ -318,7 +318,19 @@ def _load_fixture_digester(root: Path) -> Tuple[Any, Any]:
         "_rebaseline_ac_t4_surface", module_path
     )
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # The test module imports `tests.changelog_sections`, so the repository
+    # root must be importable when it is loaded by path (the CLI only adds
+    # scripts/ to sys.path). Restore sys.path afterwards to keep this helper
+    # side-effect free for its callers.
+    root_str = str(Path(root))
+    added_root = root_str not in sys.path
+    if added_root:
+        sys.path.insert(0, root_str)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if added_root:
+            sys.path.remove(root_str)
     return module._fixture_tree_sha256, module._FIXTURE_TREES
 
 
