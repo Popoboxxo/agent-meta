@@ -12,6 +12,7 @@ import glob as glob_module
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,26 @@ from typing import Any, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 CONFIG_REL = Path(".meta-config") / "project.yaml"
 SYNC_REL = Path("scripts") / "sync.py"
+
+
+def _load_test_module(root: Path, filename: str, alias: str) -> Any:
+    """Load a test module by path without going through pytest collection."""
+    path = Path(root) / "tests" / filename
+    spec = importlib.util.spec_from_file_location(alias, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def scratch_root(root: Path, scratch: Optional[Path]) -> Path:
+    """Mock-project root for topology rendering; never the repository root."""
+    return Path(scratch) if scratch is not None else Path(root)
+
+
+def reset_scratch(scratch: Optional[Path]) -> None:
+    """Clear the scratch sink between render passes."""
+    if scratch is not None:
+        shutil.rmtree(Path(scratch), ignore_errors=True)
 
 
 class RebaselineError(Exception):

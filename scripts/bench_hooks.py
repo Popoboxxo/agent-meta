@@ -24,6 +24,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
 
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from lib.config import load_config  # noqa: E402
+from lib.tmp_paths import resolve_tmp_paths, tmp_env  # noqa: E402
+
+
+def _bench_tmp_env() -> dict:
+    """Pin the subprocess temp dirs to the repo sink (AC-11/IC-18)."""
+    paths = resolve_tmp_paths(ROOT, load_config(ROOT / ".meta-config" / "project.yaml"))
+    return tmp_env(paths, dict(os.environ))
+
 PAYLOADS = {
     "bash-simple": {
         "tool_name": "Bash",
@@ -58,7 +71,7 @@ def _benchmark(project: Path, payload: dict, runs: int) -> dict:
         wrapper.write_text(_SHIM, encoding="utf-8")
         wrapper.chmod(0o755)
 
-    env = dict(os.environ)
+    env = _bench_tmp_env()
     env["PATH"] = str(shim_dir) + os.pathsep + env.get("PATH", "")
     env["BENCH_SPAWN_COUNTER"] = str(counter)
     env["BENCH_REAL_PYTHON"] = sys.executable
@@ -79,6 +92,7 @@ def _benchmark(project: Path, payload: dict, runs: int) -> dict:
             input=json.dumps(full_payload),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=str(project),
             env=env,
             timeout=30,
