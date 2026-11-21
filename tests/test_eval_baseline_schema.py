@@ -126,6 +126,7 @@ def _baseline(class_names: tuple = ("small", "balanced"), repeat: int = 3) -> di
                 "run": index + 1,
                 "metrics": runner.compute_metrics(CASES, predictions),
                 "errors": [],
+                "case_outcomes": runner.compute_case_outcomes(CASES, predictions),
             }
             for index, predictions in enumerate(sets)
         ]
@@ -461,6 +462,38 @@ def test_baseline_filename_matches_ic13_naming_scheme():
     assert runner.baseline_filename("2026-10-17", "small+balanced", "full") == (
         "2026-10-17-small-balanced-full.json"
     )
+
+
+# --- Task 3: per-case outcomes in the baseline ----------------------------
+
+
+def test_compute_case_outcomes_matches_metrics():
+    predictions = _all_correct()
+    outcomes = runner.compute_case_outcomes(CASES, predictions)
+    assert set(outcomes) == {case["id"] for case in CASES}
+    mean_correct = sum(1 for o in outcomes.values() if o["correct"]) / len(outcomes)
+    assert mean_correct * 100 == pytest.approx(
+        runner.compute_metrics(CASES, predictions)["top1_accuracy"]
+    )
+
+
+def test_build_baseline_includes_per_case():
+    baseline = _baseline()
+    assert baseline["per_case"]["small"]["c-collision"] == [1, 0, 1]
+    assert baseline["per_case"]["balanced"]["c-collision"] == [1, 0, 1]
+
+
+def test_validate_baseline_accepts_missing_per_case():
+    baseline = _baseline()
+    assert "per_case" in baseline
+    baseline.pop("per_case")
+    assert runner.validate_baseline(baseline) == []
+
+
+def test_validate_baseline_rejects_non_binary_per_case():
+    baseline = _baseline()
+    baseline["per_case"]["small"]["c-keyword"] = [1, 2, 0]
+    assert runner.validate_baseline(baseline)
 
 
 def test_repository_artifacts_are_valid_when_present():
