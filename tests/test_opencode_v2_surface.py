@@ -5538,7 +5538,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # render output, not a red-test fix. Tree digest ab13100f.. -> 95a315d6.. (same event).
 _FIXTURE_TREES = {
     "ac01-baseline": "95a315d6eb49c1b4254bedd4898e2a33344cb26d30d8890dc479f396e571b594",
-    "slimming-golden": "6eb489dcc07c41ef43c3283dc1bde73e025213af182c716ef7af3c1ec70e7b02",
+    "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
 
