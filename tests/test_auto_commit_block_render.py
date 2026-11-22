@@ -265,3 +265,86 @@ def test_no_trailer_line_when_disabled_or_misconfigured():
         resolved = _with_trailers(resolved)
         assert _TRAILERS[0] not in render_auto_commit_block(resolved, a)
     assert render_auto_commit_block(_with_trailers({"mode": "off"}), "direct") == ""
+
+
+# --- Issue #1181 (T5): grant line in the rendered block -------------------
+
+_GRANT_LINE_DOCUMENTER = (
+    "Granted by project config `auto_commit.authority_overrides.documenter` "
+    "(issue #1181). This is a full `Bash` grant, not a `git`-only grant: the "
+    "guard hook blocks git mutations outside `git add` and a non-amending "
+    "`git commit`, and rejects your sentinel on any non-git command."
+)
+
+
+def test_granted_role_gets_grant_line():
+    resolved = {**_AUTO, "authority_overrides": {"documenter": "direct"}}
+    block = render_auto_commit_block(resolved, "direct", role="documenter")
+    assert _GRANT_LINE_DOCUMENTER in block
+    # AC-2: the wording names the EXPANSION, not just the boundary.
+    assert "full `Bash` grant, not a `git`-only grant" in block
+    assert "outside `git add` and a non-amending `git commit`" in block
+    # grant line sits after the sentinel and before the BOM boundary
+    assert block.index("#agent-meta:agent=") < block.index(_GRANT_LINE_DOCUMENTER)
+    assert block.index(_GRANT_LINE_DOCUMENTER) < block.index(_BOM_START)
+
+
+def test_non_granted_role_has_no_grant_line():
+    resolved = {**_AUTO, "authority_overrides": {"documenter": "direct"}}
+    block = render_auto_commit_block(resolved, "direct", role="planner")
+    assert "#1181" not in block
+    assert "Granted by project config" not in block
+
+
+def test_role_none_is_byte_identical():
+    _CUSTOM_DIRECT_REFERENCE = (
+        '**Commit authority (issue #694):** this project has `auto_commit.mode: custom` enabled for your role.\n'
+        'Commit directly whenever `scripts/should-commit.sh` exits 0 (the project\'s own commit-decision script has full control; no other trigger applies).\n'
+        "Before committing, run the project's secret scan against your staged changes; a finding blocks the commit -- report it and ask for manual intervention instead of committing anyway.\n"
+        'Prefix the Bash command with `#agent-meta:agent=<your-role-name>` as its first line before `git add`/`git commit` -- required for the guard hook to authorize the commit on hook-capable providers, harmless elsewhere.\n'
+        'Ensure the commit message has no leading UTF-8 BOM — the subject must start at byte 0 with the Conventional-Commit type (issue #842); the guard hook rejects a BOM-prefixed commit.\n'
+        "This commit authority never extends to pushing, tagging, or branch management -- those remain exclusively the `git` role's job."
+    )
+    combos = [
+        ({"mode": "off"}, "direct", ""),
+        ({"mode": "suggest"}, "direct", _NOTRAILER_REFERENCE["suggest"]),
+        (_REF_AUTO, "direct", _NOTRAILER_REFERENCE["direct"]),
+        (_REF_AUTO, "delegate", _NOTRAILER_REFERENCE["delegate"]),
+        (_REF_AUTO, "notify", _NOTRAILER_REFERENCE["notify"]),
+        (_CUSTOM, "direct", _CUSTOM_DIRECT_REFERENCE),
+    ]
+    for resolved, authority, expected in combos:
+        assert render_auto_commit_block(resolved, authority) == expected, (resolved, authority)
+        assert render_auto_commit_block(resolved, authority, role=None) == expected, (resolved, authority)
+    # A grant in `resolved` must not leak into the render when no role is given.
+    with_grant = {**_REF_AUTO, "authority_overrides": {"documenter": "direct"}}
+    assert render_auto_commit_block(with_grant, "direct", role=None) == _NOTRAILER_REFERENCE["direct"]
+
+
+def test_grant_line_only_in_direct_authority():
+    resolved = {**_AUTO, "authority_overrides": {"documenter": "direct"}}
+    for authority in ("delegate", "notify"):
+        block = render_auto_commit_block(resolved, authority, role="documenter")
+        assert "#1181" not in block, authority
+        assert "Granted by project config" not in block, authority
+    # suggest is propose-only (D20); off renders nothing at all.
+    suggest = render_auto_commit_block(
+        {"mode": "suggest", "authority_overrides": {"documenter": "direct"}},
+        "direct", role="documenter")
+    assert "Granted by project config" not in suggest
+    assert render_auto_commit_block(
+        {"mode": "off", "authority_overrides": {"documenter": "direct"}},
+        "direct", role="documenter") == ""
+
+
+def test_grant_line_does_not_mention_push_tag_branch():
+    resolved = {**_AUTO, "authority_overrides": {"documenter": "direct"}}
+    block = render_auto_commit_block(resolved, "direct", role="documenter")
+    grant = next(line for line in block.splitlines()
+                 if line.startswith("Granted by project config"))
+    low = grant.lower()
+    assert "push" not in low
+    assert "tag" not in low
+    assert "branch" not in low
+    assert "git push" not in block.lower()
+    assert "git tag" not in block.lower()

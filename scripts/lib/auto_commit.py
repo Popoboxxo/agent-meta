@@ -91,6 +91,25 @@ _PUSH_BOUNDARY_LINE = (
     "management -- those remain exclusively the `git` role's job."
 )
 
+# Issue #1181 (T5): the one place the grant is named as a RIGHT (D16). The
+# wording is a contract (spec §4.5, AC-2): it names the expansion to a full
+# Bash grant, not only the guard-hook boundary. Emitted only for a granted
+# role at direct authority; `role=None` never renders it (byte-identical).
+_GRANT_LINE_TEMPLATE = (
+    "Granted by project config `auto_commit.authority_overrides.{role}` "
+    "(issue #1181). This is a full `Bash` grant, not a `git`-only grant: the "
+    "guard hook blocks git mutations outside `git add` and a non-amending "
+    "`git commit`, and rejects your sentinel on any non-git command."
+)
+
+
+def _grant_applies(resolved: dict, role: str | None, authority: str) -> bool:
+    """T5: grant line only for a granted role at direct authority (spec §4.5)."""
+    if not role or authority != AUTHORITY_DIRECT:
+        return False
+    overrides = resolved.get("authority_overrides")
+    return isinstance(overrides, Mapping) and overrides.get(role) == AUTHORITY_DIRECT
+
 _CONFIG_ERROR_LINE = (
     "Commit authority is misconfigured: `mode: custom` requires "
     "`custom_script` to be set, but none is configured. Report this as a "
@@ -595,7 +614,12 @@ def _describe_triggers(resolved: dict) -> str:
     return "; ".join(descriptions)
 
 
-def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) -> str:
+def render_auto_commit_block(
+    resolved: dict,
+    authority: str = AUTHORITY_DIRECT,
+    *,
+    role: str | None = None,
+) -> str:
     """Render the `{{AUTO_COMMIT_BLOCK}}` prose for a role at `authority`.
 
     Mode dominates authority (see the mode x authority matrix in the #767
@@ -604,6 +628,11 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
     push/tag/branch as something the role may do -- those remain the `git`
     role's exclusive job. An unknown/None `authority` fails CLOSED (rendered
     as "none", i.e. ""); only the explicit default parameter is "direct".
+
+    `role` is optional (keyword-only): a role with a normalized direct grant
+    in `resolved["authority_overrides"]` gets the #1181 grant line appended
+    right after the sentinel in the direct branch of auto/custom. `role=None`
+    (the default) renders byte-identically to the pre-grant block.
     """
     # Issue #1091 fail-safe: an invalid block is rendered as an explicit
     # "off" notice for every authority (see INVALID_CONFIG_MARKER) -- the
@@ -680,6 +709,8 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
             )
             lines.append(scan_line)
             lines.append(_SENTINEL_PREFIX_LINE)
+            if _grant_applies(resolved, role, authority):
+                lines.append(_GRANT_LINE_TEMPLATE.format(role=role))
         elif authority == AUTHORITY_DELEGATE:
             lines.append(
                 f"Whenever `{script}` exits 0 (the project's own "
@@ -709,6 +740,8 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
             )
             lines.append(scan_line)
             lines.append(_SENTINEL_PREFIX_LINE)
+            if _grant_applies(resolved, role, authority):
+                lines.append(_GRANT_LINE_TEMPLATE.format(role=role))
         elif authority == AUTHORITY_DELEGATE:
             lines.append(
                 "At each configured trigger boundary -- as soon as ANY of "
