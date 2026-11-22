@@ -733,6 +733,15 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})
+    # #1209 / SPEC-artifact-mode-gating-2026-11-20 §3.2 (Entscheidung 56):
+    # the two derived artifact-mode gates are strippable conditionals. Suffix
+    # match only — a plain ARTIFACT_ prefix would also capture the unrelated
+    # release vars ARTIFACT_ZIP_CMD / ARTIFACT_TAR_CMD (Abweichung 10).
+    conditional_vars.update({
+        k for k in variables
+        if k.startswith("ARTIFACT_")
+        and k.endswith(("_MODE_FILES", "_MODE_INLINE"))
+    })
     # IC-03 / IC-17: per-role activity flags (ROLE_<UPPER_SNAKE>_ACTIVE);
     # built from the ActiveSet by build_variables (IC-18 no. 18)
     conditional_vars.update({k for k in variables if k.startswith("ROLE_") and k.endswith("_ACTIVE")})

@@ -71,6 +71,23 @@ DEFAULT_SE_ROOT = "SE"
 DEFAULT_SCRATCH_PATH = ".tmp"
 DEFAULT_STATE_PATH = ".meta-viz"
 
+
+def artifact_mode_flags(mode: str) -> tuple[str, str]:
+    """Derive the two template-gate flags for one artifact class mode.
+
+    SPEC-artifact-mode-gating-2026-11-20 §3.1 / Phase-E Entscheidung 56:
+    ``files`` -> (``"true"``, ``"false"``), ``inline`` -> (``"false"``,
+    ``"true"``), ``off`` -> (``"false"``, ``"false"``). Unknown values fail
+    closed (both inactive); an absent mode resolves to ``files`` via
+    :data:`DEFAULT_MODE`.
+    """
+    if mode == "files":
+        return "true", "false"
+    if mode == "inline":
+        return "false", "true"
+    return "false", "false"
+
+
 #: Closed artifact-kind enum from the schema (20 values).
 ALL_KINDS = (
     "code", "concept", "domain", "copyedit", "proofread", "se", "vv",
@@ -847,6 +864,7 @@ __all__ = [
     "ResolvedClass",
     "ResolvedMatrix",
     "artifact_file_stats",
+    "artifact_mode_flags",
     "load_presets",
     "resolve_artifact_cell_path",
     "resolve_artifact_locations",

@@ -45,7 +45,7 @@ Legende: Art = B Bugfix · C Config · T Template/Render · D Doku · A Audit ·
 | P14 | Phase D Rest (#1172 Doku, #1176, #1168 Trailer) | phase-d | #1172 #1176 #1168 #1247 | T/D | ja (`agents/1-generic/orchestrator.md`, `agents/1-generic/git.md`) | AC, G, B | S–M | *E-18: #1172 nur Doku in W2, Permission-Regel erst bei positiver Machbarkeit (W4). E-19: Trailer-Contract KONFIGURIERBAR (Config-Key), Contract in git.md, Git-Agent-PR kommt ZUERST (§3, PR 0.9)* |
 | P15 | Phase D Strom C Hooks | phase-d Tasks 5–9 | #1169 #1238 #1210 #1250 #1217 | B/S | nein | Hook-Hash | L | *E-24: #1210 + #1169 JETZT APPROVED; #1217 erst nach Task 1a (ask-API), bleibt DRAFT; E-25: #1238 in #1169-PR* |
 | P16 | Phase D Strom A (#1181) + #1141 | phase-d Block A | #1181 #1141 | S/C/T | ja (Commit-Authority-Blöcke) | AC, G, Allowlist | L | nach F (#1188); *E-21: #1141 als eigener S-PR nach F* |
-| P17 | Phase E Phasen-PR (feat/phase-e-artifact-locations) | phase-e | #1187 #1198 #1186 #1199 #1200 (+#1197) | S/C/T | ja (70/98 Templates) | AC, G, SA, B, H — größte Rebaseline | XL | Specs APPROVED; *E-20: #1187 wieder öffnen = Nutzer-Aktion bei Phase-E-Start; E-C0-Messung akzeptiert* |
+| P17 | Phase E Phasen-PR (feat/phase-e-artifact-locations) | phase-e | #1187 #1198 #1186 #1199 #1200 (+#1197) | S/C/T | ja (70/98 Templates) | AC, G, SA, B, H — größte Rebaseline | XL | Specs APPROVED; *E-20: #1188 wieder öffnen = Nutzer-Aktion bei Phase-E-Start; E-C0-Messung akzeptiert* |
 | P18 | Phase E-2 #1209 Artifact-Mode-Gating | phase-e Block 4 | #1209 | S/T | ja | AC, G | M | *E-22: Spec E-T7 einzeln zum Wellenstart nach Review (DRAFT bis dahin)* |
 | P19 | Phase F-PR1 (#1188, #1203, #1204) | phase-f | #1188 #1203 #1204 | S/C/T | ja | AC, G, B | L | Spec #1188 APPROVED; nach E-Kern |
 | P20 | Phase F-PR2 (#1202, #1201) | phase-f | #1202 #1201 (#1211 gesperrt) | S/C | ja | AC, G | M | *E-22: Kinder-Addendum einzeln zum Wellenstart (DRAFT bis dahin)* |
@@ -187,7 +187,7 @@ Begründung: Roster-Reduktion bleibt der größte always-on-Hebel, DoD/KE/Rules-
 | PR | Branch | Inhalt | Issues | RB | Gate |
 |---|---|---|---|---|---|
 | 3.0 | feat/phase-g1 | P21 G-PR1 (#800 fail-closed, #1171 xfail, #1175 Doku, #860 Runbook) | #800 #1171 #1175 #860 | Hash-only | Gemini-Gates nur CLI (E-26) |
-| 3.1 | feat/phase-e-artifact-locations | P17: #1187 Block 0 → #1198 → #1186 → #1199 → #1200 (+#1197) | #1187 #1198 #1186 #1199 #1200 #1197 | **1 Rebaseline** (AC, G, SA, B, H) | Nutzer öffnet #1187 wieder (E-20); E-C0 Messung akzeptiert |
+| 3.1 | feat/phase-e-artifact-locations | P17: #1187 Block 0 → #1198 → #1186 → #1199 → #1200 (+#1197) | #1187 #1198 #1186 #1199 #1200 #1197 | **1 Rebaseline** (AC, G, SA, B, H) | Nutzer öffnet #1188 wieder (E-20); E-C0 Messung akzeptiert |
 | 3.2 | feat/phase-f-label-taxonomy | P19 F-PR1: #1203 → #1188 → #1204 | #1188 #1203 #1204 | **1 Rebaseline** | Kinder-Addendum nur individuell (E-22) |
 | 3.3 | feat/commit-authority-grant | P16 Strom A #1181 (T1–T16); **#1141 als eigener S-PR danach (E-21)** | #1181 | **1 Rebaseline** (AC, G, Allowlist) | Gate G-A |
 | 3.3b | feat/schema-unknown-keys | #1141 Schema-Unknown-Keys, S-PR nach F | #1141 | keiner/klein | Spec-Gate (Task 11) |
@@ -285,7 +285,7 @@ Empf. = Empfehlung des Reviews. „Wie Empf.“ = Nutzer folgt der Empfehlung; �
 | E-17 | Worker-Control-Capability | Capability pro Provider (ersetzt Phase-D-Task 3/#1176); Continue `subagent` → WARNING; primary Claude/Kimi als prose-only gemeldet | wie Empf. |
 | E-18 | #1172 | Doku in W2; Permission-Regel nur bei positiver Machbarkeit (W4) | wie Empf. |
 | E-19 | Trailer-Contract | **KONFIGURIERBAR (Config-Key)**, Contract in git.md; **Git-Agent-PR kommt ZUERST** (früh in W0/W1) statt fest im Prompt-Trailer | **Abweichung** (Review: fester Prompt-Trailer) |
-| E-20 | #1187 / E-C0 | #1187 wieder öffnen (Nutzer-Aktion zum Phase-E-Start); E-C0-Messung akzeptiert | wie Empf. |
+| E-20 | #1188 / E-C0 | #1188 wieder öffnen (Nutzer-Aktion zum Phase-E-Start); E-C0-Messung akzeptiert | wie Empf. |
 | E-21 | #1141 | eigener S-PR nach F | wie Empf. |
 | E-22 | Specs Kinder-Addendum F / #1209 / #1141 | einzeln zum Wellenstart nach Review freigeben (bis dahin DRAFT) | wie Empf. |
 | E-23 | Routing PR 2 | wie Empf.: kompaktes Zeilenformat Default, name_index reduzieren, Direct-Dispatch generieren, Lazy-Detaildatei, Minor-Bump + CHANGELOG; NICHT das globale Compact-Profil | wie Empf. |
@@ -309,7 +309,7 @@ Zusammenfassung der Abweichungen: E-13, E-14, E-15 (drei Einsparungen entfallen)
 5. #1237-Mini-Spec schreiben; danach Status APPROVED (User, 2026-11-16) laut E-10.
 6. Spec-Freigaben zum Wellenstart (E-22: Kinder-Addendum F, #1209, #1141; E-31: Phase G/I-Specs und Konzepte).
 7. #1217 und #1172 bleiben DRAFT (#1217 nach Task 1a, #1172 nach Machbarkeit).
-8. Nutzer-Aktion: #1187 wieder öffnen bei Phase-E-Start (E-20).
+8. Nutzer-Aktion: #1188 wieder öffnen bei Phase-E-Start (E-20).
 9. Offen aus §3.8: Git-Agent-PR 0.9 gesondert rebaselinen oder in 2.2 mitnehmen (Entscheidung bei Start von 0.9).
 10. Routing-Spec nach Review freigeben (E-07); Rollenliste-Vorlage vor 2.2.
 

@@ -1,8 +1,10 @@
 """T7: ARTIFACT_* placeholder allow-list registration (issue #1186, Spec §4.7).
 
-The 54 names exported by T6's ``_build_artifact_variables`` must be registered
-in ``_BUILTIN_VARS`` so that ``check_builder_known_set`` stays green. The
-shrink-only ``_UNREGISTERED_BUILDER_RATCHET`` must not be touched.
+The 54 core names exported by T6's ``_build_artifact_variables`` must be
+registered in ``_BUILTIN_VARS`` so that ``check_builder_known_set`` stays green.
+#1209 adds 46 derived template-gate flags (2 per class), so the pinned set is
+now 100 names. The shrink-only ``_UNREGISTERED_BUILDER_RATCHET`` must not be
+touched.
 """
 from __future__ import annotations
 
@@ -14,7 +16,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from lib.consistency import placeholders as ph  # noqa: E402
 
-# The exact 54-name contract from plan §3.3 / Spec §3.4 (T6/T7 pin this set).
+# The exact 54 core names from plan §3.3 / Spec §3.4 (T6/T7 pin), plus the
+# 46 #1209 template-gate flags (SPEC-artifact-mode-gating-2026-11-20 §3.4).
 # The two pre-existing release vars (ARTIFACT_ZIP_CMD, ARTIFACT_TAR_CMD) are
 # already registered and are intentionally not part of this set.
 EXPECTED_ARTIFACT_NAMES: frozenset[str] = frozenset({
@@ -49,6 +52,36 @@ EXPECTED_ARTIFACT_NAMES: frozenset[str] = frozenset({
     "ARTIFACT_SE_INTERFACES_MODE", "ARTIFACT_SE_IMPLEMENTATION_MODE",
     "ARTIFACT_SE_TESTPLAN_MODE", "ARTIFACT_SE_VALIDATION_MODE",
     "ARTIFACT_SE_VERIFICATION_MODE", "ARTIFACT_SE_DECISIONS_MODE",
+    # 46 #1209 template-gate flags (2 per class, derived from the class mode)
+    "ARTIFACT_SPECS_MODE_FILES", "ARTIFACT_SPECS_MODE_INLINE",
+    "ARTIFACT_PLANS_MODE_FILES", "ARTIFACT_PLANS_MODE_INLINE",
+    "ARTIFACT_CONCEPTS_MODE_FILES", "ARTIFACT_CONCEPTS_MODE_INLINE",
+    "ARTIFACT_SPIKES_MODE_FILES", "ARTIFACT_SPIKES_MODE_INLINE",
+    "ARTIFACT_REVIEWS_MODE_FILES", "ARTIFACT_REVIEWS_MODE_INLINE",
+    "ARTIFACT_AUDITS_MODE_FILES", "ARTIFACT_AUDITS_MODE_INLINE",
+    "ARTIFACT_ANALYSIS_MODE_FILES", "ARTIFACT_ANALYSIS_MODE_INLINE",
+    "ARTIFACT_REPORTS_MODE_FILES", "ARTIFACT_REPORTS_MODE_INLINE",
+    "ARTIFACT_ADR_MODE_FILES", "ARTIFACT_ADR_MODE_INLINE",
+    "ARTIFACT_TRACEABILITY_MODE_FILES", "ARTIFACT_TRACEABILITY_MODE_INLINE",
+    "ARTIFACT_RUNBOOKS_MODE_FILES", "ARTIFACT_RUNBOOKS_MODE_INLINE",
+    "ARTIFACT_SCRATCH_MODE_FILES", "ARTIFACT_SCRATCH_MODE_INLINE",
+    "ARTIFACT_STATE_MODE_FILES", "ARTIFACT_STATE_MODE_INLINE",
+    "ARTIFACT_PROJECT_DOCS_MODE_FILES", "ARTIFACT_PROJECT_DOCS_MODE_INLINE",
+    "ARTIFACT_SE_REQUIREMENTS_MODE_FILES",
+    "ARTIFACT_SE_REQUIREMENTS_MODE_INLINE",
+    "ARTIFACT_SE_ARCHITECTURE_MODE_FILES",
+    "ARTIFACT_SE_ARCHITECTURE_MODE_INLINE",
+    "ARTIFACT_SE_DECOMPOSITION_MODE_FILES",
+    "ARTIFACT_SE_DECOMPOSITION_MODE_INLINE",
+    "ARTIFACT_SE_INTERFACES_MODE_FILES",
+    "ARTIFACT_SE_INTERFACES_MODE_INLINE",
+    "ARTIFACT_SE_IMPLEMENTATION_MODE_FILES",
+    "ARTIFACT_SE_IMPLEMENTATION_MODE_INLINE",
+    "ARTIFACT_SE_TESTPLAN_MODE_FILES", "ARTIFACT_SE_TESTPLAN_MODE_INLINE",
+    "ARTIFACT_SE_VALIDATION_MODE_FILES", "ARTIFACT_SE_VALIDATION_MODE_INLINE",
+    "ARTIFACT_SE_VERIFICATION_MODE_FILES",
+    "ARTIFACT_SE_VERIFICATION_MODE_INLINE",
+    "ARTIFACT_SE_DECISIONS_MODE_FILES", "ARTIFACT_SE_DECISIONS_MODE_INLINE",
 })
 
 # Exact current ratchet contents, pinned so any growth fails this task.
@@ -75,15 +108,15 @@ def test_all_derived_artifact_vars_are_registered():
     assert missing == set(), f"Unregistered ARTIFACT_* vars: {sorted(missing)}"
 
 
-def test_exactly_54_artifact_names_derived_and_registered():
-    """The builder yields exactly the pinned 54 names, all registered."""
-    assert len(EXPECTED_ARTIFACT_NAMES) == 54
+def test_exactly_100_artifact_names_derived_and_registered():
+    """The builder yields exactly the pinned 100 names, all registered."""
+    assert len(EXPECTED_ARTIFACT_NAMES) == 100
     assert _derived_artifact_names() == set(EXPECTED_ARTIFACT_NAMES)
     assert EXPECTED_ARTIFACT_NAMES <= ph._BUILTIN_VARS
 
 
 def test_template_artifact_placeholders_resolve_to_allow_list(tmp_path):
-    """All 54 names used in a template produce no placeholders.unknown."""
+    """All 100 names used in a template produce no placeholders.unknown."""
     template = tmp_path / "a.md"
     body = "Use " + ", ".join(f"{{{{{name}}}}}" for name in sorted(EXPECTED_ARTIFACT_NAMES)) + ".\n"
     template.write_text("---\nname: a\n---\n" + body, encoding="utf-8")

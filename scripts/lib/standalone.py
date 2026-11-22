@@ -18,6 +18,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from .artifact_locations import artifact_mode_flags
 from .frontmatter import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
 from .config import (
     AGENT_BLOCK_SNIPPETS,
@@ -314,9 +315,10 @@ def _standalone_active_set_flags(agent_meta_root: Path) -> dict:
 
 
 # Issue #1186 (T6): a standalone persona has no project config to resolve the
-# artifact-location matrix from, so it ships the same 54 ARTIFACT_* names with
-# framework defaults (Spec §3.4). Without this block the 26 matrix-driven
-# templates would render "[ARTIFACT_* — not available]" notes (D2/D9).
+# artifact-location matrix from, so it ships the 100 ARTIFACT_* names (core 54
+# + 46 #1209 gate flags) with framework defaults (Spec §3.4). Without this
+# block the 26 matrix-driven templates would render "[ARTIFACT_* — not
+# available]" notes (D2/D9).
 _ARTIFACT_MODE_STEMS: tuple[str, ...] = (
     # 13 non-SE classes
     "SPECS", "PLANS", "CONCEPTS", "SPIKES", "REVIEWS", "AUDITS", "ANALYSIS",
@@ -366,6 +368,15 @@ _ARTIFACT_FALLBACKS: dict[str, str] = {
     "ARTIFACT_ISSUE_LABELS_FILE": "docs/issue-labels.md",
     # 23 _MODE values (no project config => never inline/off)
     **{f"ARTIFACT_{_stem}_MODE": "files" for _stem in _ARTIFACT_MODE_STEMS},
+    # #1209: a standalone persona has no config either, so the derived gate
+    # flags use the same framework default (files -> FILES true / INLINE false).
+    **{
+        f"ARTIFACT_{_stem}_MODE_{_suffix}": _value
+        for _stem in _ARTIFACT_MODE_STEMS
+        for _suffix, _value in zip(
+            ("FILES", "INLINE"), artifact_mode_flags("files")
+        )
+    },
 }
 
 
