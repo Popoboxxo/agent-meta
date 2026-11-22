@@ -61,7 +61,7 @@
   "_comment_max_parallel_agents": "Optional: Maximale Anzahl parallel laufender Agenten (1–5). Default: 2.",
   "max-parallel-agents": 2,
 
-  "_comment_speech_mode": "Optional: Kommunikationsstil aller Agenten. Wird als .claude/rules/speech-mode.md generiert. 'full' (Default) = kein Output. 'short' = Fakten only. 'childish' = kindgerecht. 'caveman' = Höhlenmensch. 'asozial' = verachtend. 'submissive' = devot und unterwürfig.",
+  "_comment_speech_mode": "Optional: Kommunikationsstil aller Agenten. Wird als Rules-Datei (z.B. .claude/rules/speech-mode.md) geschrieben, wenn der Provider Rules unterstützt (has_rules: true); sonst als Abschnitt '## Speech-Mode' in die Kontextdatei des Providers (z.B. AGENTS.md) eingebettet. 'full' (Default) = kein Output. 'short' = Fakten only. 'childish' = kindgerecht. 'caveman' = Höhlenmensch. 'asozial' = verachtend. 'submissive' = devot und unterwürfig.",
   "speech-mode": "full",
 
   "_comment_hooks": "Optional: Hooks aktivieren. Two-Gate: Script muss existieren UND enabled:true gesetzt sein.",
