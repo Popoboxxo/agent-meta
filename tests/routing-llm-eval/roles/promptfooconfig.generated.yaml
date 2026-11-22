@@ -731,7 +731,20 @@ tests:
 - description: rx-tester-01 [tester]
   vars:
     role: orchestrator
-    prompt: Schreibe Tests für das Modul (TDD).
+    prompt: Deutsch
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: tester
+- description: rx-tester-02 [tester]
+  vars:
+    role: orchestrator
+    prompt: English
   assert:
   - type: contains-json
     value:
@@ -5345,6 +5358,32 @@ tests:
       properties:
         target:
           const: mammouth-expert
+- description: rn-provider-expert-de [provider-expert]
+  vars:
+    role: orchestrator
+    prompt: Rufe den Agenten provider-expert auf und starte direkt.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: provider-expert
+- description: rn-provider-expert-en [provider-expert]
+  vars:
+    role: orchestrator
+    prompt: Run the provider-expert agent directly.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: provider-expert
 - description: rk-knowledge-curator-01 [knowledge-curator]
   vars:
     role: orchestrator

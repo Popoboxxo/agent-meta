@@ -484,8 +484,17 @@ cases:
   role: tester
   category: example
   lang: de
-  task: Schreibe Tests für das Modul (TDD).
-  source_example: Schreibe Tests für das Modul (TDD).
+  task: Deutsch
+  source_example: Deutsch
+  expected:
+    target: tester
+    tier_escalation: false
+- id: rx-tester-02
+  role: tester
+  category: example
+  lang: de
+  task: English
+  source_example: English
   expected:
     target: tester
     tier_escalation: false
@@ -3665,6 +3674,24 @@ cases:
   source_example: Wie nutze ich die Mammouth-Plan/Build-Modes?
   expected:
     target: mammouth-expert
+    tier_escalation: false
+- id: rn-provider-expert-de
+  role: provider-expert
+  category: name_only
+  lang: de
+  task: Rufe den Agenten provider-expert auf und starte direkt.
+  pair_id: rn-provider-expert
+  expected:
+    target: provider-expert
+    tier_escalation: false
+- id: rn-provider-expert-en
+  role: provider-expert
+  category: name_only
+  lang: en
+  task: Run the provider-expert agent directly.
+  pair_id: rn-provider-expert
+  expected:
+    target: provider-expert
     tier_escalation: false
 - id: rk-knowledge-curator-01
   role: knowledge-curator
