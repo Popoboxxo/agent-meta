@@ -1,6 +1,7 @@
 """Sync pipeline writes .meta-config/auto-commit-allowlist.json (issue
 #694). Real-subprocess e2e test, matching the pattern used for
 generated-file-hashes.json / progress-file tests."""
+from __future__ import annotations
 
 import json
 import subprocess
