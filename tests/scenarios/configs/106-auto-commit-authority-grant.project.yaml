@@ -20,7 +20,7 @@ auto_commit:
       acknowledge_full_shell: true
 project:
   name: scenario-auto-commit-authority-grant
-  prefix: s94
+  prefix: s106
   short: scenario-authority-grant
 variables:
   PROJECT_NAME: scenario-auto-commit-authority-grant

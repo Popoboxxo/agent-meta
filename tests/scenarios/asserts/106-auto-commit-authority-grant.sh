@@ -1,5 +1,5 @@
 #!/bin/bash
-# Scenario assert for 94-auto-commit-authority-grant (issue #1181, plan T12).
+# Scenario assert for 106-auto-commit-authority-grant (issue #1181, plan T12).
 #
 # Contract (see tests/scenarios/run.sh header): cwd = the scenario's temp
 # project dir (the sync output); $1 and env REPO_ROOT both carry the
@@ -24,7 +24,7 @@ set -u
 
 REPO_ROOT="${1:-${REPO_ROOT:-}}"
 if [ -z "$REPO_ROOT" ]; then
-    echo "ASSERT ERROR (94-auto-commit-authority-grant): REPO_ROOT missing (pass as \$1 or env var)" >&2
+    echo "ASSERT ERROR (106-auto-commit-authority-grant): REPO_ROOT missing (pass as \$1 or env var)" >&2
     exit 2
 fi
 
@@ -33,7 +33,7 @@ GRANT_SUBSTR='full `Bash` grant, not a `git`-only grant'
 HOOKLESS_WARN="auto-commit-grant: documenter=direct not enforced on provider 'Opencode' (has_hooks=false); rendered as notify (issue #1181)"
 
 fail() {
-    echo "ASSERT FAIL (94-auto-commit-authority-grant): $*"
+    echo "ASSERT FAIL (106-auto-commit-authority-grant): $*"
     exit 1
 }
 
@@ -82,17 +82,17 @@ with open(sys.argv[1], encoding="utf-8") as fh:
     data = json.load(fh)
 
 if data.get("version") != 2:
-    print(f"ASSERT FAIL (94, allowlist): version must be 2, got {data.get('version')!r}")
+    print(f"ASSERT FAIL (106, allowlist): version must be 2, got {data.get('version')!r}")
     sys.exit(1)
 if data.get("authority_overrides", {}).get("documenter") != "direct":
-    print("ASSERT FAIL (94, allowlist): authority_overrides.documenter must be 'direct', "
+    print("ASSERT FAIL (106, allowlist): authority_overrides.documenter must be 'direct', "
           f"got {data.get('authority_overrides')!r}")
     sys.exit(1)
 PY
 
 # --- (e) 2nd sync: no authority_overrides + documenter removed from roles ---
 CFG=".meta-config/project.yaml"
-cp "$CFG" ".scenario-logs/94.project.orig.yaml" \
+cp "$CFG" ".scenario-logs/106.project.orig.yaml" \
     || fail "cannot back up $CFG"
 python3 - "$CFG" <<'PY' || fail "cannot rewrite config for withdrawal sync"
 import sys
@@ -105,7 +105,7 @@ grant = ("  authority_overrides:\n"
          "      authority: direct\n"
          "      acknowledge_full_shell: true\n")
 if grant not in text:
-    print("ASSERT ERROR (94): expected grant block not found in project.yaml")
+    print("ASSERT ERROR (106): expected grant block not found in project.yaml")
     sys.exit(1)
 text = text.replace(grant, "")
 text = text.replace("- documenter\n", "")
@@ -123,7 +123,7 @@ grep -qF 'documenter (grant withdrawn)' ".scenario-logs/sync2.log" \
     || fail "2nd sync log missing 'documenter (grant withdrawn)' (D17: roles: withdrawal)"
 
 # --- (f) 3rd sync: restore grant, disable guard, expect no Bash ------------
-cp ".scenario-logs/94.project.orig.yaml" "$CFG" \
+cp ".scenario-logs/106.project.orig.yaml" "$CFG" \
     || fail "cannot restore original config for guard-off sync"
 cat >>"$CFG" <<'YAML'
 hooks:
@@ -141,4 +141,4 @@ fi
 grep -qF 'guard hook disabled: hooks.orchestrator-guard.enabled is not true' ".scenario-logs/sync3.log" \
     || fail "3rd sync log missing guard-disabled WARN"
 
-echo "ASSERT OK (94-auto-commit-authority-grant): grant render, non-grant byte-stability, hookless deny+WARN, allowlist v2, roles: withdrawal WARN and guard-off fail-closed verified"
+echo "ASSERT OK (106-auto-commit-authority-grant): grant render, non-grant byte-stability, hookless deny+WARN, allowlist v2, roles: withdrawal WARN and guard-off fail-closed verified"
