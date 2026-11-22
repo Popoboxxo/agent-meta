@@ -8,7 +8,7 @@ roles:
   orchestrator:
     model: balanced
     memory: ''
-    permission_mode: plan
+    permission_mode: default
     workflow_tier: required
     description: Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen
       Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation
@@ -272,9 +272,8 @@ roles:
     model: fast
     memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
-    description: 'Installation doctor: runs `sync.py --doctor`, deduplicates and prioritizes
-      known-issue findings of this agent-meta installation, and hands fixes to agent-meta-manager
-      — never repairs anything and writes reports only to the configured tmp-sink.'
+    description: 'Installation doctor: runs `sync.py --doctor`, dedupes/prioritizes findings,
+      hands fixes to agent-meta-manager — never repairs anything; reports to tmp-sink.'
     routing:
       addressability: name_only
       name_only_reason: Diagnostic meta role; invoked explicitly by name (e.g. 'run
@@ -293,9 +292,8 @@ roles:
     model: balanced
     memory: ''
     workflow_tier: optional
-    description: 'Read-only config optimizer: reads a `sync.py --optimize-config` proposal
-      and presents token-compact, evidence-backed variants of the project config
-      with mandatory warnings — never edits or applies anything.'
+    description: 'Read-only config optimizer: reads `sync.py --optimize-config` proposals
+      and presents token-compact variants with warnings — never edits or applies.'
     routing:
       addressability: name_only
       name_only_reason: Config optimization meta role; produces proposals only and is
@@ -422,6 +420,12 @@ roles:
       addressability: keyword
       parallel: true
       orchestrator_only: false
+      intents: [docs]
+      size_class: M
+      direct_dispatch: true
+      direct_dispatch_order: 4
+      direct_dispatch_operation: Session-Erkenntnisse speichern
+      direct_dispatch_condition: Nur bei Session-Ende
     routing_patterns:
       keywords:
       - Dokumentation
@@ -593,6 +597,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [meta]
+      size_class: M
+      direct_dispatch: true
+      direct_dispatch_order: 2
+      direct_dispatch_operation: Sync, Upgrade, Meta-Konfiguration
+      direct_dispatch_condition: Reine agent-meta-Operation
     routing_patterns:
       keywords:
       - Meta-Fragen
@@ -632,6 +642,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [git]
+      size_class: S
+      direct_dispatch: true
+      direct_dispatch_order: 1
+      direct_dispatch_operation: Commit, Push, Branch, Tag, PR
+      direct_dispatch_condition: Einzelner Git-Befehl
     routing_patterns:
       keywords:
       - Git
@@ -742,6 +758,12 @@ roles:
       addressability: keyword
       parallel: false
       orchestrator_only: false
+      intents: [meta, triage]
+      size_class: S
+      direct_dispatch: true
+      direct_dispatch_order: 3
+      direct_dispatch_operation: Bug/Feature/Verbesserung melden
+      direct_dispatch_condition: Issue-Erstellung
     routing_patterns:
       keywords:
       - Feedback

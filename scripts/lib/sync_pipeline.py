@@ -88,17 +88,18 @@ from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, safe_path, write_atomic
 from lib.isolation import (
-    _sync_opencode_runtime_gate,
+    sync_runtime_gate,
     gate_state_present,
     owns_gate_surface,
-    reconcile_opencode_surface_gate,
-    rollback_opencode_runtime_gate,
+    reconcile_surface_gate,
+    rollback_runtime_gate,
     sync_provider_isolation,
 )
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.mcp_deny import sync_mcp_deny
 from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
@@ -918,7 +919,7 @@ def _sync_stage_legacy_cleanup(
             # back BEFORE the provider directory is pruned. Ownership-guarded
             # and state-guarded: a foreign provider and a provider without gate
             # state are no-ops.
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 project_root, prov, provider_config, log, args.dry_run,
                 config=config, include_isolation_deny=True,
             )
@@ -1012,6 +1013,11 @@ def _managed_dirs_for_prune(
             specs.append(pc.get("rules_dir", ".claude/rules"))
         if pc.get("has_commands", False):
             specs.append(pc.get("commands_dir", ".claude/commands"))
+        # #1161 Pkt 4: backups written next to the context file live in its
+        # parent directory, which may not be any of the managed dirs above
+        # (e.g. a context file under docs/ or a provider-specific subdir).
+        if pc.get("context_file"):
+            specs.append(str(Path(pc["context_file"]).parent))
         specs.append(resolve_pipeline_details_dir(pc, provider))
         for rel in specs:
             if not rel:
@@ -1529,6 +1535,24 @@ def _sync_stage_per_provider(
                 project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,
             )
 
+        # PR 4.1 / P26 (E-23): lazy routing detail file. One provider-agnostic
+        # companion holding every deferred routing field (intents, all examples,
+        # priority, size_class, contracts). The orchestrator prompt references
+        # it with exactly one pointer line (ROUTING_DETAILS_PATH). Registered in
+        # generated-file-hashes.json so --check detects drift.
+        if str(variables.get("ROUTING_DETAILS_ENABLED", "true")).lower() == "true":
+            from .intent_routing import (
+                render_routing_detail, resolve_routing_detail_path,
+            )
+            routing_rules = variables.get("_ROUTING_MODEL_RULES") or []
+            detail_doc = render_routing_detail(routing_rules, root=agent_meta_root)
+            detail_rel = resolve_routing_detail_path(pc, provider)
+            detail_path = project_root / detail_rel
+            if not args.dry_run:
+                detail_path.parent.mkdir(parents=True, exist_ok=True)
+                detail_path.write_text(detail_doc, encoding="utf-8")
+            log.note("routing-detail", f"wrote {detail_rel}")
+
         sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                  log, args.dry_run, provider, provider_config,
                                  platform_vars=platform_vars,
@@ -1575,6 +1599,15 @@ def _sync_stage_per_provider(
         for entry in mcp_extras:
             if entry not in mcp_gitignore_extras:
                 mcp_gitignore_extras.append(entry)
+        # #1263: project each active server's blocked tools into the provider's
+        # native permission deny surface. Capability-gated inside the helper —
+        # providers without it keep the prompt convention and are logged.
+        from lib.mcp import resolve_active_mcp_servers
+        sync_mcp_deny(
+            project_root, provider, provider_config, mcp_registry,
+            resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry),
+            log, args.dry_run, agent_meta_root=agent_meta_root,
+        )
         # External tools: generate rule files for active locally-installed CLI tools
         try:
             generate_external_tool_artifacts(
@@ -1643,7 +1676,7 @@ def _sync_stage_per_provider(
                 provider, provider_config,
             )
         if provider_runtime_gate_tier(pc, caps) == "permission":
-            _sync_opencode_runtime_gate(
+            sync_runtime_gate(
                 project_root, config, provider, provider_config,
                 agent_meta_root, log, args.dry_run,
                 active_set=active_set,
@@ -1657,9 +1690,9 @@ def _sync_stage_per_provider(
             # tier, so a tier change away from it skipped the writer and left
             # the recorded deny + ``default_agent`` behind. A v1 document with a
             # pending gate record is rolled back here; v2 documents keep their
-            # tier-independent ``reconcile_opencode_surface_gate`` path (below)
+            # tier-independent ``reconcile_surface_gate`` path (below)
             # and are excluded so their entry point is never taken back.
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 project_root, provider, provider_config, log, args.dry_run,
                 config=config,
             )
@@ -1681,12 +1714,12 @@ def _sync_stage_per_provider(
             active_set=active_set,
         )
         if not topology_explicit(config, provider) and active_set is None:
-            # Same guard as the Spec-A writer (``_sync_opencode_runtime_gate``):
+            # Same guard as the Spec-A writer (``sync_runtime_gate``):
             # without active-set information the derivation can only fall back
             # to ``subagent``, which would silently withhold an entry point the
             # caller had no information about (AC-6 byte identity).
             topology = None
-        reconcile_opencode_surface_gate(
+        reconcile_surface_gate(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
             active_set=active_set, topology=topology,

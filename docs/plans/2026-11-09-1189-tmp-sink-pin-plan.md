@@ -10,6 +10,8 @@ trace:
   - issue-1189
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status APPROVED, Fix in beta.8 ausgeliefert — Plan nicht nachgezogen (CHANGELOG :42-44, #1189).
+
 # Tmp-Sink-Pin vs. System-Temp-Root (Issue #1189) — Implementation Plan
 
 > Status: **APPROVED (2026-11-09)** — durch den User freigegeben; dieser Plan

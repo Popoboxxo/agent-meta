@@ -25,11 +25,16 @@ Gate input (``evaluate_gate``), metric values in percent (0-100;
     candidate = {"corpus_hash", "model_ids",
                  "model_classes": {cls: {metric: value}}}
 
-Deliberately deferred: the paired McNemar test (IC-36 "preferred"). The
-interface carries only aggregate values, no paired per-case results. Consequence:
-only the tau = max(1 pp, k*sigma) criterion is applied, which is the
-conservative fallback; a significant paired degradation inside tau is not
-detected.
+Optional per-case evidence (``per_case``, IC-36 "preferred")::
+
+    baseline["per_case"]  = {cls: {case_id: [0|1, ...]}}   # one value per run (majority -> correct)
+    candidate["per_case"] = {cls: {case_id: 0|1}}         # single aggregated value per case
+
+When both sides carry ``per_case`` for a class, ``evaluate_gate`` additionally
+runs an exact paired McNemar test on ``top1_accuracy`` (baseline majority vs.
+candidate value). A significant regression (p < alpha and c > b) fails the gate
+even when the aggregate tau criterion passes. Without ``per_case`` the gate
+applies only the tau = max(1 pp, k*sigma) criterion, byte-identically to before.
 """
 
 from __future__ import annotations
@@ -78,6 +83,25 @@ DEFAULT_OUTPUT_TOKENS_PER_CALL = 200
 DEFAULT_TASK_TOKENS_PER_CASE = 150
 DEFAULT_MAX_PRICE_AGE_DAYS = 90
 SKIP_RECORD_DIR = "tests/routing-llm-eval/roles/runs"
+
+
+def mcnemar_exact(b: int, c: int) -> float:
+    """Two-sided exact binomial p-value for paired McNemar discordant counts.
+
+    ``c`` counts cases where the baseline was correct and the candidate wrong
+    (regressions); ``b`` counts the reverse (improvements). Under the null
+    hypothesis the discordant pairs are binomially distributed with p=0.5, so
+    the two-sided p-value is ``2 * P(X <= min(b, c))`` for ``X ~ Bin(n=b+c, 0.5)``.
+    A significant regression requires ``c > b`` *and* ``p < alpha``.
+    """
+    if b < 0 or c < 0:
+        raise ValueError("discordant counts must be non-negative")
+    n = b + c
+    if n == 0:
+        return 1.0
+    k = min(b, c)
+    p = 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2**n
+    return min(1.0, p)
 
 
 def _context_tokens(report: Mapping) -> int:
@@ -328,7 +352,45 @@ def _metric_ok(direction: str, base_runs: Sequence[float], value: float, k: floa
     return abs(value) <= abs(mean) + tau + _EPS  # abs_delta
 
 
-def evaluate_gate(baseline: dict, candidate: dict, k: float = 2.0) -> str:
+def _is_binary(value: Any) -> bool:
+    """True only for a plain int 0/1 (``bool`` is deliberately rejected)."""
+    return type(value) is int and value in (0, 1)
+
+
+def _paired_regression(
+    base_runs_by_case: Mapping, cand_by_case: Mapping, alpha: float
+) -> Optional[bool]:
+    """Return True on a significant paired regression, False on no signal,
+    or ``None`` when the per-case evidence is not evaluable (-> unevidenced).
+
+    ``c`` counts baseline-correct/candidate-wrong cases; ``b`` counts the
+    reverse. The baseline verdict per case is the majority of its runs (ties
+    count as wrong). Case-id sets must match exactly and every value must be a
+    plain 0/1 int; a violation makes the evidence unusable but never raises.
+    """
+    if not isinstance(base_runs_by_case, Mapping) or not isinstance(cand_by_case, Mapping):
+        return None
+    if set(base_runs_by_case) != set(cand_by_case):
+        return None
+    b = c = 0
+    for case_id, runs in base_runs_by_case.items():
+        cand = cand_by_case[case_id]
+        if not isinstance(runs, (list, tuple)) or not runs or not _is_binary(cand):
+            return None
+        if not all(_is_binary(run) for run in runs):
+            return None
+        baseline_correct = sum(runs) * 2 > len(runs)
+        if baseline_correct and cand == 0:
+            c += 1
+        elif not baseline_correct and cand == 1:
+            b += 1
+    p = mcnemar_exact(b, c)
+    return p < alpha and c > b
+
+
+def evaluate_gate(
+    baseline: dict, candidate: dict, k: float = 2.0, alpha: float = 0.05
+) -> str:
     """Return ``passed`` | ``failed`` | ``not-evidenced`` (IC-36).
 
     ``not-evidenced`` (never ``passed``) when the comparison itself is not
@@ -354,6 +416,17 @@ def evaluate_gate(baseline: dict, candidate: dict, k: float = 2.0) -> str:
         return NOT_EVIDENCED
     failed = False
     unevidenced = False
+    base_pc = baseline.get("per_case")
+    cand_pc = candidate.get("per_case")
+    # Paired per-case McNemar on top1_accuracy, only when both sides carry
+    # per-case data at all. Absence keeps the byte-identical tau-only behaviour.
+    pc_applicable = (
+        isinstance(base_pc, Mapping)
+        and isinstance(cand_pc, Mapping)
+        and any("top1_accuracy" in classes[cls] for cls in classes)
+    )
+    pc_malformed = False
+    pc_regression = False
     for cls in sorted(classes):
         cand_metrics = cand_classes.get(cls)
         if not isinstance(cand_metrics, Mapping):
@@ -367,6 +440,18 @@ def evaluate_gate(baseline: dict, candidate: dict, k: float = 2.0) -> str:
                 continue
             if not _metric_ok(direction, classes[cls][metric], float(value), k):
                 failed = True
+        if pc_applicable and cls in base_pc and cls in cand_pc:
+            regression = _paired_regression(base_pc[cls], cand_pc[cls], alpha)
+            if regression is None:
+                pc_malformed = True
+            elif regression:
+                pc_regression = True
+    # Malformed per-case evidence cannot prove quality (IC-36): it suppresses
+    # any McNemar-derived regression and makes the comparison not-evidenced.
+    if pc_malformed:
+        unevidenced = True
+    elif pc_regression:
+        failed = True
     if failed:
         return FAILED
     return NOT_EVIDENCED if unevidenced else PASSED

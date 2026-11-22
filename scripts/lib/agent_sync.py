@@ -39,7 +39,6 @@ from .providers import (
     load_provider_capabilities,
     load_providers_config,
     provider_has_capability,
-    provider_hooks_supported,
     resolve_providers,
 )
 from .provider_transform import (
@@ -54,7 +53,11 @@ from .rule_index import (
     read_managed_index,
     write_managed_index,
 )
-from .variables import strip_inactive_conditional_blocks, substitute
+from .variables import (
+    render_worker_control_tools,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 
 if TYPE_CHECKING:
     from .active_set import ActiveSet
@@ -485,6 +488,51 @@ def _resolve_sync_targets(
         target_dir.mkdir(parents=True, exist_ok=True)
     return pc, role_map, overrides, target_dir
 
+
+# Git-sentinel scope (issue #1307, Task 1). On providers with the
+# ``hook-agent-id`` capability the guard discards a leading sentinel on the
+# main thread, so a pure ``gh`` call does not need one — the extra comment line
+# breaks user allow rules such as ``Bash(gh issue *)``. Providers WITHOUT that
+# capability keep today's text verbatim (Strict-Mode needs the sentinel on
+# every Bash call). These are module constants so the two render paths cannot
+# drift apart; the leading space on the scope value is intentional (inline
+# after a sentence, so the empty case stays byte-identical).
+_GIT_SENTINEL_SCOPE_WITH_HOOK_AGENT_ID = (
+    " Exception: for Bash calls that run only `gh` (no `git` in the call), "
+    "do NOT add the sentinel line — it is not needed for `gh`, and the extra "
+    "line makes allow rules such as `Bash(gh issue *)` not match. Run such "
+    "`gh` calls as their own Bash call; never mix `gh` and `git` in one call. "
+    "Every call that runs `git` keeps the sentinel as its first line."
+)
+_GIT_SENTINEL_SCOPE_WITHOUT_HOOK_AGENT_ID = ""
+_GIT_SENTINEL_BASH_RULE_WITH_HOOK_AGENT_ID = (
+    "`git` calls always prefixed with `#agent-meta:agent=git` as the first "
+    "line, `gh`-only calls without it (see workflow step 0)"
+)
+_GIT_SENTINEL_BASH_RULE_WITHOUT_HOOK_AGENT_ID = (
+    "always prefixed with `#agent-meta:agent=git` as the first line "
+    "(see workflow step 0)"
+)
+
+
+def _git_sentinel_scope_vars(pc: dict) -> dict:
+    """Resolve the two inline git-sentinel texts for one provider.
+
+    Pure function driven only by the ``hook-agent-id`` capability — no provider
+    names, no I/O. Consumed by :func:`_build_provider_vars` (provider-injected
+    template values) and asserted verbatim by the Task 1 regression tests.
+    """
+    if provider_has_capability(pc, "hook-agent-id"):
+        return {
+            "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITH_HOOK_AGENT_ID,
+            "GIT_SENTINEL_BASH_RULE": _GIT_SENTINEL_BASH_RULE_WITH_HOOK_AGENT_ID,
+        }
+    return {
+        "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITHOUT_HOOK_AGENT_ID,
+        "GIT_SENTINEL_BASH_RULE": _GIT_SENTINEL_BASH_RULE_WITHOUT_HOOK_AGENT_ID,
+    }
+
+
 def _build_provider_vars(
     pc: dict,
     provider: str,
@@ -509,9 +557,22 @@ def _build_provider_vars(
     used (AC-30), so it is never resolved or defaulted here.
     """
     from .delegation_syntax import DelegationSyntaxEngine
+    from .intent_routing import resolve_routing_detail_path
 
     _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     file_based = _ds_engine.has_file_based_agents(provider)
+    # SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19 (IC-2 / O4): per-provider
+    # messaging/worker-control capability, read once from the data registry.
+    # Missing/empty key -> empty list -> both gates fail-safe false. No
+    # provider-name branch, no hook coupling.
+    _declared_wc = (
+        (load_provider_capabilities(agent_meta_root).get(provider) or {})
+        .get("worker_control_tools")
+    )
+    _provider_worker_tools = (
+        [t for t in _declared_wc if isinstance(t, str) and t]
+        if isinstance(_declared_wc, list) else []
+    )
     provider_vars = {
         'EXTENSION_DIR': pc.get('extension_dir', f".{provider.lower()}/3-project"),
         'SNIPPETS_DIR': pc.get('snippets_dir', f".{provider.lower()}/snippets"),
@@ -519,12 +580,16 @@ def _build_provider_vars(
         'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
         'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
         'FILE_BASED_AGENTS': 'true' if file_based else 'false',
-        # Per-provider Tier-A gate (issue #743): the global
-        # PROGRESS_CHAT_PUSH_ENABLED from build_variables() ANDs across all
-        # active providers; here each provider's own verified hook_protocol
-        # decides, so a hook-less provider never blanks the chat-push block in
-        # a hook-capable provider's generated orchestrator.
-        'PROGRESS_CHAT_PUSH_ENABLED': 'true' if provider_hooks_supported(pc) else 'false',
+        # Per-provider worker-control gate (IC-2, #1176): derived from THIS
+        # provider's declared worker-control/messaging tools, not from hook
+        # support (O4). A tool-less provider gets a closed gate; a tool-bearing
+        # provider keeps its block regardless of hook_protocol.
+        'WORKER_CONTROL_ENABLED': 'true' if _provider_worker_tools else 'false',
+        # IC-3: the exact tool names this provider declares, rendered as a
+        # backtick list for the gated prose. Derived from the same capability
+        # list as the gate — no provider-name branch, no foreign literal.
+        'WORKER_CONTROL_TOOLS': render_worker_control_tools(_provider_worker_tools),
+        'PROGRESS_CHAT_PUSH_ENABLED': 'true' if _provider_worker_tools else 'false',
         # ROUTE_INTENT_CALLABLE (issue #264 runtime follow-up): gates the §3
         # route_intent mandate vs. its routing-rules fallback. Fail-safe false
         # unless the harness registers route_intent as a callable tool
@@ -537,7 +602,17 @@ def _build_provider_vars(
         # missing placeholder wiring surfaces via the consistency checks,
         # never as a crashed sync.
         'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
+        # PR 4.1 / P26 (E-23): provider-agnostic pointer to the lazy routing
+        # detail file. The path is derived from the provider's agents_dir (data
+        # from ai-providers.yaml), never a hardcoded provider name in a template
+        # (provider-agnostic policy). One pointer line in the orchestrator.
+        'ROUTING_DETAILS_PATH': resolve_routing_detail_path(pc, provider)
+        if str(variables.get('ROUTING_DETAILS_ENABLED', 'true')).lower() == 'true' else '',
     }
+    # issue #1307 (Task 1): inline git-sentinel scope texts, capability-driven
+    # so gh-only calls may omit the sentinel on hook-agent-id providers while
+    # every other provider keeps the byte-identical legacy text.
+    provider_vars.update(_git_sentinel_scope_vars(pc))
     # IC-02/IC-03 (AC-30): per-provider context-profile values resolved in
     # build_variables; the core CONTEXT_PROFILE/CONTEXT_PROFILE_COMPACT values
     # are only the full/false fallback.
@@ -837,8 +912,9 @@ def _apply_content_pipeline(
     pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     content = pal_engine.apply(content, provider, log=log)
     # Evaluate {{#if}} gates against the provider-merged variables, so
-    # per-provider overrides (e.g. PROGRESS_CHAT_PUSH_ENABLED, issue #743)
-    # take effect in the rendered agent. merged_vars is a superset of
+    # per-provider overrides (e.g. WORKER_CONTROL_ENABLED / PROGRESS_CHAT_PUSH_ENABLED,
+    # SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19) take effect in the rendered agent.
+    # merged_vars is a superset of
     # `variables`, so non-overridden gates behave identically.
     content = strip_inactive_conditional_blocks(content, merged_vars)
     # Apply platform-config substitution ({{platform.*}} placeholders)

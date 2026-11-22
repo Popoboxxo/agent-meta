@@ -4,6 +4,13 @@
 # temp project directory (never against this repo itself), then dry-run,
 # real sync and --validate are exercised.
 #
+# Profiles (SCENARIO_PROFILE, default `release` = historical behaviour):
+#   release  dry-run + real sync + full `sync.py --validate` per scenario.
+#   dev      real sync + `sync.py --validate-config-only` per scenario, with
+#            the repo-wide source consistency scan run ONCE for the whole
+#            invocation. Dry-run is skipped unless SCENARIO_KEEP_DRY_RUN=1.
+#            Use for local iteration / PR CI; never for a release decision.
+#
 # Per-scenario content assertions (optional):
 #   If tests/scenarios/asserts/<scenario-name>.sh exists and is executable,
 #   it is run after the --validate step (only when dry-run/sync/validate
@@ -56,6 +63,10 @@ Environment:
   SCENARIO_TOTAL=<n>  number of shards; both must be set together
   SCENARIO_JOBS=<n>   scenarios to run concurrently inside this shard
                       (default 1 = sequential)
+  SCENARIO_PROFILE=<release|dev>  validation depth; default release
+  SCENARIO_KEEP_DRY_RUN=1          keep the dry-run pass in dev profile
+  SCENARIO_SKIP_SOURCE_CHECK=1     skip the once-per-invocation source scan
+                                   in dev (only when the caller already ran it)
 EOF
 }
 
@@ -159,6 +170,18 @@ for name in ${SCENARIO_NAMES[@]+"${SCENARIO_NAMES[@]}"}; do
     index=$((index + 1))
 done
 
+# --- profile validation -----------------------------------------------------
+SCENARIO_PROFILE="${SCENARIO_PROFILE:-release}"
+case "$SCENARIO_PROFILE" in
+    release|dev) ;;
+    *)
+        echo "error: SCENARIO_PROFILE must be 'release' or 'dev' (got '$SCENARIO_PROFILE')" >&2
+        exit 2
+        ;;
+esac
+SCENARIO_KEEP_DRY_RUN="${SCENARIO_KEEP_DRY_RUN:-0}"
+SCENARIO_SKIP_SOURCE_CHECK="${SCENARIO_SKIP_SOURCE_CHECK:-0}"
+
 if [ "$LIST_ONLY" -eq 1 ]; then
     for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
         printf '%s\n' "$name"
@@ -191,6 +214,16 @@ if [ "$SCENARIO_JOBS" -lt 1 ]; then
     exit 2
 fi
 
+if [ "$SCENARIO_PROFILE" = "dev" ] && [ "$SCENARIO_SKIP_SOURCE_CHECK" != "1" ]; then
+    # The repo-wide scan is config-independent: run it once per invocation
+    # instead of once per scenario (measured 18.8 s per call on main).
+    echo "Source consistency check (once per invocation, dev profile)..."
+    if ! python3 "$REPO_ROOT/scripts/consistency-check.py"; then
+        echo "error: source consistency check failed; scenario suite aborted" >&2
+        exit 1
+    fi
+fi
+
 RESULTS_DIR="$(mktemp -d)"
 
 # Runs one scenario and records its verdict in $RESULTS_DIR.
@@ -209,11 +242,20 @@ run_one() {
 
     (
         cd "$tmp_dir" || exit 1
-        python3 "$REPO_ROOT/scripts/sync.py" --dry-run >"$log_dir/dryrun.log" 2>&1
-        echo $? >"$log_dir/dryrun.rc"
+        if [ "$SCENARIO_PROFILE" = "release" ] || [ "$SCENARIO_KEEP_DRY_RUN" = "1" ]; then
+            python3 "$REPO_ROOT/scripts/sync.py" --dry-run >"$log_dir/dryrun.log" 2>&1
+            echo $? >"$log_dir/dryrun.rc"
+        else
+            printf 'skipped (dev profile)\n' >"$log_dir/dryrun.log"
+            echo 0 >"$log_dir/dryrun.rc"
+        fi
         python3 "$REPO_ROOT/scripts/sync.py" >"$log_dir/sync.log" 2>&1
         echo $? >"$log_dir/sync.rc"
-        python3 "$REPO_ROOT/scripts/sync.py" --validate >"$log_dir/validate.log" 2>&1
+        if [ "$SCENARIO_PROFILE" = "dev" ]; then
+            python3 "$REPO_ROOT/scripts/sync.py" --validate-config-only >"$log_dir/validate.log" 2>&1
+        else
+            python3 "$REPO_ROOT/scripts/sync.py" --validate >"$log_dir/validate.log" 2>&1
+        fi
         echo $? >"$log_dir/validate.rc"
     )
 
@@ -229,7 +271,7 @@ run_one() {
     if [ -x "$assert_script" ] && [ "$dry_rc" = "0" ] && [ "$sync_rc" = "0" ] && [ "$val_rc" = "0" ]; then
         (
             cd "$tmp_dir" || exit 1
-            REPO_ROOT="$REPO_ROOT" "$assert_script" "$REPO_ROOT"
+            REPO_ROOT="$REPO_ROOT" SCENARIO_PROFILE="$SCENARIO_PROFILE" "$assert_script" "$REPO_ROOT"
         ) >"$log_dir/assert.log" 2>&1
         assert_rc=$?
     fi
@@ -300,6 +342,7 @@ done
 rm -rf "$RESULTS_DIR"
 
 echo "----"
+echo "Profile: $SCENARIO_PROFILE"
 if [ "$shard_active" -eq 1 ]; then
     echo "Scenarios (shard $SHARD/$TOTAL): $((pass + fail))  Passed: $pass  Failed: $fail"
 else

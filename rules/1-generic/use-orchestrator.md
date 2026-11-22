@@ -69,6 +69,7 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 {{INTENT_ROUTING_TABLE}}
 
 Volle Stage-Details (Agent/Modus je Stage, Loop/Fallback/Approval-Gate) einer gematchten Pipeline bei Bedarf: `Read {{PIPELINE_DETAILS_DIR}}/<pipeline-name>.md`.
+{{#if ROUTING_DETAILS_ENABLED}}Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read {{ROUTING_DETAILS_PATH}}`.{{/if}}
 
 ## A2A Delegation
 {{A2A_HANDOFF_BLOCK}}
@@ -89,9 +90,7 @@ Git Mutationen (commit, push, add etc){{#if ROLE_GIT_ACTIVE}} -> `git` Agent{{el
 {{#if AUTO_COMMIT_ENABLED}}
 Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. {{#if ORCH_MODE_STRICT}}Strict-Mode: der Main Chat führt kein Bash aus, auch kein read-only Git (status, log) — Git-Lesezugriffe über einen Subagenten.{{else}}Read-only (status, log) im Main Chat ok.{{/if}}
 {{/if}}
-{{#if ROLE_GIT_ACTIVE}}
-**Merge-Muster (#1172):** Main Chat dispatcht Merges direkt an `git` (Fallback; #783).
-{{/if}}
+**Merge-Muster (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 Worker-Subagenten ohne `git`-Sentinel können auch `git init`, schreibendes `git config` und `git stash` nicht ausführen (Orchestrator-Guard-Mutationsliste).
 {{#if ORCH_MODE_MAIN_CHAT}}Ausnahme auf User-Wunsch erlaubt.{{/if}}
 

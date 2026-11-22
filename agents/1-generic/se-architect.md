@@ -1,7 +1,7 @@
 ---
 name: se-architect
 version: 2.2.3
-description: "Designs system architecture via functional decomposition. Processes arch_trigger flags. Owns ADRs (MADR-minimal standard, Issue #339 B1)."
+description: "Designs system architecture via functional decomposition; processes arch_trigger flags and owns ADRs per the MADR-minimal standard."
 hint: Design L1 and L2 architectures from requirements.
 tools:
 - Read

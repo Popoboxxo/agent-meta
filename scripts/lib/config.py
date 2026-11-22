@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -46,6 +47,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     _VALID_SUBAGENT_PERMISSION_MODES,
     derive_agent_meta_repo,
     normalize_subagent_permission_mode,
+    render_worker_control_tools,
     repo_containment_variables,
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
@@ -89,7 +91,6 @@ from .dod import (
     resolve_spec_plan_bundle,
 )
 from .providers import (
-    all_providers_support_hooks,
     build_provider_routing,
     load_provider_capabilities,
     load_providers_config,
@@ -138,6 +139,18 @@ except ImportError:
 #: by ``maxLength`` in ``schemas/a2a-handoff.schema.json`` and
 #: ``schemas/handoffs/task-spec.schema.json`` (a test locks the values together).
 DEFAULT_A2A_T_SIZE_LIMIT = 300
+
+#: Content-based dedupe for the ``! Config validation warnings`` block.
+#: Sync validation runs the config check more than once (issue #321), so the
+#: *identical* warnings must appear at most once. Unlike a boolean latch, this
+#: is keyed to the exact (config path, warning signature): a different config
+#: or a different error set still emits its warnings. This matters for
+#: long-lived processes (admin-server, multi-project sync in one interpreter)
+#: where a global "already emitted" flag would silently drop all later
+#: diagnostics. The lock makes the check-then-add atomic for concurrent
+#: ``load_config`` callers.
+_EMITTED_VALIDATION_WARNINGS: set = set()
+_VALIDATION_WARNINGS_LOCK = threading.Lock()
 
 
 def resolve_a2a_t_size_limit(config: dict) -> int:
@@ -938,6 +951,18 @@ def _validate_config(config: dict, config_path: Path) -> None:
         validator = _jsonschema.Draft7Validator(schema)
         errors = sorted(validator.iter_errors(config), key=lambda e: list(e.path))
         if errors:
+            # Dedupe by the *content* of this run's warnings, not a process-level
+            # boolean latch. A second config with different errors must still
+            # emit its own warnings (issue #321 / long-lived processes).
+            signature = tuple(
+                (".".join(str(p) for p in err.path) or "(root)", err.message)
+                for err in errors
+            )
+            key = (str(config_path), signature)
+            with _VALIDATION_WARNINGS_LOCK:
+                if key in _EMITTED_VALIDATION_WARNINGS:
+                    return
+                _EMITTED_VALIDATION_WARNINGS.add(key)
             # The hint must NOT read like jsonschema enables suppression: this
             # branch only runs when jsonschema IS installed (the unavailable
             # case returned above), so installing it produces the warnings, not
@@ -2581,19 +2606,28 @@ def _build_orch_variables(
     variables["A2A_PROTOCOL_ENABLED"] = (
         "false" if str(_handoff_protocol).lower() in ("none", "false", "off", "") else "true"
     )
-    # DIRECT_DISPATCH_SECTION: loaded from central template file; empty when direct dispatch is disabled
+    # DIRECT_DISPATCH_SECTION (PR 4.1 / P26, AC-R7): generated from the
+    # framework routing model instead of the static config copy. Only active
+    # roles carrying `routing.direct_dispatch: true` become rows; the generator
+    # emits the exact legacy template format (golden text-identical).
+    from .intent_routing import build_direct_dispatch_section
+
     _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
     if _dd_enabled:
-        _dd_template = agent_meta_root / "templates" / "direct-dispatch-section.md"
-        # IC-18 no. 7: each row sits under {{#if ROLE_<ROLE>_ACTIVE}}; resolve
-        # against the ActiveSet here so the value is final for every consumer.
-        variables["DIRECT_DISPATCH_SECTION"] = (
-            strip_inactive_conditional_blocks(
-                _dd_template.read_text(encoding="utf-8"), active_set_variables(active_set))
-            if _dd_template.exists() else ""
+        _active_role_names = set(active_set.roles) if active_set is not None else set()
+        variables["DIRECT_DISPATCH_SECTION"] = build_direct_dispatch_section(
+            agent_meta_root, _active_role_names
         )
     else:
         variables["DIRECT_DISPATCH_SECTION"] = ""
+    # PR 4.1: lazy routing detail file switch (routing-overrides.detail-file).
+    _routing_overrides = config.get("routing-overrides") or {}
+    variables["ROUTING_DETAILS_ENABLED"] = (
+        "true" if (
+            _routing_overrides.get("detail-file", True)
+            if isinstance(_routing_overrides, dict) else True
+        ) else "false"
+    )
     # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml
     oc_config = config.get("outcome-caching", {})
     variables["ORCHESTRATOR_OUTCOME_CACHING"] = "true" if oc_config.get("enabled", False) else "false"
@@ -2604,16 +2638,43 @@ def _build_orch_variables(
     variables["CHECKPOINTING_ENABLED"] = (
         "false" if orch_config.get("checkpointing", True) is False else "true"
     )
-    # PROGRESS_CHAT_PUSH_ENABLED (design doc 2026-09-10-live-progress-channel-
-    # design.md, Architecture §1 Tier A): true only when EVERY active
-    # provider has a verified hook_protocol (providers.provider_hooks_supported)
-    # -- gates the Tier-A "also SendMessage(to:"main")" instruction in
-    # orchestrator.md §7 so hook-less providers never see an instruction
-    # they cannot follow.
-    _pcpe_provider_config = load_providers_config(agent_meta_root)
-    _pcpe_active = resolve_providers(config, _pcpe_provider_config)
+    # WORKER_CONTROL_ENABLED / PROGRESS_CHAT_PUSH_ENABLED
+    # (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-2 / O4). Both derive from
+    # the declared `worker_control_tools` capability — the provider's
+    # messaging/worker-control tool surface — never from a provider name and
+    # never from hook support. Missing/empty key resolves fail-safe to false.
+    _wcc_provider_config = load_providers_config(agent_meta_root)
+    _wcc_active = resolve_providers(config, _wcc_provider_config)
+    _wcc_caps = load_provider_capabilities(agent_meta_root)
+
+    def _declared_worker_tools(provider: str) -> list:
+        declared = (_wcc_caps.get(provider) or {}).get("worker_control_tools")
+        return (
+            [t for t in declared if isinstance(t, str) and t]
+            if isinstance(declared, list) else []
+        )
+
+    variables["WORKER_CONTROL_ENABLED"] = (
+        "true" if any(_declared_worker_tools(p) for p in _wcc_active) else "false"
+    )
+    # IC-3: the provider-less basis for the prose tool list. Union of all
+    # active providers' declared tools, order-preserving + deduplicated; the
+    # per-provider override in agent_sync._build_provider_vars is authoritative
+    # at render time, so no mixed-provider render can leak a foreign literal.
+    _wcc_global_tools: list[str] = []
+    for _wcc_provider in _wcc_active:
+        for _wcc_tool in _declared_worker_tools(_wcc_provider):
+            if _wcc_tool not in _wcc_global_tools:
+                _wcc_global_tools.append(_wcc_tool)
+    variables["WORKER_CONTROL_TOOLS"] = render_worker_control_tools(_wcc_global_tools)
+    # O4: the progress-chat push gate is the messaging-tool capability, not
+    # hooks. Keep the "all active providers" structure so a mixed set stays
+    # conservative in the global value; agent_sync refines it per provider at
+    # render time (same seam, no hook / provider-name branch).
     variables["PROGRESS_CHAT_PUSH_ENABLED"] = (
-        "true" if all_providers_support_hooks(_pcpe_active, _pcpe_provider_config) else "false"
+        "true"
+        if _wcc_active and all(_declared_worker_tools(p) for p in _wcc_active)
+        else "false"
     )
     # NATIVE_EXTENSIONS_ENABLED: exempt platform-native extension mechanisms
     # (Skills, Plugins, Lifecycle-Hooks) from the STRICT-mode orchestrator gate.
@@ -3519,6 +3580,19 @@ def build_variables(
         info_sink=routing_info,
         active_set=active_set,
     )
+    # PR 4.1: the routing model rules are the single source for the lazy detail
+    # file (rendered per provider in sync_pipeline). Same resolver call, same
+    # activation/language filtering as the inline block — no second source.
+    from .agents import build_routing_tool_definition
+    variables["_ROUTING_MODEL_RULES"] = build_routing_tool_definition(
+        agent_meta_root,
+        config,
+        variables,
+        pipelines=effective,
+        warn_sink=unmapped,
+        info_sink=routing_info,
+        active_set=active_set,
+    )["routing"]["rules"]
     # IC-29: INFO lines (e.g. routing.examples-language-fallback) collected during
     # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
     variables["_ROUTING_INFO"] = routing_info

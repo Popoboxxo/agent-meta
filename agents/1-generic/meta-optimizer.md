@@ -1,7 +1,7 @@
 ---
 name: template-meta-optimizer
 version: "1.0.0"
-description: "Read-only config optimizer: reads a `sync.py --optimize-config` proposal and presents token-compact, evidence-backed variants of the project config with mandatory warnings — never edits or applies anything."
+description: "Read-only config optimizer: reads `sync.py --optimize-config` proposals and presents token-compact variants with warnings — never edits or applies."
 hint: "Proposes compact project-config variants (proposal only)"
 reference_standards:
   - "Clean Code: separation of concerns"

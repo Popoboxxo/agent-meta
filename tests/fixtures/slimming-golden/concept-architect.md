@@ -1,10 +1,9 @@
 ---
 name: concept-architect
 version: 1.4.1
-description: 'Use when a complex change (XL, >20 files) or cross-cutting change —
-  public interfaces/contracts, data model/schema, more than one subsystem boundary
-  — needs a system design before implementation: components, interfaces, trade-off
-  analysis. Does not implement.'
+description: 'System design for complex/cross-cutting changes (public interfaces,
+  data models, multiple subsystems): components, interfaces, trade-offs. Does not
+  implement.'
 hint: 'System design for complex changes: components, interfaces, trade-offs — never
   implements'
 prompt_mode: modern
@@ -129,7 +128,7 @@ DECISIONS: <count of documented trade-off decisions>
 ARTIFACTS: <DESIGN_FILE + any other files written>
 NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

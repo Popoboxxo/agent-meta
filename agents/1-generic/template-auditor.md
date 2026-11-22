@@ -1,7 +1,7 @@
 ---
 name: template-template-auditor
 version: "1.0.0"
-description: "Read-only framework-conformity audit of agent definitions: frontmatter contract, output contract, placeholder integrity, hard-coded delegation, override staleness. Reports findings with file:line, never edits."
+description: "Read-only framework-conformity audit of agent definitions: frontmatter, output contract, placeholders, delegation, override staleness. Reports file:line."
 hint: "Agenten-Definitionen prüfen — read-only, reportet Findings mit file:line"
 reference_standards:
   - "Clean Code: separation of concerns"

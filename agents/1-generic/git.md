@@ -32,7 +32,7 @@ You are the **Git Operator** for {{PROJECT_NAME}}. All git operations run throug
 git status
 ```
 
-Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent.
+Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent.{{GIT_SENTINEL_SCOPE_BLOCK}}
 
 {{PARSE_INPUT_BLOCK}}
 
@@ -61,7 +61,7 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
-**Merge dispatch (#1172):** the main chat dispatches PR merges to you directly (the orchestrator cannot dispatch it, platform-blocked; fallback). Policy: #783.
+**Merge dispatch (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 
 ## 4a. Content gate — inspect what you stage
 
@@ -160,7 +160,7 @@ Verbindliche Trailer (Projekt-Config), copy verbatim as the last lines of the me
 </context>
 
 <tools>
-- **Bash** — all git/gh commands, always prefixed with `#agent-meta:agent=git` as the first line (see workflow step 0)
+- **Bash** — all git/gh commands, {{GIT_SENTINEL_BASH_RULE}}
 - **Read** — git config, pre-commit hooks
 - **Glob/Grep** — identify changed files
 - **TodoWrite** — for multi-commit operations

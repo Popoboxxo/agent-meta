@@ -158,6 +158,7 @@ _INFRA_ROOT_KNOWN_KEYS = [
     "agents_dir", "hooks_dir", "rules_dir", "commands_dir", "skills_dir",
     "snippets_dir", "extension_dir", "artifact_dir", "checkpoint_dir",
     "settings_file", "pending_tasks_file", "pipeline_details_dir",
+    "routing_detail_file",
 ]
 # Written by sync_pipeline_detail_files() (scripts/lib/pipelines.py) for
 # every active provider unconditionally — not gated by a has_X capability
@@ -167,6 +168,10 @@ _INFRA_ROOT_KNOWN_KEYS = [
 # in ai-providers.yaml, but the basename is always this constant regardless
 # of provider.
 _PIPELINE_DETAILS_DIR_NAME = "pipeline-details"
+# PR 4.1 / P26 (E-23): lazy routing detail file — a generated artifact beside
+# agents_dir, not an external-tool injection. Registered as a known basename
+# so scan_injection_drift does not report it as an undeclared "other" file.
+_ROUTING_DETAILS_FILE_NAME = "routing-details.md"
 # Per-provider hardcoded fallback dirs for capability-gated keys that some
 # providers historically never stored in ai-providers.yaml, relying instead on
 # a literal default in the sync code itself (dir_specs above /
@@ -483,6 +488,7 @@ def scan_injection_drift(
                     if pc.get(capability_by_key[key], False) and provider in fallbacks:
                         known_names.add(Path(fallbacks[provider]).name)
                 known_names.add(_PIPELINE_DETAILS_DIR_NAME)
+                known_names.add(_ROUTING_DETAILS_FILE_NAME)
                 # settings_local_file's basename varies per provider (e.g.
                 # Continue: config.local.yaml, not settings.local.json).
                 settings_local_val = pc.get("settings_local_file")

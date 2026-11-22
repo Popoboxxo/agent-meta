@@ -33,7 +33,7 @@ You are the **Git Operator** for agent-meta. All git operations run through you 
 git status
 ```
 
-Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent.
+Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent. Exception: for Bash calls that run only `gh` (no `git` in the call), do NOT add the sentinel line — it is not needed for `gh`, and the extra line makes allow rules such as `Bash(gh issue *)` not match. Run such `gh` calls as their own Bash call; never mix `gh` and `git` in one call. Every call that runs `git` keeps the sentinel as its first line.
 
 ## 1. Parse input
 A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
@@ -63,7 +63,7 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
-**Merge dispatch (#1172):** the main chat dispatches PR merges to you directly (the orchestrator cannot dispatch it, platform-blocked; fallback). Policy: #783.
+**Merge dispatch (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 
 ## 4a. Content gate — inspect what you stage
 
@@ -160,7 +160,7 @@ Report the candidates (local + remote) to the user.
 </context>
 
 <tools>
-- **Bash** — all git/gh commands, always prefixed with `#agent-meta:agent=git` as the first line (see workflow step 0)
+- **Bash** — all git/gh commands, `git` calls always prefixed with `#agent-meta:agent=git` as the first line, `gh`-only calls without it (see workflow step 0)
 - **Read** — git config, pre-commit hooks
 - **Glob/Grep** — identify changed files
 - **TodoWrite** — for multi-commit operations
@@ -176,7 +176,7 @@ PR_URL: <url> (if created)
 TAG: vX.Y.Z (if created)
 ARTIFACTS: [changed/new files]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

@@ -107,6 +107,8 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
 
 {{INTENT_ROUTING_TOOLS}}
 
+{{#if ROUTING_DETAILS_ENABLED}}Volle Routing-Details (Intents, alle Beispiele, Priorität, Contracts) bei Bedarf: `Read {{ROUTING_DETAILS_PATH}}`.
+{{/if}}
 Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Routing-Regel:
 1. **Pipeline-Treffer** (Signal-Keywords): §2-Bestätigung einholen (NO auto-run), dann Pipeline-Route — Stage-Detail aus §2a.
 2. **Rollen-Treffer** (keywords/examples): `target_agent` aus der Tool-Definition bzw. der Routing-Regel dispatchen — Tier via §4, dann §5 Self-Validation.
@@ -237,7 +239,7 @@ Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` h
 
 **Communication:** before "[task] → [agent] (reason)"; after "[agent]: [result]. Next: [...]". FANOUT>{{MAX_PARALLEL_AGENTS}} → confirmation.
 
-**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification. Steht es in deiner Tool-Liste: Worker mit `SendMessage` (an seine Agent-ID) fortsetzen, hängenden Hintergrund-Worker mit `TaskStop` beenden.
+**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`); dessen Ergebnis kommt als Completion-Notification.{{#if WORKER_CONTROL_ENABLED}} Worker-Control (issue #1176): Deine Worker-Control-Tools sind {{WORKER_CONTROL_TOOLS}}. Nutze sie, um einen Worker fortzusetzen und einen hängenden Hintergrund-Worker zu beenden.{{/if}}
 **Hinweis (laut Plattform-Doku, in diesem Repo nicht verifiziert):** Subagenten können je nach Harness standardmäßig im Hintergrund starten — für den Sync-Vertrag `run_in_background: false` daher immer explizit setzen.
 
 **Context format (mandatory):**
@@ -267,17 +269,19 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 
 {{STATUS_TABLE_BLOCK}}
 
+{{#if WORKER_CONTROL_ENABLED}}
 {{#if PROGRESS_CHAT_PUSH_ENABLED}}
-**Tier-A chat push (live-progress-channel design, 2026-09-10):** on this hook-capable provider, additionally call `SendMessage(to:"main", content:<the status table above>)` once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
+**Tier-A chat push (live-progress-channel design, 2026-09-10):** where the active provider declares a messaging tool ({{WORKER_CONTROL_TOOLS}}), additionally push the status table above to `main` through that tool once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
+{{/if}}
 {{/if}}
 
 {{#if ROLE_GIT_ACTIVE}}
-**Merge (#1172):** main chat -> `git` directly; #783.
+**Merge (#1172):** Merges freigegebener PRs werden vom Main Chat direkt an `git` dispatched; der Pfad vom Orchestrator zum `git`-Agenten wurde 2026-11-06 vom Auto-Mode-Classifier als „Merge Without Review" blockiert (Ursache außerhalb des Repos, nicht reproduziert); Pfad bleibt Fallback, Verweis auf #783.
 {{/if}}
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
-**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending. On timeout `TaskStop` it (where granted): `status: timeout` / `STATUS: failed`, §10.
+**Hard interrupt / Wait strategy (#1176):** a synchronous tool call IS the hard interrupt (#265) — dispatch blocking; collect `run_in_background: true` results before handback, never end your turn with one pending.{{#if WORKER_CONTROL_ENABLED}} On timeout, stop it with your declared worker-control tool ({{WORKER_CONTROL_TOOLS}}): `status: timeout` / `STATUS: failed`, §10.{{/if}}
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
@@ -338,13 +342,13 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 {{#if CONTEXT_PROFILE_COMPACT}}{{#unless ROSTER_IN_HARNESS}}
 **Agent table (names only):** {{ACTIVE_ROLES}}
-{{/unless}}{{else}}
+{{/unless}}{{else}}{{#unless ROSTER_IN_HARNESS}}
 **Agent table:**
 <!-- agent-meta:managed-begin -->
 {{AGENT_DELEGATION_TABLE}}
 Parallel: max {{MAX_PARALLEL_AGENTS}}. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
-{{/if}}
+{{/unless}}{{/if}}
 
 {{PROJECT_SPECIFIC_AGENTS}}
 

@@ -1070,6 +1070,39 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the harness's own ``_hash_file`` via
   ``render_matrix_hashes``. AC-T4: ac01 ``9cee45b8…`` re-pinned to the rebaselined tree;
   ``compact-golden`` re-pinned separately (the embedded trailer line); ``slimming-golden`` unchanged.
+- Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): the provider variables
+  ``GIT_SENTINEL_SCOPE_BLOCK`` / ``GIT_SENTINEL_BASH_RULE`` let the Claude render of ``git.md``
+  (capability ``hook-agent-id``) omit the sentinel line for `gh`-only Bash calls. Patched
+  **per entry**: exactly **1 of 1182 hashes moved** (``Claude/.claude/agents/git.md``); 0
+  added/removed, every other provider byte-identical (AC-2). Hash recomputed with the harness's
+  own ``_hash_file`` from a full ``render_matrix_hashes`` run — not via ``--write``.
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``9cee45b8…`` -> ``3e389da2…``;
+  ``slimming-golden`` re-pinned separately (git golden + README diff manifest); ``compact-golden``
+  unchanged.
+- PR #1309 (2026-11-19, ``feat/scenario-profile-release-gate``): the new built-in ``scenario-suite``
+  release gate hook is rendered by both hook-writing providers. Re-generated via ``--write``: exactly
+  **8 drift entries; 0 removed** (1182 -> 1184 manifest keys) -- 4 per provider (Claude
+  ``.claude/hooks/release-gates``, Gemini ``.agents/hooks/release-gates``): ``.agent-meta-managed``
+  and ``.sha256-checksums`` (changed), ``scenario-suite.sh`` (added) and
+  ``.meta-config/generated-file-hashes.json`` (changed). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``9cee45b8…`` -> ``8cce5989…``;
+  ``slimming-golden`` and ``compact-golden`` unchanged. The ``scenario-suite.sh`` header comment was
+  then reworded to drop its inline ``project.yaml`` reference (the value is sync-time baked, no runtime
+  config read); re-ran ``--write`` again with still exactly **8 drift entries; 0 removed**. Final AC-T4:
+  ac01 ``8cce5989…`` -> ``f5802ab2…``; ``slimming-golden`` and ``compact-golden`` unchanged. This entry
+  now reflects the merged state (Issue #1307 + PR #1309); see the merged AC-T4 chain in
+  ``tests/test_opencode_v2_surface.py``.
+
+- Bundle 2 (admin-ui start mode, 2026-11-21): rebaseline after merging main ``fe768556`` into
+  ``feat/wave7-phase-i-bundle``. The only render change is the edited ``commands/1-generic/admin.md``:
+  exactly the 7 admin command renders drifted (Claude, Continue, Copilot, Gemini, Mammouth, Opencode,
+  ZCode; ``admin.prompt.md``/``admin.toml`` provider suffixes) -- 7 of 1195 hashes; 0 added/removed.
+  No agent/rule artifact, ``AGENTS.md``, ``context-hashes.json`` or golden content changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``d2b5268c…`` -> ``c0253e8b…``;
+  ``slimming-golden`` and ``compact-golden`` unchanged. The repo's own
+  ``.meta-config/generated-file-hashes.json`` was rebaselined minimally (6 admin keys only); its
+  remaining 153 stale keys are a pre-existing main follow-up, documented/excluded in
+  ``.github/workflows/validate.yml``.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

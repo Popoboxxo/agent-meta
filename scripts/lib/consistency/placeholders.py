@@ -69,6 +69,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Misc
     "SYSTEM_DEPENDENCIES", "SYSTEM_URLS",
     # Orchestrator (injected by build_variables)
+    # Worker-control gate + tool list (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19,
+    # IC-2/IC-3): emitted by config.build_variables / agent_sync; register both
+    # so the gate and its {{WORKER_CONTROL_TOOLS}} placeholder resolve.
+    "WORKER_CONTROL_ENABLED", "WORKER_CONTROL_TOOLS",
     "ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "DIRECT_DISPATCH_SECTION", "ORCHESTRATOR_OUTCOME_CACHING",
     "ORCHESTRATOR_CACHE_TTL", "ORCHESTRATOR_CACHE_MAX_ENTRIES",
     # Orchestrator topology axis (IC-4): emitted by config.build_variables via
@@ -151,6 +155,14 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # agent_sync._build_provider_vars from build_variables' provider-mapped
     # prerender (issue #264)
     "INTENT_ROUTING_TOOLS",
+    # PR 4.1 / P26 (E-23): lazy routing detail-file pointer + switch. The path
+    # is provider data (agents_dir sibling), resolved in agent_sync; no provider
+    # literal lives in the template.
+    "ROUTING_DETAILS_PATH", "ROUTING_DETAILS_ENABLED",
+    # Git-sentinel scope (issue #1307): injected per provider by
+    # agent_sync._build_provider_vars from the hook-agent-id capability.
+    # Registered here so --validate sees no unknown/unused placeholder.
+    "GIT_SENTINEL_SCOPE_BLOCK", "GIT_SENTINEL_BASH_RULE",
 
     "ROUTE_INTENT_CALLABLE",
     # Block-inlining variables loaded from snippets/agents/ by

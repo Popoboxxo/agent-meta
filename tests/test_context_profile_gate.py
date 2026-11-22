@@ -17,6 +17,7 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 
 from lib.context_profile import ResolvedContextProfile  # noqa: E402
 from lib.context_profile_gate import (  # noqa: E402
+    _as_candidate,
     context_profile_gate_state,
     context_profile_info_lines,
 )
@@ -136,6 +137,30 @@ def test_no_info_when_evidenced(tmp_path):
 def test_no_info_without_opt_in(tmp_path):
     assert context_profile_info_lines(
         [_resolved("Claude", "full"), _resolved("Gemini", "full")], tmp_path) == []
+
+
+def test_as_candidate_collapses_per_case():
+    doc = {
+        "model_classes": {"m": {"top1_accuracy": 90.0}},
+        "per_case": {"m": {"c1": [1, 1, 0]}},
+    }
+    candidate = _as_candidate(doc)
+    assert candidate["per_case"] == {"m": {"c1": 1}}
+
+
+def test_gate_state_uses_mcnemar(tmp_path):
+    base = _baseline_doc("full")
+    cand = _candidate_doc("compact", top1=89.5)  # aggregate inside tau
+    case_ids = [f"c{i}" for i in range(12)]
+    for cls in _CLASSES:
+        base.setdefault("per_case", {})[cls] = {cid: [1, 1, 1] for cid in case_ids}
+        cand["per_case"] = cand.get("per_case", {})
+        cand["per_case"][cls] = {
+            cid: (0 if idx < 10 else 1) for idx, cid in enumerate(case_ids)
+        }
+    _write(tmp_path, "baseline", "2026-10-17-model-full.json", base)
+    _write(tmp_path, "baseline", "2026-10-17-model-compact.json", cand)
+    assert context_profile_gate_state(tmp_path) == "not-evidenced"
 
 
 def test_drain_reaches_sync_log(tmp_path, monkeypatch):

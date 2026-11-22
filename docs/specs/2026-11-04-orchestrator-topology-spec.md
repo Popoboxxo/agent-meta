@@ -1,6 +1,6 @@
 # Orchestrator-Topologie konfigurierbar — Spec
 
-> Status: **APPROVED (2026-11-04)**
+> Status: **done (2026-11-20)** — Umsetzung verifiziert 2026-11-20 (PRs #1130 44f39ebc, #1133 b820acf2, issue #1077 CLOSED)
 > Freigabe durch den User am 2026-11-04 („Freigabe!") nach Beantwortung von OQ-1…OQ-5 (OQ-1 = B, OQ-2 = A, OQ-3 = A, OQ-4 = A, OQ-5 = A) — der Marker wird nie vom Planer gesetzt.
 > Revision: 3
 > Datum: 2026-11-04

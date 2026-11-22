@@ -245,7 +245,7 @@ def remove_provider_dir(
     provider wrote into a SHARED document are rolled back — otherwise
     ``opencode.json`` keeps an unowned ``permission.edit/bash`` deny and
     ``default_agent`` after deactivation. The rollback is ownership- and
-    state-guarded (``isolation.rollback_opencode_runtime_gate``): a foreign
+    state-guarded (``isolation.rollback_runtime_gate``): a foreign
     provider, or one without managed state, is a no-op. ``config`` is optional
     for positional compatibility; the rollback itself needs no project config.
     """
@@ -256,9 +256,9 @@ def remove_provider_dir(
 
     target_dir = project_root / provider_root
 
-    from .isolation import rollback_opencode_runtime_gate
+    from .isolation import rollback_runtime_gate
 
-    rollback_opencode_runtime_gate(
+    rollback_runtime_gate(
         project_root, provider, provider_config, log, dry_run, config=config,
         include_isolation_deny=True,
     )

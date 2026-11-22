@@ -1,6 +1,6 @@
 # agent-meta
 
-[![agent-meta v2.0.0-beta.9](https://img.shields.io/badge/agent--meta-v2.0.0--beta.9-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0-beta.9)
+[![agent-meta v2.0.0](https://img.shields.io/badge/agent--meta-v2.0.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v2.0.0)
 [![Version](https://img.shields.io/badge/version-2.0.0--beta.9-blue.svg)](CHANGELOG.md)
 [![Code health](https://api.repowise.dev/badge/health/popoboxxo/agent-meta.svg)](https://repowise.dev/repo/popoboxxo/agent-meta)
 [![Python](https://img.shields.io/badge/python-3.9%2B-green.svg)]()
@@ -685,14 +685,15 @@ Commit the regenerated output together with the submodule pointer and `.meta-con
 python3 scripts/sync.py --validate                 # validation of the framework itself
 python3 scripts/consistency-check.py               # template and cross-reference checks
 python3 scripts/sync.py --dry-run                  # render without writing
-tests/scenarios/run.sh                             # scenario catalog (see tests/scenarios/registry.md)
+tests/scenarios/run.sh                             # full scenario catalog (release profile)
+SCENARIO_PROFILE=dev tests/scenarios/run.sh 105    # fast dev profile for iteration
 pip install -r tests/requirements.txt && pytest    # unit and integration tests
 ```
 
 - Test dependencies live in `tests/requirements.txt`; they are not runtime dependencies.
 - Scenario runs use a fresh temp directory each and never touch this repository.
-- CI workflows: `.github/workflows/validate.yml` (sync and validation, Python 3.11) and
-  `.github/workflows/orchestration-test.yml` (tests on Python 3.9 and 3.12).
+- `release` is the default profile (dry-run + sync + full `--validate` + all asserts) and is the only one valid for a release decision. `dev` runs the identical catalog and asserts but the config-independent source scan once per invocation and no redundant dry-run; see `tests/scenarios/registry.md`.
+- CI workflows: `.github/workflows/validate.yml` (PRs use the dev profile; main/schedule use the full profile), `.github/workflows/orchestration-test.yml` (tests on Python 3.9 and 3.12), and `.github/workflows/release-gate.yml` (hard full-catalog gate on `v*` tag pushes).
 
 ## Contributing
 

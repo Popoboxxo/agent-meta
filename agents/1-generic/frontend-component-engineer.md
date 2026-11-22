@@ -1,7 +1,7 @@
 ---
 name: template-frontend-component-engineer
 version: "0.6.1"
-description: "Builds production-ready UI components from a screen spec (ui-ux-designer) plus a token/variant contract (design-system-architect) — props contract, mandatory state handling, and a built-in accessibility baseline. No design-system authoring, no WCAG audit."
+description: "Builds production-ready UI components from a screen spec and token/variant contract: props, state handling, accessibility baseline. No WCAG audit."
 hint: "Screen-Spec + Token-/Variant-Contract → produktionsreife UI-Komponenten: Props-Contract, State-Matrix (loading/error/empty/success), A11y-Baseline (kein Audit), Motion aus Tokens, Mobile-first, Test-Grundgerüst."
 reference_standards:
   - "ARIA Authoring Practices Guide (APG)"

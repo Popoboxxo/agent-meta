@@ -300,16 +300,19 @@ TOLERANCE_MAX_BYTES = 4096
 # RE-PIN (2026-11-18, #1186): the artifact-locations rule (23-class table required by
 # tests/test_artifact_locations_templates.py) is embedded under the default rules-preset
 # (+~3.5 KB rules; entry-file/always-loaded/roster follow). Only violating entries re-pinned.
+# RE-PIN (2026-11-20, worker-control-capability 2.3): Mammouth harness-roster +4,261 B
+# (B2 gated prose + B4 #1172 merge sentence). Re-measured with `measure_artifacts`; only
+# the one violating entry moved.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 705665, "entry-file": 2511, "harness-roster": 685503, "orchestrator": 72183, "rules": 20690},
-    "Codex": {"always-loaded": 702748, "entry-file": 27231, "harness-roster": 678518, "orchestrator": 71773},
-    "Continue": {"always-loaded": 24058, "entry-file": 358, "orchestrator": 74393, "rules": 23700},
-    "Copilot": {"always-loaded": 34415, "entry-file": 10887, "orchestrator": 74269, "rules": 23500},
-    "Gemini": {"always-loaded": 35874, "entry-file": 35874, "orchestrator": 72180},
-    "KimiCode": {"always-loaded": 703110, "entry-file": 27248, "harness-roster": 675862, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 698329, "entry-file": 27244, "harness-roster": 666997, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 705658, "entry-file": 28166, "harness-roster": 681353, "orchestrator": 71845},
-    "ZCode": {"always-loaded": 700979, "entry-file": 28143, "harness-roster": 672836, "orchestrator": 74965},
+    "Claude": {"always-loaded": 647296, "entry-file": 2495, "harness-roster": 623609, "orchestrator": 36328, "rules": 21192},
+    "Codex": {"always-loaded": 644402, "entry-file": 27726, "harness-roster": 616676, "orchestrator": 36260},
+    "Continue": {"always-loaded": 24560, "entry-file": 358, "orchestrator": 42364, "rules": 24202},
+    "Copilot": {"always-loaded": 34910, "entry-file": 10908, "orchestrator": 42235, "rules": 24002},
+    "Gemini": {"always-loaded": 36369, "entry-file": 36369, "orchestrator": 43718},
+    "KimiCode": {"always-loaded": 651663, "entry-file": 27743, "harness-roster": 623920, "orchestrator": 36877},
+    "Mammouth": {"always-loaded": 646881, "entry-file": 27739, "harness-roster": 619142, "orchestrator": 35248},
+    "Opencode": {"always-loaded": 647615, "entry-file": 28661, "harness-roster": 618954, "orchestrator": 35853},
+    "ZCode": {"always-loaded": 649528, "entry-file": 28638, "harness-roster": 620890, "orchestrator": 35516},
 }
 
 
@@ -600,16 +603,19 @@ def test_ac07_missing_ceiling_is_a_violation():
 # 2,459, Copilot/entry-file 10,915, Continue/full-profile artifacts and every
 # orchestrator/rules/harness-roster entry (the trailer rule is not part of them).
 # AC-26 targets are unchanged; `compact` stays opt-in/unverified (IC-36).
+# RE-PIN (2026-11-20, worker-control-capability 2.3): 13 entries moved (B2 gated prose +
+# B4 #1172 merge sentence + worker-control tool wording). Re-measured with
+# `render_into_work_dir(profile="compact")` + `measure_artifacts`; only violating entries moved.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 656608, "entry-file": 2461, "harness-roster": 633459, "orchestrator": 34792, "rules": 20690},
-    "Codex": {"always-loaded": 630218, "entry-file": 4174, "harness-roster": 622221, "orchestrator": 34283},
-    "Continue": {"always-loaded": 24058, "entry-file": 358, "orchestrator": 35357, "rules": 23700},
-    "Copilot": {"always-loaded": 34415, "entry-file": 10887, "orchestrator": 35231, "rules": 23500},
-    "Gemini": {"always-loaded": 11715, "entry-file": 11715, "orchestrator": 36105},
-    "KimiCode": {"always-loaded": 638391, "entry-file": 4184, "harness-roster": 634479, "orchestrator": 35659},
-    "Mammouth": {"always-loaded": 633653, "entry-file": 4182, "harness-roster": 625651, "orchestrator": 34072},
-    "Opencode": {"always-loaded": 634355, "entry-file": 5100, "harness-roster": 629527, "orchestrator": 34428},
-    "ZCode": {"always-loaded": 636264, "entry-file": 5087, "harness-roster": 631449, "orchestrator": 34298},
+    "Claude": {"always-loaded": 644868, "entry-file": 2445, "harness-roster": 621231, "orchestrator": 33938, "rules": 21192},
+    "Codex": {"always-loaded": 618596, "entry-file": 4397, "harness-roster": 614199, "orchestrator": 33771},
+    "Continue": {"always-loaded": 24560, "entry-file": 358, "orchestrator": 35961, "rules": 24202},
+    "Copilot": {"always-loaded": 34910, "entry-file": 10908, "orchestrator": 35830, "rules": 24002},
+    "Gemini": {"always-loaded": 11938, "entry-file": 11938, "orchestrator": 37043},
+    "KimiCode": {"always-loaded": 625910, "entry-file": 4407, "harness-roster": 621503, "orchestrator": 34448},
+    "Mammouth": {"always-loaded": 621171, "entry-file": 4405, "harness-roster": 616766, "orchestrator": 32860},
+    "Opencode": {"always-loaded": 621873, "entry-file": 5323, "harness-roster": 616550, "orchestrator": 33437},
+    "ZCode": {"always-loaded": 623779, "entry-file": 5310, "harness-roster": 618469, "orchestrator": 33083},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -629,7 +635,7 @@ _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "
 # `render_into_work_dir(..., profile="compact")` seam; the embedded trailer rule line
 # grows the shared AGENTS.md. The single-provider compact entry-file pins above
 # follow the same cause. The 32,768 B hard cap is untouched and still holds.
-_IST_COMPACT_MULTI_AGENTS_MD = 12960
+_IST_COMPACT_MULTI_AGENTS_MD = 13183
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
 # ESTIMATES (Spec section 11): goals, not measurements. `compact` ships

@@ -539,6 +539,51 @@ def test_unset_topology_subagent_render_is_byte_identical(provider, tmp_path):
     assert "**Singleton (subagent):**" not in body
 
 
+# --- O15 (PR D / P11): render goldens for the 6 remaining providers ---------
+# The byte-identity ratchet above froze the unset-topology/derived-subagent
+# render for only 3 of 9 registered providers (Claude, Opencode, Gemini —
+# O15). These 6 goldens close that gap. Each golden is the aaed14c2 baseline
+# template replayed through the CURRENT renderer for that provider (never hand
+# written); only `version`/`generated-from` may drift in the frontmatter, the
+# body is byte-frozen. Codex renders a native TOML document and has no
+# Markdown frontmatter delimiter, so its body is compared inside
+# `developer_instructions` while the `# version:` comment may drift.
+
+_MISSING_PROVIDERS = ("Continue", "Copilot", "Mammouth", "Codex", "ZCode", "KimiCode")
+_CODEX_BODY_MARKER = 'developer_instructions = """'
+
+
+def _codex_body(text: str) -> str:
+    """The developer_instructions body of a Codex TOML agent document."""
+    start = text.index(_CODEX_BODY_MARKER) + len(_CODEX_BODY_MARKER)
+    end = text.index('"""', start)
+    return text[start:end]
+
+
+@pytest.mark.parametrize("provider", _MISSING_PROVIDERS)
+def test_unset_topology_golden_for_remaining_providers(provider, tmp_path):
+    """O15: the 6 providers without a frozen baseline now have one, and their
+    unset-topology render stays byte-identical to it (version pin excepted)."""
+    golden_path = (
+        _TOPOLOGY_GOLDEN
+        / f"orchestrator.unset-derived-subagent.{provider.lower()}.md"
+    )
+    assert golden_path.is_file(), (
+        f"missing frozen baseline {golden_path.name} — regenerate it by replaying "
+        f"`{_BASELINE_TEMPLATE_FIXTURE.relative_to(_REPO_ROOT).as_posix()}` "
+        f"through render_orchestrator('{provider}', ...)"
+    )
+    golden = golden_path.read_text(encoding="utf-8")
+    current = render_orchestrator(provider, tmp_path / "current")
+
+    if provider == "Codex":
+        assert _codex_body(golden) == _codex_body(current), (
+            "Codex: the unset-topology render changed the orchestrator body"
+        )
+    else:
+        _assert_body_identity(golden, current)
+
+
 def test_frozen_baseline_fixture_replays_the_baseline_template(tmp_path):
     """The fixture really is ``aaed14c2`` + current renderer (no hand edits).
 

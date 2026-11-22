@@ -1,4 +1,3 @@
-
 ## Direkter Dispatch (nur nach Regel 2)
 
 | Operation | Direkt an | Bedingung |

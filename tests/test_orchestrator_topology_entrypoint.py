@@ -62,7 +62,7 @@ def _init_project(tmp_path: Path, config: dict) -> dict:
 def _run_gate(tmp_path: Path, config: dict, initial: str = "{}\n"):
     (tmp_path / "opencode.json").write_text(initial, encoding="utf-8")
     log = SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         tmp_path, config, "Opencode", PC, _REPO_ROOT, log, False, AS
     )
     doc = json.loads((tmp_path / "opencode.json").read_text(encoding="utf-8"))
@@ -95,7 +95,7 @@ def test_managed_default_agent_rolls_back_on_switch_to_subagent(tmp_path):
     assert doc["default_agent"] == "orchestrator"
 
     log = SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         tmp_path, SUBAGENT, "Opencode", PC, _REPO_ROOT, log, False, AS
     )
     assert (

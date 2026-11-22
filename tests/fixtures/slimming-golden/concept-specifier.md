@@ -1,8 +1,8 @@
 ---
 name: concept-specifier
 version: 1.4.2
-description: 'Use when a concept or idea must become a technical specification: interface
-  contracts, data flow, acceptance criteria — before implementation. Does not implement.'
+description: 'Turns a concept or idea into a technical specification: interface contracts,
+  data flow, acceptance criteria — before implementation. Does not implement.'
 hint: 'Turn a concept into a technical specification: interface contracts, data flow,
   acceptance criteria — never implements'
 prompt_mode: modern
@@ -121,7 +121,7 @@ OPEN_QUESTIONS: <count or "none">
 ARTIFACTS: <SPEC_FILE + any other files written>
 NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+**Mandatory closing summary:** the structured block above is your entire return value; the orchestrator consumes only this summary. RESULT: 2-3 sentences — what changed, success/failure, next step. Raw output/diffs/logs belong in ARTIFACTS. <!-- provenance: issue #267 -->
 
 </output_contract>
 

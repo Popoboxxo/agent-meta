@@ -1,4 +1,4 @@
-agent-meta-version: "2.0.0-beta.9"
+agent-meta-version: "2.0.0"
 _comment: 'Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/
   (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen
   (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist).'
@@ -8,6 +8,12 @@ ai-providers:
 - Opencode
 - Gemini
 dod-preset: rapid-prototyping
+# The framework releases itself only after the full scenario catalog passed.
+# CI enforces the same gate on tag pushes (.github/workflows/release-gate.yml).
+# Volle Suite nur direkt vor einem PR oder in CI; waehrend der Implementierung nur betroffene Testdateien + sync.py --validate.
+release-gates:
+  scenario-suite:
+    enabled: true
 rules-preset: lazy
 systems-engineering:
   enabled: false
@@ -42,10 +48,6 @@ knowledge-engine:
       - stale-index
       - orphaned-pages
       - duplicate-concepts
-  migration:
-    auto-detect-sources: true
-    clean-duplicates: false
-    preserve-originals: true
   search:
     engine: index-only
     mcp-server: ''
@@ -81,11 +83,11 @@ platforms:
 - agent-meta
 plugins:
   honcho:
-    enabled: true
+    enabled: false
   playwright:
     enabled: true
   reqogniloom:
-    enabled: true
+    enabled: false
   graphify:
     enabled: true
   viz-logger:
@@ -162,19 +164,12 @@ hooks:
   graphify-search-guard:
     enabled: true
 provider-options:
-  Claude: {}
-  Gemini: {}
   Continue:
     generate-prompts: true
     prompt-mode: slim
-  Copilot: {}
-  Mammouth: {}
   Opencode:
     surface-version: v2
     experimental-subagent-depth: 3
-  Codex: {}
-  KimiCode: {}
-  ZCode: {}
 speech-mode: short
 variables:
   PROJECT_NAME: agent-meta
@@ -278,16 +273,11 @@ variables:
   GH_ASSETS: ''
   REQUIRED_BINARIES_SECTION: Keine externen Binaries erforderlich.
   BINARY_INSTALL_STEPS: ''
-  ORCHESTRATOR_STRICT: true
-  UNKNOWN_FALLBACK_META_FEEDBACK: true
-  UNKNOWN_FALLBACK_MAIN_CHAT: true
-  UNKNOWN_FALLBACK_ASK_USER: false
   REQUIRED_BINARY_NAMES: (keine)
   BUILD_SYSTEM_NOTES: sync.py generiert .claude/agents/ im Zielprojekt — kein Build-Artifact
     im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: 'Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md
     aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag.'
-  SE_BASE_DIR: SE
 se-export:
   type: markdown
   output_dir: docs/se

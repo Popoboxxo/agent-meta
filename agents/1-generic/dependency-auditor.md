@@ -1,7 +1,7 @@
 ---
 name: template-dependency-auditor
 version: "1.7.1"
-description: "Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL matrix), version drift, outdated and deprecated packages. Categorizes dependency findings by risk and files them via the feedback agent — not application security."
+description: "Supply-chain hygiene: SBOM analysis, license compatibility, version drift, deprecated packages. Categorizes findings by risk; not application security."
 hint: "Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue"
 reference_standards:
   - "CycloneDX SBOM"

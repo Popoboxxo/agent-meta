@@ -2070,7 +2070,7 @@
         "schema-language": {
           "type": "string",
           "default": "auto",
-          "description": "Language used for schema.md and generated wiki page headers ('auto' = follow project language rules)."
+          "description": "DEPRECATED — no longer read (inert); language follows the project language rules. Key retained for backward compatibility only; 'auto' was the former default."
         },
         "okf": {
           "type": "object",
@@ -2565,6 +2565,56 @@
       },
       "additionalProperties": false
     },
+    "routing-overrides": {
+      "type": "object",
+      "description": "PR 4.1 / P26 (E-23): framework-default routing overrides. Format 'auto' (default) renders the compact line block for providers without a callable route_intent tool; 'json' restores the legacy render. Fields merge field-wise into the framework defaults; lists replace (no append). Unknown roles, intents or keys fail closed at sync time.",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": ["auto", "compact", "json", "off"],
+          "default": "auto",
+          "description": "Routing render form. auto = capability-gated compact default; json = legacy tool definition; off = no routing block."
+        },
+        "detail-file": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render the lazy routing-details.md companion file with all deferred fields."
+        },
+        "table-in-orchestrator": {
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "description": "auto suppresses the agent table when roster_in_harness is true; always/never force it."
+        },
+        "roles": {
+          "type": "object",
+          "description": "Sparse per-role routing overrides; keys must be active role names.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "addressability": { "enum": ["keyword", "name_only", "excluded"] },
+              "intents": { "type": "array", "items": { "type": "string" } },
+              "triggers": { "type": "array", "items": { "type": "string" } },
+              "size_class": { "enum": ["S", "M", "L", "XL"] },
+              "direct_dispatch": { "type": "boolean" },
+              "priority": { "type": "integer" },
+              "orchestrator_only": { "type": "boolean" }
+            }
+          }
+        },
+        "pipelines": {
+          "type": "object",
+          "description": "Sperr overrides of quality-pipeline signal keywords.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "signal_keywords": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
     "orchestrator": {
       "type": "object",
       "description": "Orchestrator behavior configuration.",
@@ -2605,12 +2655,12 @@
         "enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable orchestrator mode. When false, all tasks are handled in main chat."
+          "description": "DEPRECATED — use `orchestrator.mode` instead (set mode: main-chat instead of enabled: false). Legacy flag kept functional: enable orchestrator mode; when false, all tasks are handled in main chat."
         },
         "strict": {
           "type": "boolean",
           "default": true,
-          "description": "Strict mode: no fallback to main chat, all unknown intents are escalated."
+          "description": "DEPRECATED — use `orchestrator.mode` instead (mode: strict or advisory). Legacy flag kept functional: strict mode: no fallback to main chat, all unknown intents are escalated."
         },
         "checkpointing": {
           "type": "boolean",

@@ -184,9 +184,15 @@ def _rate(flags: Sequence[bool]) -> float:
     return round(100.0 * sum(1 for flag in flags if flag) / len(flags), 4)
 
 
-def compute_metrics(cases: Sequence[dict], predictions: Mapping[str, Optional[dict]]) -> dict:
-    """Aggregate one run into the IC-36/AC-62 metric set (values in percent)."""
-    grades: List[dict] = []
+def compute_case_outcomes(
+    cases: Sequence[dict], predictions: Mapping[str, Optional[dict]]
+) -> Dict[str, dict]:
+    """Grade every case once; single source of truth for the run metrics and
+    the paired per-case baseline data (IC-36). Keyed by case id; the five
+    McNemar-relevant flags (``correct``, ``collision``,
+    ``ambiguous_expected``, ``wrong_pipeline``, ``clarified``) are guaranteed.
+    """
+    outcomes: Dict[str, dict] = {}
     for case in cases:
         expected = case.get("expected") or {}
         expected_target = normalize_target(expected.get("target")) or ""
@@ -198,24 +204,30 @@ def compute_metrics(cases: Sequence[dict], predictions: Mapping[str, Optional[di
         else:
             target = normalize_target(prediction.get("target"))
             tier = bool(prediction.get("tier_escalation", False))
-        grades.append(
-            {
-                "id": case.get("id"),
-                "correct": target == expected_target,
-                "target": target,
-                "expected_target": expected_target,
-                "tier_escalation": tier,
-                "expected_tier": expected_tier,
-                "collision": "overlap_token" in case,
-                "ambiguous_expected": expected_target == "ASK",
-                "wrong_pipeline": bool(
-                    target
-                    and target.startswith("pipeline:")
-                    and target != expected_target
-                ),
-                "clarified": target == "ASK",
-            }
-        )
+        outcomes[case.get("id")] = {
+            "correct": target == expected_target,
+            "target": target,
+            "expected_target": expected_target,
+            "tier_escalation": tier,
+            "expected_tier": expected_tier,
+            "collision": "overlap_token" in case,
+            "ambiguous_expected": expected_target == "ASK",
+            "wrong_pipeline": bool(
+                target
+                and target.startswith("pipeline:")
+                and target != expected_target
+            ),
+            "clarified": target == "ASK",
+        }
+    return outcomes
+
+
+def compute_metrics(cases: Sequence[dict], predictions: Mapping[str, Optional[dict]]) -> dict:
+    """Aggregate one run into the IC-36/AC-62 metric set (values in percent)."""
+    by_case = compute_case_outcomes(cases, predictions)
+    grades: List[dict] = [
+        dict(by_case[case.get("id")], id=case.get("id")) for case in cases
+    ]
 
     non_ambiguous = [g for g in grades if not g["ambiguous_expected"]]
     collisions = [g for g in grades if g["collision"]]
@@ -302,6 +314,7 @@ def build_baseline(
     sigma: Dict[str, Dict[str, Optional[float]]] = {}
     runs_out: List[dict] = []
     errors_out: List[dict] = []
+    per_case: Dict[str, Dict[str, List[int]]] = {}
 
     for model_class in sorted(class_runs):
         runs = list(class_runs[model_class])
@@ -321,6 +334,14 @@ def build_baseline(
             )
             for metric, values in metrics.items()
         }
+        case_bits: Dict[str, List[int]] = {}
+        for run in runs:
+            for case_id, outcome in (run.get("case_outcomes") or {}).items():
+                case_bits.setdefault(str(case_id), []).append(
+                    1 if outcome.get("correct") else 0
+                )
+        if case_bits:
+            per_case[model_class] = case_bits
         for run in runs:
             runs_out.append(
                 {
@@ -338,7 +359,7 @@ def build_baseline(
                     )
                 )
 
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "kind": BASELINE_KIND,
         "date": run_date,
@@ -359,6 +380,9 @@ def build_baseline(
         "errors": errors_out,
         "runs": runs_out,
     }
+    if per_case:
+        result["per_case"] = per_case
+    return result
 
 
 def validate_baseline(baseline: Any) -> List[str]:
@@ -435,6 +459,30 @@ def validate_baseline(baseline: Any) -> List[str]:
                             )
                         )
                         break
+
+    per_case = baseline.get("per_case")
+    if per_case is not None:
+        if not isinstance(per_case, Mapping):
+            errors.append("per_case must be an object")
+        else:
+            for model_class, cases in per_case.items():
+                if not isinstance(cases, Mapping):
+                    errors.append("per_case.{} is not an object".format(model_class))
+                    continue
+                for case_id, values in cases.items():
+                    if not isinstance(values, list) or not values:
+                        errors.append(
+                            "per_case.{}.{} must be a non-empty list".format(
+                                model_class, case_id
+                            )
+                        )
+                        continue
+                    if any(type(value) is not int or value not in (0, 1) for value in values):
+                        errors.append(
+                            "per_case.{}.{} contains a non-binary value".format(
+                                model_class, case_id
+                            )
+                        )
 
     sigma = baseline.get("sigma")
     if not isinstance(sigma, Mapping):
@@ -819,7 +867,15 @@ def run_class(
                     }
                 )
         metrics = compute_metrics(cases, predictions)
-        runs.append({"run": index, "metrics": metrics, "errors": errors})
+        case_outcomes = compute_case_outcomes(cases, predictions)
+        runs.append(
+            {
+                "run": index,
+                "metrics": metrics,
+                "errors": errors,
+                "case_outcomes": case_outcomes,
+            }
+        )
         print(
             "[{}] run {}/{}: top1={:.1f}% collision={:.1f}% "
             "lang_delta={:+.1f}pp errors={}".format(

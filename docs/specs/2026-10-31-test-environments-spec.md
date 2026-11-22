@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-TEST-ENVIRONMENTS-2026-10-31
 title: Test-Umgebungen (lokal/remote) pro Projekt mit Remote-Freigabemodell
-status: APPROVED
+status: done
 revision: 1.2
 klasse: L (Bounded, mit Review-Loop) — zusätzlich Architectural-Kriterium F7 (neuer Config-Contract + Schema, Berührung von 6 Basis-Templates und 7 Overrides)
 related-spec: SPEC-RELEASE-CHECKLIST-2026-10-31
@@ -10,7 +10,7 @@ quellen: .tmp/recon-env-2.md (Datei:Zeile-Belege), .tmp/recon-env.md (Kurzfassun
 
 # Test-Umgebungen — Spec
 
-> Status: APPROVED (2026-10-31, Freigabe durch Nutzer). Der Approval-Marker `Status: APPROVED` wird
+> Status: done (2026-10-31, Freigabe durch Nutzer) — Umsetzung verifiziert 2026-11-20 (PR #1108 MERGED dfbaf799, PR #1089, CHANGELOG beta.7). Der Approval-Marker `Status: APPROVED` wird
 > ausschließlich vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Autor. Diese Datei enthält
 > Interface-Contracts und Akzeptanzkriterien, keine Implementierung und keinen Plan.
 > Trace-Anker: `spec-id: SPEC-TEST-ENVIRONMENTS-2026-10-31`.

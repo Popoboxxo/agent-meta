@@ -1,7 +1,7 @@
 ---
 name: template-chaos-engineer
 version: "1.0.2"
-description: "Resilience testing through controlled fault injection: a steady-state hypothesis fixed before the experiment, measured signals, minimal blast radius with abort criteria, a kill switch proven before injection, and restoration shown by re-measurement. Produces experiment records and runbook inputs; sre-engineer owns SLOs and runbooks, incident-responder owns live incidents."
+description: "Resilience testing via fault injection: hypothesis, abort criteria, kill switch, blast-radius control, re-measured restoration. sre-engineer owns SLOs."
 hint: "Chaos/resilience: steady-state hypothesis, fault injection, blast radius, abort criteria, restore proof — measures failure paths, never production without explicit approval"
 reference_standards:
   - "Security as Code"

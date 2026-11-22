@@ -788,3 +788,132 @@ def test_reference_standards_seams_are_in_lib_sweep():
     for module in ("provider_transform.py", "consistency/reference_standards.py"):
         assert module in swept, module
         assert (_LIB_DIR / module).exists(), module
+
+
+# --- SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-2 / AC 3, 4, 10 ---------
+def _worker_config(providers):
+    return {
+        "project": {"name": "worker", "prefix": "wk"},
+        "ai-providers": providers,
+        "roles": ["orchestrator", "developer"],
+    }
+
+
+def _worker_variables(providers):
+    from lib.config import build_variables
+    return build_variables(_worker_config(providers), _REPO_ROOT)[0]
+
+
+def test_worker_control_enabled_true_when_provider_declares_tools():
+    """AC 1/3: an active provider with worker-control tools enables the gate."""
+    variables = _worker_variables(["Claude"])
+    assert variables["WORKER_CONTROL_ENABLED"] == "true"
+
+
+def test_worker_control_enabled_false_without_declared_tools():
+    """AC 3: a provider without worker-control tools resolves fail-safe false."""
+    variables = _worker_variables(["Opencode"])
+    assert variables["WORKER_CONTROL_ENABLED"] == "false"
+
+
+def test_progress_chat_push_is_messaging_capability_not_hooks():
+    """AC 4: Codex declares messaging tools but has no verified hook_protocol;
+    the push gate must still be true (no hook / provider-name coupling)."""
+    variables = _worker_variables(["Codex"])
+    assert variables["PROGRESS_CHAT_PUSH_ENABLED"] == "true"
+
+
+def test_per_provider_worker_control_override_is_capability_driven():
+    """AC 3: per-provider overrides derive from worker_control_tools, so a
+    tool-less provider is false and a tool-bearing provider is true — the same
+    capability seam for every provider, never a provider-name branch."""
+    from lib.agent_sync import _build_provider_vars
+    from lib.providers import load_providers_config
+
+    pc = load_providers_config(_REPO_ROOT)
+    for provider, expected in (
+        ("Claude", "true"),
+        ("Opencode", "false"),
+        ("Codex", "true"),
+        ("Gemini", "true"),
+    ):
+        merged = _build_provider_vars(
+            pc.get(provider) or {}, provider, {}, _REPO_ROOT,
+            active_set=frozenset(),
+        )
+        assert merged["WORKER_CONTROL_ENABLED"] == expected, (
+            f"{provider}: per-provider WORKER_CONTROL_ENABLED override"
+        )
+
+
+def test_worker_control_tools_variable_is_provider_scoped():
+    """IC-3 / AC 1/2: WORKER_CONTROL_TOOLS carries exactly the active
+    provider's declared tool names as a backtick list — empty for a tool-less
+    provider. Derived from the capability key, never a provider-name branch."""
+    from lib.agent_sync import _build_provider_vars
+    from lib.providers import load_provider_capabilities, load_providers_config
+
+    pc = load_providers_config(_REPO_ROOT)
+    caps = load_provider_capabilities(_REPO_ROOT)
+    for provider in ("Claude", "Codex", "Gemini", "Opencode"):
+        merged = _build_provider_vars(
+            pc.get(provider) or {}, provider, {}, _REPO_ROOT,
+            active_set=frozenset(),
+        )
+        declared = (caps.get(provider) or {}).get("worker_control_tools") or []
+        expected = ", ".join(f"`{t}`" for t in declared)
+        assert merged["WORKER_CONTROL_TOOLS"] == expected, (
+            f"{provider}: per-provider WORKER_CONTROL_TOOLS override"
+        )
+
+
+def test_worker_control_placeholder_is_registered():
+    """IC-2 fail-safe: the new gate must be a known placeholder, otherwise
+    B2's {{#if WORKER_CONTROL_ENABLED}} gate raises an unknown-placeholder
+    finding during sync."""
+    from lib.consistency.placeholders import check_placeholders
+
+    findings = check_placeholders(
+        _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md",
+        "---\nname: x\n---\nValue: {{WORKER_CONTROL_ENABLED}}\n",
+        _REPO_ROOT,
+    )
+    unknown = [f for f in findings if f.check == "placeholders.unknown"]
+    assert not unknown, unknown
+
+
+def test_worker_control_resolver_sites_are_capability_driven():
+    """AC 10: the B1 resolver sites read the capability key, never a literal
+    provider-name comparison (the AST sweep above enforces the repo-wide
+    invariant; this pins the new sites explicitly)."""
+    for rel in (
+        "scripts/lib/config.py",
+        "scripts/lib/agent_sync.py",
+        "scripts/lib/provider_transform.py",
+    ):
+        source = (_REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert "worker_control_tools" in source, rel
+
+
+# --- Task 22 (F-PA1): provider-neutral gate function names ----------------
+
+
+def test_isolation_exports_neutral_names():
+    """F-PA1: the runtime/surface gate functions must carry provider-neutral
+    names in the generic library."""
+    from lib import isolation
+
+    for name in (
+        "sync_runtime_gate",
+        "rollback_runtime_gate",
+        "reconcile_surface_gate",
+    ):
+        assert hasattr(isolation, name), name
+
+
+def test_no_opencode_named_gate_functions_in_generic_loop():
+    """F-PA1: the generic dispatch loop must not name provider-specific gates."""
+    for rel in ("scripts/lib/cli_commands.py", "scripts/lib/sync_pipeline.py"):
+        source = (_REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert "opencode_runtime_gate" not in source, rel
+        assert "opencode_surface_gate" not in source, rel

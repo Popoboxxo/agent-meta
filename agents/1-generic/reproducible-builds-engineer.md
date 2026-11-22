@@ -1,7 +1,7 @@
 ---
 name: template-reproducible-builds-engineer
 version: "1.0.2"
-description: "Build reproducibility and artifact origin: two clean builds of the same commit compared byte for byte, every non-determinism source named with one countermeasure (timestamp, path, network, randomness, ordering, image, archive, locale, race), hermetic build checks, and signed SBOM/provenance attestations verified against the artifact digest in the release gate. dependency-auditor analyses SBOM content; this role proves origin, determinism and binding."
+description: "Build reproducibility and artifact origin: byte-identical builds, non-determinism countermeasures, hermetic checks, signed SBOM/provenance in the release gate."
 hint: "Reproducible builds: hash-equal rebuilds, non-determinism sources with countermeasures, hermetic builds, signed provenance verified in the gate — determinism and origin, not license audit"
 reference_standards:
   - "SLSA@1.0"

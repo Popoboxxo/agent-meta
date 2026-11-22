@@ -78,7 +78,7 @@ def test_entry_point_none_in_main_chat_and_compat_without_config():
 def _run_gate(tmp_path, config, initial="{}\n"):
     (tmp_path / "opencode.json").write_text(initial, encoding="utf-8")
     log = SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         tmp_path, config, "Opencode", PC, REPO_ROOT, log, False, AS
     )
     return json.loads((tmp_path / "opencode.json").read_text(encoding="utf-8")), log
@@ -126,7 +126,7 @@ def test_managed_default_agent_removed_after_switch_to_main_chat(tmp_path):
     doc, _ = _run_gate(tmp_path, STRICT)
     assert doc["default_agent"] == "orchestrator"
     log = SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         tmp_path, MAIN, "Opencode", PC, REPO_ROOT, log, False, AS
     )
     assert (

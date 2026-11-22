@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.12.0
-# changelog: 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
+# version: 1.13.0
+# changelog: 1.13.0: issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -197,6 +197,7 @@ _PY="$(hook_python_bin)"
 # after an agent-meta update) would otherwise make the calls below fail
 # obscurely. Fail closed, same as a missing lib (issue #595).
 if ! declare -F hook_json_usable >/dev/null 2>&1 \
+   || ! declare -F hook_json_get_many >/dev/null 2>&1 \
    || ! declare -F hook_known_tool_name >/dev/null 2>&1 \
    || ! declare -F hook_shell_scan_py >/dev/null 2>&1 \
    || ! declare -F hook_is_meta_submodule_dir >/dev/null 2>&1; then
@@ -228,15 +229,33 @@ if [ -z "$INPUT" ]; then
   echo "Failing closed (M2) — an unevaluable call must not be allowed." >&2
   exit 2
 fi
-if ! printf '%s' "$INPUT" | "$_PY" -c \
-  'import sys, json; json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))' \
-  2>/dev/null; then
+# #1169: ONE interpreter start reads every field this guard uses. The `ok`
+# trailer distinguishes a failed parse from a missing field, so the old
+# standalone json.loads gate (and its exit-2 message) moves in here. A NUL in
+# any requested value fails the whole call instead of shifting the fields
+# into the wrong variables (fail closed, SPEC-HOOK-SINGLE-PARSE §2.4).
+# bash 3.2 compatible: `read -r -d ''` only, no eval/mapfile/namerefs.
+_P_FAIL=0
+{
+  IFS= read -r -d '' _P_TOOL_NAME     || _P_FAIL=1
+  IFS= read -r -d '' _P_AGENT_ID      || _P_FAIL=1
+  IFS= read -r -d '' _P_ISOLATION     || _P_FAIL=1
+  IFS= read -r -d '' _P_SUBAGENT_TYPE || _P_FAIL=1
+  IFS= read -r -d '' _P_COMMAND       || _P_FAIL=1
+  IFS= read -r -d '' _P_CWD           || _P_FAIL=1
+  IFS= read -r -d '' _P_AGENT_TYPE    || _P_FAIL=1
+  IFS= read -r -d '' _P_TRAILER       || _P_FAIL=1
+} < <(hook_json_get_many "$INPUT" \
+       tool_name agent_id tool_input.isolation tool_input.subagent_type \
+       tool_input.command cwd agent_type)
+if [ "$_P_FAIL" -ne 0 ] || [ "${_P_TRAILER:-}" != "ok" ]; then
   echo "ORCHESTRATOR_GUARD: hook payload is not valid JSON." >&2
   echo "Failing closed (SR-B-09) -- the guard cannot evaluate a call it cannot parse." >&2
   exit 2
 fi
 
-TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
+TOOL_NAME="$_P_TOOL_NAME"
+AGENT_ID="$_P_AGENT_ID"
 
 # M2: a missing (or non-string/non-scalar, which hook_json_get reports as
 # missing) tool_name is a payload the guard cannot classify. This used to
@@ -266,18 +285,18 @@ fi
 # supersedes the "no agent/subagent field" limitation this hook's own
 # comments used to document (see git history) — that was true when this
 # hook was written, not anymore. Empty = main-thread call.
-AGENT_ID=$(hook_json_get "$INPUT" "agent_id")
+# AGENT_ID was read by the single parse above (#1169); no second spawn.
 
 # Delegation gate (#1151 F3-03): the orchestrator is a singleton spawned by the
 # main chat, and worktree isolation is forbidden for every spawn
 # (rules/1-generic/no-worktree-isolation.md). Both used to be text only.
 if [ "$TOOL_NAME" = "Agent" ] || [ "$TOOL_NAME" = "Task" ]; then
-  if [ "$(hook_json_get "$INPUT" "tool_input.isolation")" = "worktree" ]; then
+  if [ "$_P_ISOLATION" = "worktree" ]; then
     echo "ORCHESTRATOR_GUARD: isolation \"worktree\" is forbidden (no-worktree-isolation rule)." >&2
     echo "Spawn the agent without isolation so it works in the project directory." >&2
     exit 2
   fi
-  _SUBAGENT_TYPE=$(hook_json_get "$INPUT" "tool_input.subagent_type" | tr '[:upper:]' '[:lower:]')
+  _SUBAGENT_TYPE=$(printf '%s' "$_P_SUBAGENT_TYPE" | tr '[:upper:]' '[:lower:]')
   if [ -n "$AGENT_ID" ] && [ "$_SUBAGENT_TYPE" = "orchestrator" ]; then
     echo "ORCHESTRATOR_GUARD: a subagent must not spawn the orchestrator (singleton rule, anti-recursion)." >&2
     echo "Return your result to the caller instead of delegating back to the orchestrator." >&2
@@ -304,7 +323,7 @@ BASH_CMD=""
 DECLARED_AGENT=""
 DECLARED_ID=""
 if [ "$TOOL_NAME" = "Bash" ]; then
-  BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
+  BASH_CMD="$_P_COMMAND"
 
   # Self-declared agent identity (see note above): the first non-blank line
   # of the command must be exactly '#agent-meta:agent=<name>' or
@@ -358,6 +377,13 @@ fi
 # agent_id (the sentinel is then the only delegate signal), or the literal
 # placeholder in an unsynced source copy -- keeps the sentinel as before.
 HOOK_AGENT_ID_RELIABLE="{{AGENT_META_HOOK_AGENT_ID}}"
+# #1210: whether this provider's payload carries a harness-set role field
+# (Claude's `agent_type`), baked from the `hook-role-field` capability. The
+# value is read in the single parse above (_P_AGENT_TYPE); a "true" flag lets
+# the guard cross-check the self-declared sentinel against that role. Any
+# other value -- including the literal placeholder in an unsynced source copy
+# -- keeps the convention-boundary sentinel-only path (fail closed).
+HOOK_ROLE_FIELD_RELIABLE="{{AGENT_META_HOOK_ROLE_FIELD}}"
 SENTINEL_DISCARDED=0
 if [ -n "$DECLARED_AGENT" ] && [ -z "$AGENT_ID" ] && [ "$HOOK_AGENT_ID_RELIABLE" = "true" ]; then
   DECLARED_AGENT=""
@@ -381,7 +407,7 @@ fi
 # project's. Such a candidate is skipped while walking (but kept as a
 # fallback, so a session opened only inside the submodule still resolves).
 # PAYLOAD_CWD stays the base for cwd-relative arguments (commit -F <file>).
-PAYLOAD_CWD=$(hook_json_get "$INPUT" "cwd")
+PAYLOAD_CWD="$_P_CWD"
 if [ -z "$PAYLOAD_CWD" ]; then
   PAYLOAD_CWD="$PWD"
 fi
@@ -413,6 +439,32 @@ else
 fi
 if [ -z "$PROJECT_ROOT" ]; then
   PROJECT_ROOT="$PAYLOAD_CWD"
+fi
+
+# --- #1210: harness role field cross-checks the sentinel ----------------
+# Provider-agnostic: the capability flag above (never a provider name) decides
+# whether the payload role is trustworthy. Only a NON-EMPTY role field can
+# contradict a self-declared sentinel; an empty field falls back to the
+# sentinel path (convention boundary, SPEC §3.3 R4). Conservative choice for
+# the open questions: the role field alone never GRANTS the git path (OQ-3) --
+# the sentinel is still required -- it only detects a forged/mislabeled one.
+_ROLE_ATTRIBUTION="sentinel"
+if [ "$TOOL_NAME" = "Bash" ] && [ "$HOOK_ROLE_FIELD_RELIABLE" = "true" ] \
+   && [ -n "$AGENT_ID" ]; then
+  _PAYLOAD_ROLE=$(printf '%s' "$_P_AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
+  _DECLARED_ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+  if [ -n "$_PAYLOAD_ROLE" ]; then
+    _ROLE_ATTRIBUTION="payload-field"
+    if [ -n "$_DECLARED_ROLE" ] && [ "$_PAYLOAD_ROLE" != "$_DECLARED_ROLE" ]; then
+      _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
+      _AUDIT_LINE=$(printf '%s decision=rejected class=role-mismatch field=%s sentinel=%s cmd=%s' \
+        "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_PAYLOAD_ROLE" "$_DECLARED_ROLE" \
+        "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
+      hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
+      echo "ORCHESTRATOR_GUARD: role mismatch — payload role field \"$_PAYLOAD_ROLE\" != sentinel role \"$_DECLARED_ROLE\". The sentinel cannot override the harness-provided role." >&2
+      exit 2
+    fi
+  fi
 fi
 
 # --- Sentinel elevation: capability-scoped + audited (issue #516) ------

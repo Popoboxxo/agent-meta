@@ -1095,7 +1095,7 @@ def _run_stage(
         sync_pipeline, "sweep_orphan_skill_channel_rules", lambda *a, **k: None
     )
     monkeypatch.setattr(
-        sync_pipeline, "_sync_opencode_runtime_gate",
+        sync_pipeline, "sync_runtime_gate",
         lambda *a, **k: calls.append((a, k)),
     )
     monkeypatch.setattr(
@@ -1483,7 +1483,7 @@ def test_ac_b12_model_catalog_check_ignores_variant(tmp_path):
 # position), and the rollback identifies its own triples position-independently
 # by the exact triple — never by list index.
 #
-# The writer is exclusively called by ``reconcile_opencode_surface_gate``
+# The writer is exclusively called by ``reconcile_surface_gate``
 # (Task 13a); these tests pin its own contract in isolation: END insertion,
 # single occurrence, user order preserved, position-independent rollback, the
 # dedicated ``opencode-v2-permissions`` state namespace, and the Spec-A
@@ -1551,7 +1551,7 @@ def _run_runtime_gate(
     active_set: object = _GENERATED,
 ) -> SyncLog:
     log = log if log is not None else SyncLog()
-    isolation._sync_opencode_runtime_gate(
+    isolation.sync_runtime_gate(
         project_root,
         config if config is not None else _gate_config(),
         "Opencode",
@@ -1938,7 +1938,7 @@ def test_ac_c16a_default_agent_removed_when_primary_role_disappears(tmp_path):
 
 
 # ===========================================================================
-# Phase C1 / Task 13a (C1.2): ``reconcile_opencode_surface_gate``
+# Phase C1 / Task 13a (C1.2): ``reconcile_surface_gate``
 # ===========================================================================
 #
 # The binding 7-row rollback matrix of spec §3.4. The reconciler is the ONLY
@@ -1969,7 +1969,7 @@ def _reconcile(
     own stub — ``active_set`` is a required keyword on the production function
     (QA-C-01), never a fail-open ``None``.
     """
-    isolation.reconcile_opencode_surface_gate(
+    isolation.reconcile_surface_gate(
         project_root,
         config,
         provider,
@@ -2100,7 +2100,7 @@ def test_ac_c15_no_primary_role_writes_no_triple_and_warns(tmp_path):
 
     On the ``permission`` tier Spec A's coupling warning is the only one (the
     reconcile function stays silent). On every other tier Spec A does not run,
-    so ``reconcile_opencode_surface_gate`` emits the warning itself.
+    so ``reconcile_surface_gate`` emits the warning itself.
     """
     pc_without_role = _v2_pc()
     pc_without_role.pop("primary-role")
@@ -2310,7 +2310,7 @@ def test_ac_c14_observe_keeps_triples_enforce_removes(tmp_path, monkeypatch):
     _reconcile(project, _gate_config(), plugin_config, framework)
 
     assert "permissions" not in _read_json(project / "opencode.json"), (
-        "enforce removes the triples although _sync_opencode_runtime_gate never ran"
+        "enforce removes the triples although sync_runtime_gate never ran"
     )
     assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
 
@@ -2509,11 +2509,11 @@ _IC4_SOURCE_HASHES = {
 _RUNTIME_GATE_CALL_CONDITION = 'provider_runtime_gate_tier(pc, caps) == "permission"'
 # RVW-C-01: the condition must not merely exist once — the guarded call must sit
 # *inside* the block. Asserted in place: ``if <condition>:`` followed by the
-# deeper-indented ``_sync_opencode_runtime_gate(`` on the next code line.
+# deeper-indented ``sync_runtime_gate(`` on the next code line.
 _RUNTIME_GATE_CALL_BLOCK = re.compile(
     r"^(?P<indent>[ \t]*)if "
     + re.escape(_RUNTIME_GATE_CALL_CONDITION)
-    + r":\n(?P=indent)[ \t]+_sync_opencode_runtime_gate\(\n",
+    + r":\n(?P=indent)[ \t]+sync_runtime_gate\(\n",
     re.MULTILINE,
 )
 
@@ -2555,7 +2555,7 @@ def test_ic4_functions_and_call_condition_unchanged():
         matches = list(_RUNTIME_GATE_CALL_BLOCK.finditer(text))
         assert len(matches) == 1, (
             f"{filename}: the condition must directly guard "
-            "_sync_opencode_runtime_gate"
+            "sync_runtime_gate"
         )
         gate_block = _call_block(text, matches[0])
         assert "active_set=active_set" in gate_block, gate_block
@@ -2563,7 +2563,7 @@ def test_ic4_functions_and_call_condition_unchanged():
         # The tier-independent reconciler is called with the same active set;
         # a fail-open default there was the QA-C-01 blocker.
         reconcile = re.compile(
-            r"^(?P<indent>[ \t]*)reconcile_opencode_surface_gate\(\n",
+            r"^(?P<indent>[ \t]*)reconcile_surface_gate\(\n",
             re.MULTILINE,
         )
         reconcile_matches = list(reconcile.finditer(text))
@@ -2584,8 +2584,8 @@ def test_ic4_functions_and_call_condition_unchanged():
             f"the per-provider iteration, got indent {len(guard_indent)}"
         )
         assert reconcile_indent == guard_indent, (
-            f"{filename}: reconcile_opencode_surface_gate must be called at the "
-            f"same indentation as the guarded _sync_opencode_runtime_gate block "
+            f"{filename}: reconcile_surface_gate must be called at the "
+            f"same indentation as the guarded sync_runtime_gate block "
             f"(outside the if, indent {len(guard_indent)}), got indent "
             f"{len(reconcile_indent)} — the tier-independent reconciler must not "
             f"be nested in a runtime-gate-tier condition"
@@ -3414,7 +3414,7 @@ def test_qa_d01_stage_does_not_dispatch_plugin_writer_for_v1(
 #
 # No production code here: the behaviour under test already lives in
 # ``isolation.permission_deny_required`` (Task 13) and
-# ``isolation.reconcile_opencode_surface_gate`` (Task 13a). These tests pin it
+# ``isolation.reconcile_surface_gate`` (Task 13a). These tests pin it
 # against the SHIPPED registry (Task 18: ``surface-plugin-protocols.v2`` /
 # ``surface-has-plugins.v2``), so an edit to the registry data or a lost
 # observe branch fails loudly (AC-C14, OQ-B12).
@@ -3435,7 +3435,7 @@ def test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples(
     ``provider_runtime_gate_tier`` must return ``"plugin"`` for the resolved v2
     entry. ``permission_deny_required`` is then the single decision that keeps
     the deny additive in ``observe`` mode and drops it in ``enforce`` mode —
-    the latter without ``_sync_opencode_runtime_gate`` ever running (it is
+    the latter without ``sync_runtime_gate`` ever running (it is
     gated on tier ``permission``).
     """
     pc = _resolved_surface_pc("v2")
@@ -3491,7 +3491,7 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
 
     Spec A's ``default_agent`` merge is called under the unchanged tier
     ``permission`` condition (Spec-A freeze, IC-7), so on tier ``plugin`` the
-    stage dispatch never reaches it. ``reconcile_opencode_surface_gate``
+    stage dispatch never reaches it. ``reconcile_surface_gate``
     therefore evaluates the entry point on its own (``_opencode_entry_point``)
     and writes no ``default_agent``; a missing entry point yields exactly one
     WARNING and no triple.
@@ -3572,7 +3572,7 @@ def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
     Amendment B4 / OQ-B12 kept the ``default_agent`` managed merge on tier
     ``permission`` only, because Spec A's call condition is frozen at
     ``== "permission"``. On the C3 v2 surface (tier ``plugin``) ``settings-init``
-    writes ``default_agent`` once and ``reconcile_opencode_surface_gate`` only
+    writes ``default_agent`` once and ``reconcile_surface_gate`` only
     CHECKS the entry point. Amendment B4 called the consequence an "accepted
     limitation": a user-deleted ``default_agent`` stays deleted *while the gate
     triples stay written*.
@@ -5520,10 +5520,17 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # ef8123cc.. -> 47db7f52..); slimming-golden unchanged. Digests recomputed with
 # `_fixture_tree_sha256` over the rebaselined trees. Logs:
 # `tests/test_ac01_render_identity.py` and `tests/test_gate_card_compact.py`.
+# Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): ac01-baseline re-pinned (1 Claude git.md hash; 9cee45b8.. -> 3e389da2..); slimming-golden re-pinned (git golden: two lines, plus README manifest entry; 10f5c4c7.. -> b18ac19c..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
+# PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`); merged AC-T4 chain 9cee45b8.. -> 3e389da2.. (main #1307) -> 08ae786f.. (final, after merging #1307 + #1309); slimming-golden (main value b18ac19c..)/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
+# PR #1326 (2026-11-21, AC-01 golden re-pin to the authoritative v2.0.0 AGENTS.md state): the 6 provider AGENTS.md hashes (Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode) were pinned against beta.9 (PR base eea8aa7b); re-pinned to the v2.0.0 version-line values -- the only content diff vs. main's AGENTS.md (honcho/reqogniloom lines and mcp-* lazy rows stay removed). Merged origin/main into the branch (VERSION 2.0.0) and re-generated the AC-01 manifest via --write (1195 keys): 6 AGENTS.md hashes now match main's v2.0.0 values; the PR's hook feature entries are retained. AC-T4 ac01-baseline re-frozen from the final fixture bytes: c245a393.. -> 4e699ef6..; slimming-golden -> 7aabd546.. and compact-golden -> 4ed867bf.. follow main's fixture trees.
+# PR #1328 follow-up (Bundle-2 admin-ui start mode, 2026-11-21): ac01-baseline
+# re-pinned — 7 admin command renders (one per provider) via --write;
+# d2b5268c.. -> c0253e8b...; slimming-golden/compact-golden unchanged. Log:
+# `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "5e707bd7c0dfabb705affebcb81563ee78d40df8fd894acd7c2a8ca19e2b2840",
-    "slimming-golden": "10f5c4c7fd14de4285735fd9a080c5f4b7254fe21477a81c32a3d29ab7fba2c0",
-    "compact-golden": "47db7f52d2bc6171174003c0e7f08779a48c2c91afba43b859e1624c8e7abee5",
+    "ac01-baseline": "4582662dcf4d374877c603d950774078c8c8e41772894df7fa95a30a7af4d658",
+    "slimming-golden": "6eb489dcc07c41ef43c3283dc1bde73e025213af182c716ef7af3c1ec70e7b02",
+    "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
 
 

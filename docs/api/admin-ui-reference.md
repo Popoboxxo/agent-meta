@@ -118,6 +118,12 @@ Toggle whether this specific sub-agent is active in your project. You can comple
 <!-- author: Agent Meta Admin -->
 The Orchestrator is the apex agent (`orchestrator.md`) responsible for interpreting the user's initial prompt and dynamically delegating work to specialized sub-agents. These settings define its cognitive boundaries.
 
+### Routing
+<!-- help-id: project_instance-routing -->
+<!-- last-updated: 2026-11-21 -->
+<!-- author: Agent Meta Admin -->
+The Routing view edits `routing-overrides` in `project.yaml` (Roadmap PR 5.4 / P27). It shows every active role with its effective intents, triggers, addressability, size class, priority and direct-dispatch flag, and marks each field as **Default** (framework value from `config/role-defaults.yaml`) or **Override** (set in the project). **Reset to default** removes only the override key — the framework default is never written to `project.yaml`. The preview panel calls `GET /api/routing/preview?provider=<name>` for each active provider and renders the server-side routing block together with its byte count, a `bytes/4` token proxy and the lint findings from the existing consistency validators. Saves go through `PUT /api/config/project/section` and fail closed on schema violations or newly introduced keyword overlaps; a sync is required afterwards for the change to reach generated prompts.
+
 #### Field: Routing mode
 <!-- help-id: field-routing_mode -->
 <!-- last-updated: 2026-07-23 -->
@@ -231,6 +237,39 @@ The port the Admin Server binds to (default: `7420`). Modify this if you experie
 <!-- last-updated: 2026-07-19 -->
 <!-- author: Agent Meta Admin -->
 When enabled, the D3.js Viz Dashboard will establish a WebSocket connection and automatically re-render the agent graph the moment a `sync.py` compilation completes, providing immediate visual feedback on architectural changes.
+
+### Admin UI start modes and port matrix (issue #896)
+
+`scripts/admin-server.py` accepts an explicit start mode (issue #896):
+
+| Mode | Bind | Token | Reachability |
+|---|---|---|---|
+| `local` (default) | `127.0.0.1` | none | loopback only; never exposed to the network |
+| `network` | `0.0.0.0` (or explicit non-loopback `--host`) | generated random token, **not persisted** (rotation = restart) | prints reachable URLs `http://<ip>:7420/?token=<T>` plus firewall and security guidance |
+
+The generated network token is printed **once** by the start command and is
+transported to the child process via `ADMIN_UI_TOKEN` only — never in argv
+(`ps`) and never in `.meta-viz/admin-server.log`. `local` stays behaviourally
+identical (loopback, no token). `*?token=` deep links are ingested by the UI
+and scrubbed from the URL after loading (`docs/ui/admin-ui.html`).
+
+| Port | Service | Configured by | Bind (current code) |
+|---|---|---|---|
+| `7420` | Admin UI (`admin-server.py`) | `--port` / `admin-ui.port` | `--mode network` / `--host` |
+| `8765` | Viz dashboard (`viz-report.py --serve`) | `viz.server.port` | hard `127.0.0.1` (`viz-report.py:912`) |
+| `9090` | MCP SSE (`viz-logger.py --http`) | `viz.mcp.port` | hard `127.0.0.1` (`viz-logger.py:580`) |
+
+Firewall: allow inbound TCP `7420` only from trusted networks (host firewall /
+security group). Security warning for network mode: the token is a shared
+secret (treat it like a password), terminate TLS / use a reverse proxy and
+restrict exposure with `--allowed-hosts`; alternatively stay in `local` mode
+and tunnel (`ssh -L 7420:127.0.0.1:7420 user@host`).
+
+**Entscheidung 31 (N12)** — the documented roadmap decision for the open
+8765/9090 question: both sub-servers are to become network-configurable, each
+with its own option and a safe default. The current loopback hard-bind is the
+safe default; the missing network options are an open implementation item, not
+a new decision here.
 
 ### Provider Tier Overrides
 <!-- help-id: project_instance-tier_overrides -->

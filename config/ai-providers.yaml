@@ -67,6 +67,12 @@ providers:
     # is then discarded (issue #1151 F6-05). Providers without it keep the
     # sentinel as their only delegate signal.
     - hook-agent-id
+    # PreToolUse payload carries a harness-set role name (`agent_type`, present
+    # when the session uses --agent or the hook fires inside a subagent).
+    # Baked into orchestrator-guard via the AGENT_META_HOOK_ROLE_FIELD
+    # placeholder: a sentinel that contradicts this role is rejected (issue
+    # #1210). Providers without it keep the sentinel-only convention boundary.
+    - hook-role-field
     # channel: skill support (issue #751) — see the rationale comment next
     # to provider_supports_skill_channel() in scripts/lib/skill_channel.py.
     - native-skill-channel
@@ -133,8 +139,9 @@ providers:
       tools: keep
       tools-format: keep
       tool-name-map: {}
-      # Orchestrator worker control (#1157): continue a worker / stop a
-      # background agent. Primary role only; whitelisted in provider-tools.yaml.
+      # DEPRECATED (SPEC-WORKER-CONTROL-CAPABILITY-2026-11-19, IC-1): primary-role
+      # extra tools now come from the `worker_control_tools` capability in
+      # config/provider-capabilities.yaml. Kept as data for legacy readers only.
       primary-role-tools: [SendMessage, TaskStop]
       reject-fields: []
   Gemini:
@@ -408,6 +415,9 @@ providers:
       # unknown keys into `options` "so they survive the round-trip" — so it
       # is a legitimate emitted key, not a silent drop (runtime evidence
       # docs/analysis/evidence/2026-09-30-runtime-opencode-v{1,2}.md).
+      # Harness-side passthrough of these keys is VERIFIED, but provider-side
+      # forwarding as request options is UNVERIFIED (#1175); Probe:
+      # docs/analysis/runbooks/opencode-request-options-probe.md.
       - prompt_mode
       - subagent
       - hidden

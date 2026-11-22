@@ -87,6 +87,7 @@ from lib.sync_pipeline import (
     _sync_stage_external_skills_check,
     _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
+    _prune_managed_sync_backups,
     _sync_stage_generated_file_drift_resolve,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
@@ -263,11 +264,11 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.hook_plugins import sync_hook_lib, sync_release_gates
     from lib.hooks import sync_hooks
     from lib.isolation import (
-        _sync_opencode_runtime_gate,
+        sync_runtime_gate,
         gate_state_present,
         owns_gate_surface,
-        reconcile_opencode_surface_gate,
-        rollback_opencode_runtime_gate,
+        reconcile_surface_gate,
+        rollback_runtime_gate,
     )
     from lib.providers import (
         load_provider_capabilities,
@@ -349,7 +350,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 provider, provider_config,
             )
         if provider_runtime_gate_tier(pc, caps) == "permission":
-            _sync_opencode_runtime_gate(
+            sync_runtime_gate(
                 test_repo_path, config, provider, provider_config,
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
@@ -362,7 +363,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             # #1020 (a): same decoupled rollback as the production stage — the
             # test repo must match a normal sync after a tier change away from
             # ``permission`` (v2 documents roll back via the surface reconcile).
-            rollback_opencode_runtime_gate(
+            rollback_runtime_gate(
                 test_repo_path, provider, provider_config, log, dry_run,
                 config=config,
             )
@@ -394,7 +395,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             # Mirrors the production stage and the Spec-A writer: no active-set
             # information ⇒ keep the historic emission (AC-6 byte identity).
             topology = None
-        reconcile_opencode_surface_gate(
+        reconcile_surface_gate(
             test_repo_path, config, provider, provider_config,
             agent_meta_root, log, dry_run,
             active_set=active_set, topology=topology,
@@ -1514,8 +1515,14 @@ def _handle_doctor(ctx: _SyncContext) -> None:
     sys.exit(2 if write_failed else _doctor_exit_code(report, strict))
 
 
-def _handle_validate(ctx: _SyncContext) -> None:
-    """Handle --validate (may sys.exit; falls through on full success)."""
+def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
+    """Handle --validate (may sys.exit; falls through on full success).
+
+    ``source_checks=False`` implements ``--validate-config-only``: the
+    repository-wide consistency scan is identical for every project config and
+    is therefore run once per checkout by the caller instead of once per
+    scenario. All config-dependent checks below remain unchanged.
+    """
     args = ctx.args
     log = ctx.log
     agent_meta_root = ctx.agent_meta_root
@@ -1527,10 +1534,15 @@ def _handle_validate(ctx: _SyncContext) -> None:
     if args.dry_run:
         print("DRY-RUN — validation will not write files\n")
 
-    # Consistency checks always run (no test repo required). These validate
-    # agent templates, cross-references, dual-tree parity and handoff
-    # contracts against the agent-meta sources themselves.
-    consistency_errors = _run_consistency_checks(agent_meta_root)
+    if source_checks:
+        # Consistency checks always run (no test repo required). These validate
+        # agent templates, cross-references, dual-tree parity and handoff
+        # contracts against the agent-meta sources themselves.
+        consistency_errors = _run_consistency_checks(agent_meta_root)
+    else:
+        consistency_errors = 0
+        print("[INFO] source consistency checks skipped (--validate-config-only); "
+              "run 'python3 scripts/consistency-check.py' once per checkout")
 
     # Config-audit staleness check (issue #560): full-replacement
     # 2-platform overrides pin their generic base via `based-on:
@@ -1638,6 +1650,26 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # Gitignored checkpoint/progress dirs (#1000): WARNING only, exit code unchanged.
     from lib.consistency.checkpoint_tracking import check_checkpoint_dir_ignored
     _strict_findings += check_checkpoint_dir_ignored(project_root, config)
+    # #1263: every blocked tool of an active MCP server must have a native
+    # permission deny rule where the provider declares the capability.
+    # WARNING only: prompt convention remains the documented fallback.
+    from lib.mcp import load_mcp_registry, resolve_active_mcp_servers
+    from lib.mcp_deny import validate_mcp_deny
+    from lib.deactivation import is_provider_active
+    _mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    _mcp_active = resolve_active_mcp_servers(
+        config, agent_meta_root, project_root, registry=_mcp_registry)
+    for _provider in _provider_config:
+        if not is_provider_active(config, _provider):
+            continue
+        for _message in validate_mcp_deny(
+            project_root, _provider, _provider_config, _mcp_registry, _mcp_active,
+            agent_meta_root=agent_meta_root,
+        ):
+            _strict_findings.append(Finding(
+                Severity.WARNING, "mcp-deny.missing-rule", Path(config_path).name,
+                _message,
+            ))
     _strict_exit_code = 0
     if _strict_findings:
         _strict_exit_code = print_report(_strict_findings, project_root, changed_only=False)
@@ -1668,6 +1700,11 @@ def _handle_validate(ctx: _SyncContext) -> None:
 
     ctx.config = config
     ctx.mode = mode
+
+
+def _handle_validate_config_only(ctx: _SyncContext) -> None:
+    """--validate-config-only: same checks minus the repo-wide source scan."""
+    _handle_validate(ctx, source_checks=False)
 
 
 def _handle_sync(ctx: _SyncContext) -> None:
@@ -1760,6 +1797,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
         try:
             _sync_stage_generated_file_drift_resolve(
                 ctx.project_root, drift_findings, ctx.args, ctx.log, written_paths)
+            # #1270 (d): resolve just wrote drift backups after the stage-0
+            # prune; prune again so the per-source keep limit holds per run.
+            if drift_findings:
+                _prune_managed_sync_backups(
+                    ctx.project_root, config, provider_config, ctx.args, ctx.log)
         except Exception as exc:  # noqa: BLE001 - never mask the original abort
             if all_stages_completed:
                 raise

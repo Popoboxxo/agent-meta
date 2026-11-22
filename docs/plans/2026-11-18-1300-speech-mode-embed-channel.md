@@ -9,6 +9,8 @@ klasse: M (Architectural nach F7)
 branch: fix/1300-speech-mode-embed
 ---
 
+> **ARCHIV-PRÜFUNG 2026-11-20 (teilweise umgesetzt):** Status geplant/APPROVED, aber Fix bereits gelandet — Status veraltet, Plan nicht nachgezogen (CHANGELOG :11, "Resolves #1300", Unreleased).
+
 # Speech-Mode Embed-Kanal für has_rules:false-Provider — Spec + Plan
 
 > Status: APPROVED

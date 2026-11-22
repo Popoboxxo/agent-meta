@@ -68,6 +68,7 @@ from typing import Optional
 from .report import Finding, Severity
 from ..topology import (
     DEFAULT_MAX_INSTANCES,
+    VALID_TOPOLOGIES,
     resolve_orchestrator_instances,
     resolve_topology,
     topology_explicit,
@@ -88,6 +89,7 @@ CHECK_GATE_INACTIVE = "orchestrator-topology.gate-inactive"
 CHECK_DEFAULT_AGENT_CONFLICT = "orchestrator-topology.default-agent-conflict"
 CHECK_SINGLETON_REDUNDANT = "orchestrator-topology.singleton-redundant"
 CHECK_INSTANCES_CLAMPED = "orchestrator-topology.instances-clamped"
+CHECK_PRIMARY_PROSE_ONLY = "orchestrator-topology.primary-prose-only"
 
 
 def _orchestrator_block(config: dict) -> dict:
@@ -248,6 +250,40 @@ def _append_once(
         message=message,
         suggestion=suggestion,
     ))
+
+
+def _degrade_mechanism(capabilities: dict, axis: str) -> Optional[str]:
+    """Non-topology ``topology_degrade[axis]`` value (e.g. sequential-text)."""
+    degrade = capabilities.get("topology_degrade")
+    value = degrade.get(axis) if isinstance(degrade, dict) else None
+    if isinstance(value, str) and value and value not in VALID_TOPOLOGIES:
+        return value
+    return None
+
+
+def _subagent_fail_safe_unsupported(resolution, capabilities: dict) -> bool:
+    """Fail-safe on unsupported ``subagent``; real degradations stay with DEGRADED."""
+    if resolution.effective != "subagent" or resolution.degraded_from is not None:
+        return False
+    support = capabilities.get("topology_support")
+    return (
+        isinstance(support, dict)
+        and support.get("subagent") is False
+        and _degrade_mechanism(capabilities, "subagent") is not None
+    )
+
+
+def _primary_prose_only(resolution, pc: dict, provider: str, caps: dict) -> bool:
+    """Effective ``primary`` without an entry mechanism / runtime proof."""
+    if resolution.effective != "primary":
+        return False
+    from ..providers import explicit_primary_role
+
+    if explicit_primary_role(pc, provider) is not None:
+        return False
+    verified = caps.get("topology_verified_state")
+    state = verified.get("primary") if isinstance(verified, dict) else None
+    return state != "VERIFIED-RUNTIME"
 
 
 def check_orchestrator_topology(
@@ -420,19 +456,20 @@ def check_orchestrator_topology(
 
             support = caps.get("topology_support")
             if (
-                resolution.declared is not None
-                and resolution.degraded_from is None
-                and isinstance(support, dict)
-                and support.get(resolution.effective) is False
+                (
+                    resolution.declared is not None
+                    and resolution.degraded_from is None
+                    and isinstance(support, dict)
+                    and support.get(resolution.effective) is False
+                )
+                or _subagent_fail_safe_unsupported(resolution, caps)
             ):
+                # One check ID/message for declared + derived fail-safe (O5).
+                mechanism = _degrade_mechanism(caps, "subagent") or "prose-only"
                 _append_once(
-                    findings,
-                    seen,
-                    CHECK_SUBAGENT_UNSUPPORTED,
-                    _PROJECT_CONFIG,
-                    f"provider '{provider}' cannot dispatch subagents natively "
-                    f"for the declared topology '{resolution.effective}'; the "
-                    "orchestrator runs as prose only.",
+                    findings, seen, CHECK_SUBAGENT_UNSUPPORTED, _PROJECT_CONFIG,
+                    f"provider '{provider}' subagent unsupported → {mechanism} "
+                    "degradation; the orchestrator runs as prose only.",
                     "Accept the prose-only orchestrator, or use a provider "
                     "whose capability cell supports this position.",
                 )
@@ -473,6 +510,15 @@ def check_orchestrator_topology(
                 )
 
             role = explicit_primary_role(provider_config, provider)
+            if _primary_prose_only(resolution, provider_config, provider, caps):
+                _append_once(
+                    findings, seen, CHECK_PRIMARY_PROSE_ONLY, _PROJECT_CONFIG,
+                    f"orchestrator topology 'primary' for provider '{provider}' "
+                    "is prose-only: no primary-role and no runtime evidence; "
+                    "no primary setting is emitted.",
+                    "Keep it prose until a verified probe exists; do not set a "
+                    "primary-role mechanically.",
+                )
             gate_role_emitted = False
             if role is not None:
                 from ..active_set import role_emitted_for_provider

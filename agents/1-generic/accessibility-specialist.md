@@ -1,7 +1,7 @@
 ---
 name: template-accessibility-specialist
 version: "0.6.1"
-description: "WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen reader testing guidelines, color contrast analysis, focus management and accessibility tree analysis. Produces WCAG audit reports with A/AA/AAA severity and ARIA fix suggestions."
+description: "Audits WCAG 2.1/2.2 compliance (ARIA, keyboard, contrast, focus, screen readers). Reports A/AA/AAA findings with fixes. Use for accessibility reviews."
 hint: "Accessibility-Audit: WCAG 2.1/2.2, ARIA, Keyboard-Nav, Screenreader-Guidelines, Kontrast, Focus-Management, A11y-Tree — Findings mit A/AA/AAA-Severity"
 reference_standards:
   - "WCAG 2.2"

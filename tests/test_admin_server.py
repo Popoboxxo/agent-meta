@@ -2226,14 +2226,16 @@ class TestArtifactLocationsWhitelist(unittest.TestCase):
             self.assertEqual(persisted["artifact-locations"], {"enabled": True})
 
     def test_whitelist_size_increased_by_one(self) -> None:
+        # T17 added `artifact-locations`; PR 5.4 / P27 added `routing-overrides`
+        # (both go through the same PUT section route). No section was removed.
         added = (admin_server.PROJECT_WRITABLE_SECTIONS
                  - self._PRE_T17_WRITABLE_SECTIONS)
         removed = (self._PRE_T17_WRITABLE_SECTIONS
                    - admin_server.PROJECT_WRITABLE_SECTIONS)
-        self.assertEqual(added, {"artifact-locations"})
+        self.assertEqual(added, {"artifact-locations", "routing-overrides"})
         self.assertEqual(removed, set())
         self.assertEqual(len(admin_server.PROJECT_WRITABLE_SECTIONS),
-                         len(self._PRE_T17_WRITABLE_SECTIONS) + 1)
+                         len(self._PRE_T17_WRITABLE_SECTIONS) + 2)
 
     def test_no_derivation_in_this_task(self) -> None:
         tree = ast.parse(_ADMIN_SERVER_PATH.read_text(encoding="utf-8"))
@@ -3433,8 +3435,11 @@ def start_env(monkeypatch, tmp_path):
     """Spawn faked: Popen yields a ``_SpawnProc`` and never runs a child."""
     monkeypatch.setattr(admin_server, "_tmp_sink_env", lambda root, base=None: None)
     monkeypatch.setattr(admin_server, "_probe_port_bindable", lambda h, p: (True, ""))
-    # Host-independent: without this stub _write_pid reads the real /proc/4242/stat.
+    # Host-independent: without these stubs the fake spawn PID (4242) can be a
+    # real live process on the CI host, making the second start short-circuit as
+    # "already running" before _wait_for_admin is reached.
     monkeypatch.setattr(admin_server, "_pid_starttime", lambda p: None)
+    monkeypatch.setattr(admin_server, "_is_pid_running", lambda p: False)
     state = {"proc": _SpawnProc(pid=4242), "popen_calls": 0}
 
     def fake_popen(cmd, **kw):
