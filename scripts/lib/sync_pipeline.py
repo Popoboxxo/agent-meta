@@ -36,7 +36,11 @@ import sys
 from pathlib import Path
 
 from lib.agent_sync import sync_agents_for_provider
-from lib.auto_commit import auto_commit_violations, resolve_auto_commit_config
+from lib.auto_commit import (
+    auto_commit_violations,
+    effective_commit_authority,
+    resolve_auto_commit_config,
+)
 from lib.commands import sync_commands_for_provider
 from lib.config import (
     _orch_mode_flags,
@@ -2022,6 +2026,69 @@ def _sync_stage_generated_file_hash_capture(
     capture_generated_file_hashes(agent_meta_root, project_root, config, provider_config, args.dry_run)
 
 
+def _previous_allowlist(project_root: Path) -> dict | None:
+    """Read the previous allowlist for the read-only shrink comparison.
+
+    ``None`` means the file is absent (first sync / upgrade from before the
+    allowlist existed). A malformed, unreadable or non-object JSON file raises
+    ``json.JSONDecodeError`` / ``OSError`` so the caller emits the byte-stable
+    WARN instead of silently treating it as "no previous file" (D19: WARN-only,
+    never an abort). A JSON ``null`` is NOT the same as a missing file.
+    """
+    path = project_root / ".meta-config" / "auto-commit-allowlist.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    if not isinstance(data, dict):
+        raise json.JSONDecodeError(
+            "auto-commit-allowlist: root must be a JSON object", "", 0)
+    return data
+
+
+def _shrink_reasons(previous: dict, resolved: dict, roles_cfg, active_set,
+                    agent_meta_root) -> list[tuple[str, str]]:
+    """Return ``(role, reason)`` for every role that left ``eligible_roles``.
+
+    The four reasons are DISJOINT and checked in this exact order (spec §3.5,
+    RVW-1181-04): ``grant withdrawn`` → ``role removed`` → ``gate-dropped`` →
+    ``no Bash``. ``no Bash`` applies only to roles still listed in ``roles:``;
+    a role removed from ``roles:`` never gets that label.
+    """
+    previous_roles = set(previous.get("eligible_roles") or ())
+    current_roles = set(resolved.get("eligible_roles") or ())
+    dropped = sorted(previous_roles - current_roles)
+
+    previous_overrides = previous.get("authority_overrides")
+    if not isinstance(previous_overrides, dict):
+        previous_overrides = {}
+    current_overrides = resolved.get("authority_overrides")
+    if not isinstance(current_overrides, dict):
+        current_overrides = {}
+    roles_in_config = set(roles_cfg or ())
+
+    reasons: list[tuple[str, str]] = []
+    for role in dropped:
+        if (previous_overrides.get(role) == "direct"
+                and role not in roles_in_config):
+            # D17: the ONLY place this literal is used -- the role left
+            # `roles:` while previously holding a grant.
+            reason = "grant withdrawn"
+        elif role not in roles_in_config:
+            reason = "role removed"
+        elif not active_set.has(role):
+            reason = "gate-dropped"
+        else:
+            # Listed + active yet absent from eligible_roles: the same
+            # effective derivation resolve() used is non-direct and no
+            # current grant exists (D17: only key removal; no third reason).
+            effective_commit_authority(
+                role, agent_meta_root, None, current_overrides)
+            reason = "no Bash"
+        reasons.append((role, reason))
+    return reasons
+
+
 def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log, active_set) -> None:
     """Issue #694: write .meta-config/auto-commit-allowlist.json reflecting
     the resolved auto_commit config for this sync. Runs on every sync,
@@ -2036,7 +2103,19 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     upper bound (no ``roles:`` key keeps the empty list, default render
     unchanged) and the ActiveSet intersects it, so a gate-dropped role loses
     commit authority. The allowlist comes from the sanctioned
-    ``ActiveSet.raw_roles`` (``None`` == no ``roles:`` key -> empty list)."""
+    ``ActiveSet.raw_roles`` (``None`` == no ``roles:`` key -> empty list).
+
+    Issue #1181 (T9): before writing, the stage performs a READ-ONLY forward
+    comparison against the existing allowlist. It therefore also runs in a
+    dry-run (before the early ``return``): a preview reports an impending
+    shrink without changing any bytes. The reasons are the disjoint set of
+    spec §3.5 (``grant withdrawn`` / ``role removed`` / ``gate-dropped`` /
+    ``no Bash``); D17 binds ``grant withdrawn`` to the `roles:`-removal path
+    only, while removing just the override key for a still-listed role is
+    ``no Bash``. ``version: 2`` is additive -- readers tolerate ``version: 1``
+    and the hook reads ``mode`` / ``eligible_roles`` / ``authority_overrides``
+    (missing field == no grant). D19: the comparison is WARN-only and has NO
+    exit-code effect (not a ``--check`` / ``--validate`` gate)."""
     active_roles = sorted(active_set.raw_roles) if active_set.raw_roles is not None else []
     # Issue #1091: an invalid block must not break sync (existing projects
     # keep syncing, rc=0), but commit authority is disabled fail-safe and the
@@ -2054,6 +2133,44 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     ]
 
     allowlist_path = project_root / ".meta-config" / "auto-commit-allowlist.json"
+    # Issue #1181 (T9): read-only comparison, deliberately before the dry-run
+    # return so a preview reports the shrink. Never writes, never affects rc
+    # (D19). The four log strings below are byte-stable (spec §4.6).
+    try:
+        previous = _previous_allowlist(project_root)
+    except (json.JSONDecodeError, OSError):
+        log.warn(
+            "auto-commit-allowlist: previous allowlist unreadable at "
+            f"{allowlist_path} — shrink check skipped")
+    else:
+        if previous is None:
+            log.note(
+                "auto-commit-allowlist: no previous allowlist — shrink check skipped",
+                "",
+            )
+        else:
+            previous_mode = previous.get("mode")
+            if (previous_mode not in (None, "off")
+                    and resolved.get("mode") == "off"):
+                log.warn(
+                    f"auto-commit-allowlist: mode changed {previous_mode} -> off; "
+                    f"all {len(previous.get('eligible_roles') or ())} "
+                    "eligible role(s) dropped")
+            reasons = _shrink_reasons(
+                previous, resolved, config.get("roles"), active_set,
+                agent_meta_root)
+            if reasons:
+                old_n = len(previous.get("eligible_roles") or ())
+                new_n = len(resolved.get("eligible_roles") or ())
+                shown = [f"{role} ({reason})" for role, reason in reasons[:20]]
+                warn_line = (
+                    f"auto-commit-allowlist: eligible_roles shrank {old_n} -> {new_n} "
+                    f"(-{len(reasons)}): " + ", ".join(shown)
+                )
+                if len(reasons) > 20:
+                    warn_line += f", … (+{len(reasons) - 20} more)"
+                log.warn(warn_line)
+
     if getattr(args, "dry_run", False):
         return
     write_atomic(allowlist_path, json.dumps(resolved, indent=2, sort_keys=True) + "\n")
