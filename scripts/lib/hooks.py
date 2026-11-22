@@ -6,6 +6,7 @@ import posixpath
 import re
 from pathlib import Path
 
+from .hook_state import resolve_hook_enabled
 from .io import is_absent_gitignored_target, is_unchanged, load_json_file, safe_path, write_atomic, write_checked
 from .log import SyncLog
 from .providers import provider_has_capability, provider_hooks_supported
@@ -636,10 +637,15 @@ def sync_hooks(
             is_enabled = True
         else:
             enabled_by_default = meta.get("enabled_by_default", "false").lower() == "true"
-            is_enabled = _strict_enabled(
-                project_hooks_cfg.get(hook_stem, {}).get("enabled", enabled_by_default),
-                f"hooks.{hook_stem}.enabled", log,
+            is_enabled, invalid_value = resolve_hook_enabled(
+                project_hooks_cfg, hook_stem, enabled_by_default,
             )
+            if invalid_value:
+                raw = project_hooks_cfg.get(hook_stem, {}).get("enabled")
+                log.warning(
+                    f"hooks.{hook_stem}.enabled: expected true/false (bool), got {raw!r} "
+                    f"({type(raw).__name__}) — treated as disabled"
+                )
 
         event = meta.get("event", "PreToolUse")
         if is_enabled and event in NON_RUNTIME_HOOK_EVENTS:
