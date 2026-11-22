@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.8.4
+version: 1.9.0
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -28,7 +28,7 @@ You sit at the implementation floor of the SE cascade: the `se-architect` decomp
 
 Expects `task-spec-v1` with SE leaf-node data:
 - `leaf_id`: Identifier of the leaf node (e.g. `L3-AuthService-TokenValidator`)
-- `req_id`: REQ-ID from REQUIREMENTS.md (e.g. `REQ-047`)
+- `req_id`: REQ-ID from REQUIREMENTS.md (e.g. `REQ-CMD-01`)
 - `domain`: `software` | `hardware` | `mechanics` (only `software` is implemented)
 - `description`: Black-box description of the leaf node
 - `interface_specs`: Interface contracts from the interface-registry (provided by `se-interface-mgr`)
@@ -94,8 +94,8 @@ Separate read/query paths from write/command paths on this component's interface
 
 ### Traceability
 
-- Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
-- Commit message format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- Every code artifact references its `req_id` (format `REQ-<AREA>-<NN>`) and `leaf_id` (comment or docstring).{{/if}}
+- Commit message format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-<AREA>-<NN>): <description>`{{else}}`<type>: <description>`{{/if}}
 
 ### Domain Gate
 
@@ -113,7 +113,7 @@ Separate read/query paths from write/command paths on this component's interface
 6. Reference req_id + leaf_id in every code artifact
 7. Cover each implemented interface with a test
 8. Do not break existing tests
-9. Commit format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-xxx): <description>`{{else}}`<type>: <description>`{{/if}}
+9. Commit format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-<AREA>-<NN>): <description>`{{else}}`<type>: <description>`{{/if}}
 ```
 
 ## Mandatory Escalation

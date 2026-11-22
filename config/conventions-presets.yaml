@@ -32,6 +32,9 @@ presets:
         format: keep-a-changelog
         sections: [Added, Fixed, Changed, Removed]
         entry_prefix: "REQ-xxx: "   # bewusst unverändert ggü. heute (siehe Konzept Abschnitt 8)
+        # Issue #1167: canonical REQ format is REQ-<AREA>-<NN>. This prefix stays
+        # byte-identical to the pre-feature output because
+        # tests/test_conventions_migration_invariant.py pins it as non-negotiable.
         # exact-timestamp (default) | calendar-day (deprecated, siehe Issue #726:
         # Kalendertag-Filter erzeugt doppelte Changelog-Einträge bei >1 Release/Tag).
         cutoff_method: exact-timestamp

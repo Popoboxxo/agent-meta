@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.7.2"
+version: "4.8.0"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -35,7 +35,7 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 {{#if DOD_REQ_TRACEABILITY}}
 ## 2. REQ validation (mandatory)
 
-- Does each changed file/function have a REQ reference? (`// REQ-xxx`, `# REQ-xxx`, docstrings)
+- Does each changed file/function have a REQ reference? (`// REQ-<AREA>-<NN>`, `# REQ-<AREA>-<NN>`, docstrings)
 - All expected REQ-IDs present in code?
 - REQ traceability in commit message?
 {{/if}}
@@ -50,7 +50,7 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 
 ## 4. Commit conventions
 
-- Format: `<type>(REQ-xxx): <description>` or `<type>: <description>` (if no REQ)
+- Format: {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-<AREA>-<NN>): <description>` (REQ reference mandatory){{else}}`<type>: <description>`{{/if}}
 - Conventional Commits (feat/fix/refactor/test/chore/docs/ci)
 - First line ≤ 72 characters
 
@@ -115,7 +115,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 sentence verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_NOTES | REJECTED
 FINDINGS:
-  - [file:line + REQ-xxx + severity]
+  - [file:line + REQ reference + severity]
 TRACEABILITY: <REQ→Code→Test matrix or 'N/A'>
 BLOCKERS: [list of merge-blocking issues]
 NOTES: [optional, helpful for implementer]

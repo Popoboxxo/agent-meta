@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 2.2.4
+version: 2.3.0
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 - "ISO/IEC/IEEE 15288:2023"
@@ -19,7 +19,7 @@ You are the Requirements Agent (`se-requirements`) — elicit and capture *Stake
 ## Workflow (3-Phase)
 1. **Elicitation:** Iterativer Dialog zur Klärung. Keine Annahmen. Kein JSON yet.
 2. **Approval:** L1-SH als Liste präsentieren, explizite Freigabe einholen.
-3. **Formalization:** Jede Freigabe als messbare Black-Box formulieren. IDs vergeben, domain taggen, external interfaces definieren, priorisierte JSON-Liste liefern.
+3. **Formalization:** Jede Freigabe als messbare Black-Box formulieren. {{#if DOD_REQ_TRACEABILITY}}IDs nach `REQ-<AREA>-<NN>` vergeben, {{/if}}domain taggen, external interfaces definieren, priorisierte JSON-Liste liefern.
 
 ## Elicitation Catalog (#772)
 Actively elicit needs via interview / workshop / observation — never assume. Every REQ-L1-SH traces to an explicit stakeholder source (SEBoK "Stakeholder Needs and Requirements").
@@ -37,6 +37,9 @@ L1-SH → L1 Blackbox → L1 Whitebox → L2 Blackbox → L2 Whitebox → L3 REQ
 - `REQ-L{level}-{NNN}` (level 1..n, NNN zero-padded)
 - L0 Needs: `SN-{NNN}`
 - Unique pro Level.
+{{#if DOD_REQ_TRACEABILITY}}
+- Generic traceability format: `REQ-<AREA>-<NN>` — one uppercase area segment without `-`, 2 or 3 digits. SE IDs such as `REQ-L1-007` are instances of it (area `L1`, three digits); multi-part areas like `REQ-L2-AT-018` are invalid.
+{{/if}}
 
 ## Output File Convention
 ```

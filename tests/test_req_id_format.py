@@ -12,6 +12,7 @@ Run: python3 -m pytest tests/test_req_id_format.py -q
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +23,51 @@ if str(_SCRIPTS) not in sys.path:
 
 from lib.consistency.report import Severity  # noqa: E402
 from lib.consistency.req_format import REQ_ID_PATTERN, check_req_ids  # noqa: E402
+
+#: Task 21 — agent templates whose REQ wording is gated on DOD_REQ_TRACEABILITY.
+GATED_AGENTS = (
+    "validator",
+    "bug-feature-analyzer",
+    "requirements",
+    "se-requirements",
+    "se-developer",
+    "api-specialist",
+)
+#: Canonical format token (spec IC-4 / O-H2 decision \d{2,3}).
+CANONICAL_FORMAT = "REQ-<AREA>-<NN>"
+
+
+def _render_project(root: Path, *, traceability: bool) -> Path:
+    """Sync a scratch project with either DoD state and return its root."""
+    project = root / ("trace-on" if traceability else "rapid")
+    (project / ".meta-config").mkdir(parents=True)
+    dod_override = "dod:\n  req-traceability: true\n" if traceability else ""
+    (project / ".meta-config" / "project.yaml").write_text(
+        "ai-providers:\n- Claude\n"
+        "dod-preset: rapid-prototyping\n"
+        + dod_override
+        + "systems-engineering:\n  enabled: true\n"
+        + "roles:\n" + "".join(f"- {role}\n" for role in GATED_AGENTS)
+        + "variables:\n  PROJECT_NAME: req-gate-probe\n  PROJECT_PREFIX: rg\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "sync.py"),
+         "--config", str(project / ".meta-config" / "project.yaml")],
+        cwd=project, capture_output=True, text=True, timeout=300,
+    )
+    assert result.returncode == 0, (
+        f"sync failed for traceability={traceability}\n"
+        f"{result.stdout[-1500:]}\n{result.stderr[-1500:]}"
+    )
+    return project
+
+
+def _rendered_agent(project: Path, role: str) -> str:
+    path = project / ".claude" / "agents" / f"{role}.md"
+    assert path.is_file(), f"rendered agent missing: {path}"
+    return path.read_text(encoding="utf-8")
 
 
 def _run(tmp_path: Path, body: str, *, traceability: bool):
@@ -74,3 +120,33 @@ def test_four_digit_rejected(tmp_path):
     assert len(findings) == 1
     assert findings[0].severity is Severity.ERROR
     assert "REQ-COM-1234" in findings[0].message
+
+
+# --- Task 21: render gating on DOD_REQ_TRACEABILITY -------------------------
+
+
+def test_render_rapid_prototyping_has_no_req_mandate(tmp_path):
+    """rapid-prototyping must render no ungated REQ mandate / old format."""
+    project = _render_project(tmp_path, traceability=False)
+    validator = _rendered_agent(project, "validator")
+    triage = _rendered_agent(project, "bug-feature-analyzer")
+    requirements = _rendered_agent(project, "requirements")
+
+    # The commit-format mandate and the old placeholder must be gone.
+    assert "(REQ-xxx): <description>" not in validator
+    assert CANONICAL_FORMAT not in validator
+    # Ungated triage mandates ("REQ-ID needed", "for a REQ-ID") must be gone.
+    assert "(REQ-ID needed)" not in triage
+    assert "for a REQ-ID, then" not in triage
+    assert CANONICAL_FORMAT not in triage
+    # The REQ-ID schema placeholder must not render in the minimal preset.
+    assert "REQ-xxx" not in requirements
+    assert CANONICAL_FORMAT not in requirements
+
+
+def test_render_traceability_on_shows_canonical_format(tmp_path):
+    """With traceability on, every touched agent shows the canonical format."""
+    project = _render_project(tmp_path, traceability=True)
+    for role in GATED_AGENTS:
+        text = _rendered_agent(project, role)
+        assert CANONICAL_FORMAT in text, f"{role}: canonical REQ format missing"

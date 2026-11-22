@@ -2706,7 +2706,7 @@ quality_pipelines:
         dod_flag: spec-plan-enabled
     - id: requirement
       agent: requirements
-      task: REQ-ID vergeben
+      task: 'REQ-ID (REQ-<AREA>-<NN>) vergeben'
       mode: conditional
       condition:
         dod_flag: req-traceability

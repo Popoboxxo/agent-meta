@@ -1,6 +1,6 @@
 ---
 name: template-api-specialist
-version: "1.7.0"
+version: "1.8.0"
 description: "API design, OpenAPI specifications, contract-first development. Creates and maintains API contracts."
 hint: "Use this agent for API design, OpenAPI specifications, and contract-first development."
 reference_standards:
@@ -106,7 +106,7 @@ Full: `schemas/api-spec-report.schema.json`. Required fields: `spec_file`, `spec
 | Bugfix in spec | `fix` | `fix(api): correct response type for POST /orders` |
 | Version bump | `chore` | `chore(api): bump API version to 2.0.0` |
 
-{{#if DOD_REQ_TRACEABILITY}}With REQ-ID: `feat(REQ-xxx)(api): add GET /users endpoint`{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}With REQ-ID (`REQ-<AREA>-<NN>`): `feat(REQ-CMD-01)(api): add GET /users endpoint`{{/if}}
 </workflow>
 
 <context>
@@ -144,7 +144,7 @@ ARTIFACTS: <spec + supporting file paths>
 - No provider-specific protocols without an abstraction layer
 - Never commit an API spec without validation
 - **Never** commit API specs directly to `main`/`master`
-- {{#if DOD_REQ_TRACEABILITY}}Every API change needs a REQ-ID{{/if}}
+- {{#if DOD_REQ_TRACEABILITY}}Every API change needs a REQ-ID (`REQ-<AREA>-<NN>`){{/if}}
 
 **User proxy:** `main_chat`.
 
