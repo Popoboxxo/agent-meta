@@ -1671,6 +1671,10 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
     # `_run_consistency_checks` -- so --validate prints the family exactly once.
     from lib.consistency.temp_literals import check_temp_literals
     _strict_findings += check_temp_literals(agent_meta_root, project_root, config)
+    # Issue #1167 (Task 20): canonical REQ-ID format in docs/REQUIREMENTS.md.
+    # Silent with req-traceability off; Severity.ERROR findings fail --validate.
+    from lib.consistency.req_format import check_req_ids
+    _strict_findings += check_req_ids(agent_meta_root, project_root, config)
     # Gitignored checkpoint/progress dirs (#1000): WARNING only, exit code unchanged.
     from lib.consistency.checkpoint_tracking import check_checkpoint_dir_ignored
     _strict_findings += check_checkpoint_dir_ignored(project_root, config)
