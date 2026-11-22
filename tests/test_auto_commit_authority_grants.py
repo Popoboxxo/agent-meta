@@ -88,3 +88,79 @@ def test_is_role_eligible_matches_effective_authority():
         assert with_grant == (_effective(role, None, granted) == AUTHORITY_DIRECT), role
         assert is_role_eligible(role, _REPO_ROOT, None, None) == without, role
         assert is_role_eligible(role, _REPO_ROOT, None, granted) == with_grant, role
+
+
+# --------------------------------------------------------------------------- #
+# T6 (issue #1181): provider-hook / active-guard gated Bash render              #
+# --------------------------------------------------------------------------- #
+
+def _resolve(role: str, resolved: dict, pc, *, guard_enabled: bool = True) -> tuple[str, bool]:
+    """Call T6 via a lazy import so the red phase is 10 failures (not one
+    module-level collection error)."""
+    from lib.auto_commit import resolve_commit_grant  # noqa: E402
+
+    return resolve_commit_grant(
+        role, resolved, pc, _REPO_ROOT, guard_enabled=guard_enabled
+    )
+
+
+def _granted(mode: str = "auto", role: str = "documenter") -> dict:
+    """A resolved auto_commit block with a NORMALIZED direct grant (T2)."""
+    return {"mode": mode, "authority_overrides": {role: "direct"}}
+
+
+_HOOKED = {"has_hooks": True, "hook_protocol": "claude-code-json"}
+_ANTIGRAVITY = {"has_hooks": True, "hook_protocol": "antigravity-hooks-json"}
+
+
+def test_grant_on_hook_provider_renders_bash():
+    assert _resolve("documenter", _granted(), _HOOKED) == ("direct", True)
+
+
+def test_grant_on_antigravity_provider_renders_bash():
+    assert _resolve("documenter", _granted(), _ANTIGRAVITY) == ("direct", True)
+
+
+def test_grant_on_hookless_provider_does_not_render():
+    # No verified hook ⇒ gate downgrades the grant to the derived authority (D21).
+    assert _resolve("documenter", _granted(), {"has_hooks": False}) == ("notify", False)
+
+
+def test_grant_on_provider_without_verified_protocol_does_not_render():
+    # Mammouth (config/ai-providers.yaml:622) / Codex (:734) form: no protocol.
+    pc = {"has_hooks": True, "hook_protocol": None}
+    assert _resolve("documenter", _granted(), pc) == ("notify", False)
+
+
+def test_grant_under_off_and_suggest_does_not_render():
+    # D20: off/suggest always yield (derived, False).
+    for mode in ("off", "suggest"):
+        assert _resolve("documenter", _granted(mode), _HOOKED) == ("notify", False), mode
+
+
+def test_grant_without_active_guard_does_not_render():
+    # RVW-1181-01: guard disabled ⇒ fail closed even on a verified hook provider.
+    resolved = _granted()
+    assert _resolve("documenter", resolved, _HOOKED, guard_enabled=False) == ("notify", False)
+
+
+def test_derived_direct_role_never_needs_bash_injection():
+    # K-3: developer's DERIVED authority is already direct; no Bash injection.
+    assert _resolve("developer", _granted(role="developer"), _HOOKED) == ("direct", False)
+
+
+def test_none_capabilities_fail_closed():
+    # No exception; no verified hook ⇒ (derived, False).
+    assert _resolve("documenter", _granted(), None) == ("notify", False)
+
+
+def test_grant_under_suggest_is_never_rendered():
+    # D20: suggest is propose-only — never rendered, even with an active guard.
+    assert _resolve("documenter", _granted("suggest"), _HOOKED) == ("notify", False)
+
+
+def test_grant_in_mixed_provider_set_renders_on_hook_provider():
+    # D21: resolution is per provider; the caller invokes once per provider.
+    resolved = _granted()
+    assert _resolve("documenter", resolved, _HOOKED) == ("direct", True)
+    assert _resolve("documenter", resolved, {"has_hooks": False}) == ("notify", False)

@@ -267,6 +267,64 @@ def is_role_eligible(
     )
 
 
+def resolve_commit_grant(
+    role: str,
+    resolved: dict,
+    provider_capabilities: dict | None,
+    agent_meta_root: Path,
+    *,
+    guard_enabled: bool,
+) -> tuple[str, bool]:
+    """Resolve one provider's (authority, Bash-render) decision for a grant.
+
+    Returns ``(authority, render_bash)``. The provider/guard gate can only
+    DOWNGRADE (spec §4.2): when ``render_bash`` is False the role stays at its
+    DERIVED authority (``role_commit_authority``, e.g. ``notify``), so the
+    caller never renders "commit directly" prose on an agent without ``Bash``.
+    Only when the render is actually enabled does the grant escalate the
+    derived delegate/notify authority to ``direct`` (via
+    ``effective_commit_authority``). Resolution is per provider (D21): a mixed
+    set is invoked once per provider.
+
+    ``render_bash`` is True only when ALL hold: a normalized direct grant on
+    ``role``, ``mode in {"auto", "custom"}`` (D20: ``off``/``suggest`` always
+    yield ``(derived, False)``), an active guard hook, a verified provider hook
+    (``provider_hooks_supported``), and no ``Bash`` already in the role's own
+    template (K-3: never duplicate an existing grant).
+
+    Gate rationales (issue #1181, security dependency #1151): without a
+    verified provider hook a ``direct`` grant would be pure prose on an agent
+    that cannot run ``Bash`` (``bash: deny``) -- the exact contradiction issue
+    #767 forbids. Without an ACTIVE guard a ``Bash`` grant is an unrestricted
+    shell on an Edit-only role (no sentinel allowlist containing git
+    mutations), which is worse than no grant at all (RVW-1181-01).
+
+    Never raises: ``provider_capabilities=None`` (or a hookless/unverified
+    provider) fails closed to ``(derived, False)`` (spec §3.3).
+    """
+    overrides = resolved.get("authority_overrides")
+    granted = isinstance(overrides, Mapping) and overrides.get(role) == AUTHORITY_DIRECT
+
+    # Lazy import: mirrors `authority_override_violations` and keeps io/runtime
+    # loading out of auto_commit's import path (no load-time cycle).
+    from .providers import provider_hooks_supported
+
+    render_bash = (
+        granted
+        and resolved.get("mode") in ("auto", "custom")
+        and guard_enabled
+        and provider_hooks_supported(provider_capabilities or {})
+        and "Bash" not in _role_tools(role, agent_meta_root)
+    )
+    if not render_bash:
+        # Gate can only downgrade: no render ⇒ keep the derived authority.
+        return (role_commit_authority(role, agent_meta_root), False)
+    return (
+        effective_commit_authority(role, agent_meta_root, None, overrides),
+        True,
+    )
+
+
 _MODES = ("off", "suggest", "auto", "custom")
 _TRIGGERS = (
     "task-boundary",
