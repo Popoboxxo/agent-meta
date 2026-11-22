@@ -122,6 +122,27 @@ golden; the remaining 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and the normalizatio
 table are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
 `tests/test_template_slimming_equivalence.py`.
 
+## Diff manifest — Issue #1167 / #1339 rebaseline (2026-11-22)
+
+**Reason:** T21 (commit `52d85e2d`, issue #1167) gated the REQ-ID mandate wording on
+`DOD_REQ_TRACEABILITY` and moved the literal to the canonical `REQ-<AREA>-<NN>` form, with
+per-role version bumps. The generated output of four active roles therefore changed; the
+four goldens were re-pinned from the real per-role sync render (the same pipeline the
+`render_env` fixture mirrors), with only the intended hunks applied and every frozen meta
+token, `{{PYTEST_BASETEMP}}` token, `model:` pin and normalization region left untouched:
+
+- `api-specialist.md`: `version` + `generated-from` `1.7.0 -> 1.8.0` (the REQ-wording
+  hunks fall inside declared normalization regions and need no fixture change).
+- `bug-feature-analyzer.md`: `version` + `generated-from` `1.5.1 -> 1.6.0`; FEATURE
+  triage prose no longer spells out the ungated `(REQ-ID)` mandate.
+- `requirements.md`: `version` + `generated-from` `1.9.2 -> 1.10.0`; step 5 and the
+  REQ-ID schema / `NEW_REQS` lines are now gated on `DOD_REQ_TRACEABILITY`.
+- `validator.md`: `version` + `generated-from` `4.7.2 -> 4.8.0`; commit-format and
+  `FINDINGS` REQ-wording moved to the canonical form / neutral phrasing.
+
+The other 54 goldens, `_GOLDEN_ROLE_COUNT` (58), the normalization table and the
+`model:` pins are unchanged. No assertion or whitelist was weakened.
+
 ## Diff manifest — Issue #1307 rebaseline (2026-11-19)
 
 **Reason:** provider variables `GIT_SENTINEL_SCOPE_BLOCK` / `GIT_SENTINEL_BASH_RULE` let the

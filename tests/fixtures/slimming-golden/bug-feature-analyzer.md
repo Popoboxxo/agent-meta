@@ -1,6 +1,6 @@
 ---
 name: bug-feature-analyzer
-version: 1.5.1
+version: 1.6.0
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before
@@ -12,7 +12,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/bug-feature-analyzer.md@1.5.1
+generated-from: 1-generic/bug-feature-analyzer.md@1.6.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -43,8 +43,7 @@ Before classifying, search the issue tracker (`gh issue list --search "<title ke
 
 1. Behavior covered by `agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.`? Yes → FEATURE in scope
 2. Contradicts explicit don'ts/architecture? Yes → OUT-OF-SCOPE
-3. Reasonable extension? Yes → FEATURE (REQ-ID needed)
-
+3. Reasonable extension? Yes → FEATURE
 ## 5. Escalation (on uncertainty)
 
 At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to orchestrator.
@@ -75,7 +74,7 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 |----------|-----------|
 | **BUG** | → `developer` (fix) or `feedback` (create issue) |
 | **USER-ERROR** | Reply with explanation, no dev task |
-| **FEATURE** | → `requirements` (REQ-ID) → `feature-lifecycle` pipeline or `developer` |
+| **FEATURE** | → `requirements` → `feature-lifecycle` pipeline or `developer` |
 | **OUT-OF-SCOPE** | Rejection with rationale, no follow-up |
 | **UNCLEAR** | Needs-info follow-up (request missing fields) — no action until answered |
 | **NEEDS-INFO** | Follow-up sent to reporter; re-triage once the requested info arrives |
@@ -125,7 +124,7 @@ ARTIFACTS: <persisted triage report path, empty if returned inline>
 ### Recommendation to orchestrator
 - BUG → "Delegate to `developer` with this triage report as context."
 - USER-ERROR → "No delegation. Reply to the user with: <explanation>"
-- FEATURE → "Delegate to `requirements` for a REQ-ID, then to the `feature-lifecycle` pipeline."
+- FEATURE → "Delegate to `requirements`, then to the `feature-lifecycle` pipeline."
 - OUT-OF-SCOPE → "No delegation. Reply to the user with: <rejection>"
 - UNCLEAR → "Ask the user the following questions: <list>"
 ```
