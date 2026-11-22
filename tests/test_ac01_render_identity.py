@@ -1063,6 +1063,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   added/removed**. No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the
   harness's own ``_hash_file``. AC-T4: ac01 ``e3f2cd50…`` -> ``9cee45b8…``; ``slimming-golden`` and
   ``compact-golden`` unchanged.
+- Issue #1247 (2026-11-19, commit trailer rule line): ``rules/1-generic/commit-conventions.md``
+  gains one trailer line. Patched **per entry**: exactly **9 of 1182 hashes moved; 0 added/removed**
+  -- the three ``commit-conventions`` rule renders (Claude/Continue/Copilot) and the six ``AGENTS.md``
+  that embed the rules text (Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. Hashes recomputed with the harness's own ``_hash_file`` via
+  ``render_matrix_hashes``. AC-T4: ac01 ``9cee45b8…`` re-pinned to the rebaselined tree;
+  ``compact-golden`` re-pinned separately (the embedded trailer line); ``slimming-golden`` unchanged.
 - Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): the provider variables
   ``GIT_SENTINEL_SCOPE_BLOCK`` / ``GIT_SENTINEL_BASH_RULE`` let the Claude render of ``git.md``
   (capability ``hook-agent-id``) omit the sentinel line for `gh`-only Bash calls. Patched

@@ -5514,6 +5514,12 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # Issue #1186 T12 (2026-11-17, audit-role artifact matrix): ac01-baseline re-pinned (36 per-file hashes, the 4 audit roles x 9 providers, -> 090cfabe.. -> 7d92667b..); slimming-golden re-pinned (app-lifecycle-governor golden: version/generated-from 1.4.1 -> 1.4.2 + {{ARTIFACT_AUDITS_DIR}} rendered path, plus the README manifest entry -> d8c20af6.. -> 22ac56a9..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # Issue #1186 (2026-11-18, artifact-locations rule): compact-golden re-pinned (agents-managed.md: one "Weitere Regeln als Skills" line + artifact-locations; 4ac22975.. -> ef8123cc..); ac01-baseline/slimming-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # Issue #1300 (2026-11-18, speech-mode schema description): ac01-baseline re-pinned (9 .meta-config/project.yaml hashes, 1 per provider; e3f2cd50.. -> 9cee45b8..); slimming-golden/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1247 (2026-11-19, commit trailer rule line): ac01-baseline re-pinned per
+# entry (9 of 1182 hashes: 3 commit-conventions rule renders + 6 AGENTS.md;
+# 9cee45b8.. -> 5e707bd7..); compact-golden re-pinned (the embedded trailer line,
+# ef8123cc.. -> 47db7f52..); slimming-golden unchanged. Digests recomputed with
+# `_fixture_tree_sha256` over the rebaselined trees. Logs:
+# `tests/test_ac01_render_identity.py` and `tests/test_gate_card_compact.py`.
 # Issue #1307 (2026-11-19, git sentinel scope for gh-only calls): ac01-baseline re-pinned (1 Claude git.md hash; 9cee45b8.. -> 3e389da2..); slimming-golden re-pinned (git golden: two lines, plus README manifest entry; 10f5c4c7.. -> b18ac19c..); compact-golden unchanged. Logs: `tests/test_ac01_render_identity.py` and `tests/test_template_slimming_equivalence.py`.
 # PR #1309 (2026-11-19, built-in `scenario-suite` release gate + hook-comment reformulation dropping the inline `project.yaml` reference): ac01-baseline re-pinned via --write (8 drift entries, 4 per provider: hooks/release-gates `.agent-meta-managed`, `.sha256-checksums`, `scenario-suite.sh` [added] + `.meta-config/generated-file-hashes.json`); merged AC-T4 chain 9cee45b8.. -> 3e389da2.. (main #1307) -> 08ae786f.. (final, after merging #1307 + #1309); slimming-golden (main value b18ac19c..)/compact-golden unchanged. Log: `tests/test_ac01_render_identity.py`.
 # PR #1326 (2026-11-21, AC-01 golden re-pin to the authoritative v2.0.0 AGENTS.md state): the 6 provider AGENTS.md hashes (Codex/Gemini/KimiCode/Mammouth/Opencode/ZCode) were pinned against beta.9 (PR base eea8aa7b); re-pinned to the v2.0.0 version-line values -- the only content diff vs. main's AGENTS.md (honcho/reqogniloom lines and mcp-* lazy rows stay removed). Merged origin/main into the branch (VERSION 2.0.0) and re-generated the AC-01 manifest via --write (1195 keys): 6 AGENTS.md hashes now match main's v2.0.0 values; the PR's hook feature entries are retained. AC-T4 ac01-baseline re-frozen from the final fixture bytes: c245a393.. -> 4e699ef6..; slimming-golden -> 7aabd546.. and compact-golden -> 4ed867bf.. follow main's fixture trees.
@@ -5522,9 +5528,9 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # d2b5268c.. -> c0253e8b...; slimming-golden/compact-golden unchanged. Log:
 # `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "c0253e8b83aaf91c54aecb5ffb351096db6a85887a14ae66e46560d097a72192",
+    "ac01-baseline": "4582662dcf4d374877c603d950774078c8c8e41772894df7fa95a30a7af4d658",
     "slimming-golden": "6eb489dcc07c41ef43c3283dc1bde73e025213af182c716ef7af3c1ec70e7b02",
-    "compact-golden": "4ed867bf15b467ea87108f097193c66958d802634ff6cb11acd6d894fdd7035b",
+    "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
 
 

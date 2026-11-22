@@ -60,6 +60,11 @@ Rebaseline log:
   (``Weitere Regeln als Skills: ...``) to the gate card; nothing else changed.
 - Issue #1186: the new always-on rule ``artifact-locations`` joins the
   ``Weitere Regeln als Skills`` pointer list (that one line); nothing else.
+- Issue #1247 (2026-11-19, commit trailer rule line): the embedded
+  ``commit-conventions`` gate-card section gains the one trailer line
+  (``Trailer: Die per commit.trailers ...``). Re-derived from the real compact
+  render through ``_render``; exactly that one line plus its blank separator
+  changed (10,400 -> 10,671 characters). Nothing else.
 """
 from __future__ import annotations
 

@@ -4,7 +4,7 @@ Pure stdlib; the sync path must not depend on jsonschema. Messages are
 prefixed with ``commit.`` so they are greppable in ``--validate`` output.
 """
 import re
-from typing import List
+from typing import List, Tuple
 
 _TRAILER_RE = re.compile(r"[A-Za-z][A-Za-z0-9-]*: \S.*")
 _EMAIL_RE = re.compile(r"<[^<>]*@[^<>]*>")
@@ -66,3 +66,63 @@ def render_commit_trailers(cfg: dict) -> str:
         if _valid(item) and item not in seen:
             seen.append(item)
     return "\n".join(seen)
+
+
+def _footer_lines(message: str) -> List[str]:
+    """Footer paragraph lines of a message whose CRLF is already normalised.
+
+    Comment ('#') lines are dropped and trailing whitespace is stripped per
+    line. A message with fewer than two paragraphs has no footer (a one-liner)
+    and yields an empty list.
+    """
+    kept: List[str] = []
+    for raw in message.split("\n"):
+        if raw.lstrip().startswith("#"):
+            continue
+        kept.append(raw.rstrip())
+    paragraphs: List[List[str]] = []
+    current: List[str] = []
+    for line in kept:
+        if not line.strip():
+            if current:
+                paragraphs.append(current)
+                current = []
+        else:
+            current.append(line)
+    if current:
+        paragraphs.append(current)
+    return paragraphs[-1] if len(paragraphs) > 1 else []
+
+
+def check_commit_message(message: str, cfg: dict) -> Tuple[List[str], List[str]]:
+    """Check a commit message against the configured ``commit.trailers``.
+
+    Pure and never raises. Returns ``(errors, warnings)``. Expected trailers
+    come from :func:`render_commit_trailers`; an empty contract is a no-op.
+    Only the footer (the last paragraph after comment lines and trailing
+    whitespace are removed) is inspected, with verbatim token spelling.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+    rendered = render_commit_trailers(cfg)
+    if not rendered:
+        return errors, warnings
+    if not isinstance(message, str):
+        message = ""
+    if message.startswith("\ufeff"):
+        errors.append("commit message starts with a UTF-8 BOM")
+        message = message[1:]
+    footer = _footer_lines(message.replace("\r\n", "\n"))
+    for expected in rendered.split("\n"):
+        token = expected.split(":", 1)[0]
+        token_lines = [line for line in footer if line.startswith(token + ":")]
+        if not token_lines:
+            errors.append("commit trailer missing: " + expected)
+        elif footer.count(expected) > 1:
+            errors.append("commit trailer duplicated: " + expected)
+        elif footer.count(expected) == 0:
+            warnings.append(
+                "commit trailer token '%s' has a different value (brief override?)"
+                % token
+            )
+    return errors, warnings
