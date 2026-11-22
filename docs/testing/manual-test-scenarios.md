@@ -1207,7 +1207,11 @@ Skill-Dateien in das provider-spezifische Skills-Verzeichnis.
 **Beschreibung:** agent-meta unterstützt 6 Kommunikationsmodi: `full` (Standard),
 `short` (kurz & prägnant), `childish` (kindlich), `caveman` (Höhlenmensch), `asozial`
 (unhöflich), `submissive` (unterwürfig). Der Modus wird via `speech-mode` in project.yaml
-gesetzt und generiert eine Rule `speech/<mode>.md` → `.claude/rules/speech-mode.md`.
+gesetzt. Provider mit nativen Rules (`has_rules: true`, z.B. Claude, Continue) erhalten
+`speech/<mode>.md` als `<rules_dir>/speech-mode.md` (Claude: `.claude/rules/speech-mode.md`);
+Provider ohne Rules (`has_rules: false`, z.B. Gemini, Opencode) erhalten den Inhalt als
+Abschnitt `## Speech-Mode` im managed Block ihrer Kontextdatei (`AGENTS.md`), ohne Rule-Datei.
+Mode `full` erzeugt auf beiden Kanälen nichts.
 
 ### 10.1 Speech Modes — Claude — Standard Modus (full)
 
@@ -1249,17 +1253,18 @@ gesetzt und generiert eine Rule `speech/<mode>.md` → `.claude/rules/speech-mod
 
 **Schritte:**
 1. Führe `python scripts/sync.py` aus
-2. Öffne `.gemini/rules/speech-mode.md`
-3. Prüfe: Inhalt entspricht `speech/submissive.md`
+2. Öffne `AGENTS.md` und suche den Abschnitt `## Speech-Mode` (Gemini: `has_rules: false`)
+3. Prüfe: Inhalt entspricht `speech/submissive.md` (Überschrift `Kommunikationsstil: Submissive`);
+   `.gemini/rules/speech-mode.md` existiert NICHT
 4. Prüfe: Rule enthält Anweisungen für devote/unterwürfige Kommunikation
 5. Starte einen Agenten — prüfe ob der submissive Ton verwendet wird
 6. Prüfe: Der Agent verwendet "Meister"/"Herrin"-Anrede oder ähnlich devote Formulierungen
 
 **Erwartetes Ergebnis:**
-- Speech-Mode Rule wird korrekt in das Provider-Regelverzeichnis kopiert
-- Rule enthält vollständige Kommunikationsanweisungen für den submissiven Modus
+- Speech-Mode wird als Abschnitt `## Speech-Mode` in `AGENTS.md` eingebettet (nach den regulären Rules)
+- Abschnitt enthält vollständige Kommunikationsanweisungen für den submissiven Modus
 - Agenten kommunizieren im gewählten Modus
-- Rule wird als managed-Datei getrackt
+- Keine Rule-Datei im Gemini-Verzeichnis; Wechsel auf `full` entfernt den Abschnitt beim nächsten Sync
 
 **Tatsächliches Ergebnis:**
 - _(Platzhalter für Tester)_
@@ -1279,17 +1284,17 @@ gesetzt und generiert eine Rule `speech/<mode>.md` → `.claude/rules/speech-mod
 
 **Schritte:**
 1. Führe `python scripts/sync.py` aus
-2. Öffne `.opencode/rules/speech-mode.md` (falls vorhanden — Opencode hat kein natives Rules-Verzeichnis)
-3. Prüfe: Speech-Mode wurde als Teil des Agent-Kontexts integriert
+2. Öffne `AGENTS.md` und suche den Abschnitt `## Speech-Mode` (Opencode: `has_rules: false`)
+3. Prüfe: Speech-Mode ist als Abschnitt im managed Block integriert; `.opencode/rules/speech-mode.md` existiert NICHT
 4. Prüfe: Inhalt entspricht der Höhlenmenschen-Kommunikation (kurze Sätze, einfache Worte)
 5. Starte einen Agenten — prüfe ob Höhlenmenschen-Stil verwendet wird
 6. Setze zurück auf `speech-mode: full` und sync
 
 **Erwartetes Ergebnis:**
-- Speech-Mode wird auf Opencode angewandt (soweit unterstützt)
+- Speech-Mode wird auf Opencode als Abschnitt `## Speech-Mode` in `AGENTS.md` angewandt
 - Agenten kommunizieren im Caveman-Stil
-- Bei Opencode ohne natives Rules-Verzeichnis wird der Modus anderswo integriert
-- Zurücksetzen auf "full" entfernt den Override
+- Keine separate Rule-Datei (kein natives Rules-Verzeichnis)
+- Zurücksetzen auf "full" entfernt den Abschnitt beim nächsten Sync
 
 **Tatsächliches Ergebnis:**
 - _(Platzhalter für Tester)_
