@@ -103,3 +103,83 @@ def test_custom_trigger_without_custom_script_rejected():
         jsonschema.validate(
             _base_config({"mode": "auto", "triggers": ["custom"]}), _schema(),
         )
+
+
+# --------------------------------------------------------------------------- #
+# authority_overrides (issue #1181)                                            #
+# --------------------------------------------------------------------------- #
+
+
+def _with_overrides(value: dict) -> dict:
+    return _base_config({
+        "mode": "auto",
+        "triggers": ["task-boundary"],
+        "authority_overrides": value,
+    })
+
+
+def _grant(**overrides) -> dict:
+    entry = {"authority": "direct", "acknowledge_full_shell": True}
+    entry.update(overrides)
+    return entry
+
+
+def test_authority_overrides_direct_with_ack_is_valid():
+    jsonschema.validate(
+        _with_overrides({"documenter": _grant()}), _schema(),
+    )
+
+
+def test_authority_overrides_scalar_shorthand_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _with_overrides({"documenter": "direct"}), _schema(),
+        )
+
+
+def test_authority_overrides_missing_ack_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _with_overrides({"documenter": {"authority": "direct"}}), _schema(),
+        )
+
+
+def test_authority_overrides_ack_must_be_true():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _with_overrides({"documenter": _grant(acknowledge_full_shell=False)}),
+            _schema(),
+        )
+
+
+def test_authority_overrides_rejects_unknown_value():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _with_overrides({"documenter": _grant(authority="notify")}), _schema(),
+        )
+
+
+def test_authority_overrides_rejects_unknown_subkey():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _with_overrides({"documenter": _grant(extra=1)}), _schema(),
+        )
+
+
+def test_authority_overrides_rejects_bad_role_name():
+    for bad_name in ("Documenter", "_x"):
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(
+                _with_overrides({bad_name: _grant()}), _schema(),
+            )
+
+
+def test_authority_overrides_default_is_empty_object():
+    ac = _schema()["properties"]["auto_commit"]["properties"]["authority_overrides"]
+    assert ac["default"] == {}
+
+
+def test_authority_overrides_enum_is_exactly_direct():
+    ac = _schema()["properties"]["auto_commit"]["properties"]["authority_overrides"]
+    enum = ac["additionalProperties"]["properties"]["authority"]["enum"]
+    assert set(enum) == {"direct"}

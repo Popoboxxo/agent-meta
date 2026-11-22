@@ -35,6 +35,19 @@ def test_valid_and_absent_blocks_have_no_violations():
         {"auto_commit": {"mode": "custom", "custom_script": "x.sh"}}) == []
 
 
+def test_authority_overrides_key_is_known():
+    cfg = {
+        "auto_commit": {
+            "mode": "auto",
+            "triggers": ["task-boundary"],
+            "authority_overrides": {
+                "documenter": {"authority": "direct", "acknowledge_full_shell": True}
+            },
+        }
+    }
+    assert auto_commit_violations(cfg) == []
+
+
 def test_triggers_with_mode_off_is_violation():
     v = auto_commit_violations(
         {"auto_commit": {"mode": "off", "triggers": ["task-boundary"]}})

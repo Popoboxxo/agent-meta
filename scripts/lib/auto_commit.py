@@ -32,7 +32,7 @@ from .frontmatter import parse_frontmatter_file
 _ELIGIBLE_TOOLS = {"Edit", "Write"}
 _SPAWN_TOOLS = {"Agent", "Task"}
 
-ALLOWLIST_VERSION = 1
+ALLOWLIST_VERSION = 2
 
 # Authority literal values (mirrors the capability table in the module docstring).
 AUTHORITY_DIRECT = "direct"
@@ -215,7 +215,8 @@ _TRIGGERS = (
     "custom",
 )
 _STATIC_KEYS = frozenset(
-    {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan"})
+    {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan",
+     "authority_overrides"})
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "config" / "project-config.schema.json"
 
 

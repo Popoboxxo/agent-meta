@@ -1541,6 +1541,29 @@
           "type": "boolean",
           "default": true,
           "description": "Run the project's existing secret scan (scripts/lib/secrets.py::scan_for_secrets) against the staged diff before any auto/custom commit. Default true; set false to skip (explicit opt-out, not a silent gap)."
+        },
+        "authority_overrides": {
+          "type": "object",
+          "description": "Issue #1181: opt-in commit-authority grant per role. Escalates a write-capable role (delegate/notify) to 'direct' for the guard-hook sentinel and the rendered permission. Every entry MUST acknowledge that the grant is a full Bash grant, not a git-only grant. Default: {} (no grant, rendering unchanged). Only valid for roles that already have Edit/Write; a read-only role is a configuration error.",
+          "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["authority", "acknowledge_full_shell"],
+            "properties": {
+              "authority": {
+                "type": "string",
+                "enum": ["direct"],
+                "description": "Escalation target. v1: only 'direct' (delegate/notify are derived automatically; withdrawal runs through the roles: allowlist)."
+              },
+              "acknowledge_full_shell": {
+                "type": "boolean",
+                "const": true,
+                "description": "Mandatory. Confirms that the grant renders a full Bash permission (a sentinel-carrying command is limited to git add / non-amending git commit; commands without the sentinel are not attributable to the role)."
+              }
+            }
+          },
+          "default": {}
         }
       },
       "additionalProperties": false,
