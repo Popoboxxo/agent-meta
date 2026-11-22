@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: sync-on-config-change
-# version: 1.1.0
+# version: 1.1.1
 # event: PostToolUse
 # matcher: Write|Edit
 # provider: Claude
@@ -19,10 +19,23 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null || exit 0
 hook_have_python || exit 0
+declare -F hook_json_get_many >/dev/null 2>&1 || exit 0
 
 INPUT=$(cat)
-TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
-FILE_PATH=$(hook_json_get "$INPUT" "tool_input.file_path")
+# #1161 Pkt5: ONE interpreter start reads both fields. This hook is
+# informational and fails OPEN, so a failed parse (rc 1, no output) simply
+# skips config-change detection. bash 3.2: `read -r -d ''`, no eval/mapfile.
+_P_FAIL=0
+{
+  IFS= read -r -d '' _P_TOOL_NAME || _P_FAIL=1
+  IFS= read -r -d '' _P_FILE_PATH || _P_FAIL=1
+  IFS= read -r -d '' _P_TRAILER   || _P_FAIL=1
+} < <(hook_json_get_many "$INPUT" tool_name tool_input.file_path)
+if [ "$_P_FAIL" -ne 0 ] || [ "${_P_TRAILER:-}" != "ok" ]; then
+  exit 0
+fi
+TOOL_NAME="$_P_TOOL_NAME"
+FILE_PATH="$_P_FILE_PATH"
 
 # Only intercept file-writing tools
 [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ] || exit 0

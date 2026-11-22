@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: lifecycle-check
-# version: 1.1.0
+# version: 1.1.1
 # event: PostToolUse
 # matcher: Bash
 # provider: Claude
@@ -19,11 +19,28 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null || exit 0
 hook_have_python || exit 0
+declare -F hook_json_get_many >/dev/null 2>&1 || exit 0
 
 INPUT=$(cat)
-TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
-COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
-EXIT_CODE=$(hook_json_get "$INPUT" "tool_result.exit_code" "0")
+# #1161 Pkt5: ONE interpreter start reads all three fields. This hook is
+# informational and fails OPEN, so a failed parse (rc 1, no output) simply
+# skips lifecycle detection. bash 3.2: `read -r -d ''`, no eval/mapfile.
+_P_FAIL=0
+{
+  IFS= read -r -d '' _P_TOOL_NAME  || _P_FAIL=1
+  IFS= read -r -d '' _P_COMMAND    || _P_FAIL=1
+  IFS= read -r -d '' _P_EXIT_CODE  || _P_FAIL=1
+  IFS= read -r -d '' _P_TRAILER    || _P_FAIL=1
+} < <(hook_json_get_many "$INPUT" tool_name tool_input.command tool_result.exit_code)
+if [ "$_P_FAIL" -ne 0 ] || [ "${_P_TRAILER:-}" != "ok" ]; then
+  exit 0
+fi
+TOOL_NAME="$_P_TOOL_NAME"
+COMMAND="$_P_COMMAND"
+# hook_json_get_many has no default argument: map a missing/empty exit_code
+# field to the old single-field reader's default of "0".
+EXIT_CODE="$_P_EXIT_CODE"
+[ -n "$EXIT_CODE" ] || EXIT_CODE="0"
 
 # Only intercept successful Bash tool calls
 [ "$TOOL_NAME" = "Bash" ] || exit 0

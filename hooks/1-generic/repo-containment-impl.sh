@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.6.0
-# changelog: 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, $CLAUDE_PROJECT_DIR (hook environment) and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
+# version: 1.6.1
+# changelog: 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, $CLAUDE_PROJECT_DIR (hook environment) and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -191,6 +191,7 @@ _PY="$(hook_python_bin)"
 # after an agent-meta update) would otherwise make the calls below fail
 # obscurely. Fail closed, same as a missing lib (issue #595).
 if ! declare -F hook_json_usable >/dev/null 2>&1 \
+   || ! declare -F hook_json_get_many >/dev/null 2>&1 \
    || ! declare -F hook_known_tool_name >/dev/null 2>&1 \
    || ! declare -F hook_shell_scan_py >/dev/null 2>&1 \
    || ! declare -F hook_shell_resolver_py >/dev/null 2>&1 \
@@ -214,7 +215,36 @@ fi
 
 INPUT=$(cat)
 
-TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
+# #1161 Pkt5: ONE interpreter start reads every payload field this guard uses
+# (hook_json_get_many, SPEC-HOOK-SINGLE-PARSE §2). The `ok` trailer tells a
+# failed parse (rc 1, no output) from a missing field, so a malformed payload
+# fails closed here. bash 3.2 compatible: `read -r -d ''` only, no
+# eval/mapfile/namerefs. The hook_json_usable and hook_known_tool_name probes
+# above stay unchanged.
+_P_FAIL=0
+{
+  IFS= read -r -d '' _P_TOOL_NAME     || _P_FAIL=1
+  IFS= read -r -d '' _P_FILE_PATH     || _P_FAIL=1
+  IFS= read -r -d '' _P_NOTEBOOK_PATH || _P_FAIL=1
+  IFS= read -r -d '' _P_COMMAND       || _P_FAIL=1
+  IFS= read -r -d '' _P_CWD           || _P_FAIL=1
+  IFS= read -r -d '' _P_TRAILER       || _P_FAIL=1
+} < <(hook_json_get_many "$INPUT" \
+       tool_name tool_input.file_path tool_input.notebook_path \
+       tool_input.command cwd)
+if [ "$_P_FAIL" -ne 0 ] || [ "${_P_TRAILER:-}" != "ok" ]; then
+  echo "REPO_CONTAINMENT: empty or unparseable PreToolUse payload (cannot read fields)." >&2
+  echo "Failing closed so an unknown tool call cannot write outside the repo root." >&2
+  exit 2
+fi
+
+TOOL_NAME="$_P_TOOL_NAME"
+FILE_PATH="$_P_FILE_PATH"
+if [ -z "$FILE_PATH" ]; then
+  FILE_PATH="$_P_NOTEBOOK_PATH"
+fi
+BASH_CMD="$_P_COMMAND"
+CWD_RAW="$_P_CWD"
 
 # Empty/malformed payload -> fail CLOSED: a containment guard cannot tell a
 # benign non-tool event from a truncated payload, so an unevaluable payload
@@ -275,13 +305,10 @@ resolve_realpath() {
 }
 
 # --- Target extraction -------------------------------------------------
-# Extracted before the anchor: with a missing/empty `cwd`, an absolute
+# FILE_PATH / BASH_CMD / CWD_RAW were read in the single parse above (the
+# file_path -> notebook_path fallback is already applied there). They are
+# extracted before the anchor: with a missing/empty `cwd`, an absolute
 # Write/Edit target is what the anchor is derived from.
-FILE_PATH=$(hook_json_get "$INPUT" "tool_input.file_path")
-if [ -z "$FILE_PATH" ]; then
-  FILE_PATH=$(hook_json_get "$INPUT" "tool_input.notebook_path")
-fi
-BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
 
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
   if [ -z "$FILE_PATH" ]; then
@@ -361,7 +388,6 @@ fi
 # a missing one, so an absolute Write/Edit target can still anchor the search.
 # The anchor is used to resolve RELATIVE targets and to locate the root only
 # when FIXED_ROOT is absent; it never replaces a fixed root.
-CWD_RAW=$(hook_json_get "$INPUT" "cwd")
 WORKDIR=""
 ANCHOR_SOURCE="none"
 case "$CWD_RAW" in
