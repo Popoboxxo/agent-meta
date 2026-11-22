@@ -1104,6 +1104,15 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   remaining 153 stale keys are a pre-existing main follow-up, documented/excluded in
   ``.github/workflows/validate.yml``.
 
+- PR #1336 / issue #1181 (2026-11-22, commit-authority grant): rebaselined the 11 rendered
+  hook/allowlist hashes after #1181 hardened ``hooks/1-generic/orchestrator-guard-impl.sh``
+  (T16 grant sentinel, version kept 1.13.0; 2 hook renders: Claude + Gemini) and bumped the
+  allowlist artifact to ``version: 2`` with ``authority_overrides`` (T4/T9; 9 provider renders).
+  11 of 1195 hashes moved; 0 added/removed. No other artifact, ``AGENTS.md`` or golden changed;
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4: ac01 ``c0253e8b…`` -> ``ab13100f…``;
+  ``slimming-golden`` and ``compact-golden`` unchanged. Same event is recorded in the AC-T4
+  comment of ``tests/test_opencode_v2_surface.py``.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

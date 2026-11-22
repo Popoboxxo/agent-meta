@@ -1628,6 +1628,30 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
     from lib.providers import load_providers_config as _load_pc
 
     _provider_config = _load_pc(agent_meta_root)
+
+    # Issue #1181 (T2): semantic commit-authority grants. Structural
+    # auto_commit violations are reported above and stay unchanged; grants are
+    # validated here so the already-loaded provider registry can be reused.
+    # No early exit — the existing consistency_errors mechanism decides rc.
+    from lib.auto_commit import (
+        authority_override_notices,
+        authority_override_violations,
+    )
+
+    for _grant_violation in authority_override_violations(
+            config, agent_meta_root, _provider_config):
+        log.warning(f"config-audit [ERROR] auto_commit: {_grant_violation}")
+        consistency_errors += 1
+
+    # D22: a grant on an inactive role is INFO only — no counter increment.
+    # Use the EFFECTIVE active set (raw_roles ∩ active_set.has) so a
+    # gate-dropped role still receives its notice (K-15/RVW2-1181-05).
+    for _grant_notice in authority_override_notices(
+            config,
+            {r for r in (ctx.active_set.raw_roles or ()) if ctx.active_set.has(r)}):
+        log.note("config-audit [INFO] auto_commit", _grant_notice)
+        print(f"config-audit [INFO] auto_commit: {_grant_notice}")
+
     _strict_findings = list(_config_audit_findings)
     _strict_findings += check_orchestrator_strict_hook_support(
         project_root, config, _provider_config, agent_meta_root)

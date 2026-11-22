@@ -1,6 +1,6 @@
 #!/bin/bash
 # version: 1.13.0
-# changelog: 1.13.0: issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
+# changelog: 1.13.0: issue #1181 -- a granted role's sentinel is restricted to git add / non-amending git commit (all_git classifier field + IS_GRANT_SENTINEL gate); issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -471,6 +471,10 @@ fi
 IS_GIT_SENTINEL=0
 IS_ORCH_SENTINEL=0
 IS_ALLOWLIST_SENTINEL=0
+# Issue #1181: separate flag for a role explicitly granted direct commit
+# authority by the v2 allowlist's `authority_overrides` map. Deliberately NOT
+# IS_ALLOWLIST_SENTINEL -- the existing mutation gate's logic stays unchanged.
+IS_GRANT_SENTINEL=0
 
 if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
   _ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
@@ -531,6 +535,27 @@ except Exception:
       fi
       ;;
   esac
+  # Issue #1181: a role listed as a KEY in the v2 allowlist's
+  # `authority_overrides` map has been granted direct commit authority.
+  # This is a SEPARATE flag: IS_ALLOWLIST_SENTINEL (set above) still drives
+  # the existing mutation gate unchanged; the dedicated grant gate below
+  # uses this one to narrow the sentinel to add / non-amending commit only.
+  # A v1 allowlist has no such key -> no grant -> full shell as before.
+  _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
+  if [ -f "$_ALLOWLIST" ]; then
+    _IS_GRANT=$("$_PY" -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    print('1' if sys.argv[2] in data.get('authority_overrides', {}) else '0')
+except Exception:
+    print('0')
+" "$_ALLOWLIST" "$_ROLE" 2>/dev/null)
+    if [ "$_IS_GRANT" = "1" ]; then
+      IS_GRANT_SENTINEL=1
+    fi
+  fi
   if [ -n "$_AUDIT_ROLE" ]; then
     # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
     # credential-shaped substrings before writing (issue #596), hardens
@@ -558,12 +583,15 @@ fi
 # mutation gate (further down) applies only in non-strict mode for non-git
 # callers. Classifying once, with the same tokenizer, keeps the two gates
 # consistent and fixes the raw-regex gaps #590/#591/#602 (see header note).
-# The scan prints exactly three words: '<category> <scope> <bom>', where
+# The scan prints exactly four words: '<category> <scope> <bom> <all_git>', where
 # category is 'destructive', 'mutation' or 'none' ('destructive' takes
 # precedence when a statement is both), scope is 'broad' or 'narrow', and
 # bom is 'message' | 'file' | 'none' (issue #842: a leading UTF-8 BOM in a
 # commit message; the detector also covers ANSI-C quoting -- -m $'\uFEFF...' --
-# and combined short-option clusters/glued forms like -am/-mMSG). Scope only
+# and combined short-option clusters/glued forms like -am/-mMSG). The fourth
+# word (issue #1181) is 1 only when EVERY statement's command word is `git`,
+# else 0; the grant gate uses it to reject a mixed git+non-git command list.
+# Scope only
 # qualifies a
 # 'mutation': 'narrow' means every git mutation found is `add` or a
 # non-amending `commit`, 'broad' means at least one other mutation is present
@@ -576,11 +604,12 @@ fi
 # (hook_shell_scan_py: quote/heredoc-aware statement splitter + fork-bomb
 # detector) plus the git-specific part below. Any classifier failure -- a
 # non-zero interpreter exit or output that is not exactly '<category> <scope>
-# <bom>' -- fails CLOSED (exit 2). The old '|| echo none narrow none' fallback
-# allowed every call whose classifier died (issue #943 (k)).
+# <bom> <all_git>' -- fails CLOSED (exit 2). The old '|| echo none narrow none'
+# fallback allowed every call whose classifier died (issue #943 (k)).
 _GIT_SCAN="none"
 _GIT_SCAN_SCOPE="narrow"
 _GIT_BOM="none"
+_GIT_SCAN_ALL_GIT="0"
 if [ "$TOOL_NAME" = "Bash" ]; then
   _GIT_SCAN_SRC=$(hook_shell_scan_py
 cat <<'PYEOF'
@@ -1345,6 +1374,11 @@ destructive = fork_bomb
 mutation = False
 mutation_scope_broad = False
 bom = 'none'
+# Issue #1181: 1 only when EVERY statement's command word is `git`. The grant
+# gate uses this to reject a mixed git+non-git list (e.g. `git add && curl`)
+# even when the git mutations themselves stay within the narrow add/commit
+# scope. Comments (incl. the sentinel line) are absent from this stream.
+all_git = True
 # Quote/heredoc-aware statements from the shared lib (issue #943 (c)/(j),
 # #944 SR-B-16). Heredoc bodies are attached to the statement that opened
 # them; they are prose for command classification, except that
@@ -1362,6 +1396,7 @@ for stmt, heredoc_bodies in _statement_stream:
         destructive = True
         break
     if cmd != 'git':
+        all_git = False
         continue
     subcmd, git_args, config_values = parse_git(args)
     # An empty heredoc list means the stdin was not visible (a pipe), which is
@@ -1383,7 +1418,7 @@ category = 'destructive' if destructive else ('mutation' if mutation else 'none'
 # message names the fork-bomb scan only when it fired (scope is otherwise
 # irrelevant for 'destructive').
 scope = 'forkbomb' if fork_bomb else ('broad' if mutation_scope_broad else 'narrow')
-print(f'{category} {scope} {bom}')
+print(f'{category} {scope} {bom} {1 if all_git else 0}')
 PYEOF
 )
   _GIT_SCAN_RC=0
@@ -1393,7 +1428,7 @@ PYEOF
     echo "Failing closed (issue #943 (k)) — an unevaluable command must not be allowed." >&2
     exit 2
   fi
-  if [ "$(printf '%s' "$_GIT_SCAN_RAW" | awk 'NF{print NF}')" != "3" ]; then
+  if [ "$(printf '%s' "$_GIT_SCAN_RAW" | awk 'NF{print NF}')" != "4" ]; then
     echo "ORCHESTRATOR_GUARD: the git/destructive classifier returned malformed output." >&2
     echo "Failing closed (issue #943 (k)) — an unevaluable command must not be allowed." >&2
     exit 2
@@ -1401,6 +1436,7 @@ PYEOF
   _GIT_SCAN=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $1}')
   _GIT_SCAN_SCOPE=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $2}')
   _GIT_BOM=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $3}')
+  _GIT_SCAN_ALL_GIT=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $4}')
   case "$_GIT_SCAN" in
     destructive|mutation|none) ;;
     *)
@@ -1604,6 +1640,25 @@ if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENT
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Delegate git operations to the \`git\` agent." >&2
   exit 2
+fi
+
+# --- Issue #1181: a granted role's sentinel is the commit path only -------
+# Covers ONLY commands that actually carry the sentinel (IS_GRANT_SENTINEL=1):
+# a granted role may stage and commit (git add / non-amending git commit) and
+# NOTHING else -- non-git commands (curl ...), mixed git+non-git command lists,
+# git status/log, push and `commit --amend` all fall through to exit 2. That is
+# intentional (Spec §3.3.1 point 2): for a granted role the sentinel IS the
+# commit path, not a general shell pass. Do not "fix" this by widening it.
+# D18 / attribution gap #1210: this gate never sees a command WITHOUT the
+# sentinel -- it is NOT a security boundary against injection, only the
+# convention-boundary role check documented in this file's header (still a
+# best-effort token scan, no shell interpreter). The grant is narrow on
+# purpose; an unattributed command stays outside it exactly like today.
+if [ "$TOOL_NAME" = "Bash" ] && [ "$IS_GRANT_SENTINEL" = "1" ]; then
+  if [ "$_GIT_SCAN" != "mutation" ] || [ "$_GIT_SCAN_SCOPE" != "narrow" ] || [ "$_GIT_SCAN_ALL_GIT" != "1" ]; then
+    echo "ORCHESTRATOR_GUARD: a granted commit role may only use its sentinel for \`git add\`/\`git commit\` (issue #1181)." >&2
+    exit 2
+  fi
 fi
 
 exit 0

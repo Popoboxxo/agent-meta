@@ -2,9 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Opt-in commit-authority grant (`auto_commit.authority_overrides`, #1181):** new optional `project.yaml` key escalates a write-capable role (`delegate`/`notify`) to `direct` for the guard-hook sentinel and the rendered permission. Object form only, with mandatory `acknowledge_full_shell: true`; default `{}` leaves every render unchanged. A granted role's generated block carries the grant line naming it as a full `Bash` grant, not a `git`-only grant. New sync logs: `auto-commit-grant: … (source: auto_commit.authority_overrides; hook-enforced: yes)` (INFO), `auto-commit-allowlist: eligible_roles shrank …` (WARN, with the disjoint reasons `grant withdrawn` / `role removed` / `gate-dropped` / `no Bash`), and `config-audit [INFO] auto_commit: … grant ignored — role is not active` for grants on inactive roles (no exit-code effect). New import-free predicate `scripts/lib/hook_state.py::guard_hook_enabled` gives the guard and the hook sync one strict-bool source for guard enablement.
+
 ### Changed
+- **Allowlist version 2 on every sync (#1181, K-10):** `ALLOWLIST_VERSION` 1→2 adds the `authority_overrides` field (readers tolerate v1; a missing field means no grant). `version: 2` is written to `.meta-config/auto-commit-allowlist.json` on **every** sync, including projects with no grant; no render change for those projects.
 - **Artifact-locations migration notes:** the `artifact-locations` matrix lists former write locations via additive, read-only `legacy[]` entries; set `artifact-locations.enabled: false` to restore the exact legacy behaviour immediately; run `sync.py --migrate-artifact-aliases --write` to move the scratch-path alias into the matrix. ADR filenames use the `ADR-{nnn}_{slug}.md` canon (former `NNNN-…`/`ADR-NNN-…` names stay readable through `legacy[]`).
 - **Project context injection (#1187):** optional `project.yaml` section controlling whether the embedded project-context paragraph reaches generated roles; documented in the changelog of the release that shipped it.
+
+### Security
+- **Full-shell expansion with mandatory acknowledgement (#1181, D18):** a grant renders a full `Bash` permission, not a git-only restriction; `acknowledge_full_shell: true` is required or the grant is rejected. Rendering and sentinel injection require both a provider with a verified `hook_protocol` and an active `orchestrator-guard`; on hookless providers the grant falls back to the derived authority and logs a WARN. The guard hardens sentinel-carrying commands to `git add` and a non-amending `git commit`. Commands without a sentinel are not attributable to a role — tracked as #1210 (formerly F-5) and explicitly **not** documented as a security boundary. Rollout: the guard hardening from #1151 ships before this grant; there is no automatic hook rollout.
 
 ## [2.0.0] - 2026-11-20
 

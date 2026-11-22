@@ -25,14 +25,16 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter_file
+from .hook_state import guard_hook_enabled
 
 _ELIGIBLE_TOOLS = {"Edit", "Write"}
 _SPAWN_TOOLS = {"Agent", "Task"}
 
-ALLOWLIST_VERSION = 1
+ALLOWLIST_VERSION = 2
 
 # Authority literal values (mirrors the capability table in the module docstring).
 AUTHORITY_DIRECT = "direct"
@@ -88,6 +90,25 @@ _PUSH_BOUNDARY_LINE = (
     "This commit authority never extends to pushing, tagging, or branch "
     "management -- those remain exclusively the `git` role's job."
 )
+
+# Issue #1181 (T5): the one place the grant is named as a RIGHT (D16). The
+# wording is a contract (spec §4.5, AC-2): it names the expansion to a full
+# Bash grant, not only the guard-hook boundary. Emitted only for a granted
+# role at direct authority; `role=None` never renders it (byte-identical).
+_GRANT_LINE_TEMPLATE = (
+    "Granted by project config `auto_commit.authority_overrides.{role}` "
+    "(issue #1181). This is a full `Bash` grant, not a `git`-only grant: the "
+    "guard hook blocks git mutations outside `git add` and a non-amending "
+    "`git commit`, and rejects your sentinel on any non-git command."
+)
+
+
+def _grant_applies(resolved: dict, role: str | None, authority: str) -> bool:
+    """T5: grant line only for a granted role at direct authority (spec §4.5)."""
+    if not role or authority != AUTHORITY_DIRECT:
+        return False
+    overrides = resolved.get("authority_overrides")
+    return isinstance(overrides, Mapping) and overrides.get(role) == AUTHORITY_DIRECT
 
 _CONFIG_ERROR_LINE = (
     "Commit authority is misconfigured: `mode: custom` requires "
@@ -196,14 +217,112 @@ def role_commit_authority(
     return AUTHORITY_NOTIFY
 
 
-def is_role_eligible(role: str, agent_meta_root: Path, platform: str | None = None) -> bool:
+def effective_commit_authority(
+    role: str,
+    agent_meta_root: Path,
+    platform: str | None = None,
+    authority_overrides: Mapping[str, str] | None = None,
+) -> str:
+    """Like `role_commit_authority`, but a valid grant escalates delegate|notify.
+
+    Pure function: the only I/O is the base-template frontmatter read already
+    performed by `role_commit_authority`. `authority_overrides` is the
+    NORMALIZED map `{role: "direct"}` (spec §3.2 rule 6), not the config-object
+    form. A non-Mapping is treated as "no grant" (K-14 / RVW2-1181-04), so the
+    function never raises even on a caller-side type error. It only ever
+    ESCALATES (D17): `delegate`/`notify` -> `direct` when granted; `direct` is
+    a no-op and `none` is never escalated. An explicit non-`direct` value is
+    NOT a revoke -- validation reports it via `authority_override_violations`.
+    """
+    derived = role_commit_authority(role, agent_meta_root, platform)
+    wanted = (
+        authority_overrides.get(role)
+        if isinstance(authority_overrides, Mapping)
+        else None
+    )
+    if wanted == AUTHORITY_DIRECT and derived in (AUTHORITY_DELEGATE, AUTHORITY_NOTIFY):
+        return AUTHORITY_DIRECT
+    return derived
+
+
+def is_role_eligible(
+    role: str,
+    agent_meta_root: Path,
+    platform: str | None = None,
+    authority_overrides: Mapping[str, str] | None = None,
+) -> bool:
     """True only if `role` can commit DIRECTLY (Bash AND Edit/Write).
 
     Direct-only on purpose: `eligible_roles` gates the guard-hook sentinel,
     which authorizes the role to run `git add`/`git commit` itself. Delegate/
-    notify roles must never hold that sentinel.
+    notify roles must never hold that sentinel -- unless a valid grant is in
+    effect. A grant (`authority_overrides={role: "direct"}`, normalized) is the
+    **only** exception to the direct-only principle and is limited to
+    write-capable roles by `authority_override_violations` (spec §3.2/D17).
+    The default `None` preserves the pre-grant behaviour.
     """
-    return role_commit_authority(role, agent_meta_root, platform) == AUTHORITY_DIRECT
+    return (
+        effective_commit_authority(role, agent_meta_root, platform, authority_overrides)
+        == AUTHORITY_DIRECT
+    )
+
+
+def resolve_commit_grant(
+    role: str,
+    resolved: dict,
+    provider_capabilities: dict | None,
+    agent_meta_root: Path,
+    *,
+    guard_enabled: bool,
+) -> tuple[str, bool]:
+    """Resolve one provider's (authority, Bash-render) decision for a grant.
+
+    Returns ``(authority, render_bash)``. The provider/guard gate can only
+    DOWNGRADE (spec §4.2): when ``render_bash`` is False the role stays at its
+    DERIVED authority (``role_commit_authority``, e.g. ``notify``), so the
+    caller never renders "commit directly" prose on an agent without ``Bash``.
+    Only when the render is actually enabled does the grant escalate the
+    derived delegate/notify authority to ``direct`` (via
+    ``effective_commit_authority``). Resolution is per provider (D21): a mixed
+    set is invoked once per provider.
+
+    ``render_bash`` is True only when ALL hold: a normalized direct grant on
+    ``role``, ``mode in {"auto", "custom"}`` (D20: ``off``/``suggest`` always
+    yield ``(derived, False)``), an active guard hook, a verified provider hook
+    (``provider_hooks_supported``), and no ``Bash`` already in the role's own
+    template (K-3: never duplicate an existing grant).
+
+    Gate rationales (issue #1181, security dependency #1151): without a
+    verified provider hook a ``direct`` grant would be pure prose on an agent
+    that cannot run ``Bash`` (``bash: deny``) -- the exact contradiction issue
+    #767 forbids. Without an ACTIVE guard a ``Bash`` grant is an unrestricted
+    shell on an Edit-only role (no sentinel allowlist containing git
+    mutations), which is worse than no grant at all (RVW-1181-01).
+
+    Never raises: ``provider_capabilities=None`` (or a hookless/unverified
+    provider) fails closed to ``(derived, False)`` (spec §3.3).
+    """
+    overrides = resolved.get("authority_overrides")
+    granted = isinstance(overrides, Mapping) and overrides.get(role) == AUTHORITY_DIRECT
+
+    # Lazy import: mirrors `authority_override_violations` and keeps io/runtime
+    # loading out of auto_commit's import path (no load-time cycle).
+    from .providers import provider_hooks_supported
+
+    render_bash = (
+        granted
+        and resolved.get("mode") in ("auto", "custom")
+        and guard_enabled
+        and provider_hooks_supported(provider_capabilities or {})
+        and "Bash" not in _role_tools(role, agent_meta_root)
+    )
+    if not render_bash:
+        # Gate can only downgrade: no render ⇒ keep the derived authority.
+        return (role_commit_authority(role, agent_meta_root), False)
+    return (
+        effective_commit_authority(role, agent_meta_root, None, overrides),
+        True,
+    )
 
 
 _MODES = ("off", "suggest", "auto", "custom")
@@ -215,7 +334,8 @@ _TRIGGERS = (
     "custom",
 )
 _STATIC_KEYS = frozenset(
-    {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan"})
+    {"mode", "triggers", "file_count_threshold", "custom_script", "secret_scan",
+     "authority_overrides"})
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "config" / "project-config.schema.json"
 
 
@@ -300,6 +420,154 @@ def auto_commit_violations(config: dict) -> list[str]:
     return violations
 
 
+# --------------------------------------------------------------------------- #
+# Issue #1181 (T2): semantic grant validation                                 #
+# --------------------------------------------------------------------------- #
+
+_GRANT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_PREFIX = "auto_commit.authority_overrides"
+_FORM_MSG = f"expected {{authority: direct, acknowledge_full_shell: true}}"
+
+
+def normalize_authority_overrides(raw: object) -> dict[str, str]:
+    """Collapse config-form grants to ``{role: "direct"}`` (spec §4.3 rule 6).
+
+    A single normalization point: only mapping entries with
+    ``authority == "direct"`` AND ``acknowledge_full_shell is True`` become
+    grants. Never raises; malformed entries are reported by
+    ``authority_override_violations`` and produce no grant here.
+    """
+    if not isinstance(raw, Mapping):
+        return {}
+    normalized: dict[str, str] = {}
+    for role, value in raw.items():
+        if not isinstance(role, str) or not isinstance(value, Mapping):
+            continue
+        if (value.get("authority") == AUTHORITY_DIRECT
+                and value.get("acknowledge_full_shell") is True):
+            normalized[role] = AUTHORITY_DIRECT
+    return normalized
+
+
+def authority_override_violations(
+    config: dict,
+    agent_meta_root: Path,
+    provider_config: Mapping | None = None,
+) -> list[str]:
+    """Semantic validation of ``auto_commit.authority_overrides`` (issue #1181).
+
+    Every message starts with ``auto_commit.authority_overrides``; messages are
+    byte-exact per spec §4.3 (stable prefixes for consumer CI). Order is stable
+    and sorted by role name. This function is intentionally separate from the
+    purely structural ``auto_commit_violations``. The provider registry is
+    loaded only when at least one normalized grant exists (no I/O in the
+    dominant no-grant case).
+    """
+    ac_cfg = (config or {}).get("auto_commit")
+    if not isinstance(ac_cfg, dict):
+        return []
+    raw = ac_cfg.get("authority_overrides")
+    if raw is None:
+        return []
+    if not isinstance(raw, Mapping):
+        return [f"{_PREFIX}: expected an object of role -> grant object"]
+
+    violations: list[str] = []
+    normalized = normalize_authority_overrides(raw)
+
+    # (a) per-role form / name / derived-authority checks, sorted by role name.
+    for role in sorted(raw, key=str):
+        entry = raw[role]
+        rkey = f"{_PREFIX}.{role}"
+        role_name = str(role)
+
+        if not _GRANT_NAME_PATTERN.fullmatch(role_name):
+            violations.append(f"{rkey}: role name must match ^[a-z0-9][a-z0-9-]*$")
+
+        if not isinstance(entry, Mapping):
+            # D23: a scalar entry (or any non-object) is a form error, never a
+            # grant and never a TypeError.
+            violations.append(f"{rkey}: {_FORM_MSG}")
+        else:
+            allowed = {"authority", "acknowledge_full_shell"}
+            if (set(entry) - allowed) or entry.get("authority") != AUTHORITY_DIRECT:
+                violations.append(f"{rkey}: {_FORM_MSG}")
+            elif entry.get("acknowledge_full_shell") is not True:
+                violations.append(
+                    f"{rkey}: missing acknowledge_full_shell: true "
+                    "(the grant is a full Bash grant, not a git-only grant)")
+
+        # A role that derives to `none` (read-only or unknown template) can
+        # never be granted — report it even when the form itself was valid.
+        if role_name in normalized:
+            if role_commit_authority(role_name, agent_meta_root) == AUTHORITY_NONE:
+                violations.append(
+                    f"{rkey}: role has no Edit/Write (derived authority is 'none')")
+
+    # (b) enforcement: one message per granted role (not per provider) only
+    # when the grant cannot be enforced anywhere (D21: "no active provider
+    # with a verified hook", not "not all"). Load the registry lazily.
+    if normalized:
+        guard_ok = guard_hook_enabled(config)[0]
+        if provider_config is None:
+            from .providers import load_providers_config
+            provider_config = load_providers_config(agent_meta_root, config)
+        from .providers import provider_hooks_supported, resolve_providers
+
+        try:
+            active = resolve_providers(config, provider_config)
+        except (ValueError, TypeError):
+            active = []
+        hooked = [p for p in active
+                  if provider_hooks_supported(provider_config.get(p, {}))]
+
+        if not guard_ok or not hooked:
+            hookless = sorted(p for p in active if p not in hooked)
+            for role in sorted(normalized):
+                rkey = f"{_PREFIX}.{role}"
+                if not guard_ok:
+                    violations.append(
+                        f"{rkey}: grant not enforced (guard hook disabled: "
+                        "hooks.orchestrator-guard.enabled is not true)")
+                elif len(hookless) == 1:
+                    violations.append(
+                        f"{rkey}: grant not enforced (provider '{hookless[0]}', "
+                        "reason has_hooks=false)")
+                elif hookless:
+                    names = ", ".join(f"'{p}'" for p in hookless)
+                    violations.append(
+                        f"{rkey}: grant not enforced (providers {names}, "
+                        "reason has_hooks=false)")
+                else:
+                    violations.append(
+                        f"{rkey}: grant not enforced (no active provider, "
+                        "reason has_hooks=false)")
+
+    return violations
+
+
+def authority_override_notices(
+    config: dict,
+    active_roles: Iterable[str],
+) -> list[str]:
+    """INFO messages for grants on inactive roles (D22: never an error).
+
+    ``active_roles`` MUST be the effective active set (``raw_roles`` filtered
+    by ``ActiveSet.has``, RVW2-1181-05); otherwise gate-dropped roles get no
+    notice. Messages are byte-exact per spec §4.3.
+    """
+    ac_cfg = (config or {}).get("auto_commit")
+    if not isinstance(ac_cfg, dict):
+        return []
+    normalized = normalize_authority_overrides(ac_cfg.get("authority_overrides"))
+    active = set(active_roles)
+    return [
+        f"{_PREFIX}.{role}: grant ignored — role is not active "
+        "(not listed in `roles:` or dropped by the active set)"
+        for role in sorted(normalized) if role not in active
+    ]
+
+
 def _is_positive_integer(value) -> bool:
     """JSON-Schema ``type: integer`` semantics: 5.0 is an integer, 5.5 is not."""
     if isinstance(value, bool):
@@ -336,7 +604,9 @@ def resolve_auto_commit_config(
     existing projects) -- it resolves to a fail-safe allowlist with commit
     authority fully disabled. No time-based grace.
     """
-    if auto_commit_violations(config):
+    if auto_commit_violations(config) or authority_override_violations(
+        config, agent_meta_root
+    ):
         return {
             "version": ALLOWLIST_VERSION,
             "mode": "off",
@@ -345,15 +615,27 @@ def resolve_auto_commit_config(
             "file_count_threshold": 5,
             "custom_script": None,
             "secret_scan": True,
+            "authority_overrides": {},
         }
 
     ac_cfg = config.get("auto_commit", {}) or {}
     mode = ac_cfg.get("mode", "off")
 
+    # D17: only direct grants on ACTIVE roles reach the allowlist. A withdrawn
+    # grant is simply a missing key, never a non-direct value.
+    active = set(active_roles)
+    overrides = {
+        role: value
+        for role, value in normalize_authority_overrides(
+            ac_cfg.get("authority_overrides")
+        ).items()
+        if role in active
+    }
+
     eligible_roles = sorted(
         role
         for role in active_roles
-        if is_role_eligible(role, agent_meta_root, platform)
+        if is_role_eligible(role, agent_meta_root, platform, overrides)
     )
 
     return {
@@ -365,6 +647,7 @@ def resolve_auto_commit_config(
             ac_cfg.get("file_count_threshold", 5)),
         "custom_script": ac_cfg.get("custom_script"),
         "secret_scan": ac_cfg.get("secret_scan", True),
+        "authority_overrides": overrides,
     }
 
 
@@ -389,7 +672,12 @@ def _describe_triggers(resolved: dict) -> str:
     return "; ".join(descriptions)
 
 
-def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) -> str:
+def render_auto_commit_block(
+    resolved: dict,
+    authority: str = AUTHORITY_DIRECT,
+    *,
+    role: str | None = None,
+) -> str:
     """Render the `{{AUTO_COMMIT_BLOCK}}` prose for a role at `authority`.
 
     Mode dominates authority (see the mode x authority matrix in the #767
@@ -398,6 +686,11 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
     push/tag/branch as something the role may do -- those remain the `git`
     role's exclusive job. An unknown/None `authority` fails CLOSED (rendered
     as "none", i.e. ""); only the explicit default parameter is "direct".
+
+    `role` is optional (keyword-only): a role with a normalized direct grant
+    in `resolved["authority_overrides"]` gets the #1181 grant line appended
+    right after the sentinel in the direct branch of auto/custom. `role=None`
+    (the default) renders byte-identically to the pre-grant block.
     """
     # Issue #1091 fail-safe: an invalid block is rendered as an explicit
     # "off" notice for every authority (see INVALID_CONFIG_MARKER) -- the
@@ -474,6 +767,8 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
             )
             lines.append(scan_line)
             lines.append(_SENTINEL_PREFIX_LINE)
+            if _grant_applies(resolved, role, authority):
+                lines.append(_GRANT_LINE_TEMPLATE.format(role=role))
         elif authority == AUTHORITY_DELEGATE:
             lines.append(
                 f"Whenever `{script}` exits 0 (the project's own "
@@ -503,6 +798,8 @@ def render_auto_commit_block(resolved: dict, authority: str = AUTHORITY_DIRECT) 
             )
             lines.append(scan_line)
             lines.append(_SENTINEL_PREFIX_LINE)
+            if _grant_applies(resolved, role, authority):
+                lines.append(_GRANT_LINE_TEMPLATE.format(role=role))
         elif authority == AUTHORITY_DELEGATE:
             lines.append(
                 "At each configured trigger boundary -- as soon as ANY of "

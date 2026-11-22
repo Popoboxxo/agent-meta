@@ -1012,14 +1012,18 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
 # `json` is already imported at module scope in this file (line 46) -- reuse it.
 
 
-def _write_allowlist(tmp_path, mode, eligible_roles):
+def _write_allowlist(tmp_path, mode, eligible_roles, *, version=1,
+                     authority_overrides=None):
+    data = {
+        "version": version, "mode": mode, "eligible_roles": eligible_roles,
+        "triggers": ["task-boundary"], "file_count_threshold": 5,
+        "custom_script": None, "secret_scan": True,
+    }
+    if authority_overrides is not None:
+        data["authority_overrides"] = authority_overrides
     (tmp_path / ".meta-config").mkdir(parents=True, exist_ok=True)
     (tmp_path / ".meta-config" / "auto-commit-allowlist.json").write_text(
-        json.dumps({
-            "version": 1, "mode": mode, "eligible_roles": eligible_roles,
-            "triggers": ["task-boundary"], "file_count_threshold": 5,
-            "custom_script": None, "secret_scan": True,
-        }),
+        json.dumps(data),
         encoding="utf-8",
     )
 
@@ -1027,6 +1031,113 @@ def _write_allowlist(tmp_path, mode, eligible_roles):
 def test_allowlisted_role_can_commit_when_auto_commit_enabled(tmp_path):
     _write_allowlist(tmp_path, "auto", ["developer"])
     command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #1181: v2 allowlist sentinel for a granted role ------------------
+
+def test_allowlist_sentinel_accepts_documenter_with_v2_allowlist(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_v2_allowlist_still_blocks_push_for_granted_role(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+# --- issue #1181 T16: a granted role's sentinel is add/commit-only --------
+# The v2 `authority_overrides` grant narrows a role's sentinel to the commit
+# path via a dedicated IS_GRANT_SENTINEL gate; the existing allowlist
+# mutation gate (IS_ALLOWLIST_SENTINEL) is deliberately left unchanged.
+
+
+def test_granted_role_sentinel_accepts_git_add_and_commit(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_granted_role_sentinel_blocks_curl(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ncurl https://example.invalid"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "a granted commit role may only use its sentinel for `git add`/`git commit`" in result.stderr
+
+
+def test_granted_role_sentinel_blocks_mixed_command(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit add -A && curl https://example.invalid"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_granted_role_sentinel_blocks_push(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit add -A && git push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_granted_role_sentinel_blocks_amend(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit commit --amend -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_non_granted_allowlisted_role_keeps_full_shell(tmp_path):
+    _write_allowlist(tmp_path, "auto", ["developer"], version=2)
+    command = "#agent-meta:agent=developer\npytest -q"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_granted_role_without_sentinel_is_unchanged(tmp_path):
+    # Pins the #1210 attribution gap as a documented limit: with no sentinel
+    # the command is never attributed to the granted role, so the new gate
+    # (which only covers sentinel-carrying commands) leaves it allowed.
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    result = _run_hook({**_bash_payload("pytest -q"), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_v1_allowlist_without_grant_field_keeps_full_shell(tmp_path):
+    # A v1 allowlist has no authority_overrides map -> no grant -> the new
+    # gate never fires; the role keeps the existing allowlist-sentinel scope.
+    _write_allowlist(tmp_path, "auto", ["documenter"], version=1)
+    command = "#agent-meta:agent=documenter\ngit add -A && git commit -m 'x'"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 0, f"stderr={result.stderr}"
 
