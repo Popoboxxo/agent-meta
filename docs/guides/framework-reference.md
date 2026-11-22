@@ -16,6 +16,7 @@
 4. Commit-Authority nach Capability-Klasse
 5. Synchronisations- und SE-Variablen
 6. README-Struktur-Standard (`readme:`)
+7. Routing-Sprache und Keywords
 
 ---
 
@@ -273,3 +274,7 @@ readme:
 Die Werte landen als Variablen `README_BADGES`, `README_WARNINGS_ENABLED`, `README_SECTIONS` im Documenter.
 Referenzgerüst: `templates/configs/README-template.md` (Strukturleitfaden, kein Byte-genaues Template).
 Siehe auch `docs/concepts/agent-meta-version-badge.md`.
+
+## 7. Routing-Sprache und Keywords
+
+`routing_patterns.keywords` in `config/role-defaults.yaml` sind kanonisch und sprachneutral: sie sind die einzige Quelle der Routing-Begriffe und werden unverändert durch alle Provider und Sprachen gereicht (`scripts/lib/delegation_table.py:236-255`). Sprachliche Nuance liegt ausschließlich in `routing_patterns.examples` als sprachgetagtes Mapping `{"Deutsch": [...], "English": [...]}`; der Generator löst die Variante über `COMMUNICATION_LANGUAGE` auf und fällt bei unbekanntem Schlüssel deterministisch auf die erste Variante zurück (nur Log als INFO `routing.examples-language-fallback`). Die 17 Einträge in `config/routing-language.yaml:keyword_allow` sind die eingefrorene Ist-Menge historisch gewachsener DE-Keywords (Entscheidung D-H3): bestehende DE-Keywords bleiben erlaubt, neue Umlaut- oder Stoppwort-Keywords sind verboten und die Liste darf nur schrumpfen (`PHASE0_ALLOW_MAX = 17`, Ratchet in `tests/test_routing_keywords_language_neutral.py`, Guard in `tests/test_routing_language_guard.py`).
