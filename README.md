@@ -517,6 +517,54 @@ auto_commit:
 Push, tag and branch changes stay exclusively with the `git` role. Authority is derived from each
 role's `tools:` frontmatter; roles without Bash get `delegate` or `notify` behavior instead of direct commits.
 
+#### Opt-in commit-authority grant (`authority_overrides`)
+
+`auto_commit.authority_overrides` escalates a write-capable role from `delegate`/`notify` to
+`direct` (issue #1181). It is off by default (`{}`) and adds only the right to commit. Use the
+object form; each entry requires both fields:
+
+```yaml
+auto_commit:
+  mode: auto
+  authority_overrides:
+    documenter:
+      authority: direct
+      acknowledge_full_shell: true
+```
+
+`acknowledge_full_shell: true` is mandatory; the scalar shorthand `documenter: direct` is invalid.
+There is no `revoke` value. Withdraw a grant by removing the role from `roles:` or by deleting its
+`authority_overrides` key.
+
+> **Security — read before granting.** Der Grant ist eine bewusste Voll-Shell-Ausweitung, keine `git`-Beschränkung; der Guard-Hook begrenzt Sentinel-tragende Kommandos auf `git add` und ein nicht-amendierendes `git commit`. Kommandos ohne Sentinel kann er keiner Rolle zuordnen (#1210, vormals F-5).
+
+`documenter` remains the reference role for grants. Its persona ("implements nothing") is unchanged;
+the grant only adds commit authority to the generated block. Under `mode: suggest` the grant never
+renders — `suggest` is propose-only for every role.
+
+**Enforcement gate.** Rendering the grant as full Bash with a sentinel requires both (a) a provider
+with a verified `hook_protocol` and (b) an active `orchestrator-guard` hook
+(`hooks.orchestrator-guard.enabled: true`).
+
+| Provider | Verified hook protocol | Grant renders as full Bash + sentinel |
+|---|---|---|
+| Claude Code | `claude-code-json` | Yes |
+| Gemini (Antigravity) | `antigravity-hooks-json` | Yes |
+| OpenCode, Continue, Copilot, ZCode, KimiCode, Mammouth, Codex | none verified | No — derived authority stays; a WARN is logged |
+
+**Precedence and the active-set.** `permission-mode-overrides` is orthogonal to the grant: it sets a
+role's `permissionMode` (project value > framework default) and neither grants nor blocks commit
+authority. The active-set wins over the grant — a role removed from `roles:` or dropped by an
+activation gate loses its grant silently at render time. `sync.py --validate` reports such a grant
+with an INFO line and no exit-code effect:
+
+```
+config-audit [INFO] auto_commit: auto_commit.authority_overrides.<role>: grant ignored — role is not active (not listed in `roles:` or dropped by the active set)
+```
+
+A grant on a read-only role, a malformed entry, or a grant no active provider can enforce is an
+ERROR instead.
+
 ### Speech modes
 
 One rule file per mode in [`speech/`](speech/): `full` (default, no rule), `short`, `caveman`, `asozial`,

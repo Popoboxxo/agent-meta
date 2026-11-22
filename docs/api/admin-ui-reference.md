@@ -192,9 +192,11 @@ Repository and branch conventions surfaced in the `git` section of `project.yaml
 
 ### Auto-Commit
 <!-- help-id: project_instance-auto_commit -->
-<!-- last-updated: 2026-09-12 -->
+<!-- last-updated: 2026-11-22 -->
 <!-- author: Agent Meta Admin -->
 Controls the opt-in tiered commit authority for write-capable agents (issue #694). `off` (default) keeps today's behaviour where only the dedicated `git` role commits. `suggest` has agents propose a commit message in their own report but never run git. `auto` lets agents commit directly when any selected trigger (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`, `custom`) fires — any one is enough (OR). `custom` hands the entire decision to `custom_script` and ignores the built-in triggers. `file_count_threshold` (default 5) is only read for the `file-count-threshold` trigger. `secret_scan` (default true) runs the project's secret scan against the staged diff before any auto/custom commit. A `custom` mode, or `custom` among the triggers, requires `custom_script`.
+
+`authority_overrides` (issue #1181) is a YAML-only field: edit it directly in `project.yaml`, not in this panel. Each entry is an object with `authority: direct` and a mandatory `acknowledge_full_shell: true`; the scalar shorthand (`documenter: direct`) is invalid. A grant escalates a write-capable role (`delegate`/`notify`) to `direct` and renders a full `Bash` permission. The panel has no field editor for this key yet (finding F-2), but saving the auto-commit section preserves unknown keys, so a grant set in YAML survives a round-trip through the UI. A grant on a role that is not active is reported by `sync.py --validate` as ``config-audit [INFO] auto_commit: auto_commit.authority_overrides.<role>: grant ignored — role is not active (not listed in `roles:` or dropped by the active set)`` — an INFO line with no exit-code effect.
 
 ### Project Context Injection
 <!-- help-id: project_instance-project_context_injection -->

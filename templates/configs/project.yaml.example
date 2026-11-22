@@ -104,6 +104,18 @@ project:
 #   file_count_threshold: 5
 #   custom_script: null
 #   secret_scan: true
+#   # authority_overrides (Issue #1181): optionaler Grant, der eine schreibfähige
+#   # Rolle (delegate/notify) auf `direct` eskaliert. NUR die Objektform mit
+#   # Pflicht-Ack ist gueltig; die Skalar-Kurzform (`documenter: direct`) ist
+#   # UNGUELTIG. Der Grant ist eine volle Bash-Ausweitung, keine git-only-
+#   # Beschraenkung: der Guard-Hook begrenzt Sentinel-Kommandos auf `git add`
+#   # und ein nicht-amendierendes `git commit`; ohne Sentinel ist kein Kommando
+#   # einer Rolle zuordenbar (#1210). Es gibt KEINEN revoke-Wert — Entzug über
+#   # `roles:` oder durch Entfernen des Keys. Default: {} (kein Grant).
+#   authority_overrides:
+#     documenter:
+#       authority: direct
+#       acknowledge_full_shell: true
 #
 # git:
 #   # Repo-Settings für die Admin-UI-Sektion "Git". Kanonische Quelle der
