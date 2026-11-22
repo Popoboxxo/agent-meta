@@ -527,7 +527,9 @@ def resolve_auto_commit_config(
     existing projects) -- it resolves to a fail-safe allowlist with commit
     authority fully disabled. No time-based grace.
     """
-    if auto_commit_violations(config):
+    if auto_commit_violations(config) or authority_override_violations(
+        config, agent_meta_root
+    ):
         return {
             "version": ALLOWLIST_VERSION,
             "mode": "off",
@@ -536,15 +538,27 @@ def resolve_auto_commit_config(
             "file_count_threshold": 5,
             "custom_script": None,
             "secret_scan": True,
+            "authority_overrides": {},
         }
 
     ac_cfg = config.get("auto_commit", {}) or {}
     mode = ac_cfg.get("mode", "off")
 
+    # D17: only direct grants on ACTIVE roles reach the allowlist. A withdrawn
+    # grant is simply a missing key, never a non-direct value.
+    active = set(active_roles)
+    overrides = {
+        role: value
+        for role, value in normalize_authority_overrides(
+            ac_cfg.get("authority_overrides")
+        ).items()
+        if role in active
+    }
+
     eligible_roles = sorted(
         role
         for role in active_roles
-        if is_role_eligible(role, agent_meta_root, platform)
+        if is_role_eligible(role, agent_meta_root, platform, overrides)
     )
 
     return {
@@ -556,6 +570,7 @@ def resolve_auto_commit_config(
             ac_cfg.get("file_count_threshold", 5)),
         "custom_script": ac_cfg.get("custom_script"),
         "secret_scan": ac_cfg.get("secret_scan", True),
+        "authority_overrides": overrides,
     }
 
 

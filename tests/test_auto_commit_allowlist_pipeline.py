@@ -85,6 +85,6 @@ def test_allowlist_excludes_gate_dropped_role(tmp_path):
     assert "senior-developer" not in data["eligible_roles"]
     assert "developer" in data["eligible_roles"]
     assert sorted(data) == [
-        "custom_script", "eligible_roles", "file_count_threshold",
+        "authority_overrides", "custom_script", "eligible_roles", "file_count_threshold",
         "mode", "secret_scan", "triggers", "version",
     ]

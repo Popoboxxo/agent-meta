@@ -163,3 +163,107 @@ def test_load_config_normalizes_unquoted_off_bool(tmp_path):
     assert result["mode"] == "off"
     assert result["eligible_roles"] == ["developer"]
     assert "git" not in result["eligible_roles"]
+
+
+# --- issue #1181 (T4): grants carried into the allowlist artifact ----------
+
+
+def _grant(role):
+    return {role: {"authority": "direct", "acknowledge_full_shell": True}}
+
+
+def _grant_config(*roles, mode="auto"):
+    ac = {"mode": mode}
+    if mode == "auto":
+        ac["triggers"] = ["task-boundary"]
+    overrides = {}
+    for role in roles:
+        overrides.update(_grant(role))
+    ac["authority_overrides"] = overrides
+    return {"auto_commit": ac}
+
+
+def test_granted_notify_role_becomes_eligible():
+    out = resolve_auto_commit_config(
+        config=_grant_config("documenter"),
+        active_roles=["documenter", "developer"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["eligible_roles"] == ["developer", "documenter"]
+
+
+def test_grant_is_mode_independent():
+    for mode in ("off", "suggest", "auto"):
+        out = resolve_auto_commit_config(
+            config=_grant_config("documenter", mode=mode),
+            active_roles=["documenter", "developer"],
+            agent_meta_root=_REPO_ROOT,
+        )
+        # D20: capability is mode-independent; only rendering is skipped.
+        assert out["eligible_roles"] == ["developer", "documenter"], mode
+
+
+def test_artifact_carries_only_active_grants():
+    out = resolve_auto_commit_config(
+        config=_grant_config("documenter", "planner"),
+        active_roles=["documenter"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["authority_overrides"] == {"documenter": "direct"}
+
+
+def test_artifact_version_is_two():
+    out = resolve_auto_commit_config(
+        config=_grant_config("documenter"),
+        active_roles=["documenter"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["version"] == 2
+
+
+def test_grant_without_roles_key_has_no_effect():
+    out = resolve_auto_commit_config(
+        config=_grant_config("documenter"),
+        active_roles=[],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["eligible_roles"] == []
+    assert out["authority_overrides"] == {}
+
+
+def test_grant_without_ack_triggers_fail_safe():
+    cfg = {"auto_commit": {
+        "mode": "auto", "triggers": ["task-boundary"],
+        "authority_overrides": {"documenter": {"authority": "direct"}},
+    }}
+    out = resolve_auto_commit_config(
+        config=cfg,
+        active_roles=["documenter", "developer"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["mode"] == "off"
+    assert out["eligible_roles"] == []
+    assert out["authority_overrides"] == {}
+
+
+def test_invalid_grant_triggers_fail_safe():
+    out = resolve_auto_commit_config(
+        config=_grant_config("explorer"),
+        active_roles=["explorer", "developer"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert out["mode"] == "off"
+    assert out["eligible_roles"] == []
+    assert out["authority_overrides"] == {}
+
+
+def test_fail_safe_artifact_shape_includes_grant_map():
+    # Schema-invalid block (triggers with mode: off) -> fail-safe artifact.
+    cfg = {"auto_commit": {"mode": "off", "triggers": ["task-boundary"]}}
+    out = resolve_auto_commit_config(
+        config=cfg,
+        active_roles=["developer"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert "authority_overrides" in out
+    assert out["authority_overrides"] == {}
