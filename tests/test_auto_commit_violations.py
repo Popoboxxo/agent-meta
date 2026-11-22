@@ -18,7 +18,23 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from lib.auto_commit import auto_commit_violations, resolve_auto_commit_config
+from lib.auto_commit import (
+    authority_override_notices,
+    authority_override_violations,
+    auto_commit_violations,
+    resolve_auto_commit_config,
+)
+
+
+def _grant(role):
+    return {role: {"authority": "direct", "acknowledge_full_shell": True}}
+
+
+_HOOKLESS_PC = {"Opencode": {"has_hooks": False, "hook_protocol": None}}
+_HOOKED_PC = {
+    "Claude": {"has_hooks": True, "hook_protocol": "claude-code-json"},
+    "Opencode": {"has_hooks": False, "hook_protocol": None},
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -253,3 +269,161 @@ def test_unknown_key_message_names_key_and_source():
     v = auto_commit_violations({"auto_commit": {"mode": "off", "bogus": 1}})
     msg = [m for m in v if "bogus" in m][0]
     assert "config/project-config.schema.json" in msg and "allowed:" in msg
+
+
+# --------------------------------------------------------------------------- #
+# Issue #1181 (T2): semantic grant validation + inactive-role notices          #
+# --------------------------------------------------------------------------- #
+
+
+def test_authority_override_valid_grant_has_no_violation():
+    cfg = {"auto_commit": {"mode": "auto", "triggers": ["task-boundary"],
+                           "authority_overrides": _grant("documenter")}}
+    assert authority_override_violations(cfg, REPO_ROOT) == []
+
+
+def test_authority_override_missing_ack_rejected():
+    cfg = {"auto_commit": {
+        "authority_overrides": {"documenter": {"authority": "direct"}}}}
+    v = authority_override_violations(cfg, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.documenter: missing acknowledge_full_shell: true "
+        "(the grant is a full Bash grant, not a git-only grant)"
+    ]
+
+
+def test_authority_override_scalar_value_rejected():
+    cfg = {"auto_commit": {"authority_overrides": {"documenter": "direct"}}}
+    v = authority_override_violations(cfg, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.documenter: "
+        "expected {authority: direct, acknowledge_full_shell: true}"
+    ]
+
+
+def test_authority_override_unknown_value_rejected():
+    cfg = {"auto_commit": {"authority_overrides": {
+        "documenter": {"authority": "notify", "acknowledge_full_shell": True}}}}
+    v = authority_override_violations(cfg, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.documenter: "
+        "expected {authority: direct, acknowledge_full_shell: true}"
+    ]
+
+
+def test_authority_override_read_only_role_rejected():
+    v = authority_override_violations(
+        {"auto_commit": {"authority_overrides": _grant("explorer")}}, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.explorer: "
+        "role has no Edit/Write (derived authority is 'none')"
+    ]
+
+
+def test_authority_override_typo_role_rejected():
+    v = authority_override_violations(
+        {"auto_commit": {"authority_overrides": _grant("documenterr")}}, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.documenterr: "
+        "role has no Edit/Write (derived authority is 'none')"
+    ]
+
+
+def test_authority_override_non_mapping_rejected():
+    v = authority_override_violations(
+        {"auto_commit": {"authority_overrides": ["documenter"]}}, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides: expected an object of role -> grant object"
+    ]
+
+
+def test_grant_not_enforced_when_guard_disabled():
+    cfg = {
+        "hooks": {"orchestrator-guard": {"enabled": False}},
+        "auto_commit": {"authority_overrides": _grant("documenter")},
+    }
+    v = authority_override_violations(cfg, REPO_ROOT)
+    assert v == [
+        "auto_commit.authority_overrides.documenter: grant not enforced "
+        "(guard hook disabled: hooks.orchestrator-guard.enabled is not true)"
+    ]
+
+
+def test_grant_not_enforced_on_hookless_provider():
+    cfg = {"ai-providers": ["Opencode"],
+           "auto_commit": {"authority_overrides": _grant("documenter")}}
+    v = authority_override_violations(cfg, REPO_ROOT, _HOOKLESS_PC)
+    assert v == [
+        "auto_commit.authority_overrides.documenter: grant not enforced "
+        "(provider 'Opencode', reason has_hooks=false)"
+    ]
+
+
+def test_grant_enforced_on_mixed_provider_set_is_no_violation():
+    cfg = {"ai-providers": ["Claude", "Opencode"],
+           "auto_commit": {"authority_overrides": _grant("documenter")}}
+    assert authority_override_violations(cfg, REPO_ROOT, _HOOKED_PC) == []
+
+
+def test_authority_override_inactive_role_is_not_a_violation():
+    cfg = {"auto_commit": {"authority_overrides": _grant("documenter")}}
+    assert authority_override_violations(cfg, REPO_ROOT) == []
+    notes = authority_override_notices(cfg, ["developer"])
+    assert notes == [
+        "auto_commit.authority_overrides.documenter: grant ignored — role is not active "
+        "(not listed in `roles:` or dropped by the active set)"
+    ]
+
+
+def test_grant_notice_for_gate_dropped_role():
+    # Role is in raw_roles but dropped by the active set, so the EFFECTIVE
+    # active set passed to the notices helper excludes it (K-15/RVW2-1181-05).
+    cfg = {"auto_commit": {"authority_overrides": _grant("documenter")}}
+    raw_roles = {"documenter", "developer"}
+
+    class _DroppingActiveSet:
+        def has(self, role):
+            return role == "developer"
+
+    effective = {r for r in raw_roles if _DroppingActiveSet().has(r)}
+    notes = authority_override_notices(cfg, effective)
+    assert len(notes) == 1 and "grant ignored" in notes[0]
+    assert "documenter" in notes[0]
+
+
+def test_validate_rc1_on_read_only_grant(tmp_path):
+    p = _project(tmp_path,
+                 "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n"
+                 "  authority_overrides:\n    explorer:\n      authority: direct\n"
+                 "      acknowledge_full_shell: true\n")
+    r = _sync(p, "--validate")
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "config-audit [ERROR] auto_commit: auto_commit.authority_overrides.explorer" in out
+
+
+def test_validate_rc0_on_inactive_role_grant(tmp_path):
+    p = _project(tmp_path,
+                 "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n"
+                 "  authority_overrides:\n    documenter:\n      authority: direct\n"
+                 "      acknowledge_full_shell: true\n")
+    r = _sync(p, "--validate")
+    out = r.stdout + r.stderr
+    assert r.returncode == 0, out
+    assert "config-audit [ERROR]" not in out
+    assert ("config-audit [INFO] auto_commit: "
+            "auto_commit.authority_overrides.documenter") in out
+
+
+def test_validate_rc1_on_grant_without_active_guard(tmp_path):
+    p = _project(tmp_path,
+                 "hooks:\n  orchestrator-guard:\n    enabled: false\n"
+                 "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n"
+                 "  authority_overrides:\n    documenter:\n      authority: direct\n"
+                 "      acknowledge_full_shell: true\n")
+    r = _sync(p, "--validate")
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert ("config-audit [ERROR] auto_commit: auto_commit.authority_overrides.documenter: "
+            "grant not enforced (guard hook disabled: "
+            "hooks.orchestrator-guard.enabled is not true)") in out

@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter_file
+from .hook_state import guard_hook_enabled
 
 _ELIGIBLE_TOOLS = {"Edit", "Write"}
 _SPAWN_TOOLS = {"Agent", "Task"}
@@ -299,6 +301,154 @@ def auto_commit_violations(config: dict) -> list[str]:
         violations.append("auto_commit.file_count_threshold must be an integer >= 1")
 
     return violations
+
+
+# --------------------------------------------------------------------------- #
+# Issue #1181 (T2): semantic grant validation                                 #
+# --------------------------------------------------------------------------- #
+
+_GRANT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_PREFIX = "auto_commit.authority_overrides"
+_FORM_MSG = f"expected {{authority: direct, acknowledge_full_shell: true}}"
+
+
+def normalize_authority_overrides(raw: object) -> dict[str, str]:
+    """Collapse config-form grants to ``{role: "direct"}`` (spec §4.3 rule 6).
+
+    A single normalization point: only mapping entries with
+    ``authority == "direct"`` AND ``acknowledge_full_shell is True`` become
+    grants. Never raises; malformed entries are reported by
+    ``authority_override_violations`` and produce no grant here.
+    """
+    if not isinstance(raw, Mapping):
+        return {}
+    normalized: dict[str, str] = {}
+    for role, value in raw.items():
+        if not isinstance(role, str) or not isinstance(value, Mapping):
+            continue
+        if (value.get("authority") == AUTHORITY_DIRECT
+                and value.get("acknowledge_full_shell") is True):
+            normalized[role] = AUTHORITY_DIRECT
+    return normalized
+
+
+def authority_override_violations(
+    config: dict,
+    agent_meta_root: Path,
+    provider_config: Mapping | None = None,
+) -> list[str]:
+    """Semantic validation of ``auto_commit.authority_overrides`` (issue #1181).
+
+    Every message starts with ``auto_commit.authority_overrides``; messages are
+    byte-exact per spec §4.3 (stable prefixes for consumer CI). Order is stable
+    and sorted by role name. This function is intentionally separate from the
+    purely structural ``auto_commit_violations``. The provider registry is
+    loaded only when at least one normalized grant exists (no I/O in the
+    dominant no-grant case).
+    """
+    ac_cfg = (config or {}).get("auto_commit")
+    if not isinstance(ac_cfg, dict):
+        return []
+    raw = ac_cfg.get("authority_overrides")
+    if raw is None:
+        return []
+    if not isinstance(raw, Mapping):
+        return [f"{_PREFIX}: expected an object of role -> grant object"]
+
+    violations: list[str] = []
+    normalized = normalize_authority_overrides(raw)
+
+    # (a) per-role form / name / derived-authority checks, sorted by role name.
+    for role in sorted(raw, key=str):
+        entry = raw[role]
+        rkey = f"{_PREFIX}.{role}"
+        role_name = str(role)
+
+        if not _GRANT_NAME_PATTERN.fullmatch(role_name):
+            violations.append(f"{rkey}: role name must match ^[a-z0-9][a-z0-9-]*$")
+
+        if not isinstance(entry, Mapping):
+            # D23: a scalar entry (or any non-object) is a form error, never a
+            # grant and never a TypeError.
+            violations.append(f"{rkey}: {_FORM_MSG}")
+        else:
+            allowed = {"authority", "acknowledge_full_shell"}
+            if (set(entry) - allowed) or entry.get("authority") != AUTHORITY_DIRECT:
+                violations.append(f"{rkey}: {_FORM_MSG}")
+            elif entry.get("acknowledge_full_shell") is not True:
+                violations.append(
+                    f"{rkey}: missing acknowledge_full_shell: true "
+                    "(the grant is a full Bash grant, not a git-only grant)")
+
+        # A role that derives to `none` (read-only or unknown template) can
+        # never be granted — report it even when the form itself was valid.
+        if role_name in normalized:
+            if role_commit_authority(role_name, agent_meta_root) == AUTHORITY_NONE:
+                violations.append(
+                    f"{rkey}: role has no Edit/Write (derived authority is 'none')")
+
+    # (b) enforcement: one message per granted role (not per provider) only
+    # when the grant cannot be enforced anywhere (D21: "no active provider
+    # with a verified hook", not "not all"). Load the registry lazily.
+    if normalized:
+        guard_ok = guard_hook_enabled(config)[0]
+        if provider_config is None:
+            from .providers import load_providers_config
+            provider_config = load_providers_config(agent_meta_root, config)
+        from .providers import provider_hooks_supported, resolve_providers
+
+        try:
+            active = resolve_providers(config, provider_config)
+        except (ValueError, TypeError):
+            active = []
+        hooked = [p for p in active
+                  if provider_hooks_supported(provider_config.get(p, {}))]
+
+        if not guard_ok or not hooked:
+            hookless = sorted(p for p in active if p not in hooked)
+            for role in sorted(normalized):
+                rkey = f"{_PREFIX}.{role}"
+                if not guard_ok:
+                    violations.append(
+                        f"{rkey}: grant not enforced (guard hook disabled: "
+                        "hooks.orchestrator-guard.enabled is not true)")
+                elif len(hookless) == 1:
+                    violations.append(
+                        f"{rkey}: grant not enforced (provider '{hookless[0]}', "
+                        "reason has_hooks=false)")
+                elif hookless:
+                    names = ", ".join(f"'{p}'" for p in hookless)
+                    violations.append(
+                        f"{rkey}: grant not enforced (providers {names}, "
+                        "reason has_hooks=false)")
+                else:
+                    violations.append(
+                        f"{rkey}: grant not enforced (no active provider, "
+                        "reason has_hooks=false)")
+
+    return violations
+
+
+def authority_override_notices(
+    config: dict,
+    active_roles: Iterable[str],
+) -> list[str]:
+    """INFO messages for grants on inactive roles (D22: never an error).
+
+    ``active_roles`` MUST be the effective active set (``raw_roles`` filtered
+    by ``ActiveSet.has``, RVW2-1181-05); otherwise gate-dropped roles get no
+    notice. Messages are byte-exact per spec §4.3.
+    """
+    ac_cfg = (config or {}).get("auto_commit")
+    if not isinstance(ac_cfg, dict):
+        return []
+    normalized = normalize_authority_overrides(ac_cfg.get("authority_overrides"))
+    active = set(active_roles)
+    return [
+        f"{_PREFIX}.{role}: grant ignored — role is not active "
+        "(not listed in `roles:` or dropped by the active set)"
+        for role in sorted(normalized) if role not in active
+    ]
 
 
 def _is_positive_integer(value) -> bool:
