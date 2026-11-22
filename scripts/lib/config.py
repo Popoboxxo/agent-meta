@@ -2265,7 +2265,9 @@ def _build_core_variables(
     # not the per-role allowlist).
     from .auto_commit import (
         INVALID_CONFIG_MARKER,
+        authority_override_violations,
         auto_commit_violations,
+        normalize_authority_overrides,
         render_auto_commit_block,
     )
     from .commit_trailers import commit_violations, render_commit_trailers
@@ -2281,7 +2283,10 @@ def _build_core_variables(
     variables["COMMIT_TRAILERS_SET"] = "true" if variables["COMMIT_TRAILERS"] else "false"
 
     _auto_commit_cfg = config.get("auto_commit", {}) or {}
-    if auto_commit_violations(config):
+    # Issue #1181 (K-13/RVW2-1181-03): a semantic grant violation is as
+    # disqualifying as a structural auto_commit violation — both land in the
+    # same fail-safe with an empty grant map and INVALID_CONFIG_MARKER.
+    if auto_commit_violations(config) or authority_override_violations(config, agent_meta_root):
         # Issue #1091 (PR #1118 blocking finding): the same fail-safe as
         # resolve_auto_commit_config -- an invalid block is treated as
         # ``mode: off`` with an empty effective block. The marker makes
@@ -2297,6 +2302,7 @@ def _build_core_variables(
             "secret_scan": True,
             INVALID_CONFIG_MARKER: True,
             "commit_trailers": [],
+            "authority_overrides": {},
         }
     else:
         _threshold = _auto_commit_cfg.get("file_count_threshold", 5)
@@ -2310,6 +2316,10 @@ def _build_core_variables(
             "custom_script": _auto_commit_cfg.get("custom_script"),
             "secret_scan": _auto_commit_cfg.get("secret_scan", True),
             "commit_trailers": _commit_trailers.split("\n") if _commit_trailers else [],
+            # D17: only normalized `direct` grants; no filtering against the
+            # active roles here (T8/T9 own that step; config.py sees the block).
+            "authority_overrides": normalize_authority_overrides(
+                _auto_commit_cfg.get("authority_overrides")),
         }
     # ``AUTO_COMMIT_ENABLED`` gates the {{#if}} block. The fail-safe notice
     # must render, so the gate stays "true" even though the effective mode is

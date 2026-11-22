@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from lib.auto_commit import render_auto_commit_block
+from lib.auto_commit import INVALID_CONFIG_MARKER, render_auto_commit_block
 
 _AUTHORITIES = ("direct", "delegate", "notify")
 _AUTO = {
@@ -348,3 +348,69 @@ def test_grant_line_does_not_mention_push_tag_branch():
     assert "branch" not in low
     assert "git push" not in block.lower()
     assert "git tag" not in block.lower()
+
+
+# --- Issue #1181 (T7): _AUTO_COMMIT_RESOLVED carries authority_overrides ------
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _core_variables(config):
+    """T7 via build_variables; lazy import keeps the red phase to 4 failures."""
+    from lib.config import build_variables  # noqa: E402
+
+    variables, _warnings = build_variables(config, _REPO_ROOT, _REPO_ROOT)
+    return variables
+
+
+def _grant(acknowledge=True):
+    entry = {"authority": "direct"}
+    if acknowledge:
+        entry["acknowledge_full_shell"] = True
+    return {"documenter": entry}
+
+
+def test_core_variables_carry_authority_overrides():
+    config = {
+        "auto_commit": {
+            "mode": "auto",
+            "triggers": ["task-boundary"],
+            "authority_overrides": _grant(),
+        }
+    }
+    resolved = _core_variables(config)["_AUTO_COMMIT_RESOLVED"]
+    assert resolved["authority_overrides"] == {"documenter": "direct"}
+    assert INVALID_CONFIG_MARKER not in resolved
+
+
+def test_core_variables_grant_without_ack_triggers_fail_safe():
+    config = {
+        "auto_commit": {
+            "mode": "auto",
+            "triggers": ["task-boundary"],
+            "authority_overrides": _grant(acknowledge=False),
+        }
+    }
+    resolved = _core_variables(config)["_AUTO_COMMIT_RESOLVED"]
+    assert resolved["mode"] == "off"
+    assert resolved["authority_overrides"] == {}
+    assert resolved.get(INVALID_CONFIG_MARKER) is True
+
+
+def test_core_variables_invalid_block_has_empty_grant_map():
+    config = {
+        "auto_commit": {
+            "mode": "off",
+            "triggers": ["task-boundary"],  # only valid with mode: auto
+            "authority_overrides": _grant(),
+        }
+    }
+    resolved = _core_variables(config)["_AUTO_COMMIT_RESOLVED"]
+    assert resolved[INVALID_CONFIG_MARKER] is True
+    assert resolved["authority_overrides"] == {}
+
+
+def test_core_variables_without_block_have_empty_grant_map():
+    variables = _core_variables({})
+    assert variables["_AUTO_COMMIT_RESOLVED"]["authority_overrides"] == {}
+    assert variables["AUTO_COMMIT_ENABLED"] == "false"
