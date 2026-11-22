@@ -93,8 +93,11 @@ def _tools_can_spawn(tools) -> bool:
     return "Agent" in names or "Task" in names
 
 def _apply_role_auto_commit_overrides(
-    merged_vars: dict, role: str, agent_meta_root: Path, variables: dict
-) -> None:
+    merged_vars: dict, role: str, agent_meta_root: Path, variables: dict,
+    *, config: dict | None = None, provider: str | None = None,
+    provider_capabilities: dict | None = None, log: SyncLog | None = None,
+    guard_off_logged: set[str] | None = None,
+) -> bool:
     """Issue #767: narrow AUTO_COMMIT_BLOCK/ENABLED to this role's authority.
 
     The global values built in ``config._build_core_variables`` default to the
@@ -102,28 +105,100 @@ def _apply_role_auto_commit_overrides(
     tool capability (direct/delegate/notify/none) instead. Mode "off" always
     wins: AUTO_COMMIT_ENABLED is forced to "false" and the block emptied, so
     the output stays byte-identical to a sync without an auto_commit key.
+
+    Issue #1181 (T8): a normalized direct grant is gated per provider and per
+    guard-hook state via ``resolve_commit_grant``. The return value is the
+    ``render_bash`` decision; the caller uses it to inject ``Bash`` into the
+    frontmatter BEFORE the provider transform (K-12/K-4). Logs are emitted only
+    for a grant in an enforcing mode (``auto``/``custom``); under ``suggest``
+    both lines stay silent (D20). ``guard_off_logged`` deduplicates the global
+    guard-off WARN once per role across all providers (D21).
     """
     from .auto_commit import (
         INVALID_CONFIG_MARKER,
+        normalize_authority_overrides,
         render_auto_commit_block,
+        resolve_commit_grant,
         role_commit_authority,
     )
+    from .hook_state import guard_hook_enabled
+    from .providers import provider_hooks_supported
 
     resolved = variables.get("_AUTO_COMMIT_RESOLVED") or {"mode": "off"}
-    if resolved.get(INVALID_CONFIG_MARKER):
+    invalid = bool(resolved.get(INVALID_CONFIG_MARKER))
+    raw_ac = (config or {}).get("auto_commit")
+    raw_ac = raw_ac if isinstance(raw_ac, dict) else {}
+    guard_on, _guard_invalid = guard_hook_enabled(config or {})
+
+    overrides = resolved.get("authority_overrides")
+    granted = overrides.get(role) == "direct" if isinstance(overrides, dict) else False
+    if invalid and not granted:
+        # config.py's K-13 fail-safe empties the resolved grant map on a
+        # semantic violation (guard off / no hooked provider). Recover the
+        # normalized grant from the raw project config so the §4.6 WARN stays
+        # visible on the very sync that disables the block.
+        granted = normalize_authority_overrides(
+            raw_ac.get("authority_overrides")).get(role) == "direct"
+
+    if invalid:
         # Issue #1091 fail-safe: the invalid block resolves to "off", but the
         # explicit disabled notice must still render -- on hookless providers
-        # it is the only enforcement path.
+        # it is the only enforcement path. No Bash extension is rendered.
         merged_vars["AUTO_COMMIT_ENABLED"] = "true"
         merged_vars["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(resolved)
-        return
-    if resolved.get("mode", "off") == "off":
+        render_bash = False
+        authority = role_commit_authority(role, agent_meta_root)
+    elif resolved.get("mode", "off") == "off":
         merged_vars["AUTO_COMMIT_ENABLED"] = "false"
         merged_vars["AUTO_COMMIT_BLOCK"] = ""
-        return
-    authority = role_commit_authority(role, agent_meta_root)
-    merged_vars["AUTO_COMMIT_ENABLED"] = "true"
-    merged_vars["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(resolved, authority)
+        render_bash = False
+        authority = role_commit_authority(role, agent_meta_root)
+    else:
+        authority, render_bash = resolve_commit_grant(
+            role, resolved, provider_capabilities, agent_meta_root,
+            guard_enabled=guard_on,
+        )
+        merged_vars["AUTO_COMMIT_ENABLED"] = "true"
+        merged_vars["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(
+            resolved, authority, role=role)
+
+    # D20: under `suggest` (and `off`) the grant is never rendered, so both log
+    # lines stay silent. In the fail-safe case the resolved mode is "off"; the
+    # raw config mode is the authoritative intent for the enforcement WARN.
+    effective_mode = (
+        raw_ac.get("mode", "off") if invalid else resolved.get("mode", "off")
+    )
+    if log is not None and granted and effective_mode in ("auto", "custom"):
+        if render_bash:
+            log.note(
+                f"auto-commit-grant: {role}=direct "
+                "(source: auto_commit.authority_overrides; hook-enforced: yes)",
+                "",
+            )
+        elif not guard_on:
+            if guard_off_logged is None:
+                guard_off_logged = set()
+            if role not in guard_off_logged:
+                guard_off_logged.add(role)
+                log.warn(
+                    f"auto-commit-grant: {role}=direct not enforced "
+                    "(guard hook disabled: hooks.orchestrator-guard.enabled "
+                    "is not true); "
+                    f"rendered as {authority} (issue #1181)"
+                )
+        elif not provider_hooks_supported(provider_capabilities or {}):
+            # Spec §4.6: this WARN is for hook-LESS providers only. In the
+            # fail-safe branch render_bash is False for EVERY provider, so a
+            # verified-hook provider whose fail-safe has another cause (a
+            # structural auto_commit violation, or a non-enforcement grant
+            # violation such as a bad role name / derived 'none') must not
+            # receive a false `has_hooks=false` WARN (review F2).
+            log.warn(
+                f"auto-commit-grant: {role}=direct not enforced on provider "
+                f"'{provider}' (has_hooks=false); "
+                f"rendered as {authority} (issue #1181)"
+            )
+    return render_bash
 
 def resolve_mcp_tools_for_role(
     role: str,
@@ -1195,6 +1270,7 @@ def _finalize_agent_content(
     *,
     provider_capabilities: dict | None = None,
     active_set=None,
+    extra_tools: list[str] | None = None,
 ) -> str:
     """Post-pipeline finalization of one agent's content: provider transform,
     MCP tools, viz block, debug block, critical footer, path rules, XML wrap
@@ -1261,6 +1337,13 @@ def _finalize_agent_content(
             agent_meta_root=agent_meta_root,
             debug_mode=debug_mode,
         )
+
+    # Issue #1181 (T8, K-12/K-4): a granted role's `Bash` must enter the
+    # frontmatter BEFORE the provider transform so provider tool-name maps
+    # (e.g. Gemini Bash->run_command) and permission maps see it. Injecting at
+    # the MCP site below would be too late -- that runs AFTER the transform.
+    if extra_tools:
+        content = append_frontmatter_tools(content, extra_tools)
 
     content = transform_agent_content_for_provider(
         content=content,
@@ -1708,6 +1791,11 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
     chars_added = 0
     pc_mode = (variables.get("_PROJECT_CONTEXT_SCOPE") or {}).get("mode", "all")
 
+    # Issue #1181 (T8, D21): deduplicate the global guard-off grant WARN once
+    # per role. ``SyncLog.warn`` additionally deduplicates byte-identical
+    # messages across providers (the text has no provider name).
+    guard_off_logged: set[str] = set()
+
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
             role, source_path, provider, pc, role_map, None,
@@ -1740,7 +1828,11 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
             merged_vars, role, variables.get("_PROJECT_CONTEXT_SCOPE") or {})
         if injected:
             roles_injected += 1
-        _apply_role_auto_commit_overrides(merged_vars, role, agent_meta_root, variables)
+        render_bash = _apply_role_auto_commit_overrides(
+            merged_vars, role, agent_meta_root, variables,
+            config=config, provider=provider, provider_capabilities=pc,
+            log=log, guard_off_logged=guard_off_logged,
+        )
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
             platform_vars, agent_meta_root, log)
@@ -1762,7 +1854,8 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
             source_version, description, _can_spawn, config, agent_meta_root,
             project_root, target_path, variables, debug_mode, log,
             provider_capabilities=artifact_capabilities,
-            active_set=active_set)
+            active_set=active_set,
+            extra_tools=["Bash"] if render_bash else None)
         _write_agent_file(target_path, content, source_path, agent_meta_root,
                           project_root, config, dry_run, log)
 

@@ -1012,14 +1012,18 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
 # `json` is already imported at module scope in this file (line 46) -- reuse it.
 
 
-def _write_allowlist(tmp_path, mode, eligible_roles):
+def _write_allowlist(tmp_path, mode, eligible_roles, *, version=1,
+                     authority_overrides=None):
+    data = {
+        "version": version, "mode": mode, "eligible_roles": eligible_roles,
+        "triggers": ["task-boundary"], "file_count_threshold": 5,
+        "custom_script": None, "secret_scan": True,
+    }
+    if authority_overrides is not None:
+        data["authority_overrides"] = authority_overrides
     (tmp_path / ".meta-config").mkdir(parents=True, exist_ok=True)
     (tmp_path / ".meta-config" / "auto-commit-allowlist.json").write_text(
-        json.dumps({
-            "version": 1, "mode": mode, "eligible_roles": eligible_roles,
-            "triggers": ["task-boundary"], "file_count_threshold": 5,
-            "custom_script": None, "secret_scan": True,
-        }),
+        json.dumps(data),
         encoding="utf-8",
     )
 
@@ -1029,6 +1033,28 @@ def test_allowlisted_role_can_commit_when_auto_commit_enabled(tmp_path):
     command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #1181: v2 allowlist sentinel for a granted role ------------------
+
+def test_allowlist_sentinel_accepts_documenter_with_v2_allowlist(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_v2_allowlist_still_blocks_push_for_granted_role(tmp_path):
+    _write_allowlist(
+        tmp_path, "auto", ["documenter"], version=2,
+        authority_overrides={"documenter": "direct"},
+    )
+    command = "#agent-meta:agent=documenter\ngit push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
 
 
 def test_auto_commit_non_allowlisted_role_still_blocked(tmp_path):

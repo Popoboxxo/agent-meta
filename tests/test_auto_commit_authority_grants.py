@@ -10,6 +10,7 @@ Both functions under test expect the NORMALIZED map ``{role: "direct"}``
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from lib.auto_commit import (  # noqa: E402
     is_role_eligible,
     role_commit_authority,
 )
+from lib.frontmatter import _parse_frontmatter_yaml  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -164,3 +166,264 @@ def test_grant_in_mixed_provider_set_renders_on_hook_provider():
     resolved = _granted()
     assert _resolve("documenter", resolved, _HOOKED) == ("direct", True)
     assert _resolve("documenter", resolved, {"has_hooks": False}) == ("notify", False)
+
+
+# --------------------------------------------------------------------------- #
+# T8 (issue #1181): provider gate + Bash injection before the provider         #
+# transform + sync.log contracts. Real-subprocess syncs (pattern:              #
+# tests/test_auto_commit_allowlist_pipeline.py:13-43).                         #
+# --------------------------------------------------------------------------- #
+
+_GRANT_YAML = (
+    "  authority_overrides:\n"
+    "    documenter:\n"
+    "      authority: direct\n"
+    "      acknowledge_full_shell: true\n"
+)
+
+_CLAUDE_INFO = (
+    "auto-commit-grant: documenter=direct "
+    "(source: auto_commit.authority_overrides; hook-enforced: yes)"
+)
+_HOOKLESS_WARN = (
+    "auto-commit-grant: documenter=direct not enforced on provider 'Opencode' "
+    "(has_hooks=false); rendered as notify (issue #1181)"
+)
+_GUARD_OFF_WARN = (
+    "auto-commit-grant: documenter=direct not enforced "
+    "(guard hook disabled: hooks.orchestrator-guard.enabled is not true); "
+    "rendered as notify (issue #1181)"
+)
+
+
+def _write_project(project: Path, *, providers: str = "[Claude]",
+                   roles: str = "[orchestrator, developer, documenter]",
+                   grant: bool = True, mode: str = "auto",
+                   guard_disabled: bool = False) -> None:
+    """Write a minimal project.yaml for a real sync subprocess."""
+    auto = f"auto_commit:\n  mode: {mode}\n  triggers: [task-boundary]\n"
+    if grant:
+        auto += _GRANT_YAML
+    hooks = "hooks:\n  orchestrator-guard:\n    enabled: false\n" if guard_disabled else ""
+    cfg = (
+        "project:\n  name: t\n  prefix: t\n"
+        f"ai-providers: {providers}\n"
+        f"roles: {roles}\n"
+        + hooks + auto
+    )
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(cfg, encoding="utf-8")
+
+
+def _run_sync(project: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py")],
+        cwd=project, capture_output=True, text=True, timeout=180,
+    )
+
+
+def _sync_log(project: Path) -> str:
+    return (project / "sync.log").read_text(encoding="utf-8")
+
+
+def _frontmatter_tools(text: str) -> list:
+    return list(_parse_frontmatter_yaml(text).get("tools") or [])
+
+
+def _agent_text(project: Path, provider_dir: str, role: str = "documenter") -> str:
+    path = project / provider_dir / "agents" / f"{role}.md"
+    assert path.exists(), path
+    return path.read_text(encoding="utf-8")
+
+
+def test_claude_documenter_gains_bash_when_granted(tmp_path):
+    _write_project(tmp_path)
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".claude")
+    assert "Bash" in _frontmatter_tools(doc)          # frontmatter `- Bash`
+    assert "Granted by project config" in doc          # grant line in the body
+    assert "issue #1181" in doc
+    assert _CLAUDE_INFO in _sync_log(tmp_path)
+
+
+def test_claude_documenter_without_grant_keeps_bash_deny(tmp_path):
+    _write_project(tmp_path, grant=False)
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".claude")
+    assert "Bash" not in _frontmatter_tools(doc)
+    assert "issue #1181" not in doc
+    assert "auto-commit-grant:" not in _sync_log(tmp_path)
+
+
+def test_claude_grant_with_disabled_guard_keeps_bash_deny(tmp_path):
+    _write_project(tmp_path, guard_disabled=True)
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".claude")
+    assert "Bash" not in _frontmatter_tools(doc)
+    assert "issue #1181" not in doc
+    log = _sync_log(tmp_path)
+    assert _GUARD_OFF_WARN in log
+    assert _CLAUDE_INFO not in log  # N-1: no hook-enforced INFO anywhere
+
+
+def test_opencode_v1_documenter_bash_deny_by_default(tmp_path):
+    _write_project(tmp_path, providers="[Opencode]", grant=False)
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".opencode")
+    # The only real Opencode render case (K-12): shell stays denied.
+    assert ("bash: deny" in doc) or ("action: shell" in doc and "effect: deny" in doc)
+    assert "Bash" not in _frontmatter_tools(doc)
+
+
+def test_render_bash_on_synthetic_hook_capable_fixture():
+    from lib.agent_sync import _apply_role_auto_commit_overrides  # noqa: E402
+
+    merged: dict = {}
+    variables = {
+        "_AUTO_COMMIT_RESOLVED": {
+            "mode": "auto", "authority_overrides": {"documenter": "direct"},
+        }
+    }
+    render_bash = _apply_role_auto_commit_overrides(
+        merged, "documenter", _REPO_ROOT, variables,
+        config={}, provider="Claude",
+        provider_capabilities={"has_hooks": True, "hook_protocol": "claude-code-json"},
+        log=None, guard_off_logged=set(),
+    )
+    assert render_bash is True
+    assert "Granted by project config" in merged["AUTO_COMMIT_BLOCK"]
+    assert "issue #1181" in merged["AUTO_COMMIT_BLOCK"]
+
+
+def test_hookless_provider_renders_derived_and_warns(tmp_path):
+    # A mixed set keeps the block valid (D21): the hookless provider renders the
+    # DERIVED authority and gets its own WARN; Claude carries the INFO.
+    _write_project(tmp_path, providers="[Claude, Opencode]")
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".opencode")
+    assert ("bash: deny" in doc) or ("action: shell" in doc and "effect: deny" in doc)
+    assert "Do NOT run `git` yourself" in doc          # derived notify prose
+    assert "issue #1181" not in doc                    # no grant line
+    log = _sync_log(tmp_path)
+    assert _HOOKLESS_WARN in log
+    assert "Granted by project config" not in doc
+
+
+def test_grant_log_line_on_claude(tmp_path):
+    _write_project(tmp_path)
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert _CLAUDE_INFO in _sync_log(tmp_path)
+
+
+def test_mixed_provider_set_logs_info_and_warn(tmp_path):
+    _write_project(tmp_path, providers="[Claude, Opencode]")
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    log = _sync_log(tmp_path)
+    assert log.count("hook-enforced: yes") == 1
+    assert log.count("not enforced on provider 'Opencode'") == 1
+    # D21: the hook-capable provider renders, the hookless one stays notify.
+    assert "Bash" in _frontmatter_tools(_agent_text(tmp_path, ".claude"))
+    assert "Bash" not in _frontmatter_tools(_agent_text(tmp_path, ".opencode"))
+
+
+def test_suggest_renders_no_grant_line_and_no_bash(tmp_path):
+    _write_project(tmp_path, mode="suggest")
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".claude")
+    assert "Bash" not in _frontmatter_tools(doc)
+    assert "issue #1181" not in doc
+    log = _sync_log(tmp_path)
+    assert "hook-enforced: yes" not in log
+    assert "auto-commit-grant:" not in log             # D20: both lines silent
+
+
+def test_grant_on_inactive_role_is_logged_as_info(tmp_path):
+    # D22: the notice comes from authority_override_notices (§4.3) on --validate.
+    _write_project(tmp_path, roles="[developer]", grant=False)
+    (tmp_path / ".meta-config" / "project.yaml").write_text(
+        "project:\n  name: t\n  prefix: t\n"
+        "ai-providers: [Claude]\n"
+        "roles: [developer]\n"
+        "auto_commit:\n  mode: auto\n  triggers: [task-boundary]\n"
+        "  authority_overrides:\n"
+        "    planner:\n"
+        "      authority: direct\n"
+        "      acknowledge_full_shell: true\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--validate"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=180,
+    )
+    output = result.stdout + result.stderr
+    assert "grant ignored — role is not active" in output
+
+
+def test_gemini_grant_maps_to_run_command(tmp_path):
+    _write_project(tmp_path, providers="[Gemini]")
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    doc = _agent_text(tmp_path, ".gemini")
+    assert "run_command" in doc
+    assert "code_execution" not in doc
+
+
+def test_ungranted_roles_render_byte_identical(tmp_path):
+    with_grant = tmp_path / "with"
+    without = tmp_path / "without"
+    _write_project(with_grant, grant=True)
+    _write_project(without, grant=False)
+    r1 = _run_sync(with_grant)
+    r2 = _run_sync(without)
+    assert r1.returncode == 0, r1.stderr
+    assert r2.returncode == 0, r2.stderr
+    d1 = with_grant / ".claude" / "agents"
+    d2 = without / ".claude" / "agents"
+    names = {p.name for p in d1.glob("*.md")} - {"documenter.md"}
+    assert names
+    for name in sorted(names):
+        assert (d1 / name).read_bytes() == (d2 / name).read_bytes(), name
+
+
+def test_hookless_only_failsafe_logs_hookless_warn(tmp_path):
+    # Review F3 (hookless seam): a single hookless provider + a well-formed
+    # grant triggers the non-enforcement fail-safe. The recovered grant must
+    # still emit the byte-exact §4.6 hookless WARN.
+    _write_project(tmp_path, providers="[Opencode]")
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    log = _sync_log(tmp_path)
+    assert _HOOKLESS_WARN in log
+    assert "hook-enforced: yes" not in log
+    # Fail-safe rendering is untouched: no grant line on the agent.
+    assert "issue #1181" not in _agent_text(tmp_path, ".opencode")
+
+
+def test_hooked_provider_structural_failsafe_has_no_false_hookless_warn(tmp_path):
+    # Review F3 (hooked seam): a single HOOKED provider, an active guard and a
+    # well-formed grant, but an unrelated structural violation forces the
+    # fail-safe. A `has_hooks=false` WARN here would be a false positive (F2).
+    _write_project(tmp_path, providers="[Claude]")
+    cfg_path = tmp_path / ".meta-config" / "project.yaml"
+    cfg_path.write_text(
+        cfg_path.read_text(encoding="utf-8").replace(
+            "  triggers: [task-boundary]\n",
+            "  triggers: [task-boundary]\n  file_count_threshold: 0\n",
+        ),
+        encoding="utf-8",
+    )
+    result = _run_sync(tmp_path)
+    assert result.returncode == 0, result.stderr
+    log = _sync_log(tmp_path)
+    assert "not enforced on provider" not in log
+    assert "guard hook disabled" not in log
+    assert "hook-enforced: yes" not in log
+    assert "issue #1181" not in _agent_text(tmp_path, ".claude")
