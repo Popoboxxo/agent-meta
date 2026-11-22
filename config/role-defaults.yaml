@@ -322,7 +322,12 @@ roles:
       - TDD
       - Testabdeckung
       examples:
-      - "Schreibe Tests für das Modul (TDD)."
+        Deutsch:
+        - "Schreibe Tests für das Modul (TDD)."
+        - "Sichere die Testabdeckung für dieses Modul."
+        English:
+        - "Write tests for the module (TDD)."
+        - "Ensure test coverage for this module."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1879,6 +1884,19 @@ roles:
       - "Wie nutze ich die Mammouth-Plan/Build-Modes?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
       Ko...'
+  provider-expert:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Wrapper-Basis fuer plattformspezifische *-expert-Overrides (claude-expert,
+      gemini-expert, etc.) via based-on; keine eigene Routing-Flaeche, nur explizite
+      Namens-Delegation.'
+    routing:
+      addressability: name_only
+      name_only_reason: Wrapper base template for platform-specific *-expert roles (via based-on); no own routing surface, reachable only via explicit name dispatch.
+      parallel: false
+      orchestrator_only: false
+    short_desc: 'Wrapper-Basis fuer plattformspezifische *-expert-Overrides.'
   knowledge-curator:
     group: knowledge
     model: balanced
@@ -2688,7 +2706,7 @@ quality_pipelines:
         dod_flag: spec-plan-enabled
     - id: requirement
       agent: requirements
-      task: REQ-ID vergeben
+      task: 'REQ-ID (REQ-<AREA>-<NN>) vergeben'
       mode: conditional
       condition:
         dod_flag: req-traceability

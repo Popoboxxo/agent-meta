@@ -45,7 +45,8 @@ def test_no_platforms_and_no_override_falls_back_to_full():
 _GATED_TEMPLATES = ("git", "tester", "se-developer", "se-junior-developer",
                     "se-senior-developer")
 # Mandatory REQ markers: commit-format scope and test-name prefix.
-_REQ_MANDATE_MARKERS = ("(REQ-xxx)", "[REQ-xxx]", "[REQ-004]", "always with a REQ reference")
+_REQ_MANDATE_MARKERS = ("(REQ-xxx)", "[REQ-xxx]", "[REQ-004]", "always with a REQ reference",
+                        "(REQ-<AREA>-<NN>)")
 
 
 def _render_with_preset(template: str, preset: str) -> str:

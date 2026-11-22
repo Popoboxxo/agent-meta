@@ -1,6 +1,6 @@
 ---
 name: api-specialist
-version: 1.7.0
+version: 1.8.0
 description: API design, OpenAPI specifications, contract-first development. Creates
   and maintains API contracts.
 hint: Use this agent for API design, OpenAPI specifications, and contract-first development.
@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/api-specialist.md@1.7.0
+generated-from: 1-generic/api-specialist.md@1.8.0
 model: claude-sonnet-5
 memory: project
 ---

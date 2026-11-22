@@ -21,8 +21,8 @@ from scripts.lib.delegation_table import _normalize_language
 from scripts.lib.roles import load_roles_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_EXPECTED_TOTAL = 102
-_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 13, "excluded": 1}
+_EXPECTED_TOTAL = 103
+_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 14, "excluded": 1}
 # Ratchet exceptions for test_name_only_roles_have_no_routing_patterns (IC-28 Nr. 2):
 # name_only roles that still carry routing_patterns. Empty since Task 1.35 (Q9);
 # new entries are not allowed.
@@ -196,6 +196,7 @@ def test_name_only_roles_have_reason():
         "meta-optimizer",
         "principal-developer",
         "privacy-compliance-officer",
+        "provider-expert",
         "red-team-agent",
         "reproducible-builds-engineer",
         "secrets-manager",

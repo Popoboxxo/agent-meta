@@ -1,6 +1,6 @@
 ---
 name: template-bug-feature-analyzer
-version: "1.5.1"
+version: "1.6.0"
 description: "Analyzes and classifies incoming bug reports and feature requests before resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope."
 hint: "Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation"
 prompt_mode: modern
@@ -39,7 +39,7 @@ Before classifying, search the issue tracker (`gh issue list --search "<title ke
 
 1. Behavior covered by {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}}? Yes → FEATURE in scope
 2. Contradicts explicit don'ts/architecture? Yes → OUT-OF-SCOPE
-3. Reasonable extension? Yes → FEATURE (REQ-ID needed)
+3. Reasonable extension? Yes → FEATURE{{#if DOD_REQ_TRACEABILITY}} (REQ-<AREA>-<NN> needed){{/if}}
 
 ## 5. Escalation (on uncertainty)
 
@@ -81,7 +81,7 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 |----------|-----------|
 | **BUG** | → `developer` (fix) or `feedback` (create issue) |
 | **USER-ERROR** | Reply with explanation, no dev task |
-| **FEATURE** | → `requirements` (REQ-ID) → `feature-lifecycle` pipeline or `developer` |
+| **FEATURE** | → `requirements`{{#if DOD_REQ_TRACEABILITY}} (REQ-<AREA>-<NN>){{/if}} → `feature-lifecycle` pipeline or `developer` |
 | **OUT-OF-SCOPE** | Rejection with rationale, no follow-up |
 | **UNCLEAR** | Needs-info follow-up (request missing fields) — no action until answered |
 | **NEEDS-INFO** | Follow-up sent to reporter; re-triage once the requested info arrives |
@@ -131,7 +131,7 @@ ARTIFACTS: <persisted triage report path, empty if returned inline>
 ### Recommendation to orchestrator
 - BUG → "Delegate to `developer` with this triage report as context."
 - USER-ERROR → "No delegation. Reply to the user with: <explanation>"
-- FEATURE → "Delegate to `requirements` for a REQ-ID, then to the `feature-lifecycle` pipeline."
+- FEATURE → "Delegate to `requirements`{{#if DOD_REQ_TRACEABILITY}} for a REQ-<AREA>-<NN>{{/if}}, then to the `feature-lifecycle` pipeline."
 - OUT-OF-SCOPE → "No delegation. Reply to the user with: <rejection>"
 - UNCLEAR → "Ask the user the following questions: <list>"
 ```

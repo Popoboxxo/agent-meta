@@ -1069,6 +1069,12 @@ def _deployed_hook(project: Path, provider_dir: str = ".claude") -> Path:
             encoding="utf-8"),
         encoding="utf-8",
     )
+    # #1161 Pkt5: hook_json_get_many loads its importable parser module from
+    # the same lib/ directory; sync.py deploys it next to hook_common.sh.
+    shutil.copy(
+        _IMPL_PATH.parent / "lib" / "hook_json_many.py",
+        hooks / "lib" / "hook_json_many.py",
+    )
     return hooks / "repo-containment.sh"
 
 

@@ -947,7 +947,7 @@ def test_all_prose_matches_golden(tmp_path):
 #: the legitimate rebaseline lands in the same commit as the change that
 #: causes it, so a `base..HEAD` diff cannot distinguish an approved rebaseline
 #: from later drift. A content pin keeps the guard meaningful in both layouts.
-_GOLDEN_CORPUS_SHA256 = "6f480a6f76a07c6cdcf7f0d6bfcbfba7270293bb3971cfb52472398da1f5cf5f"
+_GOLDEN_CORPUS_SHA256 = "a9f23fc4ebdcf355f9142c237d50362d65b6c33ae8b753a72b12628886af174e"
 
 
 def _golden_corpus_paths():

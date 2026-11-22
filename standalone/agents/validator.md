@@ -21,7 +21,7 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 
 ## 4. Commit conventions
 
-- Format: `<type>(REQ-xxx): <description>` or `<type>: <description>` (if no REQ)
+- Format: `<type>: <description>`
 - Conventional Commits (feat/fix/refactor/test/chore/docs/ci)
 - First line ≤ 72 characters
 
@@ -82,7 +82,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 sentence verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_NOTES | REJECTED
 FINDINGS:
-  - [file:line + REQ-xxx + severity]
+  - [file:line + REQ reference + severity]
 TRACEABILITY: <REQ→Code→Test matrix or 'N/A'>
 BLOCKERS: [list of merge-blocking issues]
 NOTES: [optional, helpful for implementer]

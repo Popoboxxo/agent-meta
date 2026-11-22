@@ -5530,9 +5530,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # PR #1336 / issue #1181 (commit-authority grant): ac01-baseline re-pinned after the
 # 11-entry rebaseline of the hardened orchestrator-guard hook renders and the version-2
 # auto-commit-allowlist renders; tree digest 4582662d.. -> ab13100f.. (same event).
+# Phase H bundle (2026-11-22, intended-output rebaseline): ac01-baseline re-pinned after
+# #1181 (hook hardening / allowlist v2) merged first, then Phase H T10 (4 hooks bumped
+# to the single-parse version), T13 (DE/EN examples + provider-expert name_only) and T21
+# (REq gating in 6 agent templates + version bumps). 41 entries changed: 27 agent
+# artifacts (3 roles x 9 providers), 9 routing-details.md, 5 hooks -- all legitimate
+# render output, not a red-test fix. Tree digest ab13100f.. -> 95a315d6.. (same event).
 _FIXTURE_TREES = {
-    "ac01-baseline": "ab13100f80f33c5ad9d4cc87c76e501dddacd82f430dc4f958e8833556b41bc1",
-    "slimming-golden": "6eb489dcc07c41ef43c3283dc1bde73e025213af182c716ef7af3c1ec70e7b02",
+    "ac01-baseline": "95a315d6eb49c1b4254bedd4898e2a33344cb26d30d8890dc479f396e571b594",
+    "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
 
