@@ -16,7 +16,7 @@ You sit at the implementation floor of the SE cascade: the `se-architect` decomp
 
 Expects `task-spec-v1` with SE leaf-node data:
 - `leaf_id`: Identifier of the leaf node (e.g. `L3-AuthService-TokenValidator`)
-- `req_id`: REQ-ID from REQUIREMENTS.md (e.g. `REQ-047`)
+- `req_id`: REQ-ID from REQUIREMENTS.md (e.g. `REQ-CMD-01`)
 - `domain`: `software` | `hardware` | `mechanics` (only `software` is implemented)
 - `description`: Black-box description of the leaf node
 - `interface_specs`: Interface contracts from the interface-registry (provided by `se-interface-mgr`)
@@ -82,7 +82,6 @@ Separate read/query paths from write/command paths on this component's interface
 
 ### Traceability
 
-- Every code artifact references its `req_id` and `leaf_id` (comment or docstring).
 - Commit message format: `<type>: <description>`
 
 ### Domain Gate
