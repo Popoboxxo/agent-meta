@@ -198,14 +198,54 @@ def role_commit_authority(
     return AUTHORITY_NOTIFY
 
 
-def is_role_eligible(role: str, agent_meta_root: Path, platform: str | None = None) -> bool:
+def effective_commit_authority(
+    role: str,
+    agent_meta_root: Path,
+    platform: str | None = None,
+    authority_overrides: Mapping[str, str] | None = None,
+) -> str:
+    """Like `role_commit_authority`, but a valid grant escalates delegate|notify.
+
+    Pure function: the only I/O is the base-template frontmatter read already
+    performed by `role_commit_authority`. `authority_overrides` is the
+    NORMALIZED map `{role: "direct"}` (spec §3.2 rule 6), not the config-object
+    form. A non-Mapping is treated as "no grant" (K-14 / RVW2-1181-04), so the
+    function never raises even on a caller-side type error. It only ever
+    ESCALATES (D17): `delegate`/`notify` -> `direct` when granted; `direct` is
+    a no-op and `none` is never escalated. An explicit non-`direct` value is
+    NOT a revoke -- validation reports it via `authority_override_violations`.
+    """
+    derived = role_commit_authority(role, agent_meta_root, platform)
+    wanted = (
+        authority_overrides.get(role)
+        if isinstance(authority_overrides, Mapping)
+        else None
+    )
+    if wanted == AUTHORITY_DIRECT and derived in (AUTHORITY_DELEGATE, AUTHORITY_NOTIFY):
+        return AUTHORITY_DIRECT
+    return derived
+
+
+def is_role_eligible(
+    role: str,
+    agent_meta_root: Path,
+    platform: str | None = None,
+    authority_overrides: Mapping[str, str] | None = None,
+) -> bool:
     """True only if `role` can commit DIRECTLY (Bash AND Edit/Write).
 
     Direct-only on purpose: `eligible_roles` gates the guard-hook sentinel,
     which authorizes the role to run `git add`/`git commit` itself. Delegate/
-    notify roles must never hold that sentinel.
+    notify roles must never hold that sentinel -- unless a valid grant is in
+    effect. A grant (`authority_overrides={role: "direct"}`, normalized) is the
+    **only** exception to the direct-only principle and is limited to
+    write-capable roles by `authority_override_violations` (spec §3.2/D17).
+    The default `None` preserves the pre-grant behaviour.
     """
-    return role_commit_authority(role, agent_meta_root, platform) == AUTHORITY_DIRECT
+    return (
+        effective_commit_authority(role, agent_meta_root, platform, authority_overrides)
+        == AUTHORITY_DIRECT
+    )
 
 
 _MODES = ("off", "suggest", "auto", "custom")
