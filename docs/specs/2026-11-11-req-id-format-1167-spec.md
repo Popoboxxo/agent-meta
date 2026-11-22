@@ -18,27 +18,27 @@ gate: "Task 19 → Tasks 20/21"
 
 > Status: APPROVED (Nutzergo 22.11 — Spezifikation auf Basis des freigegebenen Phasenplans 2026-11-11-phase-h-context-eval.md nachgetragen, keine neue Entscheidung)
 > Datum: 2026-11-22 | Ist-Anker: Branch `chore/phase-h-bundle` @ `4d3d21f5416bd8f1048e2491bb9ee260bbad2f5c` (alle file:line-Belege gegen diesen Stand neu gemessen) | Plan: `docs/superpowers/plans/2026-11-11-phase-h-context-eval.md`, Task 19 (Z. 410-417)
-> Entscheidungen (vom Plan fixiert, hier nicht neu entschieden): 34 / D-H4 (Z. 131), 54 / O-H5 (Z. 132), 30 (Z. 127), 38e (Z. 129) | Offen: O-H2 (Z. 146) — siehe O-H2-Messung
+> Entscheidungen (vom Plan fixiert, hier nicht neu entschieden): 34 / D-H4 (Z. 131), 54 / O-H5 (Z. 132), 30 (Z. 127), 38e (Z. 129) | O-H2 entschieden: `\d{2,3}` (User-Entscheidung 22.11. nach Review-Bestätigung) — siehe O-H2-Messung M4
 > Gate: Diese Spec ist das Freigabe-Gate für Task 20/21. Ohne obige `Status: APPROVED`-Zeile sind Tasks 20/21 nicht ausführbar (Plan Task 19, Akzeptanz Z. 416).
 
 ## Problem / Ziel / Nicht-Ziele
 
 **Problem.** Das REQ-ID-Format ist im Framework nicht vereinheitlicht. `docs/REQUIREMENTS.md:4` beschreibt zwei Formate (`REQ-xxx` dreistellig *oder* thematisch präfixiert `REQ-CMD-xx`), `agents/1-generic/requirements.md:45-46` beschreibt `REQ-xxx` (three digits) mit Sub-Requirements `REQ-xxx-A`, `agents/1-generic/se-developer.md:31,46` und `se-junior-developer.md:31,46` zeigen das konkrete Beispiel `REQ-047` (ohne Bereichs-Segment). Gleichzeitig ist das REQ-Mandat in mehreren Templates ungegated (z. B. `validator.md:53`, `bug-feature-analyzer.md:42,84,134`), während andere Stellen bereits über `{{#if DOD_REQ_TRACEABILITY}}` laufen (`validator.md:35-41`, `:97`). Issue #1167 verlangt ein einheitliches Format in Templates/Presets und eine Validator-Prüfung.
 
-**Ziel.** Implementierbare Verträge für die Plan-Tasks 20 und 21: ein kanonisches Format `REQ-<AREA>-<NN>` (D-H4), genau ein Bereichs-Segment ohne `-` (Entscheidung 54), eine Scope-Definition, Gating auf `DOD_REQ_TRACEABILITY` (Single Source), Validator-Verhalten (still bei aus, ERROR bei an und fehlerhaft) sowie die Abgrenzung zu #1158 K-01 und #339. Alle Aussagen stammen aus dem freigegebenen Phasenplan; diese Spec trifft keine neue Produktentscheidung. Die Ziffernzahl `N` bleibt gemäß O-H2 bewusst offen und wird hier nur gemessen (siehe O-H2-Messung).
+**Ziel.** Implementierbare Verträge für die Plan-Tasks 20 und 21: ein kanonisches Format `REQ-<AREA>-<NN>` (D-H4), genau ein Bereichs-Segment ohne `-` (Entscheidung 54), eine Scope-Definition, Gating auf `DOD_REQ_TRACEABILITY` (Single Source), Validator-Verhalten (still bei aus, ERROR bei an und fehlerhaft) sowie die Abgrenzung zu #1158 K-01 und #339. Alle Aussagen stammen aus dem freigegebenen Phasenplan; diese Spec trifft keine neue Produktentscheidung. Die Ziffernzahl ist mit `\d{2,3}` verbindlich festgelegt (User-Entscheidung 22.11. nach Review-Bestätigung); die Messung in M1-M4 dient als Beleg, nicht als Offenlassung.
 
 **Nicht-Ziele.**
 - Keine Implementierung — dies ist der Spec-Gate; Code, Hooks, andere Specs und Config-Dateien bleiben unberührt (nur diese Spec-Datei wird geschrieben).
-- Keine Festlegung von `N` (Ziffernzahl) — O-H2 ist eine offene Entscheidung des Plans; beide Kandidaten werden dokumentiert und an main chat eskaliert (siehe O-H2-Messung und Offene Fragen O1).
+- Keine eigene Festlegung der Ziffernzahl durch diese Spec — O-H2 wurde vom User verbindlich auf `\d{2,3}` entschieden (User-Entscheidung 22.11. nach Review-Bestätigung); kein Eskalationspunkt mehr. Die Ablehnung von `\d{2}` und die Messdaten bleiben als Beleg in M1-M4 erhalten (siehe O-H2-Messung M4 und Offene Fragen O1).
 - Kein mehrteiliges Bereichs-Segment: `REQ-L2-AT-018` ist ungültig (Entscheidung 54); #339 passt sich bei seiner Neufreigabe an (Entscheidung 30). Keine #339-Planung in Phase H.
 - Keine Abnahme von #1158 K-01 (Task 18) — disjunkte Dateimenge; hier nur Abgrenzung.
 - Keine Änderung an `docs/REQUIREMENTS.md`, außer falls die umsetzende Task 17 (K-17/K-11) dies ausdrücklich verlangt (Plan File Structure Z. 167).
 - Keine provider-spezifischen Namens-Branches; Gating ausschließlich über den bestehenden Config-Key `DOD_REQ_TRACEABILITY` / `dod.req-traceability`.
 - Keine Closing-Keywords in Commit-/PR-Texten (Entscheidung 38e, Z. 129); `(#1167)` ist reiner Verweis, #1167 wird in Phase H nicht geschlossen.
 
-## O-H2-Messung (Task 19 Step 1) — Ergebnis und Entscheidungspunkt
+## O-H2-Messung (Task 19 Step 1) — Ergebnis und User-Entscheidung 22.11. nach Review-Bestätigung
 
-Dieser Abschnitt führt die vom Plan geforderte Messung (Z. 146, Z. 413) aus und hält ihr Ergebnis objektiv fest. Es wird **keine** Entscheidung zwischen den beiden Kandidaten getroffen.
+Dieser Abschnitt führt die vom Plan geforderte Messung (Z. 146, Z. 413) aus und hält ihr Ergebnis objektiv fest. Die Messdaten (M1-M3) bleiben unverändert als Beleg erhalten; die Regex-Wahl ist inzwischen durch den User verbindlich entschieden (siehe M4).
 
 ### M1 — Inventur der REQ-Stellen (Grep)
 
@@ -77,25 +77,25 @@ Grep-Muster `REQ-[A-Z][A-Z0-9]*-[0-9]+` auf `docs/REQUIREMENTS.md` → **37 verg
 | `agents/1-generic/requirements.md:46` | `Sub-requirements: REQ-xxx-A, REQ-xxx-B` | Platzhalter für Sub-Requirements |
 | `agents/1-generic/se-developer.md:31,46`, `se-junior-developer.md:31,46` | `e.g. REQ-047` | konkretes dreistelliges Beispiel, aber **ohne** Bereichs-Segment → nach D-H4/Entscheidung 54 ohnehin ungültig; gehört zu den Stellen, die #1167 bereinigt |
 
-### M4 — Verdict: AMBIGUOUS → Entscheidungspunkt für main chat
+### M4 — Verdict: DECIDED — `\d{2,3}` (User-Entscheidung 22.11. nach Review-Bestätigung)
 
-Die Messung (M2) ist objektiv eindeutig (alle vergebenen IDs zweistelig). Die **Regex-Wahl** ist es nicht, weil beide Kandidaten auf konkretem, im Plan benanntem Beleg beruhen:
+Die Messung (M2) ist objektiv eindeutig (alle vergebenen IDs zweistelig). Die **Regex-Wahl** war zunächst offen, weil beide Kandidaten auf konkretem, im Plan benanntem Beleg beruhen:
 
 - **Kandidat A — `\d{2}` (genau 2 Ziffern):** `^REQ-[A-Z][A-Z0-9]*-\d{2}$`. Beleg: D-H4 schreibt wörtlich `<NN>` (Z. 131); alle 37 vergebenen IDs (M2) sind zweistellig; Task-20-Fixture `REQ-CMD-01` ist als gültig gesetzt (Z. 422).
 - **Kandidat B — `\d{2,3}` (2 oder 3 Ziffern):** `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$`. Beleg: O-H2 nennt `\d{2,3}` ausdrücklich als Alternative „wegen `REQ-xxx` dreistellig in `docs/REQUIREMENTS.md:4`" (Z. 146); `requirements.md:45` wiederholt „three digits"; `REQ-047` existiert als konkrete dreistellige Form (M3).
 
-Da der Plan O-H2 bewusst offen gelassen hat (Abschnitt „Offene Entscheidungen", Z. 144-146) und Task 20 die „Ziffernzahl O-H2" explizit nicht vorgibt (Z. 422), wird **hier keine Wahl getroffen**. `N` ist Entscheidungspunkt für main chat; beide Optionen sind in Offene Fragen O1 und in IC-1 festgehalten. Die Implementierung von Task 20 darf erst nach Auflösung durch main chat mit der dann festgelegten Konstante erfolgen.
+**User-Entscheidung 22.11. nach Review-Bestätigung:** O-H2 = **Kandidat B `\d{2,3}`**. Verbindliche Konstante: `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$` mit `re.fullmatch`. Begründung: vorwärtskompatibel mit der dokumentierten dreistelligen Form (`REQ-047`, `docs/REQUIREMENTS.md:4`); bestehende zweistellige IDs bleiben gültig. Damit ist die Wahl fixiert; Task 20 implementiert mit dieser Konstante (kein Eskalationspunkt mehr). Die Regel „genau ein Bereichs-Segment ohne `-`" bleibt unverändert — `REQ-L2-AT-018` bleibt ungültig (Entscheidung 54).
 
 ## Interface Contracts (Datei:Symbol, Signatur, Fehlerpfade)
 
 Alle Anker gegen `chore/phase-h-bundle @ 4d3d21f` neu gemessen (Plan maß bei `9aa0e0c0`; Phase-H-Sibling-Specs bei `87564958`). Python 3.9-kompatibel, provider-agnostisch.
 
-### IC-1 — Regex-Konstante (Plan Z. 412, D-H4 + Entscheidung 54; `N` offen)
+### IC-1 — Regex-Konstante (Plan Z. 412, D-H4 + Entscheidung 54; O-H2 = `\d{2,3}` entschieden 22.11.)
 
-- **Form (vom Plan vorgegeben):** `^REQ-[A-Z][A-Z0-9]*-\d{N}$`, angewendet mit `re.fullmatch`.
+- **Form (verbindlich, User-Entscheidung 22.11. nach Review-Bestätigung):** `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$`, angewendet mit `re.fullmatch`. Die Ziffernzahl ist damit auf `{2,3}` festgelegt (O-H2 = Kandidat B); 2 und 3 Ziffern sind gültig.
 - **Bereichs-Segment (Entscheidung 54, fix):** `[A-Z][A-Z0-9]*` — genau **ein** Segment, **ohne** `-`. Damit ist `REQ-L2-AT-018` ungültig (mehrteiliger Bereich), `REQ-CMD-01` gültig.
-- **`N` (offen, O-H2):** Kandidat A `^REQ-[A-Z][A-Z0-9]*-\d{2}$` oder Kandidat B `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$`. Keine Festlegung in dieser Spec (siehe M4, Offene Fragen O1).
-- **Fehlerpfade (unabhängig von `N`):** `REQ-1` (zu wenige Ziffern) → ungültig; beliebige Zeichenketten ohne `REQ-`-Präfix, mit Kleinschreibung im Bereich oder mit `-` im Bereich → ungültig; `re.fullmatch` verhindert Teil Treffer.
+- **O-H2-Entscheidungsgrundlage (Beleg, nicht mehr offen):** Kandidat B `\d{2,3}` (siehe M4) ist gewählt — vorwärtskompatibel mit der dokumentierten dreistelligen Form (`REQ-047`), bestehende zweistellige IDs bleiben gültig. Der abgelehnte Kandidat A `\d{2}` und die Messdaten bleiben als Evidenz in M1-M4 erhalten.
+- **Fehlerpfade:** `REQ-1` (zu wenige Ziffern) → ungültig; `REQ-1234` (mehr als 3 Ziffern) → ungültig; beliebige Zeichenketten ohne `REQ-`-Präfix, mit Kleinschreibung im Bereich oder mit `-` im Bereich → ungültig; `re.fullmatch` verhindert Teil Treffer.
 
 ### IC-2 — Gating-Quelle (Single Source)
 
@@ -120,7 +120,7 @@ Alle Anker gegen `chore/phase-h-bundle @ 4d3d21f` neu gemessen (Plan maß bei `9
   - `config/conventions-presets.yaml:34` (`entry_prefix: "REQ-xxx: "`).
   - `config/role-defaults.yaml:179,187,190,200,2691` (REQ-Text; Plan nannte `:2668` und „nicht `:2694`" — gegen `4d3d21f`: `REQ-ID vergeben` bei `:2691`, `:2694` ist die Zeile `dod_flag: req-traceability`).
   - Je betroffener Agent-Datei `version:` im YAML-Frontmatter minor erhöhen (Plan Z. 431).
-- **Soll:** REQ-Mandate werden über `{{#if DOD_REQ_TRACEABILITY}}` gegated; bei aktiver Traceability erscheint genau das kanonische Format `REQ-<AREA>-<NN>` (mit dem von main chat festgelegten `N`).
+- **Soll:** REQ-Mandate werden über `{{#if DOD_REQ_TRACEABILITY}}` gegated; bei aktiver Traceability erscheint genau das kanonische Format `REQ-<AREA>-<NN>` (Ziffernzahl `\d{2,3}` gemäß User-Entscheidung 22.11.).
 - **Fehlerpfade:** Rendering mit `rapid-prototyping` enthält keine REQ-Mandate; Rendering mit Traceability an enthält das kanonische Format; ein verbliebenes ungatedes `REQ-xxx` im gerenderten Text ist ein Fehler (Task-21-Test, Z. 432).
 
 ### IC-5 — Abgrenzung #339 / #1158 K-01 (Plan Z. 414, Entscheidungen 30/54)
@@ -137,10 +137,10 @@ Alle Anker gegen `chore/phase-h-bundle @ 4d3d21f` neu gemessen (Plan maß bei `9
 
 ## Acceptance Criteria (nummeriert, testbar)
 
-Given/When/Then; je AC mindestens einem Interface Contract zugeordnet. Die Ziffernzahl-Aussage in AC1/AC3 ist erst nach Auflösung von O-H2 (main chat) ausführbar — dies ist der eskalierte Entscheidungspunkt, kein Placeholder dieser Spec.
+Given/When/Then; je AC mindestens einem Interface Contract zugeordnet. Die Ziffernzahl ist mit `\d{2,3}` verbindlich festgelegt (User-Entscheidung 22.11. nach Review-Bestätigung); AC1/AC3 sind damit ausführbar — 2 und 3 Ziffern werden akzeptiert.
 
 **AC1 — Regex-Konstante und Bereichs-Regel (IC-1).**
-Given die Konstante aus IC-1 mit der von main chat festgelegten Ziffernzahl `N` (Kandidat A oder B aus M4), When `re.fullmatch` auf Teststrings angewendet wird, Then: `REQ-CMD-01` wird akzeptiert; `REQ-L2-AT-018` wird abgelehnt (mehrteiliger Bereich, Entscheidung 54); `REQ-1` wird abgelehnt; Strings ohne `REQ-`-Präfix, mit Kleinbuchstaben im Bereich oder mit `-` im Bereich werden abgelehnt; bei Kandidat A wird `REQ-COM-123` abgelehnt, bei Kandidat B akzeptiert. Die Konstante entspricht byte-identisch der von main chat gewählten Form.
+Given die Konstante `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$` aus IC-1 (User-Entscheidung 22.11.), When `re.fullmatch` auf Teststrings angewendet wird, Then: `REQ-CMD-01` und `REQ-COM-123` werden akzeptiert (2 bzw. 3 Ziffern); `REQ-L2-AT-018` wird abgelehnt (mehrteiliger Bereich, Entscheidung 54); `REQ-1` (1 Ziffer) und `REQ-COM-1234` (4 Ziffern) werden abgelehnt; Strings ohne `REQ-`-Präfix, mit Kleinbuchstaben im Bereich oder mit `-` im Bereich werden abgelehnt. Die Konstante entspricht byte-identisch der festgelegten Form.
 
 **AC2 — Gating-State (IC-2).**
 Given ein Projekt mit Preset `rapid-prototyping` (`req-traceability: false`, `config/dod-presets.yaml:57`) bzw. mit aktivierter Traceability, When `check_req_ids` / der Validator läuft, Then liefert der aus-Zustand keine Findings und keinen Fehler-Exit; der an-Zustand liefert genau ein `Severity.ERROR`-Finding je fehlerhaftem Vorkommen. Der Zustand wird ausschließlich über `DOD_REQ_TRACEABILITY` / `dod.req-traceability` gelesen (`scripts/lib/config.py:3157`, `scripts/lib/dod.py:347`); es gibt keine zweite Quelle (Plan AC4 des Issues, Z. 426).
@@ -149,7 +149,7 @@ Given ein Projekt mit Preset `rapid-prototyping` (`req-traceability: false`, `co
 Given `scripts/lib/consistency/req_format.py` mit `check_req_ids(agent_meta_root: Path, project_root: Path, config: Optional[dict]) -> List[Finding]` und Fixtures `REQ-CMD-01` (gültig), `REQ-L2-AT-018` (ungültig, mehrteilig), `REQ-1` (ungültig, Ziffernzahl), When `python3 -m pytest tests/test_req_id_format.py -q` läuft, Then: `test_valid_ids_pass_both_states` ist grün; `test_malformed_req_id_fails_when_traceability_on` und `test_multi_part_area_rejected` liefern ein ERROR-Finding; `test_malformed_req_id_ignored_when_off` liefert keines; `test_single_area_accepted` (`REQ-CMD-01`) liefert keines. Die Registrierung in `cli_commands.py` (`:1518`, `:1672-1673`) ist wirksam; `python3 scripts/sync.py --validate` meldet im Repo (Preset `rapid-prototyping`) nichts Neues.
 
 **AC4 — Template-/Preset-Rendering (IC-4).**
-Given die in IC-4 gelisteten Dateien, When sync.py mit Preset `rapid-prototyping` bzw. mit Traceability an rendert, Then enthält der gerenderte Text im ersten Fall keine `REQ-ID`/`REQ-xxx`-Mandate (Grep leer), im zweiten Fall genau das kanonische Format `REQ-<AREA>-<NN>` (mit festgelegtem `N`). `python3 -m pytest tests/test_agents_frontmatter.py tests/test_ac01_render_identity.py tests/test_context_budgets.py -q` ist grün; ac01-/Budget-Hash-Drift wird per Helper (Plan Task 6) mit dokumentiertem Grund neu gepinnt (Plan Z. 435). Betroffene Agenten tragen eine minor erhöhte `version:`.
+Given die in IC-4 gelisteten Dateien, When sync.py mit Preset `rapid-prototyping` bzw. mit Traceability an rendert, Then enthält der gerenderte Text im ersten Fall keine `REQ-ID`/`REQ-xxx`-Mandate (Grep leer), im zweiten Fall genau das kanonische Format `REQ-<AREA>-<NN>` (mit `\d{2,3}` gemäß User-Entscheidung 22.11.). `python3 -m pytest tests/test_agents_frontmatter.py tests/test_ac01_render_identity.py tests/test_context_budgets.py -q` ist grün; ac01-/Budget-Hash-Drift wird per Helper (Plan Task 6) mit dokumentiertem Grund neu gepinnt (Plan Z. 435). Betroffene Agenten tragen eine minor erhöhte `version:`.
 
 **AC5 — Abgrenzung (IC-5).**
 Given die Abgrenzungsregeln aus IC-5, When die Testsuite läuft, Then wird `REQ-L2-AT-018` als ungültig behandelt (Entscheidung 54), es findet keine #339-Planung in Phase H statt (Entscheidung 30), und `tests/test_dod_gating_rendered.py` (#1158 K-01, Task 18) bleibt unverändert und grün. Keine Closing-Keywords in Commit-/PR-Texten (Entscheidung 38e).
@@ -159,11 +159,11 @@ Anzahl AC: 5 (AC1→IC-1, AC2→IC-2, AC3→IC-3, AC4→IC-4, AC5→IC-5). Jede 
 ## Offene Fragen + Risiken
 
 **Offene Fragen.**
-- **O1 — O-H2: Ziffernzahl `N` (Entscheidungspunkt für main chat).** Messung siehe M1-M4. Beide Kandidaten sind defensible: A `\d{2}` (D-H4 `<NN>`, 37/37 vergebene IDs zweistellig, Maximum 22) und B `\d{2,3}` (O-H2-Begründung `docs/REQUIREMENTS.md:4` „dreistellig", `requirements.md:45`, `REQ-047`-Beispiele). Der Plan lässt O-H2 bewusst offen (Z. 146); diese Spec wählt nicht. **Eskalation:** main chat legt `N` fest (A oder B); erst danach werden AC1/AC3 ausführbar. Kein Platzhalter, sondern eine bewusst offene, genau umrissene Entscheidung.
+- **O1 — O-H2: Ziffernzahl `N` — ENTSCHIEDEN `\d{2,3}` (User-Entscheidung 22.11. nach Review-Bestätigung).** Messung siehe M1-M4 (unverändert als Beleg erhalten). Der User hat nach Review-Bestätigung Kandidat B `\d{2,3}` verbindlich gewählt: vorwärtskompatibel mit der dokumentierten dreistelligen Form `REQ-047` (`docs/REQUIREMENTS.md:4`, `requirements.md:45`); bestehende zweistellige IDs bleiben gültig. Verbindliche Konstante `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$` mit `re.fullmatch` (IC-1). Kein Eskalationspunkt mehr; AC1/AC3 sind ausführbar. Der abgelehnte Kandidat A `\d{2}` (D-H4 `<NN>`, 37/37 vergebene IDs zweistellig, Maximum 22) bleibt als Messbeleg in M4 dokumentiert.
 - **O2 — `docs/REQUIREMENTS.md` mitziehen?** Plan File Structure (Z. 167) nennt `docs/REQUIREMENTS.md` nur für Task 17 (K-17/K-11) „nur falls Spec verlangt". Diese Spec verlangt es nicht; die Formatzeile `:4` bleibt in Task 19 unangetastet. Keine User-Rückfrage nötig.
 
 **Risiken.**
-- R1: Fälschliches Festlegen von `N` durch die Implementierung ohne main-chat-Entscheidung → falscher Validator. Mitigation: O1 als Harte Vorbedingung für Task 20; AC1 verlangt byte-identische Übereinstimmung mit der main-chat-Wahl.
+- R1: Abweichen der Implementierung von der festgelegten Ziffernzahl `\d{2,3}` → falscher Validator. Mitigation: O1/IC-1 enthalten die verbindliche Konstante (User-Entscheidung 22.11.); AC1 verlangt byte-identische Übereinstimmung und testet 2- und 3-stellige Fälle.
 - R2: Ein ungatedes `REQ-xxx` verbleibt im gerenderten Text (z. B. `validator.md:53`, `bug-feature-analyzer.md:42,84,134`) → Task-21-Test rot. Mitigation: vollständige Liste IC-4, Gating-Grep in AC4.
 - R3: `REQ-047` (ohne Bereich) wird als gültiges Vorbild übernommen → verletzt D-H4/54. Mitigation: M3 ordnet es als bereinigungsbedürftiges Beispiel ein; AC1 lehnt Strings ohne Bereichs-Segment ab.
 - R4: Anker-Drift (Plan `9aa0e0c0`, Siblings `87564958`, hier `4d3d21f`) → falsche file:line-Ziele. Mitigation: alle Anker gegen `4d3d21f` neu gemessen; Korrekturen in „Re-gemessene Anker" unten.
@@ -179,10 +179,10 @@ Anzahl AC: 5 (AC1→IC-1, AC2→IC-2, AC3→IC-3, AC4→IC-4, AC5→IC-5). Jede 
 - Plan Task 20 `_handle_validate` `:1408` → hier `:1518`; Registrierung `check_temp_literals` `:1507` → hier `:1672-1673`.
 
 **ADR (Kontext / Entscheidung / Konsequenz — alle aus dem Plan übernommen, keine neue Entscheidung).**
-- **ADR-1 (D-H4, kanonisches Format):** Kontext — zwei Formate in `docs/REQUIREMENTS.md:4` und uneinheitliche Templates. Entscheidung — ein Format `REQ-<AREA>-<NN>` (Z. 131). Konsequenz — alle Stellen in IC-4 werden vereinheitlicht; `N` bleibt O-H2 (ADR-4).
+- **ADR-1 (D-H4, kanonisches Format):** Kontext — zwei Formate in `docs/REQUIREMENTS.md:4` und uneinheitliche Templates. Entscheidung — ein Format `REQ-<AREA>-<NN>` (Z. 131). Konsequenz — alle Stellen in IC-4 werden vereinheitlicht; `N` = `\d{2,3}` durch User-Entscheidung 22.11. (ADR-4).
 - **ADR-2 (Entscheidung 54, strikter Bereich):** Kontext — #339 schlägt mehrteiligen Bereich vor. Entscheidung — genau ein Bereichs-Segment ohne `-`; `REQ-L2-AT-018` ungültig (Z. 132). Konsequenz — Fixture `REQ-L2-AT-018` wird abgelehnt (AC1/AC3/AC5); #339 passt sich bei Neufreigabe an.
 - **ADR-3 (Gating auf `DOD_REQ_TRACEABILITY`):** Kontext — teils gegate, teils ungatede REQ-Mandate. Entscheidung — Single Source über `dod.req-traceability`; still bei aus, ERROR bei an (Z. 414/421). Konsequenz — Preset `rapid-prototyping` bleibt ohne REQ-Mandate; kein zweiter Config-Key.
-- **ADR-4 (O-H2 offen, keine neue Entscheidung):** Kontext — M2 (2-stellig) und M3 (3-stellig dokumentiert) widersprechen sich; Plan lässt O-H2 offen. Entscheidung — keine Wahl in dieser Spec; Eskalation an main chat (Nutzergo 22.11: nachgetragen, keine neue Entscheidung). Konsequenz — Task 20 startet erst nach main-chat-Festlegung von `N`.
+- **ADR-4 (O-H2 = `\d{2,3}`, User-Entscheidung 22.11. nach Review-Bestätigung):** Kontext — M2 (2-stellig) und M3 (3-stellig dokumentiert) widersprechen sich; Plan lässt O-H2 offen. Entscheidung — der User hat nach Review-Bestätigung Kandidat B `\d{2,3}` verbindlich gewählt (externer Entscheid, keine neue Entscheidung dieser Spec): vorwärtskompatibel mit `REQ-047`, bestehende 2-stellige IDs bleiben gültig. Konsequenz — verbindliche Konstante `^REQ-[A-Z][A-Z0-9]*-\d{2,3}$` (IC-1); Task 20 implementiert direkt damit, kein Eskalationspunkt; Bereichsregel/Entscheidung 54 unverändert.
 
 **Nicht verifiziert (ehrlich).**
 - Keine Tests ausgeführt, kein `sync.py`-Lauf, kein `git`-Befehl (Spec-Worker ohne Shell); HEAD-SHA aus `.git/refs/heads/chore/phase-h-bundle` gelesen. Alle PASS/FAIL-Erwartungen sind Planwerte plus statisch gelesene Belege.
@@ -190,3 +190,5 @@ Anzahl AC: 5 (AC1→IC-1, AC2→IC-2, AC3→IC-3, AC4→IC-4, AC5→IC-5). Jede 
 - Zählungen (89 Treffer/36 Dateien, 37 IDs/8 Bereiche) statisch per Grep-Tool ermittelt, nicht per Python-Ausführung bestätigt.
 
 ## Trace-Anker: spec-id: SPEC-REQ-ID-FORMAT-1167-2026-11-11
+
+> Revisionsvermerk: 2026-11-22 — O-H2 verbindlich auf `\d{2,3}` entschieden (User-Entscheidung 22.11. nach Review-Bestätigung); IC-1, M4, AC1/AC3/AC4, O1, R1 und ADR-4 entsprechend aktualisiert. Messdaten (M1-M3), Status APPROVED, Approval-Marker, Format `REQ-<AREA>-<NN>`, Ein-Bereichs-Regel (Entscheidung 54), Gating und Abgrenzungen unverändert.
