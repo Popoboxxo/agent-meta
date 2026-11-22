@@ -5527,8 +5527,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # re-pinned — 7 admin command renders (one per provider) via --write;
 # d2b5268c.. -> c0253e8b...; slimming-golden/compact-golden unchanged. Log:
 # `tests/test_ac01_render_identity.py`.
+# PR #1336 / issue #1181 (commit-authority grant): ac01-baseline re-pinned after the
+# 11-entry rebaseline of the hardened orchestrator-guard hook renders and the version-2
+# auto-commit-allowlist renders; tree digest 4582662d.. -> ab13100f.. (same event).
 _FIXTURE_TREES = {
-    "ac01-baseline": "4582662dcf4d374877c603d950774078c8c8e41772894df7fa95a30a7af4d658",
+    "ac01-baseline": "ab13100f80f33c5ad9d4cc87c76e501dddacd82f430dc4f958e8833556b41bc1",
     "slimming-golden": "6eb489dcc07c41ef43c3283dc1bde73e025213af182c716ef7af3c1ec70e7b02",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
