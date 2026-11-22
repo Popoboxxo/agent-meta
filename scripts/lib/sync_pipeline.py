@@ -2157,7 +2157,7 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
                     f"all {len(previous.get('eligible_roles') or ())} "
                     "eligible role(s) dropped")
             reasons = _shrink_reasons(
-                previous, resolved, config.get("roles"), active_set,
+                previous, resolved, active_set.raw_roles, active_set,
                 agent_meta_root)
             if reasons:
                 old_n = len(previous.get("eligible_roles") or ())
