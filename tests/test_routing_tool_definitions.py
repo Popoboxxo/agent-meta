@@ -64,7 +64,9 @@ def test_roles_without_routing_stay_patternless():
     four patternless roles. Now ``openscad-developer`` HAS real routing_patterns
     (addressability keyword), ``intern-developer``/``principal-developer`` are
     ``name_only`` (reason required, no patterns) and ``orchestrator`` is
-    ``excluded``. Only keyword roles may carry a routable patterns block.
+    ``excluded``. ``provider-expert`` is registered as ``name_only`` per SPEC
+    ROUTING-LANGUAGE-779-780 D-H5 (wrapper base, explicit name dispatch only).
+    Only keyword roles may carry a routable patterns block.
     """
     roles = load_roles_config(_AGENT_META_ROOT)["roles"]
 
@@ -77,10 +79,11 @@ def test_roles_without_routing_stay_patternless():
     assert openscad["routing"]["addressability"] == "keyword"
     assert patterns.get("keywords") or patterns.get("examples")
 
-    for role in ("intern-developer", "principal-developer"):
+    for role in ("intern-developer", "principal-developer", "provider-expert"):
         routing = roles[role]["routing"]
         assert routing["addressability"] == "name_only"
         assert routing["name_only_reason"].strip()
+        assert "routing_patterns" not in roles[role]
 
     assert roles["orchestrator"]["routing"]["addressability"] == "excluded"
 
@@ -273,6 +276,54 @@ def test_get_routing_rules_language_param_is_threaded(tmp_path):
     )
     default_agents = {r["agent"]: r for r in default["rules"]}
     assert default_agents["flat-role"]["examples"] == ["Flat example."]
+
+
+# Pilot selection for AC3 (SPEC-ROUTING-LANGUAGE-779-780, S3 / O1):
+# the spec fixes only the STRUCTURAL criterion — a role with an existing
+# routing_patterns block whose flat examples list is migrated to a
+# language-tagged {"Deutsch": [...], "English": [...]} mapping. Names/count are
+# left open (O1), so `tester` is chosen as a representative keyword role: it
+# satisfies the criterion and is not bound by an exact-example pin in the
+# frozen regression suite (unlike `developer`, pinned in
+# tests/test_routing_lines_compact.py::test_compact_default_renders_lines_instead_of_tool_json).
+# Exactly one role carries the mapping because KNOWN_EXAMPLE_OVERLAPS is frozen
+# empty and the overlap detector counts the mapping keys ("Deutsch"/"English")
+# as example tokens — a second mapping role would create a new uncontrolled
+# overlap.
+_PILOT_ROLES = ("tester",)
+
+
+def test_pilot_roles_render_language_specific_examples():
+    """AC3 (#779 IT-4 / #780): pilot roles resolve distinct DE/EN examples from
+    the same canonical, language-neutral keyword source."""
+    roles = load_roles_config(_AGENT_META_ROOT)["roles"]
+    pilot_roles = [
+        name for name in _PILOT_ROLES
+        if isinstance((roles[name].get("routing_patterns") or {}).get("examples"), dict)
+    ]
+    assert pilot_roles == list(_PILOT_ROLES), (
+        "every pilot role must carry a language-tagged examples mapping"
+    )
+
+    config = {"roles": pilot_roles}
+    by_language = {
+        language: {
+            rule["agent"]: rule
+            for rule in get_routing_rules(
+                _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), language=language
+            )["rules"]
+        }
+        for language in ("Deutsch", "English")
+    }
+    for name in pilot_roles:
+        de = by_language["Deutsch"][name]
+        en = by_language["English"][name]
+        assert de["examples"] and en["examples"], f"{name}: empty language variant"
+        assert de["examples"] != en["examples"], f"{name}: DE/EN examples identical"
+        assert de["keywords"], f"{name}: pilot must be keyword-routable"
+        assert de["keywords"] == en["keywords"], (
+            f"{name}: keywords changed with the language"
+        )
 
 
 # ---------------------------------------------------------------------------
