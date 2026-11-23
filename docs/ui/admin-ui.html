@@ -361,6 +361,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .badge.required { background: rgba(248,81,73,0.12); color: var(--accent-red); border-color: rgba(248,81,73,0.4); }
 .badge.recommended { background: rgba(88,166,255,0.12); color: var(--accent-blue); border-color: rgba(88,166,255,0.4); }
 .badge.optional { background: rgba(110,118,129,0.12); color: var(--text-muted); }
+.badge.muted { background: rgba(110,118,129,0.12); color: var(--text-muted); }
 .badge.ok { color: var(--accent-green); border-color: rgba(63,185,80,0.4); }
 .badge.warn { color: var(--accent-yellow); border-color: rgba(210,153,34,0.4); }
 .badge.modern { background: rgba(163,113,247,0.12); color: #a371f7; border-color: rgba(163,113,247,0.4); }
@@ -4165,6 +4166,7 @@ async function viewConventionsPresets() {
     const labels = issues.labels = (issues.labels && typeof issues.labels === "object") ? issues.labels : {};
     issSec.appendChild(scalarField("labels.namespace", labels, "namespace"));
     issSec.appendChild(listField("closing_keywords", issues, "closing_keywords"));
+    issSec.appendChild(scalarField("language", issues, "language"));
     panel.appendChild(issSec);
 
     wrap.appendChild(panel);
@@ -4179,7 +4181,7 @@ async function viewProjectConventionsOverrides() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — Conventions Overrides"]));
   wrap.appendChild(el("p", { class: "muted" }, [
-    "Override individual convention fields on top of the selected conventions-preset. Precedence: conventions override > conventions-preset > default. List overrides replace the whole preset list (deep-merge semantics).",
+    "Override individual convention fields on top of the selected conventions-preset. Precedence: conventions override > conventions-preset > default. List overrides replace the whole preset list (deep-merge semantics). Fields marked documentation only affect the git.md help text (GIT_ISSUE_NAMING_BLOCK) and not issue creation; language is the effective field (ISSUE_LANGUAGE).",
   ]));
 
   const [data, presetsResp] = await Promise.all([
@@ -4205,7 +4207,9 @@ async function viewProjectConventionsOverrides() {
   const contentWrap = el("div");
   wrap.appendChild(contentWrap);
 
-  // Leaf fields per domain: [path, label, type]. bump_rules is intentionally
+  // Leaf fields per domain: [path, label, type, docOnly?]. docOnly rows are
+  // documentation-only: editable and saved, but without a behavioral effect.
+  // bump_rules is intentionally
   // omitted — a whole list of {trigger,bump,example} objects is not a sensible
   // single-row override; edit it via the preset editor or raw YAML instead.
   const DOMAIN_FIELDS = {
@@ -4218,10 +4222,11 @@ async function viewProjectConventionsOverrides() {
       [["changelog", "cutoff_method"], "changelog.cutoff_method", "scalar"],
     ],
     issues: [
-      [["title_format"], "title_format", "scalar"],
-      [["types"], "types", "list"],
-      [["labels", "namespace"], "labels.namespace", "scalar"],
-      [["closing_keywords"], "closing_keywords", "list"],
+      [["title_format"], "title_format", "scalar", true], // docOnly: true
+      [["types"], "types", "list", true], // docOnly: true
+      [["labels", "namespace"], "labels.namespace", "scalar", true], // docOnly: true
+      [["closing_keywords"], "closing_keywords", "list", true], // docOnly: true
+      [["language"], "language", "scalar"],
     ],
   };
 
@@ -4283,7 +4288,7 @@ async function viewProjectConventionsOverrides() {
         el("tr", {}, ["Field", "Preset Default", "Override", "Active Value"].map(h => el("th", {}, [h]))),
       ]));
       const tbody = el("tbody");
-      for (const [path, label, type] of DOMAIN_FIELDS[domain]) {
+      for (const [path, label, type, docOnly] of DOMAIN_FIELDS[domain]) {
         const fullPath = [domain, ...path];
         // presetSpec is the FULL multi-domain preset object ({release:{...},
         // issues:{...}}) — path is domain-relative (e.g. ["versioning",
@@ -4320,7 +4325,9 @@ async function viewProjectConventionsOverrides() {
         const isOverridden = overrideVal !== undefined;
         const activeVal = isOverridden ? overrideVal : presetVal;
         const activeTd = el("td");
-        activeTd.appendChild(el("span", { class: `badge ${isOverridden ? "warn" : "ok"}` }, [fmt(activeVal) || "—"]));
+        const badgeClass = docOnly ? "muted" : (isOverridden ? "warn" : "ok");
+        const badgeText = docOnly ? `documentation only · ${fmt(activeVal) || "—"}` : (fmt(activeVal) || "—");
+        activeTd.appendChild(el("span", { class: `badge ${badgeClass}` }, [badgeText]));
         tr.appendChild(activeTd);
 
         tbody.appendChild(tr);

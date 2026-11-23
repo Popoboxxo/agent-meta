@@ -137,7 +137,7 @@ spec-measured-at: 278ba54f
 - [ ] Step 1: Caller/Orchestrator führt den Secret-Scan gegen die zwei gemeldeten Dateien aus; bei Fund Block und manuelle Intervention, kein Commit.
 - [ ] Step 2: Commit mit vorbereiteter Nachricht anwenden (Subject beginnt auf Byte 0 mit `feat:`, kein BOM, keine Closing-Keywords):
   ```
-  feat: expose issue language in admin UI and mark inert fields documentation-only
+  feat: expose issue language in admin UI, mark inert fields doc-only
   ```
 - [ ] Step 3: Verifikation: genau 1 Commit, genau 2 Dateien im Scope, 0 Remote-Operationen.
 
