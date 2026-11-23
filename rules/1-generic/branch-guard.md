@@ -23,3 +23,12 @@ Das Destructive-Gate (#809) sieht nur direkte `rm`-Aufrufe (kein `find -delete`,
 Der DoD-Push-Check (Worktree-Branch-Erkennung) nimmt den Branch aus dem effektiven Verzeichnis des Pushs (`-C`-Kette bzw. führendes `cd`, sonst Hook-cwd; Worktrees zählen). Nur ein FÜHRENDES `cd` wird aufgelöst; nicht auflösbare Ziele, `pushd`/`popd`, `--git-dir`/`--work-tree` und `GIT_DIR` bleiben fail-closed.
 Gequoteter Text von Nicht-Git-Textkonsumenten (`gh ... --body "...git push..."`, `echo`, `printf`) gilt nicht als Push; Indirektion über `bash -c`/`eval`/`xargs` und `gh alias --shell` bleibt fail-closed bzw. bekannte Grenze.
 Einstufung: Convention boundary (Akzident-Netz, kein Ersatz für Backups); Security-Eigenschaften nur für das Destructive-Gate und den DoD-Push-Check (fail-closed ohne `python3`, #595).
+
+### Destructive-Gate: user-approval path (#1217, derzeit DEFAULT AUS)
+
+Für genau zwei Löschoperationen (`git branch -D`, `git push --delete` / `git push :<ref>`) existiert ein `ask`-Pfad, der dem Menschen im Harness den unveränderten Befehl im nativen Bestätigungsdialog zeigt. Er ist **derzeit nicht aktiviert** (Konfigurationsschlüssel `orchestrator.destructive-ask.enabled`, Default `false`, plus Harness-Signal `AGENT_META_HARNESS_INTERACTIVE=1`); ein dokumentierter Live-Test steht noch aus (Spec OFFEN 1). Ausgeliefertes Verhalten bleibt damit `exit 2`.
+
+- **Headless fail closed:** fehlt eines der beiden Signale (oder ist unklar), gilt unverändert `exit 2` — kein JSON, keine Freigabe.
+- **Keine Fälschung:** Sentinel (`#agent-meta:agent=…`), `agent_id` und vom Modell geschriebener Text (`# approved …`) können weder `ask` auslösen noch eine Freigabe erzeugen. Nie `permissionDecision: "allow"` — die Zustimmung kommt ausschließlich vom Menschen im Harness.
+- **Gate-Reihenfolge:** `ask` wird erst nach allen blockierenden Gates (Strict-/Mutations-Gate) emittiert; ein strengeres Verdikt gewinnt immer → `exit 2`.
+- **`asked` ≠ Ausführung:** der Audit-Eintrag `decision=asked` belegt nur das Angebot eines Prompts, nicht dass der Befehl lief. `approved`/`denied` werden ohne belegtes Harness-Event nicht protokolliert.
