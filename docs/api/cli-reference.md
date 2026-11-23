@@ -211,7 +211,7 @@ documented deviation, to be resolved by a later spec revision per AC-26; out of 
 | Flag | Description |
 |------|-------------|
 | `--backup [PROVIDER ...]` | Creates a timestamped backup of the current configuration and agents. |
-| `--label TEXT` | Optional label for the created backup. |
+| `--backup-label TEXT` | Optional label for the created backup (current spelling). `--label` is a deprecated alias kept for backward compatibility. |
 | `--restore ARCHIVE` | Restores an environment from a backup archive. |
 | `--restore-providers [...]` | Specifies which providers should be considered during the restore. |
 | `--force` | Forces overwrite during restore. |
