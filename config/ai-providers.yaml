@@ -392,6 +392,10 @@ providers:
         v2: '^[^/#\s]+/[^#\s]+(#[A-Za-z0-9._-]+)?$'
       # Allow-list source for the v2 native frontmatter fields (Spec §3.2, D1).
       surface-v2-fields: [system, permissions, steps, variant]
+      # Issue #1329: the `bash`/`shell` effect is selected by the declared
+      # `subagent-shell` + `subagent-shell-verified-state` capability keys in
+      # config/provider-capabilities.yaml (reuse of the #1113 flag mechanism).
+      # `tools-format: keep` stays unchanged; no new ad-hoc flag source.
       tools-format: keep
       tool-name-map: {}
       # §4.3: allow-list turns Opencode v2's silent frontmatter drop into a

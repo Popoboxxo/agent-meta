@@ -1,7 +1,7 @@
 ---
 name: documenter
-version: "1.2.1"
-based-on: "1-generic/documenter.md@1.11.2"
+version: "1.2.2"
+based-on: "1-generic/documenter.md@1.11.3"
 description: "Home Assistant Documenter — generiert und pflegt MkDocs-Dokumentation aus YAML-Packages, Architektur-Diagrammen und Git-History."
 hint: "HA-Doku pflegen: MkDocs-Seiten, Package-Übersichten, Architektur-Diagramme (Mermaid)"
 prompt_mode: modern
@@ -58,6 +58,9 @@ patches:
       ## 2. Cyclic documentation update (MANDATORY)
 
       The documentation cycle MUST run on: changes in `src/**`, to commands/settings/core logic, to tests indicating changed behavior, or new/changed REQ-IDs.
+      {{#if DOD_REQ_TRACEABILITY}}
+      Every documentation change must reference its REQ-ID (`REQ-<AREA>-<NN>`).
+      {{/if}}
 
       ## 3. Arbeitsablauf
 

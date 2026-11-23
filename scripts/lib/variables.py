@@ -104,6 +104,11 @@ _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     # so it is registered for resolvability but is not a boolean gate (K-2).
     "ORCH_MAX_INSTANCES",
     "ORCH_SINGLETON_DECLARED",
+    # #1335: opt-in render state. An unwired/absent value must read INACTIVE
+    # so the {{else}} (sentinel) branch survives instead of variant C — keeps
+    # the established fail-safe sentinel posture for renders that do not wire
+    # _build_provider_vars (see the strip registration comment below).
+    "GIT_PAYLOAD_ATTRIBUTION",
 })
 
 #: The four boolean topology flags as a static set. The strip helper builds
@@ -730,6 +735,11 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # entry the orphaned-marker cleanup keeps BOTH {{#if}} branches, doubling
     # the project-context prose in every template that uses the gate.
     conditional_vars.update({"PROJECT_CONTEXT_INJECTED"})
+    # #1335: the capability-derived git payload-attribution render flag gates
+    # the conditional identity/example blocks in agents/1-generic/git.md.
+    # Statically whitelisted so an unwired render keeps the sentinel (else)
+    # branch instead of emitting both branches with sentinel literals.
+    conditional_vars.update({"GIT_PAYLOAD_ATTRIBUTION"})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.startswith("RELEASE_CHECKLIST_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})

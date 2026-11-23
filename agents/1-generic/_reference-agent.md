@@ -101,7 +101,7 @@ Quick reference: `IPayload {t,ctx,con,refs,pri,dep}`, `t` max. {{A2A_T_SIZE_LIMI
 {{/if}}
 
 ## DoD flags
-{{#if DOD_REQ_TRACEABILITY}}- REQ traceability active: commits with `REQ-XXX`.{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- REQ traceability active: commits with `REQ-<AREA>-<NN>`.{{/if}}
 {{#if DOD_TESTS_REQUIRED}}- Tests mandatory: `tester` before commit.{{/if}}
 {{#if DOD_CODEBASE_OVERVIEW}}- CODEBASE_OVERVIEW via `documenter`.{{/if}}
 {{#if DOD_SECURITY_AUDIT}}- Security audit before release.{{/if}}
@@ -171,6 +171,6 @@ NEXT:
 {{#if DOD_REQ_TRACEABILITY}}| REQ-ID in commit | REQUIREMENTS.md updated{{/if}}
 {{#if DOD_SECURITY_AUDIT}}| security audit before release{{/if}}
 
-**Commits:** `<type>(REQ-xxx): <english imperative>`; first line <=72 characters.
+**Commits:** {{#if DOD_REQ_TRACEABILITY}}`<type>(REQ-<AREA>-<NN>): <english imperative>`{{else}}`<type>: <english imperative>`{{/if}}; first line <=72 characters.
 **Language:** User {{COMMUNICATION_LANGUAGE}} | External {{%EXTERNAL_DOCS_LANGUAGE%}} | Internal {{INTERNAL_DOCS_LANGUAGE}} | Code {{CODE_LANGUAGE}}. Rule `language.md`.
 </constraints>

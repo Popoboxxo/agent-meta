@@ -151,7 +151,7 @@ NEXT: [Review | Tests | Commit]
 - No default exports
 - No secrets / API keys
 - No "done" report without reproducing the original failure scenario
-- - - 
+- - 
 
 **Delegation (reference only):** requirement → `requirements` · tests → `tester` · docs → `documenter` (include DECISION block). You never delegate scope work — there is no higher tier.
 

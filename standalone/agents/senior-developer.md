@@ -127,7 +127,7 @@ FAILURE_LOG: <attempt n approach + failure reason>
 - No silent behavior changes — name breaking changes explicitly
 - No default exports
 - No secrets / API keys
-- - - 
+- - 
 - Blocked after 2+ verified failures on the same task → escalate to `principal-developer` (see workflow step 7) with reason (`repeated_failure`) + metric (`attempts: <n>`) + task summary + failure log, do not silently report `failed` or loop further
 
 **Delegation (reference only):** requirement → `requirements` · tests → `tester` · docs → `documenter` (include DECISION block) · last-resort escalation → `principal-developer` (orchestrator-routed, see workflow step 7)

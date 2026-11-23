@@ -588,15 +588,39 @@ _GIT_SENTINEL_BASH_RULE_WITHOUT_HOOK_AGENT_ID = (
     "always prefixed with `#agent-meta:agent=git` as the first line "
     "(see workflow step 0)"
 )
+# #1335 (Task 1, IC-5): with BOTH payload capabilities the harness is the
+# authoritative role source, so the rendered git agent needs no sentinel at
+# all (variant C). Exact spec literals — do not reword. Capability-derived
+# only: no provider name, no new attribution mechanism.
+_GIT_SENTINEL_SCOPE_WITH_BOTH_CAPS = (
+    " On providers whose hook payload carries a harness-set agent identity, the `git` role "
+    "is taken from that payload — do NOT add a sentinel comment to any Bash call: a "
+    "comment-only first line is a separate sub-command and can prevent narrow allow rules "
+    "such as `Bash(git status *)` from matching. Destructive-operation, branch and "
+    "auto-commit-scope checks still apply."
+)
+_GIT_SENTINEL_BASH_RULE_WITH_BOTH_CAPS = (
+    "`git` and `gh` calls without a sentinel line "
+    "(role comes from the hook payload; see workflow step 0)"
+)
 
 
 def _git_sentinel_scope_vars(pc: dict) -> dict:
     """Resolve the two inline git-sentinel texts for one provider.
 
-    Pure function driven only by the ``hook-agent-id`` capability — no provider
-    names, no I/O. Consumed by :func:`_build_provider_vars` (provider-injected
-    template values) and asserted verbatim by the Task 1 regression tests.
+    Pure function driven only by the two ``hook-*`` capabilities — no provider
+    names, no I/O. Three variants (SPEC-1335 IC-5): A (neither capability)
+    keeps today's text verbatim, B (``hook-agent-id`` only) keeps the #1307
+    gh-exception verbatim, C (both capabilities) uses the exact C literals.
+    Consumed by :func:`_build_provider_vars`; asserted verbatim by the
+    A/B/C regression tests.
     """
+    if (provider_has_capability(pc, "hook-agent-id")
+            and provider_has_capability(pc, "hook-role-field")):
+        return {
+            "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITH_BOTH_CAPS,
+            "GIT_SENTINEL_BASH_RULE": _GIT_SENTINEL_BASH_RULE_WITH_BOTH_CAPS,
+        }
     if provider_has_capability(pc, "hook-agent-id"):
         return {
             "GIT_SENTINEL_SCOPE_BLOCK": _GIT_SENTINEL_SCOPE_WITH_HOOK_AGENT_ID,
@@ -684,10 +708,18 @@ def _build_provider_vars(
         'ROUTING_DETAILS_PATH': resolve_routing_detail_path(pc, provider)
         if str(variables.get('ROUTING_DETAILS_ENABLED', 'true')).lower() == 'true' else '',
     }
-    # issue #1307 (Task 1): inline git-sentinel scope texts, capability-driven
-    # so gh-only calls may omit the sentinel on hook-agent-id providers while
-    # every other provider keeps the byte-identical legacy text.
+    # issue #1307 / #1335: inline git-sentinel scope texts, capability-driven
+    # so gh-only calls may omit the sentinel on hook-agent-id providers, both
+    # capabilities drop it entirely (variant C), and every other provider keeps
+    # the byte-identical legacy text.
     provider_vars.update(_git_sentinel_scope_vars(pc))
+    # #1335 IC-6: pure render derivation from the SAME capabilities — "true"
+    # only when the harness payload carries both a reliable agent_id and role
+    # field. Not an attribution source, not a new grant, no provider-name check.
+    provider_vars['GIT_PAYLOAD_ATTRIBUTION'] = 'true' if (
+        provider_has_capability(pc, "hook-agent-id")
+        and provider_has_capability(pc, "hook-role-field")
+    ) else 'false'
     # IC-02/IC-03 (AC-30): per-provider context-profile values resolved in
     # build_variables; the core CONTEXT_PROFILE/CONTEXT_PROFILE_COMPACT values
     # are only the full/false fallback.
@@ -1342,6 +1374,9 @@ def _finalize_agent_content(
     # frontmatter BEFORE the provider transform so provider tool-name maps
     # (e.g. Gemini Bash->run_command) and permission maps see it. Injecting at
     # the MCP site below would be too late -- that runs AFTER the transform.
+    # Issue #1329: the opencode-native permission mappers gate that `Bash` on
+    # the declared `subagent-shell` capability (plus verified state); there is
+    # deliberately no separate subagent render path here.
     if extra_tools:
         content = append_frontmatter_tools(content, extra_tools)
 

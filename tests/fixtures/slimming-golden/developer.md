@@ -1,7 +1,7 @@
 ---
 name: developer
-version: 2.0.4
-based-on: 1-generic/developer.md@4.9.0
+version: 2.0.5
+based-on: 1-generic/developer.md@4.9.1
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 2-platform/agent-meta-developer.md@2.0.4
+generated-from: 2-platform/agent-meta-developer.md@2.0.5
 model: claude-sonnet-5
 ---
 

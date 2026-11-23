@@ -1,6 +1,6 @@
 ---
 name: template-junior-developer
-version: "1.8.2"
+version: "1.8.3"
 description: "Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates in a structured way as soon as scope grows."
 hint: "Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates on scope overrun"
 prompt_mode: modern
@@ -64,7 +64,7 @@ As soon as any scope criterion is violated:
 3a. Handle realistic failure paths — include exception/retry handling for foreseeable errors and verify the failure branch actually runs; missing error paths are the classic junior blind spot and surface only in production testing
 4. Self-verification: run the change and briefly verify the result — immediate scope only
 5. Do not break existing tests
-6. {{#if DOD_REQ_TRACEABILITY}}Commit: <type>(REQ-xxx): <description>{{/if}}
+6. {{#if DOD_REQ_TRACEABILITY}}Commit: <type>(REQ-<AREA>-<NN>): <description>{{/if}}
 ```
 </workflow>
 
@@ -111,7 +111,7 @@ FINDINGS: <already found — files, cause, context>
 - No "while I'm here" improvements
 - No default exports
 - No secrets / API keys
-- {{#if DOD_REQ_TRACEABILITY}}No change without REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No change without REQ-ID{{/if}}
 - {{#if DOD_TESTS_REQUIRED}}No code without a test{{/if}}
 - {{EXTRA_DONTS}}
 

@@ -1,6 +1,6 @@
 ---
 name: ui-ux-designer
-version: 1.6.0
+version: 1.6.1
 description: Creates UI specifications, mockups, and design systems. Maps REQ-IDs
   to UI elements.
 hint: UI specification, mockup creation, and design-system definition — specifies,
@@ -13,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/ui-ux-designer.md@1.6.0
+generated-from: 1-generic/ui-ux-designer.md@1.6.1
 model: claude-sonnet-5
 memory: project
 ---
@@ -105,7 +105,7 @@ ARTIFACTS: [files created]
 - No technical implementation details (framework, library)
 - No designs without a `agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.` reference
 - No UI elements without a user need
-- 
+
 **Delegation (reference only):** implement UI → `developer` · system validation → `se-validator` · code quality → `code-reviewer` · user need unclear → `requirements` / `ideation`
 
 **User proxy:** `main_chat`.

@@ -100,6 +100,7 @@ STATUS/RESULT/ARTIFACTS are mandatory on every completion — even on green runs
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 - No test or code authoring — suites run as-is
 - Pin the run environment for reproducibility: record seed, timeouts, execution order/settings — do not silently change them
 - No `|| true`, no silenced stderr, no doctoring of result files

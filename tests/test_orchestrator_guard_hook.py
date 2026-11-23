@@ -162,10 +162,11 @@ STRICT_CASES = [
 ]
 
 
-def _rendered_guard(tmp_path, agent_id_capability: str) -> Path:
-    """Copy the guard + lib into tmp_path/hooks with the sync-time
-    `{{AGENT_META_HOOK_AGENT_ID}}` placeholder baked like
-    scripts/lib/hooks.py does for a provider (issue #1151 F6-05)."""
+def _rendered_guard(tmp_path, agent_id_capability: str, role_field_capability: str = "false") -> Path:
+    """Copy the guard + lib into tmp_path/hooks with the sync-time placeholders
+    baked like scripts/lib/hooks.py does for a provider (issues #1151/#1210/#1335).
+    ``role_field_capability`` defaults to ``"false"`` so every existing
+    sentinel-path test keeps exercising the unchanged capability-false route."""
     hooks_dir = tmp_path / "rendered-hooks"
     (hooks_dir / "lib").mkdir(parents=True)
     shutil.copy(_HOOK_PATH, hooks_dir / _HOOK_PATH.name)
@@ -178,7 +179,7 @@ def _rendered_guard(tmp_path, agent_id_capability: str) -> Path:
     )
     impl = (_IMPL_PATH.read_text(encoding="utf-8")
             .replace("{{AGENT_META_HOOK_AGENT_ID}}", agent_id_capability)
-            .replace("{{AGENT_META_HOOK_ROLE_FIELD}}", "false"))
+            .replace("{{AGENT_META_HOOK_ROLE_FIELD}}", role_field_capability))
     (hooks_dir / _IMPL_PATH.name).write_text(impl, encoding="utf-8")
     return hooks_dir / _HOOK_PATH.name
 
@@ -473,6 +474,20 @@ def test_orchestrator_sentinel_no_longer_bypasses_git_block(tmp_path):
 def test_destructive_ops_blocked_even_with_git_sentinel(command, tmp_path):
     """#516: destructive ops require user approval even with valid sentinel."""
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "git reset --hard HEAD~1",
+    "git push --force origin main",
+])
+def test_destructive_ops_blocked_with_payload_git_role(command, tmp_path):
+    """AC-07: payload role `git` never bypasses the destructive gate."""
+    hook = _rendered_guard(tmp_path, "true", "true")
+    payload = {**_bash_payload(command), "cwd": tmp_path.as_posix(),
+               "agent_id": "subagent-1", "agent_type": "git"}
+    result = _run_rendered(hook, payload)
     assert result.returncode == 2, f"stderr={result.stderr}"
     assert "user approval" in result.stderr
 

@@ -23,16 +23,81 @@ if str(_SCRIPTS) not in sys.path:
 
 from lib.consistency.report import Severity  # noqa: E402
 from lib.consistency.req_format import REQ_ID_PATTERN, check_req_ids  # noqa: E402
+from lib.variables import strip_inactive_conditional_blocks  # noqa: E402
 
-#: Task 21 — agent templates whose REQ wording is gated on DOD_REQ_TRACEABILITY.
-GATED_AGENTS = (
+#: Authoritative D-set from the 194/44 measurement (spec SPEC-T21-SCOPE-GAP-1167
+#: IC-1). 24 agent templates carry DoD REQ mandates and are the render-scan scope.
+D_AGENTS = (
+    "sharkord-developer",
+    "sharkord-release",
+    "homeassistant-documenter",
     "validator",
-    "bug-feature-analyzer",
     "requirements",
-    "se-requirements",
-    "se-developer",
+    "bug-feature-analyzer",
+    "junior-developer",
+    "senior-developer",
+    "principal-developer",
+    "tester",
+    "e2e-tester",
     "api-specialist",
+    "git",
+    "orchestrator",
+    "ui-ux-designer",
+    "database-engineer",
+    "devops-engineer",
+    "refactoring-specialist",
+    "data-engineer",
+    "documenter",
+    "_reference-agent",
+    "se-developer",
+    "se-junior-developer",
+    "se-senior-developer",
 )
+
+#: Gating scope = measured D-set (Task 2); SE-domain/neutral roles stay outside.
+GATED_AGENTS = D_AGENTS
+
+#: Independent spec IC-1 pin of the measured 24 D roles. Kept as a separate
+#: literal (not derived from D_AGENTS) so dropping a genuine D role from
+#: D_AGENTS is caught by the scope-guard test below.
+EXPECTED_D_AGENTS = (
+    "sharkord-developer",
+    "sharkord-release",
+    "homeassistant-documenter",
+    "validator",
+    "requirements",
+    "bug-feature-analyzer",
+    "junior-developer",
+    "senior-developer",
+    "principal-developer",
+    "tester",
+    "e2e-tester",
+    "api-specialist",
+    "git",
+    "orchestrator",
+    "ui-ux-designer",
+    "database-engineer",
+    "devops-engineer",
+    "refactoring-specialist",
+    "data-engineer",
+    "documenter",
+    "_reference-agent",
+    "se-developer",
+    "se-junior-developer",
+    "se-senior-developer",
+)
+
+#: SE-Kaskade domain content (S-class) and neutral role prose (N-class) are NOT
+#: DoD mandates — they stay outside gating and validation (spec F1 / ADR-2).
+S_DOMAIN_AND_NEUTRAL_ROLES = frozenset({
+    "se-requirements", "se-component-requirements", "se-architect", "se-critic",
+    "se-verifier", "se-validator", "se-test-engineer", "se-testreviewer",
+    "se-termination", "se-interface-mgr", "se-integration-and-test-manager",
+    "ideation", "developer", "planner", "ux-researcher",
+    "risk-based-audit-planner", "product-manager", "concept-specifier",
+    "concept-reviewer", "concept-architect",
+})
+
 #: Canonical format token (spec IC-4 / O-H2 decision \d{2,3}).
 CANONICAL_FORMAT = "REQ-<AREA>-<NN>"
 
@@ -64,10 +129,30 @@ def _render_project(root: Path, *, traceability: bool) -> Path:
     return project
 
 
-def _rendered_agent(project: Path, role: str) -> str:
+def _template_source(role: str) -> Path:
+    """Return the template source for a D role (1-generic or 2-platform)."""
+    for layer in ("1-generic", "2-platform"):
+        path = _REPO_ROOT / "agents" / layer / f"{role}.md"
+        if path.is_file():
+            return path
+    raise AssertionError(f"no template source for D role: {role}")
+
+
+def _rendered_agent(project: Path, role: str, *, traceability: bool) -> str:
+    """Return the rendered agent for a D role in the requested DoD state.
+
+    sync.py renders platform overrides under their base role and never emits
+    ``_reference-agent`` (underscore template). For those roles the source
+    template is resolved through the same conditional engine the renderer uses.
+    """
     path = project / ".claude" / "agents" / f"{role}.md"
-    assert path.is_file(), f"rendered agent missing: {path}"
-    return path.read_text(encoding="utf-8")
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    source = _template_source(role).read_text(encoding="utf-8")
+    return strip_inactive_conditional_blocks(
+        source,
+        {"DOD_REQ_TRACEABILITY": "true" if traceability else "false"},
+    )
 
 
 def _run(tmp_path: Path, body: str, *, traceability: bool):
@@ -128,9 +213,9 @@ def test_four_digit_rejected(tmp_path):
 def test_render_rapid_prototyping_has_no_req_mandate(tmp_path):
     """rapid-prototyping must render no ungated REQ mandate / old format."""
     project = _render_project(tmp_path, traceability=False)
-    validator = _rendered_agent(project, "validator")
-    triage = _rendered_agent(project, "bug-feature-analyzer")
-    requirements = _rendered_agent(project, "requirements")
+    validator = _rendered_agent(project, "validator", traceability=False)
+    triage = _rendered_agent(project, "bug-feature-analyzer", traceability=False)
+    requirements = _rendered_agent(project, "requirements", traceability=False)
 
     # The commit-format mandate and the old placeholder must be gone.
     assert "(REQ-xxx): <description>" not in validator
@@ -148,5 +233,42 @@ def test_render_traceability_on_shows_canonical_format(tmp_path):
     """With traceability on, every touched agent shows the canonical format."""
     project = _render_project(tmp_path, traceability=True)
     for role in GATED_AGENTS:
-        text = _rendered_agent(project, role)
+        text = _rendered_agent(project, role, traceability=True)
         assert CANONICAL_FORMAT in text, f"{role}: canonical REQ format missing"
+
+
+# --- T21 scope gap (#1167): complete D-set render scan -----------------------
+
+
+def test_gated_agents_matches_measured_d_set():
+    """AC1: the gating scope is exactly the measured 24 D agents."""
+    assert len(D_AGENTS) == 24
+    assert len(set(D_AGENTS)) == 24
+    # Pin against the independent spec IC-1 literal: GATED_AGENTS aliases
+    # D_AGENTS, so comparing those two would be tautological and would not
+    # detect a genuine D role being dropped from D_AGENTS.
+    assert set(D_AGENTS) == set(EXPECTED_D_AGENTS)
+    assert set(GATED_AGENTS) == set(EXPECTED_D_AGENTS)
+
+
+def test_se_domain_and_neutral_roles_excluded_from_gating():
+    """AC3: no SE-domain (S) or neutral (N) role enters the D-set."""
+    assert not set(D_AGENTS) & S_DOMAIN_AND_NEUTRAL_ROLES
+
+
+def test_render_all_gated_agents_no_ungated_req_mandate(tmp_path):
+    """AC2: all 24 D agents gate their mandate in both DoD states."""
+    project_off = _render_project(tmp_path, traceability=False)
+    project_on = _render_project(tmp_path, traceability=True)
+    forbidden = (
+        CANONICAL_FORMAT,
+        "(REQ-xxx): <description>",
+        "(REQ-ID needed)",
+        "for a REQ-ID, then",
+    )
+    for role in D_AGENTS:
+        off = _rendered_agent(project_off, role, traceability=False)
+        on = _rendered_agent(project_on, role, traceability=True)
+        for token in forbidden:
+            assert token not in off, f"{role}: ungated '{token}' with traceability off"
+        assert CANONICAL_FORMAT in on, f"{role}: canonical REQ format missing with traceability on"

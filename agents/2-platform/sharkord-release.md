@@ -1,6 +1,6 @@
 ---
 name: sharkord-release
-version: "1.3.3"
+version: "1.3.4"
 based-on: "1-generic/release.md@1.13.0"
 description: "Sharkord-Plattform Release-Agent. Baut auf template-release auf. Konsolidiert alle Erfahrungen aus sharkord-vid-with-friends und sharkord-hero-introducer: Versionierung, Bun-Build, Artifact-Packaging, GitHub Release via gh CLI, Required Binaries, Windows PATH-Fix."
 hint: "Sharkord Plugin Release: Bun-Build, ZIP/TAR, GitHub Release via gh CLI"
@@ -241,6 +241,7 @@ Step 0: if a `pre-release-check.sh` gate hook exists, run it first; exit code !=
 - [ ] git-Agent: Commit + Tag + Push (main + vX.Y.Z)
 - [ ] `gh release create` ausgeführt
 - [ ] Release-URL im Browser geprüft
+{{#if DOD_REQ_TRACEABILITY}}- [ ] REQ-Referenz (`REQ-<AREA>-<NN>`) im Release-Commit gesetzt{{/if}}
 
 ---
 

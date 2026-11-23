@@ -143,6 +143,36 @@ token, `{{PYTEST_BASETEMP}}` token, `model:` pin and normalization region left u
 The other 54 goldens, `_GOLDEN_ROLE_COUNT` (58), the normalization table and the
 `model:` pins are unchanged. No assertion or whitelist was weakened.
 
+## Diff manifest — #1335 rebaseline (2026-11-23)
+
+**Reason:** #1335: default provider now renders variant C; equivalence test for the frozen
+variant-B golden now renders with B capabilities; corpus pins updated for git 2.2.2 +
+tester 2.10.2 + #1329 evidence line. Claude now declares both `hook-agent-id` and
+`hook-role-field`, so the real default render of `git` has zero sentinels (variant C,
+the intended #1335 behavior). The equivalence gate's `render_env` therefore renders
+only the `git` role with the established variant-B capability set
+(`hook-agent-id` without `hook-role-field`, the `_render_git(_pc("hook-agent-id"))`
+setup from `tests/test_git_sentinel_gh_scope.py`); all other roles keep the real
+provider config, and no assertion or threshold was changed.
+
+Seven corpus files were re-pinned for the legitimate #1329/#1335 data drift only —
+the `Measured evidence only` constraint line and the frontmatter version pins:
+
+- `code-reviewer.md`: `version`/`generated-from` 1.9.3 -> 1.9.4 + evidence line.
+- `developer.md`: `version`/`generated-from` 2.0.4 -> 2.0.5,
+  `based-on` 4.9.0 -> 4.9.1 (no body hunk; the platform override carries no evidence line).
+- `devops-engineer.md`: 1.8.0 -> 1.8.1 + evidence line.
+- `e2e-tester.md`: 1.7.0 -> 1.7.1 + evidence line.
+- `git.md`: 2.2.0 -> 2.2.2 + evidence line. The five `#agent-meta:agent=git`
+  sentinel lines (AC-06, `test_golden_b_still_hunts_sentinel_and_is_untouched`)
+  remain byte-identical; no sentinel, gh-exception or `<tools>` line was touched.
+- `test-executor.md`: 1.3.0 -> 1.3.1 + evidence line.
+- `tester.md`: 2.10.1 -> 2.10.2 + evidence line.
+
+Frozen meta tokens, `{{PYTEST_BASETEMP}}` token, `model:` pins, normalization table
+and `_GOLDEN_ROLE_COUNT` (58) are unchanged; the other 51 goldens and
+`compact-golden` were not touched.
+
 ## Diff manifest — Issue #1307 rebaseline (2026-11-19)
 
 **Reason:** provider variables `GIT_SENTINEL_SCOPE_BLOCK` / `GIT_SENTINEL_BASH_RULE` let the
@@ -153,3 +183,18 @@ prefixed … `gh`-only calls without it". No version/generated-from pin, no proj
 no normalization-table entry changed; the other 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and
 `compact-golden` are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
 `tests/test_template_slimming_equivalence.py`.
+
+## Diff manifest — #1167/T21 central golden rebaseline (2026-11-23)
+
+**Reason:** #1167/T21: D-mandate gating extended to 24 roles; re-pin records intended rendered
+output. The branch additionally fixed the `- {{#if …}}` bullet form to `{{#if …}}- ` in nine
+templates, so the gated REQ-mandate bullet no longer leaves a stray `- ` in the rendered
+`<constraints>` DON'Ts list. Seven active goldens were re-pinned from the real per-role sync
+render (the same pipeline the `render_env` fixture mirrors), exactly one line each:
+`data-engineer.md`, `devops-engineer.md`, `junior-developer.md`, `principal-developer.md`,
+`refactoring-specialist.md`, `senior-developer.md` and `ui-ux-designer.md` (drop one `- `
+prefix; `ui-ux-designer` drops the trailing `- ` blank bullet). Every frozen meta token,
+`{{PYTEST_BASETEMP}}` token, `model:` pin, frontmatter version pin and declared normalization
+region is left untouched; the other 51 goldens, `_GOLDEN_ROLE_COUNT` (58), the normalization
+table and `compact-golden` are unchanged. No assertion or whitelist was weakened. The AC-T4
+digest was re-pinned accordingly; see the log in `tests/test_template_slimming_equivalence.py`.

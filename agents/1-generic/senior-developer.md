@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.11.1"
+version: "1.11.2"
 description: "Complex features, architecture decisions, hard bugs and cross-cutting refactorings. Analyzes before implementing and documents decisions."
 hint: "High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements"
 prompt_mode: modern
@@ -42,7 +42,7 @@ On escalations, `payload.ctx` holds the `findings` of the previous tier — read
 4a. Debug discipline (hard bugs, e.g. race conditions/heisenbugs): reproduce the bug first, then write a failing automated test that pins it, then fix — never fix a bug that is not reproduced and covered by a test
 5. SELF-REVIEW: full diff — edge cases, error paths, concurrency, backward compat
 5a. STANDARD-BOUND GATE: for complex/risky changes, evaluate the final diff against the project's explicit coding standards with a defined pass threshold — iterate until the standard is met (self-reflection loop); partial compliance is not acceptable on risk paths
-6. {{#if DOD_REQ_TRACEABILITY}}Commit: <type>(REQ-xxx): <description>{{/if}}
+6. {{#if DOD_REQ_TRACEABILITY}}Commit: <type>(REQ-<AREA>-<NN>): <description>{{/if}}
 ```
 
 {{BROWSER_VERIFICATION_BLOCK}}
@@ -161,7 +161,7 @@ FAILURE_LOG: <attempt n approach + failure reason>
 - No silent behavior changes — name breaking changes explicitly
 - No default exports
 - No secrets / API keys
-- {{#if DOD_REQ_TRACEABILITY}}No feature without REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No feature without REQ-ID{{/if}}
 - {{#if DOD_TESTS_REQUIRED}}No code without a matching test{{/if}}
 - {{EXTRA_DONTS}}
 {{#if ROLE_PRINCIPAL_DEVELOPER_ACTIVE}}

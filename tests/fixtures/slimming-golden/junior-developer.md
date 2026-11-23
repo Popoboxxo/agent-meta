@@ -1,6 +1,6 @@
 ---
 name: junior-developer
-version: 1.8.2
+version: 1.8.3
 description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates
   in a structured way as soon as scope grows.'
 hint: 'Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/junior-developer.md@1.8.2
+generated-from: 1-generic/junior-developer.md@1.8.3
 model: claude-haiku-5-5
 ---
 
@@ -130,7 +130,7 @@ FINDINGS: <already found — files, cause, context>
 - No "while I'm here" improvements
 - No default exports
 - No secrets / API keys
-- - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+- - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 

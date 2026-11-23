@@ -193,4 +193,4 @@ def test_template_versions():
         ver("agents/1-generic/release.md"),
         ver("agents/2-platform/hacs-release.md"),
         ver("agents/2-platform/sharkord-release.md"),
-    ) == ("1.13.0", "1.1.1", "1.3.3")
+    ) == ("1.13.0", "1.1.1", "1.3.4")

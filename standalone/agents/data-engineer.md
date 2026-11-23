@@ -127,7 +127,6 @@ NEXT: [Review | Developer implementation | Tests]
 - No load without a data-quality gate on critical fields
 - No destructive backfill without a rollback/recovery path
 - No structural DB schema change — that is `database-engineer`
-- - 
 
 **Delegation (reference only):** implementation against the pipeline spec → `developer` (with `data-pipeline-v1`) · relational schema/index/query optimization → `database-engineer` · external pipeline docs → `technical-writer` · new requirement → `requirements` · tests → `tester`.
 

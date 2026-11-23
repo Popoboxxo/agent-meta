@@ -1,6 +1,6 @@
 ---
 name: principal-developer
-version: 1.6.0
+version: 1.6.1
 description: Last-resort escalation tier after repeated senior-developer failures.
   Root-cause diagnosis before code changes. Maximum thoroughness, maximum cost.
 hint: 'Last-resort developer: only after senior-developer failed multiple times —
@@ -17,7 +17,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/principal-developer.md@1.6.0
+generated-from: 1-generic/principal-developer.md@1.6.1
 model: claude-opus-4-8
 memory: project
 ---
@@ -195,7 +195,7 @@ NEXT: [Review | Tests | Commit]
 - No default exports
 - No secrets / API keys
 - No "done" report without reproducing the original failure scenario
-- - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+- - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 

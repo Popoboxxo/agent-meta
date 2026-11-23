@@ -224,6 +224,11 @@ def _role_payload(command: str, project: Path, role_field: str | None) -> dict:
     return payload
 
 
+def _audit_text(project: Path) -> str:
+    audit = project / ".claude" / "hooks" / ".guard-audit.log"
+    return audit.read_text(encoding="utf-8") if audit.exists() else ""
+
+
 def test_role_mismatch_is_rejected(tmp_path, project):
     hook = _rendered_guard(tmp_path, "true", "true")
     r = _run_guard(
@@ -233,6 +238,8 @@ def test_role_mismatch_is_rejected(tmp_path, project):
     )
     assert r.returncode == 2, r.stderr
     assert "role mismatch" in r.stderr
+    assert "class=role-mismatch" in _audit_text(project)
+    assert "decision=rejected" in _audit_text(project)
 
 
 def test_role_match_keeps_git_path(tmp_path, project):
@@ -245,14 +252,52 @@ def test_role_match_keeps_git_path(tmp_path, project):
     assert r.returncode == 0, r.stderr
 
 
-def test_role_field_empty_falls_back_to_sentinel(tmp_path, project):
+# --- #1335: payload attribution is the authoritative role source -----------
+
+
+def test_payload_grants_without_sentinel(tmp_path, project):
+    """AC-01: harness role `git` grants the git path with NO sentinel comment."""
+    hook = _rendered_guard(tmp_path, "true", "true")
+    r = _run_guard(hook, _role_payload("git add -- f", project, "git"), project)
+    assert r.returncode == 0, r.stderr
+    assert "role=git" in _audit_text(project)
+    assert "attribution=payload-field" in _audit_text(project)
+
+
+def test_unknown_payload_role_fails_closed(tmp_path, project):
+    """AC-03/04: a non-git harness role gets no grant and hits the mutation gate."""
+    hook = _rendered_guard(tmp_path, "true", "true")
+    r = _run_guard(hook, _role_payload("git add -- f", project, "unknown-agent"), project)
+    assert r.returncode == 2, r.stderr
+    assert "role=git" not in _audit_text(project)
+
+
+def test_payload_role_audit_attribution(tmp_path, project):
+    """IC-3: the elevation audit records which source decided the role."""
+    hook = _rendered_guard(tmp_path, "true", "true")
+    r = _run_guard(hook, _role_payload("git add -- f", project, "git"), project)
+    assert r.returncode == 0, r.stderr
+    assert "attribution=payload-field" in _audit_text(project)
+    assert "decision=rejected" not in _audit_text(project)
+
+
+def test_fail_closed_empty_role_field_no_sentinel_grant(tmp_path, project):
+    """AC-04 / IC-1: capability true, agent_id set, role field empty → exit 2.
+
+    Replaces the old ``test_role_field_empty_falls_back_to_sentinel``: an empty
+    harness role must NEVER fall back to the model-writable sentinel, never
+    emit a grant, and be audited as a rejected attribution failure.
+    """
     hook = _rendered_guard(tmp_path, "true", "true")
     r = _run_guard(
         hook,
         _role_payload("#agent-meta:agent=git\ngit add -- f", project, None),
         project,
     )
-    assert r.returncode == 0, r.stderr
+    assert r.returncode == 2, r.stderr
+    assert "failing closed" in r.stderr
+    assert "decision=rejected" in _audit_text(project)
+    assert "attribution=payload-field" in _audit_text(project)
 
 
 def test_role_field_ignored_when_capability_off(tmp_path, project):

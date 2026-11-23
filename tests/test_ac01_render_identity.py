@@ -1113,6 +1113,55 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` unchanged. Same event is recorded in the AC-T4
   comment of ``tests/test_opencode_v2_surface.py``.
 
+- #1329 (central golden rebaseline): #1329 added one provider-neutral "Measured evidence only"
+  line inside ``<constraints>`` in seven execution roles (``code-reviewer``, ``developer``,
+  ``devops-engineer``, ``e2e-tester``, ``git``, ``test-executor``, ``tester``). The line is rendered
+  body content, so it legitimately changed the rendered output: **105 of 1195 hashes moved;
+  0 added/removed** -- 63 role artifacts (7 roles x 9 providers) plus 42 Mammouth artifacts that
+  this branch's provider-capability change also moved (pre-existing in the bundle, absorbed by
+  the same re-render). The manifest was regenerated with this harness's own ``--write`` helper;
+  ``AC01_EXCEPTIONS`` is NOT extended. Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes with ``_fixture_tree_sha256``:
+  ``1dc46604…`` -> ``b98ae9c0…``); ``slimming-golden`` and ``compact-golden`` are unchanged.
+  The re-pin records the intended output, not a test fix.
+
+- #1335 (central golden rebaseline): #1335 changed rendered output — git.md 2.2.1 ->
+  2.2.2 with three `GIT_PAYLOAD_ATTRIBUTION` conditional blocks (variant C drops the
+  sentinel; Claude renders variant C), and orchestrator-guard v1.14.1 -> 1.15.0
+  (`EFFECTIVE_ROLE`, audit `attribution=`). **11 of 1195 hashes moved; 0 added/removed**
+  — 9 git agent renders (one per provider) plus 2 `orchestrator-guard-impl.sh` renders
+  (Claude + Gemini). The manifest was regenerated with this harness's own `--write`
+  helper; `AC01_EXCEPTIONS` is NOT extended. Because `hashes.json` is the only
+  `ac01-baseline` file, its AC-T4 digest in `tests/test_opencode_v2_surface.py`
+  follows the rebaselined tree (recomputed from the fixture bytes with
+  `_fixture_tree_sha256`: `b98ae9c0..` -> `f319c05f..`); `slimming-golden`,
+  `compact-golden` and `topology-golden` are unchanged. The re-pin records the
+  intended output, not a test fix.
+
+- #1167/T21 (central golden rebaseline, 2026-11-23, ``fix/decision-points-bundle-20261123``):
+  D-mandate gating extended to 24 roles; re-pin records intended rendered output. The branch
+  also fixed the ``- {{#if …}}`` bullet form to ``{{#if …}}- `` in nine templates, so in the
+  ``rapid-prototyping`` (off) matrix render the stray ``- `` prefix disappears. Exactly
+  **45 of 1195 hashes moved; 0 added/removed** — five matrix-active roles (``data-engineer``,
+  ``database-engineer``, ``devops-engineer``, ``refactoring-specialist``, ``ui-ux-designer``)
+  x nine providers. No rule, ``AGENTS.md``, ``context-hashes.json`` or golden content drifted;
+  the manifest was regenerated with this harness's own ``--write`` helper and the diff verified
+  per key. ``AC01_EXCEPTIONS`` is NOT extended. Because ``hashes.json`` is the only
+  ``ac01-baseline`` file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the
+  rebaselined tree (recomputed from the fixture bytes with ``_fixture_tree_sha256``:
+  ``f319c05f..`` -> ``3e80abe6..``). ``slimming-golden`` was re-pinned separately for the seven
+  bullet-form goldens (its digest ``5db70169..`` -> ``1c26fbc9..``); ``compact-golden`` stayed
+  unchanged. The re-pin records intended output, not a test fix.
+
+- #T21: version bump after REQ-gating content change (2026-11-23, the 18 template PATCH
+  bumps / based-on re-pins). Manifest regenerated with this harness's own ``--write`` helper:
+  **90 of 1195 hashes moved; 0 added/removed** — ten matrix-active roles x nine providers.
+  ``AC01_EXCEPTIONS`` is NOT extended. ``generated-file-hashes.json``/``context-hashes.json``
+  are re-derived by the syncer from the render and not part of this manifest. AC-T4 digest
+  followed via ``_fixture_tree_sha256`` (``3e80abe6..`` -> ``bdf5afa5..``). Re-pin records
+  intended output, not a test fix.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

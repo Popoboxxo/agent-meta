@@ -5541,10 +5541,39 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # hook/rule bytes; the AC-01 manifest was re-pinned with its --write helper.
 # ac01-baseline digest recomputed from the rebaselined fixture bytes with
 # `_fixture_tree_sha256` (95a315d6.. -> 1dc46604..); slimming/compact unchanged.
+# #1329 (central golden rebaseline): #1329 added one provider-neutral "Measured
+# evidence only" line inside `<constraints>` in seven execution roles; rendered
+# output legitimately changed and the AC-01 manifest was re-pinned with its own
+# --write helper (105 hashes: 63 role artifacts + 42 pre-existing Mammouth
+# provider-capability artifacts on this branch). The ac01-baseline digest was
+# recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`
+# (1dc46604.. -> b98ae9c0..); slimming/compact/topology-golden unchanged.
+# #1335 payload attribution: git.md 2.2.1 -> 2.2.2 (3 GIT_PAYLOAD_ATTRIBUTION
+# conditional blocks) and orchestrator-guard v1.14.1 -> 1.15.0 (EFFECTIVE_ROLE,
+# audit `attribution=`) changed rendered output. The AC-01 manifest was re-pinned
+# with its own --write helper (11 hashes: 9 git agent renders + 2 guard renders;
+# 0 added/removed). The ac01-baseline digest was recomputed from the rebaselined
+# fixture bytes with `_fixture_tree_sha256` (b98ae9c0.. -> f319c05f..);
+# slimming/compact/topology-golden unchanged. Re-pin records intended output.
+# #1335 slimming-golden corpus re-pin (git 2.2.2 / tester 2.10.2 + #1329 line); digest recomputed via _fixture_tree_sha256
+# #1167/T21 central golden rebaseline (2026-11-23): #1167/T21: D-mandate gating extended to
+# 24 roles; re-pin records intended rendered output. ac01-baseline re-pinned via its own
+# --write helper (45 of 1195 hashes: five matrix-active roles x nine providers, bullet-form
+# fix in the off render); slimming-golden re-pinned for the seven bullet-form goldens via the
+# equivalence harness's own render pipeline (one line each, plus the README diff manifest);
+# test-env-baseline re-captured via --capture-baseline (5 devops-engineer hashes). All three
+# digests recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`:
+# ac01 f319c05f.. -> 3e80abe6.., slimming 5db70169.. -> 1c26fbc9.., compact-golden unchanged
+# (e2c63534..). No assertion or whitelist weakened; re-pin records intended output.
+# T21 version-bump re-pin (#1329/#1335 procedure): after the 18 REQ-gating template
+# version bumps, ac01-baseline (via --write, 90 per-file hashes), slimming-golden and
+# compact-golden (version / generated-from pins) were re-frozen. Digests recomputed with
+# `_fixture_tree_sha256` from the rebaselined trees. Reason: #T21: version bump after
+# REQ-gating content change. No assertion or whitelist weakened.
 _FIXTURE_TREES = {
-    "ac01-baseline": "1dc4660497dda05022c03801606f266d2b3591a1a7633c1e3a9a25d4638a6034",
-    "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
-    "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
+    "ac01-baseline": "bdf5afa54b0c4285252de51dad2daa14e70d8d50bf46e46695a2347e1423bfd5",
+    "slimming-golden": "932036d57b48d267bc83a764dce5629bd979d3df81b15336d87a487d5c143177",
+    "compact-golden": "7160f5c5d38b7cc9e1298963a85c4845cbcf7d3ca927954f8fab39ad6405267d",
 }
 
 

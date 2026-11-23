@@ -1,6 +1,6 @@
 ---
 name: template-ui-ux-designer
-version: "1.6.0"
+version: "1.6.1"
 description: "Creates UI specifications, mockups, and design systems. Maps REQ-IDs to UI elements."
 hint: "UI specification, mockup creation, and design-system definition — specifies, does not implement."
 reference_standards:
@@ -76,7 +76,7 @@ Full JSON schema: `schemas/ui-spec.schema.json`. Required fields: `ui_spec_id`, 
 
 {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}} provides the design vision and context for all UI decisions.
 
-{{#if DOD_REQ_TRACEABILITY}}**REQ traceability active** — every UI element/mockup area maps to a REQ-ID.{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}**REQ traceability active** — every UI element/mockup area maps to a REQ-ID (`REQ-<AREA>-<NN>`).{{/if}}
 </context>
 
 <tools>
@@ -104,7 +104,7 @@ ARTIFACTS: [files created]
 - No technical implementation details (framework, library)
 - No designs without a {{#if PROJECT_CONTEXT_INJECTED}}`{{PROJECT_CONTEXT}}`{{else}}`{{CONTEXT_FILE}}`{{/if}} reference
 - No UI elements without a user need
-- {{#if DOD_REQ_TRACEABILITY}}No screens without a REQ reference{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No screens without a REQ reference{{/if}}
 
 **Delegation (reference only):** implement UI → `developer` · system validation → `se-validator` · code quality → `code-reviewer` · user need unclear → `requirements` / `ideation`
 
