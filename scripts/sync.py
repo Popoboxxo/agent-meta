@@ -491,8 +491,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                          help="Create a timestamped backup of provider directories "
                               "and project config. Pass provider names or omit for all. "
                               "Use --label to add a description.")
-    parser.add_argument("--label", metavar="TEXT", default=None,
-                        help="Optional label/description for --backup")
+    # #1203: `--labels` is reserved for the issue-taxonomy CLI (#1188).
+    # `allow_abbrev=False` above already keeps `--labels` from silently
+    # binding to `--label`; the explicit alias gives callers a permanent,
+    # unambiguous spelling while `--label` stays backward compatible.
+    parser.add_argument("--label", "--backup-label", metavar="TEXT", default=None,
+                        help="Optional label/description for --backup. "
+                             "--backup-label is the unambiguous alias; "
+                             "--label is kept for backward compatibility.")
     parser.add_argument("--restore", metavar="ARCHIVE",
                         help="Restore provider directories from a backup archive. "
                              "Use --restore-providers to select specific providers.")
