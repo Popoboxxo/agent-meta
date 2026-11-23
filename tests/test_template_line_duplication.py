@@ -35,14 +35,19 @@ _MIN_FILES = 5
 # Ratchet ceilings (actual state after IC-31 / Tasks 1.06 + 1.07, measured by
 # ``_duplicate_lines()``). Lower them when duplicates disappear; raise only for
 # a documented, structurally unavoidable reason (see the pin note below).
-MAX_DUPLICATE_LINES = 16        # distinct lines present in >= 5 files
+MAX_DUPLICATE_LINES = 17        # distinct lines present in >= 5 files
 # IC-15 Nr. 24 (Task 1.43) bumped the `based-on: "1-generic/provider-expert.md@<v>"`
 # pin in the 2-platform provider-expert overrides, and IC-15 Nr. 6 (Task 1.27)
 # added `agent-meta-mammouth-expert` as a sixth override carrying the same pin.
 # That frontmatter pin is required per file (it cannot be snippet-ised), so an
 # already-existing duplicate line gains exactly one occurrence (164 -> 165). No
-# new duplicate LINE was introduced, so MAX_DUPLICATE_LINES stays at 16.
-MAX_DUPLICATE_OCCURRENCES = 165  # sum of files over those lines
+# new duplicate LINE was introduced, so MAX_DUPLICATE_LINES stayed at 16.
+# #1329 added the structurally-shared '**Measured evidence only:**' evidence-
+# discipline line to 7 execution-role templates: +1 distinct duplicate line
+# (16 -> 17) and +7 occurrences (165 -> 172). It is a shared constraint, not
+# boilerplate fitting an existing {{..._BLOCK}} snippet (extraction would touch
+# all 7 templates), so the ceilings are raised with reason; logic unchanged.
+MAX_DUPLICATE_OCCURRENCES = 172  # sum of files over those lines
 
 # Snippets whose body must no longer occur inline in a source template.
 # The first three are the canonical IC-31 blocks; the last three are wording

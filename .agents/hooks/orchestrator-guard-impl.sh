@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.14.1
-# changelog: 1.14.1: issue #1217 (review fix) -- ask-class requires a PURE delete: co-occurring hard flags (-f/--force/--force-with-lease/--mirror/--prune/+refspec, branch -f) make the statement hard (AC-02, strictest wins within one statement); the scan no longer breaks after the first destructive statement while ask is still eligible, so a later hard statement wins; 1.14.0: issue #1217 -- destructive gate gains a dormant, fail-closed user-approval (ask) subclass for `git branch -D` / `git push --delete` / `git push :ref` only; activation DEFAULT OFF (runtime config key + harness interactivity signal), never agent/sentinel-triggerable, never permissionDecision:allow; strict/mutation blocks still win (exit 2); 1.13.0: issue #1181 -- a granted role's sentinel is restricted to git add / non-amending git commit (all_git classifier field + IS_GRANT_SENTINEL gate); issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
+# version: 1.15.0
+# changelog: 1.15.0: issue #1335 -- the existing #1210 payload role attribution (`_ROLE_ATTRIBUTION`/`_P_AGENT_TYPE`) becomes the authoritative role source for allow matching (`EFFECTIVE_ROLE`); sentinel is only a mismatch/audit signal when the role field is reliable; empty harness role on a payload-attributed subagent call fails closed with exit 2 (no sentinel fallback/grant), while a non-empty UNKNOWN role gets no role flags — read-only ops still pass (rc 0), mutation ops exit 2 at the mutation gate (never grants); audit lines carry `attribution=`; hook-less providers keep the exact sentinel path. 1.14.1: issue #1217 (review fix) -- ask-class requires a PURE delete: co-occurring hard flags (-f/--force/--force-with-lease/--mirror/--prune/+refspec, branch -f) make the statement hard (AC-02, strictest wins within one statement); the scan no longer breaks after the first destructive statement while ask is still eligible, so a later hard statement wins; 1.14.0: issue #1217 -- destructive gate gains a dormant, fail-closed user-approval (ask) subclass for `git branch -D` / `git push --delete` / `git push :ref` only; activation DEFAULT OFF (runtime config key + harness interactivity signal), never agent/sentinel-triggerable, never permissionDecision:allow; strict/mutation blocks still win (exit 2); 1.13.0: issue #1181 -- a granted role's sentinel is restricted to git add / non-amending git commit (all_git classifier field + IS_GRANT_SENTINEL gate); issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -441,14 +441,13 @@ if [ -z "$PROJECT_ROOT" ]; then
   PROJECT_ROOT="$PAYLOAD_CWD"
 fi
 
-# --- #1210: harness role field cross-checks the sentinel ----------------
-# Provider-agnostic: the capability flag above (never a provider name) decides
-# whether the payload role is trustworthy. Only a NON-EMPTY role field can
-# contradict a self-declared sentinel; an empty field falls back to the
-# sentinel path (convention boundary, SPEC §3.3 R4). Conservative choice for
-# the open questions: the role field alone never GRANTS the git path (OQ-3) --
-# the sentinel is still required -- it only detects a forged/mislabeled one.
+# --- #1210 / #1335: harness role field attribution -----------------------
+# Provider-agnostic: the baked capability flag (never a provider name) decides
+# whether the payload role is trustworthy. The existing #1210 read/cross-check
+# stays in place; _ROLE_ATTRIBUTION is now CONSUMED (not merely set) as the
+# authoritative role source for allow matching (IC-1/IC-2).
 _ROLE_ATTRIBUTION="sentinel"
+_PAYLOAD_ROLE=""   # normalized lowercase; initialized for `set -u`
 if [ "$TOOL_NAME" = "Bash" ] && [ "$HOOK_ROLE_FIELD_RELIABLE" = "true" ] \
    && [ -n "$AGENT_ID" ]; then
   _PAYLOAD_ROLE=$(printf '%s' "$_P_AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
@@ -457,7 +456,7 @@ if [ "$TOOL_NAME" = "Bash" ] && [ "$HOOK_ROLE_FIELD_RELIABLE" = "true" ] \
     _ROLE_ATTRIBUTION="payload-field"
     if [ -n "$_DECLARED_ROLE" ] && [ "$_PAYLOAD_ROLE" != "$_DECLARED_ROLE" ]; then
       _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
-      _AUDIT_LINE=$(printf '%s decision=rejected class=role-mismatch field=%s sentinel=%s cmd=%s' \
+      _AUDIT_LINE=$(printf '%s decision=rejected class=role-mismatch attribution=payload-field field=%s sentinel=%s cmd=%s' \
         "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_PAYLOAD_ROLE" "$_DECLARED_ROLE" \
         "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
       hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
@@ -467,7 +466,42 @@ if [ "$TOOL_NAME" = "Bash" ] && [ "$HOOK_ROLE_FIELD_RELIABLE" = "true" ] \
   fi
 fi
 
-# --- Sentinel elevation: capability-scoped + audited (issue #516) ------
+# IC-1 FAIL-CLOSED GATE: on a payload-attributed provider a subagent call
+# (non-empty agent_id) MUST carry a non-empty harness role. Empty/missing role
+# means the guard cannot decide -> exit 2 for the whole call, NEVER
+# permissionDecision:allow, no sentinel fallback, no delegate/grant fallback.
+# This is independent of _ROLE_ATTRIBUTION (which stays "sentinel" when the
+# field is empty) precisely so the model-writable sentinel cannot resurrect it.
+if [ "$TOOL_NAME" = "Bash" ] && [ "$HOOK_ROLE_FIELD_RELIABLE" = "true" ] \
+   && [ -n "$AGENT_ID" ] && [ -z "$_PAYLOAD_ROLE" ]; then
+  _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
+  _AUDIT_LINE=$(printf '%s decision=rejected class=attribution-missing attribution=payload-field cmd=%s' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
+  hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
+  echo "ORCHESTRATOR_GUARD: harness role field is empty for a subagent call; failing closed (no sentinel fallback, no grant)." >&2
+  exit 2
+fi
+
+# IC-2: the authoritative effective role. Payload role wins when the harness
+# supplies it; otherwise the sentinel role (the capability-false / main-thread
+# path, byte-for-byte unchanged). Empty role on a payload-attributed subagent
+# call is rejected above with exit 2 (no sentinel fallback/grant). A NON-EMPTY
+# but unknown role receives NO role flags: read-only operations still pass
+# (rc 0), while mutation operations fail closed at the mutation gate (exit 2).
+# The guard never grants; no new grant is invented.
+if [ "$_ROLE_ATTRIBUTION" = "payload-field" ]; then
+  EFFECTIVE_ROLE="$_PAYLOAD_ROLE"
+else
+  EFFECTIVE_ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+fi
+
+# --- Role elevation: EFFECTIVE_ROLE-scoped + audited (#516/#1210/#1335) ---
+# The four flags keep their historic NAMES (all matching gates below read
+# them), but since #1335 their ROLE is EFFECTIVE_ROLE: the harness payload
+# role when reliable, otherwise the self-declared sentinel. When the role
+# field is reliable, DECLARED_AGENT is only a mismatch/audit signal -- it is
+# NOT a grant source. Capability-false/main-thread runs are unchanged.
 IS_GIT_SENTINEL=0
 IS_ORCH_SENTINEL=0
 IS_ALLOWLIST_SENTINEL=0
@@ -476,8 +510,9 @@ IS_ALLOWLIST_SENTINEL=0
 # IS_ALLOWLIST_SENTINEL -- the existing mutation gate's logic stays unchanged.
 IS_GRANT_SENTINEL=0
 
-if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
-  _ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+if [ "$TOOL_NAME" = "Bash" ] \
+   && { [ -n "$DECLARED_AGENT" ] || [ "$_ROLE_ATTRIBUTION" = "payload-field" ]; }; then
+  _ROLE="$EFFECTIVE_ROLE"
   _AUDIT_ROLE=""
   case "$_ROLE" in
     git) IS_GIT_SENTINEL=1; _AUDIT_ROLE="$_ROLE" ;;
@@ -501,9 +536,12 @@ if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
       # is Edit/Write-capable AND that this project's auto_commit
       # config has enabled. The hook never re-derives role capability
       # itself -- it only trusts the pre-computed allowlist.
-      _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
-      if [ -f "$_ALLOWLIST" ]; then
-        _AC_MODE=$("$_PY" -c "
+      # #1335: this config-driven elevation stays bound to the SELF-DECLARED
+      # sentinel. A payload-only role never gains a new grant (AC-03/IC-2).
+      if [ -n "$DECLARED_AGENT" ]; then
+        _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
+        if [ -f "$_ALLOWLIST" ]; then
+          _AC_MODE=$("$_PY" -c "
 import json, sys
 try:
     with open(sys.argv[1]) as f:
@@ -512,13 +550,13 @@ try:
 except Exception:
     print('off')
 " "$_ALLOWLIST" 2>/dev/null)
-        # Only 'auto'/'custom' grant hook-level commit authority; 'suggest'
-        # roles merely propose a commit message and must never gain the
-        # sentinel even though they may now appear in eligible_roles (that
-        # list reflects capability, not per-mode authority -- see
-        # scripts/lib/auto_commit.py resolve_auto_commit_config()).
-        if [ "$_AC_MODE" = "auto" ] || [ "$_AC_MODE" = "custom" ]; then
-          _IS_ELIGIBLE=$("$_PY" -c "
+          # Only 'auto'/'custom' grant hook-level commit authority; 'suggest'
+          # roles merely propose a commit message and must never gain the
+          # sentinel even though they may now appear in eligible_roles (that
+          # list reflects capability, not per-mode authority -- see
+          # scripts/lib/auto_commit.py resolve_auto_commit_config()).
+          if [ "$_AC_MODE" = "auto" ] || [ "$_AC_MODE" = "custom" ]; then
+            _IS_ELIGIBLE=$("$_PY" -c "
 import json, sys
 try:
     with open(sys.argv[1]) as f:
@@ -527,9 +565,10 @@ try:
 except Exception:
     print('0')
 " "$_ALLOWLIST" "$_ROLE" 2>/dev/null)
-          if [ "$_IS_ELIGIBLE" = "1" ]; then
-            IS_ALLOWLIST_SENTINEL=1
-            _AUDIT_ROLE="$_ROLE"
+            if [ "$_IS_ELIGIBLE" = "1" ]; then
+              IS_ALLOWLIST_SENTINEL=1
+              _AUDIT_ROLE="$_ROLE"
+            fi
           fi
         fi
       fi
@@ -541,9 +580,11 @@ except Exception:
   # the existing mutation gate unchanged; the dedicated grant gate below
   # uses this one to narrow the sentinel to add / non-amending commit only.
   # A v1 allowlist has no such key -> no grant -> full shell as before.
-  _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
-  if [ -f "$_ALLOWLIST" ]; then
-    _IS_GRANT=$("$_PY" -c "
+  # #1335: also sentinel-bound -- never derive a NEW grant from the payload.
+  if [ -n "$DECLARED_AGENT" ]; then
+    _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
+    if [ -f "$_ALLOWLIST" ]; then
+      _IS_GRANT=$("$_PY" -c "
 import json, sys
 try:
     with open(sys.argv[1]) as f:
@@ -552,8 +593,9 @@ try:
 except Exception:
     print('0')
 " "$_ALLOWLIST" "$_ROLE" 2>/dev/null)
-    if [ "$_IS_GRANT" = "1" ]; then
-      IS_GRANT_SENTINEL=1
+      if [ "$_IS_GRANT" = "1" ]; then
+        IS_GRANT_SENTINEL=1
+      fi
     fi
   fi
   if [ -n "$_AUDIT_ROLE" ]; then
@@ -565,14 +607,15 @@ except Exception:
     # P3 (AC-11, OQ-2 = A): the orchestrator audit line carries the reduced
     # instance record `orchestrator_id=<id|unset>`. It is logging only -- the
     # decision above never reads DECLARED_ID -- and the git/allowlist lines
-    # keep their historic shape (no instance field).
+    # keep their historic shape (no instance field, #1335 adds attribution).
     _AUDIT_INSTANCE=""
     if [ "$_AUDIT_ROLE" = "orchestrator" ]; then
       _AUDIT_INSTANCE=" orchestrator_id=${DECLARED_ID:-unset}"
     fi
     _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
-    _AUDIT_LINE=$(printf '%s role=%s%s cmd=%s' \
+    _AUDIT_LINE=$(printf '%s role=%s%s attribution=%s cmd=%s' \
       "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_AUDIT_ROLE" "$_AUDIT_INSTANCE" \
+      "$_ROLE_ATTRIBUTION" \
       "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
     hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
   fi
