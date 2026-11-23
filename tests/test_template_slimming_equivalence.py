@@ -265,6 +265,23 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   the other 57 goldens, ``_GOLDEN_ROLE_COUNT`` (58) and ``compact-golden`` are unchanged.
   AC-T4 digest ``10f5c4c7…`` -> ``b18ac19c…``; diff manifest entry in
   ``tests/fixtures/slimming-golden/README.md``.
+* #1335 (2026-11-23, payload attribution): default provider now renders variant C;
+  equivalence test for the frozen variant-B golden now renders with B capabilities;
+  corpus pins updated for git 2.2.2 + tester 2.10.2 + #1329 evidence line. The
+  default Claude provider now declares both ``hook-agent-id`` and
+  ``hook-role-field``, so the real render of ``git`` is
+  variant C (zero sentinels) — the intended #1335 behavior. The frozen slimming
+  golden for ``git`` is variant B (AC-06, 5 sentinels), so only the ``git`` render
+  context in ``render_env`` now uses the established B capability set
+  (``hook-agent-id`` only, mirroring ``_render_git(_pc("hook-agent-id"))`` in
+  ``tests/test_git_sentinel_gh_scope.py``); no other role's render context changed
+  and no assertion/threshold changed. The slimming corpus was re-pinned for the
+  legitimate drift only: the #1329 ``Measured evidence only`` line plus the
+  version pins of all seven #1329 roles (``code-reviewer`` 1.9.3 -> 1.9.4,
+  ``developer`` 2.0.4 -> 2.0.5 / ``based-on`` 4.9.0 -> 4.9.1, ``devops-engineer``
+  1.8.0 -> 1.8.1, ``e2e-tester`` 1.7.0 -> 1.7.1, ``git`` 2.2.0 -> 2.2.2,
+  ``test-executor`` 1.3.0 -> 1.3.1, ``tester`` 2.10.1 -> 2.10.2). The five
+  sentinel lines in ``slimming-golden/git.md`` remain byte-identical.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
@@ -1233,6 +1250,24 @@ class RenderEnv:
     source_paths: dict[str, str]  # role -> repo-relative template path
 
 
+def _variant_b_provider_config(pc: dict) -> dict:
+    """Per-role ``pc`` copy that renders ``git`` as established variant B.
+
+    #1335 added ``hook-role-field`` to Claude's capabilities, so the default
+    render is variant C (zero sentinels). The slimming golden for ``git`` is
+    deliberately frozen as variant B (AC-06, 5 sentinels), so this role alone is
+    rendered with the B capability set -- the same setup as
+    ``_render_git(_pc("hook-agent-id"))`` in ``tests/test_git_sentinel_gh_scope.py``.
+    Every other provider key is copied unchanged from the real configuration.
+    """
+    variant_b = dict(pc)
+    variant_b["capabilities"] = [
+        cap for cap in (pc.get("capabilities") or [])
+        if cap != "hook-role-field"
+    ]
+    return variant_b
+
+
 @pytest.fixture(scope="module")
 def render_env(tmp_path_factory: pytest.TempPathFactory) -> RenderEnv:
     """Render every active role through the real per-role sync path.
@@ -1256,8 +1291,12 @@ def render_env(tmp_path_factory: pytest.TempPathFactory) -> RenderEnv:
     rendered: dict[str, str] = {}
     source_paths: dict[str, str] = {}
     for role, source_path in overrides.items():
+        # #1335: compare the frozen variant-B git golden against a variant-B
+        # render, not the provider's default variant-C render. No other role's
+        # render context is touched.
+        role_pc = _variant_b_provider_config(pc) if role == "git" else pc
         skip, filename = _should_skip_role(
-            role, source_path, _PROVIDER, pc, role_map, allowed_roles, config,
+            role, source_path, _PROVIDER, role_pc, role_map, allowed_roles, config,
             variables, tmp_root, target_dir, log, gates=gates,
         )
         if skip:
@@ -1265,10 +1304,10 @@ def render_env(tmp_path_factory: pytest.TempPathFactory) -> RenderEnv:
         target_path = target_dir / filename
         content, can_spawn, rel_source, source_version, description = _compose_role_content(
             source_path, _PROVIDER, project_name, _REPO_ROOT, tmp_root,
-            target_path, log, pc=pc,
+            target_path, log, pc=role_pc,
         )
         merged = _build_provider_vars(
-            pc, _PROVIDER, variables, _REPO_ROOT, config=config,
+            role_pc, _PROVIDER, variables, _REPO_ROOT, config=config,
             active_set=frozenset(),
         )
         content = _apply_content_pipeline(

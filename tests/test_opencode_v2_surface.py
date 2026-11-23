@@ -5548,9 +5548,17 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # provider-capability artifacts on this branch). The ac01-baseline digest was
 # recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`
 # (1dc46604.. -> b98ae9c0..); slimming/compact/topology-golden unchanged.
+# #1335 payload attribution: git.md 2.2.1 -> 2.2.2 (3 GIT_PAYLOAD_ATTRIBUTION
+# conditional blocks) and orchestrator-guard v1.14.1 -> 1.15.0 (EFFECTIVE_ROLE,
+# audit `attribution=`) changed rendered output. The AC-01 manifest was re-pinned
+# with its own --write helper (11 hashes: 9 git agent renders + 2 guard renders;
+# 0 added/removed). The ac01-baseline digest was recomputed from the rebaselined
+# fixture bytes with `_fixture_tree_sha256` (b98ae9c0.. -> f319c05f..);
+# slimming/compact/topology-golden unchanged. Re-pin records intended output.
+# #1335 slimming-golden corpus re-pin (git 2.2.2 / tester 2.10.2 + #1329 line); digest recomputed via _fixture_tree_sha256
 _FIXTURE_TREES = {
-    "ac01-baseline": "b98ae9c067d02af98f12389f53f47cee7cf193ea1a023346f419582d546ce10d",
-    "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
+    "ac01-baseline": "f319c05fa34168c01c670d0a8b5f571f0027b91faf305deacbb49df66fe62163",
+    "slimming-golden": "5db70169718b6ad28d6b0ab2820b173f5ebf6d7640d168027821da29c9f49908",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
 

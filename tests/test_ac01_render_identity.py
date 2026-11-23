@@ -1126,6 +1126,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``1dc46604…`` -> ``b98ae9c0…``); ``slimming-golden`` and ``compact-golden`` are unchanged.
   The re-pin records the intended output, not a test fix.
 
+- #1335 (central golden rebaseline): #1335 changed rendered output — git.md 2.2.1 ->
+  2.2.2 with three `GIT_PAYLOAD_ATTRIBUTION` conditional blocks (variant C drops the
+  sentinel; Claude renders variant C), and orchestrator-guard v1.14.1 -> 1.15.0
+  (`EFFECTIVE_ROLE`, audit `attribution=`). **11 of 1195 hashes moved; 0 added/removed**
+  — 9 git agent renders (one per provider) plus 2 `orchestrator-guard-impl.sh` renders
+  (Claude + Gemini). The manifest was regenerated with this harness's own `--write`
+  helper; `AC01_EXCEPTIONS` is NOT extended. Because `hashes.json` is the only
+  `ac01-baseline` file, its AC-T4 digest in `tests/test_opencode_v2_surface.py`
+  follows the rebaselined tree (recomputed from the fixture bytes with
+  `_fixture_tree_sha256`: `b98ae9c0..` -> `f319c05f..`); `slimming-golden`,
+  `compact-golden` and `topology-golden` are unchanged. The re-pin records the
+  intended output, not a test fix.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

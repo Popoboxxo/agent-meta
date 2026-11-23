@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: 1.8.0
+version: 1.8.1
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   staging validation and environment classification.
 hint: Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks.
@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.8.0
+generated-from: 1-generic/devops-engineer.md@1.8.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -177,6 +177,7 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 - **Never** put secrets/API keys/credentials in code or config
 - **Never** change infrastructure directly on `main`
 - No manual changes to production infrastructure (only via IaC)

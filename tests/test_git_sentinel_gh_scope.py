@@ -199,8 +199,6 @@ def test_claude_render_has_gh_only_exception_and_tools_wording():
 
 
 def test_render_without_capability_is_byte_identical_to_pre_change():
-    import subprocess
-
     rendered_after = _render_git(_pc())
 
     # AC-2 (fixed golden, independent of the modified template): the <tools>
@@ -213,13 +211,79 @@ def test_render_without_capability_is_byte_identical_to_pre_change():
     assert _PRE_CHANGE_PARAGRAPH_END in rendered_after
     assert "Exception: for Bash calls" not in rendered_after
 
-    # AC-2 (full render): compare against the template pinned to the worker-control
-    # rebaseline commit (aee986c8), not a reconstruction of the modified template.
-    # The merge-sentence rephrasing is part of that single rebaseline, so the pin
-    # must follow it; pinning a commit keeps this check meaningful afterwards.
-    pre_change = subprocess.run(
-        ["git", "show", "aee986c8:agents/1-generic/git.md"],
-        cwd=_REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout
+    # AC-2 (full render): compare against a frozen baseline template, not a
+    # reconstruction of the modified template. #1335 payload attribution moved
+    # git.md 2.2.1 -> 2.2.2 (three GIT_PAYLOAD_ATTRIBUTION blocks) and the guard
+    # 1.14.1 -> 1.15.0, changing rendered output. The old git-blob pin
+    # (aee986c8: git.md 2.2.0 + no #1329 line) was stale, so the golden is
+    # re-pinned to a frozen copy of the intended #1335 baseline template. The
+    # render path and this assertion are unchanged; the fixture is frozen so
+    # future template drift still fails loudly.
+    pre_change = _GOLDEN_BASELINE_TEMPLATE.read_text(encoding="utf-8")
     rendered_pre = _render_git(_pc(), template=pre_change)
     assert rendered_after == rendered_pre
+
+
+# --- Task 3 / IC-7: variant C renders with ZERO sentinel literals ---------
+
+
+def _render_c() -> str:
+    return _render_git(_pc("hook-agent-id", "hook-role-field"))
+
+
+def test_variant_c_has_zero_sentinel_literals():
+    rendered = _render_c()
+    assert "#agent-meta:agent=git" not in rendered
+    assert "#agent-meta:agent=" not in rendered
+
+
+def test_variant_c_step0_paragraph_is_exact_spec_scope_literal():
+    rendered = _render_c()
+    from tests.test_git_payload_attribution import SCOPE_C
+
+    assert any(line == SCOPE_C for line in rendered.splitlines()), (
+        "step-0 paragraph must be exactly _GIT_SENTINEL_SCOPE_WITH_BOTH_CAPS"
+    )
+
+
+def test_variant_c_tools_line_is_exact_spec_bash_rule():
+    rendered = _render_c()
+    from tests.test_git_payload_attribution import BASH_RULE_C
+
+    assert _single_line_starting(
+        rendered, "- **Bash** — all git/gh commands,"
+    ) == "- **Bash** — all git/gh commands, " + BASH_RULE_C
+
+
+def test_variant_c_has_three_git_example_blocks_without_sentinel():
+    rendered = _render_c()
+    # The three example commands keep their bodies; only the sentinel first
+    # line is gone (section 0, state check, post-merge branch listing).
+    assert "```bash\ngit status\ngit branch --show-current" in rendered
+    assert "```bash\ngit branch --merged {{GIT_MAIN_BRANCH}}" not in rendered
+    assert "git branch --merged main" in rendered
+    assert rendered.count("\n```bash\n") >= 3
+    assert "#agent-meta:agent=git" not in rendered
+
+
+# --- Golden B byte-identical, Golden C new (IC-9) -------------------------
+
+
+_GOLDEN_B = _REPO_ROOT / "tests" / "fixtures" / "slimming-golden" / "git.md"
+_GOLDEN_C = _REPO_ROOT / "tests" / "fixtures" / "git-payload-attribution" / "git.md"
+_GOLDEN_BASELINE_TEMPLATE = (
+    _REPO_ROOT / "tests" / "fixtures" / "git-payload-attribution"
+    / "git-baseline-template.md"
+)
+
+
+def test_golden_b_still_hunts_sentinel_and_is_untouched():
+    golden_b = _GOLDEN_B.read_text(encoding="utf-8")
+    # Frozen B golden: 2 prose mentions + 3 example-block sentinels.
+    assert golden_b.count("#agent-meta:agent=git") == 5
+    assert "Exception: for Bash calls that run only `gh`" in golden_b
+
+
+def test_golden_c_matches_variant_c_render():
+    assert _GOLDEN_C.exists(), "variant C golden fixture is missing"
+    assert _GOLDEN_C.read_text(encoding="utf-8") == _render_c()

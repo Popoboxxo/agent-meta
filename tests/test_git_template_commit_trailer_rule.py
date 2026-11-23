@@ -49,7 +49,9 @@ def _render_with_variables(trailers):
 
 
 def test_git_template_version_and_precedence_wording():
-    assert 'version: "2.2.0"' in _TEMPLATE
+    # #1335: git.md version pin follows the template bump 2.2.0 -> 2.2.2
+    # (payload-attribution conditional blocks); precedence wording is unchanged.
+    assert 'version: "2.2.2"' in _TEMPLATE
     paragraph = next(p for p in _claude_render().split("\n\n") if "Co-Authored-By" in p)
     assert "explicit brief from the requester > project config (`commit.trailers`) > harness attribution" in paragraph
     assert "brief wins" in paragraph and "exactly once" in paragraph

@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.2.1"
+version: "2.2.2"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -23,6 +23,15 @@ You are the **Git Operator** for {{PROJECT_NAME}}. All git operations run throug
 </persona>
 
 <workflow>
+{{#if GIT_PAYLOAD_ATTRIBUTION}}
+## 0. Identity declaration (payload-attributed provider)
+
+{{GIT_SENTINEL_SCOPE_BLOCK}}
+
+```bash
+git status
+```
+{{else}}
 ## 0. Identity declaration (required on every Bash call)
 
 `orchestrator-guard.sh` sees from the PreToolUse payload only `agent_id` (whether the caller is some subagent), never which role it is. The role `git` is recognized solely through a sentinel comment that you prefix to **every** Bash command as its own first line:
@@ -33,17 +42,26 @@ git status
 ```
 
 Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block git mutations (without the `git` sentinel the mutation gate blocks git mutations independent of strict mode; only the narrow auto-commit allowlist (add/commit, declared via its own sentinel) is exempt). The sentinel only declares the role; it bypasses no protection (destructive-operation and branch checks still apply), and the dispatcher must not forbid it to the git agent.{{GIT_SENTINEL_SCOPE_BLOCK}}
+{{/if}}
 
 {{PARSE_INPUT_BLOCK}}
 
 ## 2. State check
 
+{{#if GIT_PAYLOAD_ATTRIBUTION}}
+```bash
+git status
+git branch --show-current
+git log --oneline -5
+```
+{{else}}
 ```bash
 #agent-meta:agent=git
 git status
 git branch --show-current
 git log --oneline -5
 ```
+{{/if}}
 
 ## 3. Branch guard
 
@@ -94,11 +112,18 @@ Rules: `--amend` only for the last, unpushed commit; `revert` for anything alrea
 
 **Step 1 — LIST candidates:**
 
+{{#if GIT_PAYLOAD_ATTRIBUTION}}
+```bash
+git branch --merged {{GIT_MAIN_BRANCH}}
+git branch -r --merged {{GIT_MAIN_BRANCH}}
+```
+{{else}}
 ```bash
 #agent-meta:agent=git
 git branch --merged {{GIT_MAIN_BRANCH}}
 git branch -r --merged {{GIT_MAIN_BRANCH}}
 ```
+{{/if}}
 
 Report the candidates (local + remote) to the user.
 

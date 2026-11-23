@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-version: 1.9.3
+version: 1.9.4
 description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis,
   AI-origin analysis (VCAL), and REQ traceability in code paths.'
 hint: Checks code quality, blast radius, and Clean Code — not functional correctness
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/code-reviewer.md@1.9.3
+generated-from: 1-generic/code-reviewer.md@1.9.4
 model: claude-opus-4-8
 memory: project
 permissionMode: plan
@@ -177,6 +177,7 @@ NEXT: [Merge | Back to developer | Escalate]
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 - Never write code — only review and report
 - Never check functional errors — `validator`
 - Never write/run tests — `tester`

@@ -159,10 +159,13 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # is provider data (agents_dir sibling), resolved in agent_sync; no provider
     # literal lives in the template.
     "ROUTING_DETAILS_PATH", "ROUTING_DETAILS_ENABLED",
-    # Git-sentinel scope (issue #1307): injected per provider by
-    # agent_sync._build_provider_vars from the hook-agent-id capability.
-    # Registered here so --validate sees no unknown/unused placeholder.
+    # Git-sentinel scope (issue #1307/#1335): injected per provider by
+    # agent_sync._build_provider_vars from the hook-* capabilities.
+    # GIT_PAYLOAD_ATTRIBUTION is a pure render flag (variant C gate), not a
+    # new attribution mechanism. Registered here so --validate sees no
+    # unknown/unused placeholder.
     "GIT_SENTINEL_SCOPE_BLOCK", "GIT_SENTINEL_BASH_RULE",
+    "GIT_PAYLOAD_ATTRIBUTION",
 
     "ROUTE_INTENT_CALLABLE",
     # Block-inlining variables loaded from snippets/agents/ by
