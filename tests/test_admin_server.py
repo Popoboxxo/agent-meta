@@ -3812,3 +3812,75 @@ def test_viz_stop_no_proc_fallback_kills(monkeypatch, tmp_path):
     f, kills = _stop_env(monkeypatch, tmp_path, "4242 100", iter([None] * 5), cmdline=None)
     admin_server.VizManager(tmp_path)._stop(f, "Viz")
     assert kills == [15, 9]
+
+
+# --------------------------------------------------------------------------- #
+# Issue #1199: drift guard for PROJECT_WRITABLE_SECTIONS                      #
+# --------------------------------------------------------------------------- #
+
+
+class TestWritableSectionsDriftGuard(unittest.TestCase):
+    """Pin the 51 writable ``project.yaml`` sections (issue #1199).
+
+    ``PROJECT_WRITABLE_SECTIONS`` stays a hand-maintained literal -- see
+    ``TestArtifactLocationsWhitelist.test_no_derivation_in_this_task``; no
+    schema derivation is introduced here. This test is the drift guard a
+    future schema-derived refactor must keep green: it pins the exact set so
+    dropping any section (notably the eight runtime-only sections absent from
+    ``config/project-config.schema.json``) fails immediately instead of
+    silently turning that section unwritable.
+    """
+
+    # Runtime-only sections: no top-level property in the schema, consumed by
+    # sync.py / the Admin UI at runtime. A naive schema-derived whitelist
+    # would drop all eight (issue #1199).
+    _RUNTIME_ONLY_SECTIONS = frozenset({
+        "agent-prompts", "backup", "environments", "rules", "rules-preset",
+        "skills-registry", "steps-overrides", "submodule-protection",
+    })
+
+    # Exact snapshot of PROJECT_WRITABLE_SECTIONS at e29381db (51 entries).
+    _EXPECTED_WRITABLE_SECTIONS = frozenset({
+        "admin-ui", "agent-prompts", "ai-providers", "artifact-locations", "auto_commit",
+        "backup", "commit", "context-profile", "context_file", "conventions",
+        "conventions-preset", "debug-mode", "dod", "dod-preset", "environments",
+        "external-skills", "git", "gitignore", "hooks", "knowledge-engine",
+        "mcp-role-overrides", "memory-overrides", "model-inherit-main-chat", "model-override-all", "model-overrides",
+        "model-source-preference", "orchestrator", "permission-mode-overrides", "platforms", "plugins",
+        "project", "project-context-injection", "provider-isolation", "provider-options", "provider-tier-overrides",
+        "release-checklist", "repo_containment", "roles", "routing-overrides", "rules",
+        "rules-preset", "se-focus", "skills-registry", "speech-mode", "steps-overrides",
+        "subagent_permissions", "submodule-protection", "test-environments", "tier-overrides", "tier-preset",
+        "viz",
+    })
+
+    def test_all_writable_sections_preserved(self) -> None:
+        """No section may be added or dropped without updating this pin."""
+        self.assertEqual(
+            admin_server.PROJECT_WRITABLE_SECTIONS,
+            self._EXPECTED_WRITABLE_SECTIONS,
+        )
+
+    def test_runtime_only_sections_stay_writable(self) -> None:
+        """The eight schema-absent sections must remain writable."""
+        self.assertEqual(len(self._RUNTIME_ONLY_SECTIONS), 8)
+        self.assertTrue(
+            self._RUNTIME_ONLY_SECTIONS <= admin_server.PROJECT_WRITABLE_SECTIONS
+        )
+
+    def test_dropped_runtime_sections_are_detected(self) -> None:
+        """Negative control: removing the eight sections is caught by the pin.
+
+        Simulates the naive schema-derived set (schema properties only) and
+        verifies the pinned assertion rejects it -- the drift is observable,
+        not silent.
+        """
+        naive = (admin_server.PROJECT_WRITABLE_SECTIONS
+                 - self._RUNTIME_ONLY_SECTIONS)
+        self.assertEqual(len(naive), 51 - 8)
+        self.assertEqual(
+            self._EXPECTED_WRITABLE_SECTIONS - naive,
+            self._RUNTIME_ONLY_SECTIONS,
+        )
+        with self.assertRaises(AssertionError):
+            self.assertEqual(naive, self._EXPECTED_WRITABLE_SECTIONS)
