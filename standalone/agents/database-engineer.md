@@ -115,7 +115,6 @@ NEXT: [Review | Developer implementation | Tests]
 - No index without a proven query pattern (EXPLAIN ANALYZE)
 - No application logic for invariants a DB constraint can guarantee
 - No breaking schema change without an Expand/Contract path
-- - 
 
 **Delegation (reference only):** implementation against the schema → `developer` (with `db-schema-v1`) · new requirement → `requirements` · API contract → `api-specialist` · tests → `tester` · docs → `documenter`.
 

@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-version: 1.11.1
+version: 1.11.2
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/senior-developer.md@1.11.1
+generated-from: 1-generic/senior-developer.md@1.11.2
 model: claude-opus-5-5
 memory: project
 ---
@@ -183,7 +183,7 @@ FAILURE_LOG: <attempt n approach + failure reason>
 - No silent behavior changes — name breaking changes explicitly
 - No default exports
 - No secrets / API keys
-- - - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+- - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 

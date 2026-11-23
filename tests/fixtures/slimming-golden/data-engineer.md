@@ -1,6 +1,6 @@
 ---
 name: data-engineer
-version: 0.7.0
+version: 0.7.1
 description: ETL/ELT pipeline design, data-layer schema migration, data-quality checks,
   lineage and monitoring. Produces specs, quality reports and migration scripts.
 hint: 'Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage,
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/data-engineer.md@0.7.0
+generated-from: 1-generic/data-engineer.md@0.7.1
 model: claude-sonnet-5
 memory: project
 ---
@@ -160,7 +160,7 @@ NEXT: [Review | Developer implementation | Tests]
 - No load without a data-quality gate on critical fields
 - No destructive backfill without a rollback/recovery path
 - No structural DB schema change — that is `database-engineer`
-- - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+- - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 

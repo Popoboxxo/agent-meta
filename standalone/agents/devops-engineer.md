@@ -162,13 +162,13 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 - **Never** put secrets/API keys/credentials in code or config
 - **Never** change infrastructure directly on `main`
 - No manual changes to production infrastructure (only via IaC)
 - No CI/CD pipeline without security scans
 - No container images without a vulnerability scan
 - No infrastructure changes without a dry-run/plan
-- - 
 **User proxy:** `main_chat`.
 
 **Language:** code comments, commit messages, infrastructure descriptions → English.

@@ -32,6 +32,17 @@ Rebaseline log:
   contract: **23 of 30 hashes moved; 0 added/removed**. The baseline was
   re-captured with this test's own ``--capture-baseline`` helper (the fixture is
   never hand-written); the re-pin records the intended output, not a test fix.
+- #1167/T21 (central golden rebaseline, 2026-11-23,
+  ``fix/decision-points-bundle-20261123``): #1167/T21: D-mandate gating extended to 24 roles;
+  re-pin records intended rendered output. The branch also fixed the ``- {{#if …}}`` bullet
+  form to ``{{#if …}}- `` in nine templates. In the ``rapid-prototyping`` (off) render the
+  gated REQ-mandate bullet is stripped entirely, so the stray ``- `` prefix disappears.
+  ``_normalized_hash`` strips frontmatter versions but NOT body content, so the OFF-state
+  body legitimately changed: exactly **5 of 30 hashes moved; 0 added/removed** — all five
+  ``devops-engineer`` matrix variants (``base``, ``homeassistant``, ``sharkord``, ``hacs``,
+  ``agent-meta``). The baseline was re-captured with this test's own ``--capture-baseline``
+  helper (the fixture is never hand-written); the re-pin records the intended output, not a
+  test fix. No other role drifted; no assertion or whitelist was weakened.
 
 Run: ``python3 -m pytest tests/test_test_environments_render.py --basetemp="{{PYTEST_BASETEMP}}"``
 """
@@ -85,11 +96,11 @@ OVERRIDE_COVERAGE = {
 
 #: Task 8: the minor version bump each base template receives with the gate.
 BASE_VERSIONS = {
-    "tester": "2.10.2",
-    "e2e-tester": "1.7.1",
+    "tester": "2.10.3",
+    "e2e-tester": "1.7.2",
     "developer": "4.9.1",
     "docker": "1.10.0",
-    "devops-engineer": "1.8.1",
+    "devops-engineer": "1.8.2",
     "test-executor": "1.3.1",
 }
 
@@ -392,11 +403,11 @@ def test_settings_json_identical_and_no_secrets_file(tmp_path_factory):  # AC-EN
 #: Override file -> (own version, based-on pin) after Task 9 (AC-ENV-10).
 OVERRIDES = {
     "homeassistant-developer.md": ("2.1.4", "1-generic/developer.md@4.9.1"),
-    "sharkord-developer.md": ("3.0.4", "1-generic/developer.md@4.9.1"),
+    "sharkord-developer.md": ("3.0.5", "1-generic/developer.md@4.9.1"),
     "hacs-developer.md": ("1.3.4", "1-generic/developer.md@4.9.1"),
     "agent-meta-developer.md": ("2.0.5", "1-generic/developer.md@4.9.1"),
-    "hacs-tester.md": ("1.0.8", "1-generic/tester.md@2.10.2"),
-    "hacs-devops-engineer.md": ("1.0.3", "1-generic/devops-engineer.md@1.8.1"),
+    "hacs-tester.md": ("1.0.9", "1-generic/tester.md@2.10.3"),
+    "hacs-devops-engineer.md": ("1.0.4", "1-generic/devops-engineer.md@1.8.2"),
     "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),
 }
 

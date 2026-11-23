@@ -5556,10 +5556,24 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # fixture bytes with `_fixture_tree_sha256` (b98ae9c0.. -> f319c05f..);
 # slimming/compact/topology-golden unchanged. Re-pin records intended output.
 # #1335 slimming-golden corpus re-pin (git 2.2.2 / tester 2.10.2 + #1329 line); digest recomputed via _fixture_tree_sha256
+# #1167/T21 central golden rebaseline (2026-11-23): #1167/T21: D-mandate gating extended to
+# 24 roles; re-pin records intended rendered output. ac01-baseline re-pinned via its own
+# --write helper (45 of 1195 hashes: five matrix-active roles x nine providers, bullet-form
+# fix in the off render); slimming-golden re-pinned for the seven bullet-form goldens via the
+# equivalence harness's own render pipeline (one line each, plus the README diff manifest);
+# test-env-baseline re-captured via --capture-baseline (5 devops-engineer hashes). All three
+# digests recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`:
+# ac01 f319c05f.. -> 3e80abe6.., slimming 5db70169.. -> 1c26fbc9.., compact-golden unchanged
+# (e2c63534..). No assertion or whitelist weakened; re-pin records intended output.
+# T21 version-bump re-pin (#1329/#1335 procedure): after the 18 REQ-gating template
+# version bumps, ac01-baseline (via --write, 90 per-file hashes), slimming-golden and
+# compact-golden (version / generated-from pins) were re-frozen. Digests recomputed with
+# `_fixture_tree_sha256` from the rebaselined trees. Reason: #T21: version bump after
+# REQ-gating content change. No assertion or whitelist weakened.
 _FIXTURE_TREES = {
-    "ac01-baseline": "f319c05fa34168c01c670d0a8b5f571f0027b91faf305deacbb49df66fe62163",
-    "slimming-golden": "5db70169718b6ad28d6b0ab2820b173f5ebf6d7640d168027821da29c9f49908",
-    "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
+    "ac01-baseline": "bdf5afa54b0c4285252de51dad2daa14e70d8d50bf46e46695a2347e1423bfd5",
+    "slimming-golden": "932036d57b48d267bc83a764dce5629bd979d3df81b15336d87a487d5c143177",
+    "compact-golden": "7160f5c5d38b7cc9e1298963a85c4845cbcf7d3ca927954f8fab39ad6405267d",
 }
 
 

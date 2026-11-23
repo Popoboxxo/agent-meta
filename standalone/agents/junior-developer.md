@@ -96,7 +96,7 @@ FINDINGS: <already found — files, cause, context>
 - No "while I'm here" improvements
 - No default exports
 - No secrets / API keys
-- - - 
+- - 
 
 **User proxy:** `main_chat`.
 

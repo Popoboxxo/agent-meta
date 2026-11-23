@@ -183,3 +183,18 @@ prefixed … `gh`-only calls without it". No version/generated-from pin, no proj
 no normalization-table entry changed; the other 57 goldens, `_GOLDEN_ROLE_COUNT` (58) and
 `compact-golden` are unchanged. The AC-T4 digest was re-pinned accordingly; see the log in
 `tests/test_template_slimming_equivalence.py`.
+
+## Diff manifest — #1167/T21 central golden rebaseline (2026-11-23)
+
+**Reason:** #1167/T21: D-mandate gating extended to 24 roles; re-pin records intended rendered
+output. The branch additionally fixed the `- {{#if …}}` bullet form to `{{#if …}}- ` in nine
+templates, so the gated REQ-mandate bullet no longer leaves a stray `- ` in the rendered
+`<constraints>` DON'Ts list. Seven active goldens were re-pinned from the real per-role sync
+render (the same pipeline the `render_env` fixture mirrors), exactly one line each:
+`data-engineer.md`, `devops-engineer.md`, `junior-developer.md`, `principal-developer.md`,
+`refactoring-specialist.md`, `senior-developer.md` and `ui-ux-designer.md` (drop one `- `
+prefix; `ui-ux-designer` drops the trailing `- ` blank bullet). Every frozen meta token,
+`{{PYTEST_BASETEMP}}` token, `model:` pin, frontmatter version pin and declared normalization
+region is left untouched; the other 51 goldens, `_GOLDEN_ROLE_COUNT` (58), the normalization
+table and `compact-golden` are unchanged. No assertion or whitelist was weakened. The AC-T4
+digest was re-pinned accordingly; see the log in `tests/test_template_slimming_equivalence.py`.

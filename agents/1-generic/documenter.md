@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.11.2"
+version: "1.11.3"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights — as artefacts that stand alone and stay traceable."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -197,6 +197,7 @@ NOTES: [short summary of changes]
 - Never document what you did not read yourself — no inferred, aspirational or copied structure
 - Every artefact states its purpose, scope, data source and date on its face
 - No wholesale rewrite of a reviewed artefact to make a small correction
+{{#if DOD_REQ_TRACEABILITY}}- Documentation change without REQ-ID (`REQ-<AREA>-<NN>`) is not complete{{/if}}
 
 **Delegation (reference only):** code changes → `developer` · missing tests → `tester` · unclear requirement → `requirements` · validation → `validator`
 

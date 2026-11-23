@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: 1.8.1
+version: 1.8.2
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   staging validation and environment classification.
 hint: Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks.
@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.8.1
+generated-from: 1-generic/devops-engineer.md@1.8.2
 model: claude-haiku-4-5-20251001
 ---
 
@@ -184,7 +184,7 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 - No CI/CD pipeline without security scans
 - No container images without a vulnerability scan
 - No infrastructure changes without a dry-run/plan
-- - 
+- 
 **User proxy:** `main_chat`.
 
 **Language:** code comments, commit messages, infrastructure descriptions → English.

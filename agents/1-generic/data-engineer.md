@@ -1,6 +1,6 @@
 ---
 name: template-data-engineer
-version: "0.7.0"
+version: "0.7.1"
 description: "ETL/ELT pipeline design, data-layer schema migration, data-quality checks, lineage and monitoring. Produces specs, quality reports and migration scripts."
 hint: "Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer"
 reference_standards:
@@ -147,7 +147,7 @@ NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer implementation{{/if}} | T
 - No load without a data-quality gate on critical fields
 - No destructive backfill without a rollback/recovery path
 - No structural DB schema change — that is `database-engineer`
-- {{#if DOD_REQ_TRACEABILITY}}No pipeline change without REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No pipeline change without REQ-ID (`REQ-<AREA>-<NN>`){{/if}}
 - {{EXTRA_DONTS}}
 
 **Delegation (reference only):** implementation against the pipeline spec → `developer` (with `data-pipeline-v1`) · relational schema/index/query optimization → `database-engineer` · external pipeline docs → `technical-writer` · new requirement → `requirements` · tests → `tester`.

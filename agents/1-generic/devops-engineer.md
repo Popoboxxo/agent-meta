@@ -1,6 +1,6 @@
 ---
 name: template-devops-engineer
-version: "1.8.1"
+version: "1.8.2"
 description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, staging validation and environment classification."
 hint: "Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks."
 reference_standards:
@@ -184,7 +184,7 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 - No CI/CD pipeline without security scans
 - No container images without a vulnerability scan
 - No infrastructure changes without a dry-run/plan
-- {{#if DOD_REQ_TRACEABILITY}}Every infrastructure change needs a REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- Every infrastructure change needs a REQ-ID (`REQ-<AREA>-<NN>`){{/if}}
 - {{#if DOD_SECURITY_AUDIT}}Security review before merge is mandatory{{/if}}
 
 **User proxy:** `main_chat`.

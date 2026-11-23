@@ -1,6 +1,6 @@
 ---
 name: template-e2e-tester
-version: "1.7.1"
+version: "1.7.2"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
@@ -64,7 +64,7 @@ You are the **E2E-Tester** for {{PROJECT_NAME}}. You test complete user flows in
 **Tests required** — no completed flow without an associated E2E test.
 {{/if}}
 {{#if DOD_REQ_TRACEABILITY}}
-**REQ-Traceability active** — every E2E test carries its REQ-ID in the name (`[REQ-xxx] should ...`) and references `docs/REQUIREMENTS.md`.
+**REQ-Traceability active** — every E2E test carries its REQ-ID (`REQ-<AREA>-<NN>`) in the name (`[REQ-xxx] should ...`) and references `docs/REQUIREMENTS.md`.
 {{/if}}
 </workflow>
 

@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 8.12.3
+version: 8.12.4
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@8.12.3
+generated-from: 1-generic/orchestrator.md@8.12.4
 mode: primary
 permissions:
 - action: edit

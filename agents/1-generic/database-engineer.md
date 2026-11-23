@@ -1,6 +1,6 @@
 ---
 name: template-database-engineer
-version: "1.4.1"
+version: "1.4.2"
 description: "Relational schema design, migrations, query optimization, index strategy. Produces backwards-compatible migrations with rollback and a schema contract."
 hint: "Database design: schema, migrations (Alembic/Flyway style), query optimization, index strategy — hands a schema contract to developer"
 reference_standards:
@@ -134,7 +134,7 @@ NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer implementation{{/if}} | T
 - No index without a proven query pattern (EXPLAIN ANALYZE)
 - No application logic for invariants a DB constraint can guarantee
 - No breaking schema change without an Expand/Contract path
-- {{#if DOD_REQ_TRACEABILITY}}No schema change without REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No schema change without REQ-ID (`REQ-<AREA>-<NN>`){{/if}}
 - {{EXTRA_DONTS}}
 
 **Delegation (reference only):** implementation against the schema → `developer` (with `db-schema-v1`) · new requirement → `requirements` · API contract → `api-specialist` · tests → `tester` · docs → `documenter`.

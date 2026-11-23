@@ -282,6 +282,29 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   1.8.0 -> 1.8.1, ``e2e-tester`` 1.7.0 -> 1.7.1, ``git`` 2.2.0 -> 2.2.2,
   ``test-executor`` 1.3.0 -> 1.3.1, ``tester`` 2.10.1 -> 2.10.2). The five
   sentinel lines in ``slimming-golden/git.md`` remain byte-identical.
+* #1167/T21 central golden rebaseline (2026-11-23,
+  ``fix/decision-points-bundle-20261123``): #1167/T21: D-mandate gating extended to 24 roles;
+  re-pin records intended rendered output. The branch also fixed the ``- {{#if …}}`` bullet
+  form to ``{{#if …}}- `` in nine templates, so the gated REQ-mandate bullet no longer leaves a
+  stray ``- `` in the rendered ``<constraints>`` DON'Ts list. Seven active goldens were
+  re-pinned from the real per-role sync render (the same pipeline this ``render_env`` fixture
+  mirrors), exactly one line each: ``data-engineer``, ``devops-engineer``, ``junior-developer``,
+  ``principal-developer``, ``refactoring-specialist``, ``senior-developer`` and
+  ``ui-ux-designer``. Every frozen meta token, ``{{PYTEST_BASETEMP}}`` token, ``model:`` pin,
+  frontmatter version pin and declared normalization region is untouched; the other 51
+  goldens, ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and ``compact-golden`` are
+  unchanged. No assertion or whitelist was weakened. AC-T4 digest
+  ``5db70169..`` -> ``1c26fbc9..`` (diff manifest entry in the golden README).
+
+* #T21: version bump after REQ-gating content change (2026-11-23, 18 template PATCH bumps /
+  based-on re-pins): 15 slimming goldens re-pinned in their ``version:`` / ``generated-from:``
+  pins only (data-engineer, devops-engineer, documenter, e2e-tester, git, junior-developer,
+  orchestrator, principal-developer, refactoring-specialist, senior-developer, tester,
+  ui-ux-designer and the three topology-orchestrator goldens); compact-golden orchestrator and
+  the git-payload-attribution fixtures likewise. Every value was read from the authoritative
+  source template, not guessed. All frozen meta tokens, ``{{PYTEST_BASETEMP}}`` tokens, ``model:``
+  pins, ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and every body line stay untouched.
+  No assertion or whitelist weakened. AC-T4 digests recomputed with ``_fixture_tree_sha256``.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

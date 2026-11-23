@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.10.2"
+version: "2.10.3"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. Integration tests belong to a dedicated integration-test role when one is active."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
@@ -37,7 +37,7 @@ You are the **Tester** for {{PROJECT_NAME}}. You write tests, run them, and ensu
 {{#if DOD_REQ_TRACEABILITY}}
 ## 3. Test naming (MANDATORY)
 
-Every test MUST carry its REQ-ID in the name:
+Every test MUST carry its REQ-ID (`REQ-<AREA>-<NN>`) in the name:
 ```
 describe / class / suite: ModuleName
   test "[REQ-004] should add a video to the queue"

@@ -1,6 +1,6 @@
 ---
 name: refactoring-specialist
-version: 0.5.1
+version: 0.5.2
 description: 'Large-scale code transformation with safety nets: Strangler Fig, incremental
   refactoring, legacy modernization, feature-flag rewrites with compatibility.'
 hint: 'Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung,
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/refactoring-specialist.md@0.5.1
+generated-from: 1-generic/refactoring-specialist.md@0.5.2
 model: claude-sonnet-5
 memory: project
 ---
@@ -155,7 +155,7 @@ NEXT: [Review | Developer feature work | Documenter]
 - No behavior change — refactoring preserves behavior (feature = `developer`)
 - No breaking change to a public contract without versioning/deprecation
 - No removal of the old path in the same change as its replacement
-- - - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+- - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in agent-meta.config.example.yaml
 

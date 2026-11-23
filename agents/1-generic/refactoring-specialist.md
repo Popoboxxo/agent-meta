@@ -1,6 +1,6 @@
 ---
 name: template-refactoring-specialist
-version: "0.5.1"
+version: "0.5.2"
 description: "Large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization, feature-flag rewrites with compatibility."
 hint: "Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung, Feature-Flag-Rewrites — braucht exklusiven Zugriff auf betroffene Module"
 prompt_mode: modern
@@ -140,7 +140,7 @@ NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer feature work{{/if}}{{#if 
 - No behavior change — refactoring preserves behavior (feature = `developer`)
 - No breaking change to a public contract without versioning/deprecation
 - No removal of the old path in the same change as its replacement
-- {{#if DOD_REQ_TRACEABILITY}}No transformation without REQ-ID{{/if}}
+{{#if DOD_REQ_TRACEABILITY}}- No transformation without REQ-ID (`REQ-<AREA>-<NN>`){{/if}}
 - {{EXTRA_DONTS}}
 
 **Delegation (reference only):** missing tests / characterization tests → `tester` · feature development (behavior change) → `developer` · map blast radius upfront → `explorer` · document refactoring plan → `documenter`.

@@ -88,6 +88,7 @@ ARTIFACTS: [files created]
 - No technical implementation details (framework, library)
 - No designs without a `(not provided — ask the user for a short project description if you need it)` reference
 - No UI elements without a user need
+
 **Delegation (reference only):** implement UI → `developer` · system validation → `se-validator` · code quality → `code-reviewer` · user need unclear → `requirements` / `ideation`
 
 **User proxy:** `main_chat`.

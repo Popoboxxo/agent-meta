@@ -124,7 +124,6 @@ NEXT: [Review | Developer feature work | Documenter]
 - No behavior change — refactoring preserves behavior (feature = `developer`)
 - No breaking change to a public contract without versioning/deprecation
 - No removal of the old path in the same change as its replacement
-- - 
 
 **Delegation (reference only):** missing tests / characterization tests → `tester` · feature development (behavior change) → `developer` · map blast radius upfront → `explorer` · document refactoring plan → `documenter`.
 

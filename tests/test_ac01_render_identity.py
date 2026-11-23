@@ -1139,6 +1139,29 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   `compact-golden` and `topology-golden` are unchanged. The re-pin records the
   intended output, not a test fix.
 
+- #1167/T21 (central golden rebaseline, 2026-11-23, ``fix/decision-points-bundle-20261123``):
+  D-mandate gating extended to 24 roles; re-pin records intended rendered output. The branch
+  also fixed the ``- {{#if …}}`` bullet form to ``{{#if …}}- `` in nine templates, so in the
+  ``rapid-prototyping`` (off) matrix render the stray ``- `` prefix disappears. Exactly
+  **45 of 1195 hashes moved; 0 added/removed** — five matrix-active roles (``data-engineer``,
+  ``database-engineer``, ``devops-engineer``, ``refactoring-specialist``, ``ui-ux-designer``)
+  x nine providers. No rule, ``AGENTS.md``, ``context-hashes.json`` or golden content drifted;
+  the manifest was regenerated with this harness's own ``--write`` helper and the diff verified
+  per key. ``AC01_EXCEPTIONS`` is NOT extended. Because ``hashes.json`` is the only
+  ``ac01-baseline`` file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the
+  rebaselined tree (recomputed from the fixture bytes with ``_fixture_tree_sha256``:
+  ``f319c05f..`` -> ``3e80abe6..``). ``slimming-golden`` was re-pinned separately for the seven
+  bullet-form goldens (its digest ``5db70169..`` -> ``1c26fbc9..``); ``compact-golden`` stayed
+  unchanged. The re-pin records intended output, not a test fix.
+
+- #T21: version bump after REQ-gating content change (2026-11-23, the 18 template PATCH
+  bumps / based-on re-pins). Manifest regenerated with this harness's own ``--write`` helper:
+  **90 of 1195 hashes moved; 0 added/removed** — ten matrix-active roles x nine providers.
+  ``AC01_EXCEPTIONS`` is NOT extended. ``generated-file-hashes.json``/``context-hashes.json``
+  are re-derived by the syncer from the render and not part of this manifest. AC-T4 digest
+  followed via ``_fixture_tree_sha256`` (``3e80abe6..`` -> ``bdf5afa5..``). Re-pin records
+  intended output, not a test fix.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
