@@ -118,6 +118,7 @@ Alle Anker gegen `chore/phase-h-bundle @ 4d3d21f` neu gemessen (Plan maß bei `9
   - `agents/1-generic/requirements.md:43-46` (REQ-ID-Schema: `REQ-xxx` three digits / `REQ-xxx-A`).
   - `agents/1-generic/se-requirements.md:36,68,99`; `agents/1-generic/se-developer.md:31,46,98,116,136`; `agents/1-generic/se-junior-developer.md:31,46,97,125,137`; `agents/1-generic/api-specialist.md:109,147`.
   - `config/conventions-presets.yaml:34` (`entry_prefix: "REQ-xxx: "`).
+    → Ausnahme laut `docs/adr/0003-entry-prefix-ic4-ausnahme.md` (ADR 0003): bleibt bewusst unverändert, weil `tests/test_conventions_migration_invariant.py:32-48,74-78` den String als byte-identische Migrations-Invariante pinnt. Reine Festschreibung, keine neue Entscheidung, keine Closing-Keywords.
   - `config/role-defaults.yaml:179,187,190,200,2691` (REQ-Text; Plan nannte `:2668` und „nicht `:2694`" — gegen `4d3d21f`: `REQ-ID vergeben` bei `:2691`, `:2694` ist die Zeile `dod_flag: req-traceability`).
   - Je betroffener Agent-Datei `version:` im YAML-Frontmatter minor erhöhen (Plan Z. 431).
 - **Soll:** REQ-Mandate werden über `{{#if DOD_REQ_TRACEABILITY}}` gegated; bei aktiver Traceability erscheint genau das kanonische Format `REQ-<AREA>-<NN>` (Ziffernzahl `\d{2,3}` gemäß User-Entscheidung 22.11.).
