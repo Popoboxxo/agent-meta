@@ -303,16 +303,22 @@ TOLERANCE_MAX_BYTES = 4096
 # RE-PIN (2026-11-20, worker-control-capability 2.3): Mammouth harness-roster +4,261 B
 # (B2 gated prose + B4 #1172 merge sentence). Re-measured with `measure_artifacts`; only
 # the one violating entry moved.
+# RE-PIN (#1217, 2026-11-23): the approved rule-doc additions
+# (rules/1-generic/a2a-delegation-gates.md +1 line, branch-guard.md +9 lines)
+# grow the embedded `rules` artifact and the artifacts that carry it.
+# Re-measured with `measure_artifacts` (the fixture's own helper), NOT
+# extrapolated: 12 violating entries moved old Ist -> measured Ist; every
+# other entry stayed inside its existing tolerance. Tolerances unchanged.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 647296, "entry-file": 2495, "harness-roster": 623609, "orchestrator": 36328, "rules": 21192},
-    "Codex": {"always-loaded": 644402, "entry-file": 27726, "harness-roster": 616676, "orchestrator": 36260},
-    "Continue": {"always-loaded": 24560, "entry-file": 358, "orchestrator": 42364, "rules": 24202},
-    "Copilot": {"always-loaded": 34910, "entry-file": 10908, "orchestrator": 42235, "rules": 24002},
-    "Gemini": {"always-loaded": 36369, "entry-file": 36369, "orchestrator": 43718},
-    "KimiCode": {"always-loaded": 651663, "entry-file": 27743, "harness-roster": 623920, "orchestrator": 36877},
-    "Mammouth": {"always-loaded": 646881, "entry-file": 27739, "harness-roster": 619142, "orchestrator": 35248},
-    "Opencode": {"always-loaded": 647615, "entry-file": 28661, "harness-roster": 618954, "orchestrator": 35853},
-    "ZCode": {"always-loaded": 649528, "entry-file": 28638, "harness-roster": 620890, "orchestrator": 35516},
+    "Claude": {"always-loaded": 647296, "entry-file": 2495, "harness-roster": 623609, "orchestrator": 36328, "rules": 23383},
+    "Codex": {"always-loaded": 644402, "entry-file": 29917, "harness-roster": 616676, "orchestrator": 36260},
+    "Continue": {"always-loaded": 26751, "entry-file": 358, "orchestrator": 42364, "rules": 26393},
+    "Copilot": {"always-loaded": 37101, "entry-file": 10908, "orchestrator": 42235, "rules": 26193},
+    "Gemini": {"always-loaded": 38560, "entry-file": 38560, "orchestrator": 43718},
+    "KimiCode": {"always-loaded": 651663, "entry-file": 29934, "harness-roster": 623920, "orchestrator": 36877},
+    "Mammouth": {"always-loaded": 646881, "entry-file": 29930, "harness-roster": 619142, "orchestrator": 35248},
+    "Opencode": {"always-loaded": 647615, "entry-file": 30852, "harness-roster": 618954, "orchestrator": 35853},
+    "ZCode": {"always-loaded": 649528, "entry-file": 30829, "harness-roster": 620890, "orchestrator": 35516},
 }
 
 
@@ -606,11 +612,15 @@ def test_ac07_missing_ceiling_is_a_violation():
 # RE-PIN (2026-11-20, worker-control-capability 2.3): 13 entries moved (B2 gated prose +
 # B4 #1172 merge sentence + worker-control tool wording). Re-measured with
 # `render_into_work_dir(profile="compact")` + `measure_artifacts`; only violating entries moved.
+# RE-PIN (#1217, 2026-11-23): same approved rule-doc additions as the full
+# profile; re-measured with `render_into_work_dir(profile="compact")` +
+# `measure_artifacts`. Exactly 5 violating entries moved (old -> measured);
+# tolerances and AC-26 targets unchanged.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 644868, "entry-file": 2445, "harness-roster": 621231, "orchestrator": 33938, "rules": 21192},
+    "Claude": {"always-loaded": 644868, "entry-file": 2445, "harness-roster": 621231, "orchestrator": 33938, "rules": 23383},
     "Codex": {"always-loaded": 618596, "entry-file": 4397, "harness-roster": 614199, "orchestrator": 33771},
-    "Continue": {"always-loaded": 24560, "entry-file": 358, "orchestrator": 35961, "rules": 24202},
-    "Copilot": {"always-loaded": 34910, "entry-file": 10908, "orchestrator": 35830, "rules": 24002},
+    "Continue": {"always-loaded": 26751, "entry-file": 358, "orchestrator": 35961, "rules": 26393},
+    "Copilot": {"always-loaded": 37101, "entry-file": 10908, "orchestrator": 35830, "rules": 26193},
     "Gemini": {"always-loaded": 11938, "entry-file": 11938, "orchestrator": 37043},
     "KimiCode": {"always-loaded": 625910, "entry-file": 4407, "harness-roster": 621503, "orchestrator": 34448},
     "Mammouth": {"always-loaded": 621171, "entry-file": 4405, "harness-roster": 616766, "orchestrator": 32860},
