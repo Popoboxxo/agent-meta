@@ -5536,8 +5536,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # (REq gating in 6 agent templates + version bumps). 41 entries changed: 27 agent
 # artifacts (3 roles x 9 providers), 9 routing-details.md, 5 hooks -- all legitimate
 # render output, not a red-test fix. Tree digest ab13100f.. -> 95a315d6.. (same event).
+# Issue #1217 (2026-11-23): GOLDEN REBASELINE. The fail-closed destructive-gate
+# ask path (hook v1.13.0 -> 1.14.1) and the two rule edits changed the rendered
+# hook/rule bytes; the AC-01 manifest was re-pinned with its --write helper.
+# ac01-baseline digest recomputed from the rebaselined fixture bytes with
+# `_fixture_tree_sha256` (95a315d6.. -> 1dc46604..); slimming/compact unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "95a315d6eb49c1b4254bedd4898e2a33344cb26d30d8890dc479f396e571b594",
+    "ac01-baseline": "1dc4660497dda05022c03801606f266d2b3591a1a7633c1e3a9a25d4638a6034",
     "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }
