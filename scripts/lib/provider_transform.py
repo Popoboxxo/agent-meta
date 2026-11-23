@@ -443,7 +443,11 @@ def _apply_agent_transform(
     rel = str(target_path.relative_to(project_root))
     # Capability entry for this provider (config/provider-capabilities.yaml),
     # read once here. The data-driven dispatch steps below consume it — never a
-    # provider-name branch.
+    # provider-name branch. `None` means the caller passed NO registry at all
+    # (legacy direct call, e.g. isolated transform unit tests): keep the frozen
+    # mapper behaviour. An explicit registry with a missing/invalid shell key
+    # is a real render and fails safe to deny (issue #1329).
+    _caps_provided = provider_capabilities is not None
     _caps = (provider_capabilities or {}).get(provider) or {}
 
     def _model_note(model: str) -> None:
@@ -459,6 +463,18 @@ def _apply_agent_transform(
     # --- opencode-native frontmatter: distinct format, handled wholesale ---
     mechanism = spec.get('frontmatter-mechanism')
     if mechanism in ('opencode-native', 'opencode-native-v2'):
+        # Issue #1329: the declared subagent-shell capability plus its verified
+        # state is the ONLY source for a rendered shell permission. A non-grant
+        # is always warned about — fail-safe must never be silent. Key-driven;
+        # no provider-name branch. Without any registry (legacy call) the
+        # mappers keep their historical output.
+        if _caps_provided:
+            _subagent_shell, _subagent_shell_state = _resolve_shell_grant(
+                _caps, provider, log
+            )
+        else:
+            _subagent_shell = _SHELL_GRANT_UNSET
+            _subagent_shell_state = _SHELL_GRANT_UNSET
         model = resolve_model(role, config, agent_meta_root,
                               provider=provider, provider_config=provider_config, log=log)
         if model:
@@ -614,11 +630,15 @@ def _apply_agent_transform(
                 strip_fields=strip_fields, mode=mode,
                 variant=_resolve_v2_model_variant(config, provider, role),
                 deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
+                subagent_shell=_subagent_shell,
+                subagent_shell_verified_state=_subagent_shell_state,
             )
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
             strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,
             deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
+            subagent_shell=_subagent_shell,
+            subagent_shell_verified_state=_subagent_shell_state,
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -886,9 +906,55 @@ def inject_debug_block(content: str, agent_name: str) -> str:
         agent_name=agent_name,
     )
 
+#: Distinguishes "caller omitted the capability argument" (legacy direct
+#: mapper calls, whose output stays frozen) from "the resolved registry value
+#: is missing". The render path ALWAYS passes both values explicitly, so a
+#: missing/invalid declared capability is a fail-safe deny (issue #1329).
+_SHELL_GRANT_UNSET = object()
+
+#: Only a runtime-verified declaration may turn a template ``Bash`` into a
+#: shell permission — a paper declaration is not evidence (issue #1329).
+_SHELL_VERIFIED_STATE = "VERIFIED-RUNTIME"
+
+
+def _shell_grant_active(subagent_shell, subagent_shell_verified_state) -> bool:
+    """Whether the declared subagent-shell capability is actually granted.
+
+    Key-driven and provider-agnostic: no provider name is inspected. The
+    ``_UNSET`` sentinel preserves the historical direct-call behaviour of the
+    mappers for external callers; every sync render passes explicit values.
+    """
+    if subagent_shell is _SHELL_GRANT_UNSET:
+        return True
+    return (
+        subagent_shell is True
+        and subagent_shell_verified_state == _SHELL_VERIFIED_STATE
+    )
+
+
+def _resolve_shell_grant(caps: dict, provider: str, log: SyncLog) -> tuple:
+    """Resolve ``(subagent_shell, verified_state)`` from the capability registry.
+
+    Emits a WARNING for every non-granting declaration — fail-safe must never
+    be silent (#1329 AC-2). Kept in the transform layer (where ``log`` lives),
+    never in the mappers.
+    """
+    declared = caps.get("subagent-shell")
+    state = caps.get("subagent-shell-verified-state")
+    if not (declared is True and state == _SHELL_VERIFIED_STATE):
+        log.warning(
+            f"{provider}: subagent shell denied (subagent-shell={declared!r}, "
+            f"verified-state={state!r}; expected True/{_SHELL_VERIFIED_STATE}) "
+            "— rendering bash/shell deny (fail-safe, #1329)"
+        )
+    return declared, state
+
+
 def _map_claude_tools_to_opencode_permissions(
     tools: list,
     deny_list: list[str] | None = None,
+    subagent_shell=_SHELL_GRANT_UNSET,
+    subagent_shell_verified_state=_SHELL_GRANT_UNSET,
 ) -> dict[str, str]:
     """Map Claude Code tool names to opencode permission keys.
 
@@ -897,6 +963,11 @@ def _map_claude_tools_to_opencode_permissions(
 
     If deny_list is provided, those permissions are set to 'deny'
     when not explicitly allowed by the template tools.
+
+    ``Bash`` -> ``bash`` is ``allow`` only for a runtime-verified
+    ``subagent-shell`` capability (issue #1329); otherwise the key is ``deny``.
+    Explicit capability arguments are passed by the render path; callers that
+    omit them keep the frozen historical mapping.
 
     Known mappings:
       Bash -> bash
@@ -923,10 +994,18 @@ def _map_claude_tools_to_opencode_permissions(
     }
     perms: dict[str, str] = {}
 
-    # Allow-mapping
+    # Allow-mapping. A template ``Bash`` alone is not evidence that the
+    # spawned worker can execute a shell — the verified capability decides.
+    shell_granted = _shell_grant_active(
+        subagent_shell, subagent_shell_verified_state
+    )
     for t in tools:
         if isinstance(t, str) and t in mapping:
-            perms[mapping[t]] = "allow"
+            key = mapping[t]
+            if key == "bash" and not shell_granted:
+                perms[key] = "deny"
+            else:
+                perms[key] = "allow"
 
     # Deny-mapping
     if deny_list:
@@ -954,6 +1033,8 @@ _V2_CLAUDE_TOOL_ACTIONS = {
 def map_tools_to_opencode_v2_permissions(
     tools: list,
     deny_list: list[str] | None = None,
+    subagent_shell=_SHELL_GRANT_UNSET,
+    subagent_shell_verified_state=_SHELL_GRANT_UNSET,
 ) -> list[dict[str, str]]:
     """Map Claude Code tool names to a closed-world opencode v2 permission list.
 
@@ -973,12 +1054,20 @@ def map_tools_to_opencode_v2_permissions(
     ``deny_list`` (``opencode_deny_critical``) is accepted for signature parity
     with the v1 mapper and deliberately has no effect: the v2 surface is closed
     by construction, so there is nothing left for a deny list to close.
+
+    ``shell`` is removed from the allowed actions unless the declared
+    ``subagent-shell`` capability is runtime-verified (issue #1329). Omitting
+    both capability arguments keeps the frozen direct-call behaviour.
     """
     allowed = {
         _V2_CLAUDE_TOOL_ACTIONS[tool]
         for tool in tools
         if isinstance(tool, str) and tool in _V2_CLAUDE_TOOL_ACTIONS
     }
+    if "shell" in allowed and not _shell_grant_active(
+        subagent_shell, subagent_shell_verified_state
+    ):
+        allowed.discard("shell")
     return [
         {
             "action": action,
@@ -1003,6 +1092,8 @@ def _transform_frontmatter_for_opencode(
     subagent_depth: int | None = None,
     deny_edit: bool = False,
     edit_allow_paths: tuple[str, ...] = (),
+    subagent_shell=_SHELL_GRANT_UNSET,
+    subagent_shell_verified_state=_SHELL_GRANT_UNSET,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -1089,7 +1180,9 @@ def _transform_frontmatter_for_opencode(
         provider_tools_cfg = load_provider_tools_config(agent_meta_root)
         deny_list = provider_tools_cfg.get("opencode_deny_critical", [])
         perms = _map_claude_tools_to_opencode_permissions(
-            template_tools, deny_list=deny_list
+            template_tools, deny_list=deny_list,
+            subagent_shell=subagent_shell,
+            subagent_shell_verified_state=subagent_shell_verified_state,
         )
         if perms:
             if deny_edit and perms.get("edit") == "allow":
@@ -1274,6 +1367,8 @@ def _transform_frontmatter_for_opencode_v2(
     variant: str | None = None,
     deny_edit: bool = False,
     edit_allow_paths: tuple[str, ...] = (),
+    subagent_shell=_SHELL_GRANT_UNSET,
+    subagent_shell_verified_state=_SHELL_GRANT_UNSET,
 ) -> str:
     """Build the native opencode **v2** agent frontmatter.
 
@@ -1336,6 +1431,8 @@ def _transform_frontmatter_for_opencode_v2(
     template_tools = template_fm.get("tools")
     permissions = map_tools_to_opencode_v2_permissions(
         template_tools if isinstance(template_tools, list) else [],
+        subagent_shell=subagent_shell,
+        subagent_shell_verified_state=subagent_shell_verified_state,
     )
     if deny_edit:
         permissions = _v2_permissions_with_edit_deny(permissions, edit_allow_paths)

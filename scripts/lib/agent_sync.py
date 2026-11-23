@@ -1342,6 +1342,9 @@ def _finalize_agent_content(
     # frontmatter BEFORE the provider transform so provider tool-name maps
     # (e.g. Gemini Bash->run_command) and permission maps see it. Injecting at
     # the MCP site below would be too late -- that runs AFTER the transform.
+    # Issue #1329: the opencode-native permission mappers gate that `Bash` on
+    # the declared `subagent-shell` capability (plus verified state); there is
+    # deliberately no separate subagent render path here.
     if extra_tools:
         content = append_frontmatter_tools(content, extra_tools)
 

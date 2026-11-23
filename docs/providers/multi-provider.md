@@ -47,6 +47,40 @@ Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin u
 > in dieselbe `AGENTS.md` im Projekt-Root — die Datei
 > ist bewusst provider-neutral (siehe Routing in `CLAUDE.md`: „Opencode, Gemini -> AGENTS.md").
 
+### Subagent-Shell-Capability (#1329)
+
+Die deklarierte Shell-Berechtigung generierter Agenten muss mit der tatsächlich verfügbaren
+Capability im Ziel-Harness übereinstimmen. Quelle ist ausschließlich
+`config/provider-capabilities.yaml` mit den beiden Keys `subagent-shell` und
+`subagent-shell-verified-state`:
+
+- `subagent-shell: true` **und** `subagent-shell-verified-state: VERIFIED-RUNTIME` ⇒ die
+  Rollen-Permission `bash` (v1) bzw. `permissions[shell].effect` (v2) wird `allow`.
+- Jeder andere Fall — Key fehlt, `false`, ungültiger Typ oder verified-state
+  `UNVERIFIED`/`DOCUMENTED`/fehlt — ⇒ `deny` (bzw. kein `allow`) **plus** `WARNING`.
+  Es wird nie still auf `allow` gefallen (fail-safe, nie silent).
+- Die Entscheidung ist key-driven (Capability-Flags/Config-Keys), nicht an einen
+  Provider-Namen gebunden; neue Provider werden rein deklarativ aktiviert.
+
+| Provider | primary mode | subagent mode | verified-state |
+|----------|--------------|---------------|----------------|
+| `Claude` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `Opencode` | `deny` (primary) | `allow` (subagent) | `VERIFIED-RUNTIME` |
+| `Gemini` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `Continue` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `Copilot` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `Mammouth` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `Codex` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `ZCode` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+| `KimiCode` | `deny` (primary) | `deny` (subagent) | `UNVERIFIED` |
+
+**Fehlt der Primary-Mode-Key** (`primary-role` / `mode`): es wird keine neue Primary-Posture
+erfunden. Der bestehende Fail-safe in
+`scripts/lib/provider_transform.py::_transform_frontmatter_for_opencode` setzt den Default
+`mode: subagent`. Die Shell-Capability wird dann nach dem `subagent-shell`-Key beurteilt;
+bei `false` oder `UNVERIFIED` ⇒ `deny`. Der Post-Render-Gate gleicht Deklaration und
+gerendertes Artefakt ab und liefert bei Abweichung ein Finding mit Rolle, Datei und Mode.
+
 ### Claude Code
 
 Vollständiger Output — keine Einschränkungen:

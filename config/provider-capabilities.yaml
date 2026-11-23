@@ -60,6 +60,15 @@
 # an absent or false value keeps the prompt-convention guardrail (fail-safe).
 # Never derive this from a provider name — use the declared capability.
 #
+# subagent-shell / subagent-shell-verified-state (issue #1329): whether the
+# harness actually registers a shell tool for agents spawned as subagents.
+# Every registered provider MUST declare both keys explicitly (same obligation
+# as `supports-permission-deny`). A shell permission is rendered as `allow`
+# ONLY when `subagent-shell: true` AND
+# `subagent-shell-verified-state: VERIFIED-RUNTIME`; any missing, false or
+# invalid value fails safe to `deny` plus a WARNING. Declarations are key-driven
+# data — never a provider-name branch in the syncer.
+#
 # route_intent_tool (issue #264 runtime follow-up): whether the harness registers
 # the generated `route_intent` definition as a CALLABLE tool. The definition is
 # rendered into the orchestrator prompt ({{INTENT_ROUTING_TOOLS}}), but rendering
@@ -139,6 +148,8 @@ capabilities:
     commands: true
     runtime_gate: hook                  # verified PreToolUse hook contract (hook_protocol claude-code-json)
     supports-permission-deny: true  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]
     worker_control_tools: ["SendMessage", "TaskStop"]  # IC-1: worker control (#1176)
@@ -199,6 +210,8 @@ capabilities:
     commands: true
     runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: true                # issue #1329: decision (a) grant — Opencode workers get the shell tool
+    subagent-shell-verified-state: VERIFIED-RUNTIME  # verified harness support for spawned workers
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["task"]
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -259,6 +272,8 @@ capabilities:
     commands: true                 # .gemini/commands/*.toml (commands_dir/commands_ext/commands_format in ai-providers.yaml)
     runtime_gate: hook             # verified Antigravity hooks.json contract (hook_protocol antigravity-hooks-json)
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false       # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     worker_control_tools: ["send_message"]  # IC-1: worker control (#1176)
@@ -328,6 +343,8 @@ capabilities:
     commands: true
     runtime_gate: advisory
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -391,6 +408,8 @@ capabilities:
     commands: true                  # .github/prompts/*.prompt.md (VS Code / GitHub Copilot prompt files, `/name`) — issue #807, UNDERCLAIM P-6 fixed
     runtime_gate: advisory
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["agent"]    # must also be listed in `tools:` when `agents:` is non-empty — issue #855, UNDERCLAIM P-6 fixed
     worker_control_tools: []         # IC-1: no verified worker-control tool
@@ -462,6 +481,8 @@ capabilities:
     commands: true                  # .mammouth/commands/*.md — Mammouth (OpenCode fork) runtime binary: "Add .md files to .mammouth/commands/ for reusable prompts" (issue #807)
     runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false        # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     worker_control_tools: []             # IC-1: no verified worker-control tool
@@ -536,6 +557,8 @@ capabilities:
     commands: false                   # verified decision (issue #807): Codex custom prompts are user-global (${CODEX_HOME}/prompts) + deprecated in favor of skills; no project-scoped prompt surface (openai/codex #9848 open)
     runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
     worker_control_tools: ["send_input", "close_agent", "wait_agent"]  # IC-1: worker control (#1176)
@@ -611,6 +634,8 @@ capabilities:
     commands: true                    # .zcode/commands/*.md workspace command surface (zcode.z.ai/en/docs/commands) — issue #807, UNDERCLAIM ZC-2 fixed
     runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
     worker_control_tools: []                # IC-1: no verified worker-control tool
@@ -682,6 +707,8 @@ capabilities:
     commands: false                   # verified decision (issue #807): Kimi exposes slash commands as built-ins + Active Skills (/skill:<name>), no project custom-command dir; the synced .kimi-code/skills/ tree is the command surface
     runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
     supports-permission-deny: false  # issue #1263: native mcp__<server>__<tool> deny; opt-in, fail-safe
+    subagent-shell: false               # issue #1329: harness provides shell to spawned subagent workers; fail-safe deny
+    subagent-shell-verified-state: UNVERIFIED  # VERIFIED-RUNTIME only with a live harness proof
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
     worker_control_tools: []                      # IC-1: no verified worker-control tool

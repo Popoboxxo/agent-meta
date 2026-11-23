@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.9.0"
+version: "4.9.1"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
@@ -130,6 +130,7 @@ Delegation:
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 {{ANTI_RECURSION_BLOCK}}
 - No default exports
 - No secrets / API keys in code

@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.2.0"
+version: "2.2.1"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -181,6 +181,7 @@ ARTIFACTS: [changed/new files]
 </output_contract>
 
 <constraints>
+- **Measured evidence only:** claim success (tests passed, green, pass counts) only with an exit code you actually observed in this turn — without a measured exit code report the result as `partial`/unverified; never fabricate pass evidence.
 ## Danger zones — always confirm
 
 | Operation | Action |

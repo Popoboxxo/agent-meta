@@ -24,6 +24,14 @@ Rebaseline log:
   (``da1a95ec…`` -> ``b43ddf27…``): ``agent-meta-developer`` 2.0.4 escape example,
   and its placeholder constraint line (the matrix project sets no ``EXTRA_DONTS``). Patched
   per key from ``_matrix_hashes``' own helpers, not via ``--capture-baseline``.
+- #1329 (central golden rebaseline): #1329 added one provider-neutral "Measured
+  evidence only" line inside ``<constraints>`` in seven execution roles
+  (``code-reviewer``, ``developer``, ``devops-engineer``, ``e2e-tester``, ``git``,
+  ``test-executor``, ``tester``). ``_normalized_hash`` strips frontmatter versions
+  but NOT body content, so the added body line legitimately changed the rendered
+  contract: **23 of 30 hashes moved; 0 added/removed**. The baseline was
+  re-captured with this test's own ``--capture-baseline`` helper (the fixture is
+  never hand-written); the re-pin records the intended output, not a test fix.
 
 Run: ``python3 -m pytest tests/test_test_environments_render.py --basetemp="{{PYTEST_BASETEMP}}"``
 """
@@ -77,12 +85,12 @@ OVERRIDE_COVERAGE = {
 
 #: Task 8: the minor version bump each base template receives with the gate.
 BASE_VERSIONS = {
-    "tester": "2.10.1",
-    "e2e-tester": "1.7.0",
-    "developer": "4.9.0",
+    "tester": "2.10.2",
+    "e2e-tester": "1.7.1",
+    "developer": "4.9.1",
     "docker": "1.10.0",
-    "devops-engineer": "1.8.0",
-    "test-executor": "1.3.0",
+    "devops-engineer": "1.8.1",
+    "test-executor": "1.3.1",
 }
 
 #: Static role line inside the gate, directly below {{TEST_ENVIRONMENT_BLOCK}}.
@@ -383,12 +391,12 @@ def test_settings_json_identical_and_no_secrets_file(tmp_path_factory):  # AC-EN
 
 #: Override file -> (own version, based-on pin) after Task 9 (AC-ENV-10).
 OVERRIDES = {
-    "homeassistant-developer.md": ("2.1.3", "1-generic/developer.md@4.9.0"),
-    "sharkord-developer.md": ("3.0.3", "1-generic/developer.md@4.9.0"),
-    "hacs-developer.md": ("1.3.3", "1-generic/developer.md@4.9.0"),
-    "agent-meta-developer.md": ("2.0.4", "1-generic/developer.md@4.9.0"),
-    "hacs-tester.md": ("1.0.7", "1-generic/tester.md@2.10.1"),
-    "hacs-devops-engineer.md": ("1.0.2", "1-generic/devops-engineer.md@1.8.0"),
+    "homeassistant-developer.md": ("2.1.4", "1-generic/developer.md@4.9.1"),
+    "sharkord-developer.md": ("3.0.4", "1-generic/developer.md@4.9.1"),
+    "hacs-developer.md": ("1.3.4", "1-generic/developer.md@4.9.1"),
+    "agent-meta-developer.md": ("2.0.5", "1-generic/developer.md@4.9.1"),
+    "hacs-tester.md": ("1.0.8", "1-generic/tester.md@2.10.2"),
+    "hacs-devops-engineer.md": ("1.0.3", "1-generic/devops-engineer.md@1.8.1"),
     "sharkord-docker.md": ("1.2.5", "1-generic/docker.md@1.10.0"),
 }
 

@@ -5541,8 +5541,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # hook/rule bytes; the AC-01 manifest was re-pinned with its --write helper.
 # ac01-baseline digest recomputed from the rebaselined fixture bytes with
 # `_fixture_tree_sha256` (95a315d6.. -> 1dc46604..); slimming/compact unchanged.
+# #1329 (central golden rebaseline): #1329 added one provider-neutral "Measured
+# evidence only" line inside `<constraints>` in seven execution roles; rendered
+# output legitimately changed and the AC-01 manifest was re-pinned with its own
+# --write helper (105 hashes: 63 role artifacts + 42 pre-existing Mammouth
+# provider-capability artifacts on this branch). The ac01-baseline digest was
+# recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`
+# (1dc46604.. -> b98ae9c0..); slimming/compact/topology-golden unchanged.
 _FIXTURE_TREES = {
-    "ac01-baseline": "1dc4660497dda05022c03801606f266d2b3591a1a7633c1e3a9a25d4638a6034",
+    "ac01-baseline": "b98ae9c067d02af98f12389f53f47cee7cf193ea1a023346f419582d546ce10d",
     "slimming-golden": "abffd8ead4f4300c8d6eb369ad729728972e617447b676e213f4377c2bc10d86",
     "compact-golden": "e2c63534f1c7fc4dab8d60ad1c77d5868ae0d58383e68ace019524cb08f61bb4",
 }

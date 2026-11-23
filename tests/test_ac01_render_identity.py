@@ -1113,6 +1113,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``slimming-golden`` and ``compact-golden`` unchanged. Same event is recorded in the AC-T4
   comment of ``tests/test_opencode_v2_surface.py``.
 
+- #1329 (central golden rebaseline): #1329 added one provider-neutral "Measured evidence only"
+  line inside ``<constraints>`` in seven execution roles (``code-reviewer``, ``developer``,
+  ``devops-engineer``, ``e2e-tester``, ``git``, ``test-executor``, ``tester``). The line is rendered
+  body content, so it legitimately changed the rendered output: **105 of 1195 hashes moved;
+  0 added/removed** -- 63 role artifacts (7 roles x 9 providers) plus 42 Mammouth artifacts that
+  this branch's provider-capability change also moved (pre-existing in the bundle, absorbed by
+  the same re-render). The manifest was regenerated with this harness's own ``--write`` helper;
+  ``AC01_EXCEPTIONS`` is NOT extended. Because ``hashes.json`` is the only ``ac01-baseline``
+  file, its AC-T4 digest in ``tests/test_opencode_v2_surface.py`` follows the rebaselined tree
+  (recomputed from the fixture bytes with ``_fixture_tree_sha256``:
+  ``1dc46604…`` -> ``b98ae9c0…``); ``slimming-golden`` and ``compact-golden`` are unchanged.
+  The re-pin records the intended output, not a test fix.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

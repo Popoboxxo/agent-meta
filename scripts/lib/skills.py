@@ -409,6 +409,18 @@ def sync_external_skills_for_provider(
     agents_dir = project_root / agents_dir_rel
     skills_dir = project_root / skills_dir_rel
 
+    # Issue #1329 (Stage-2 F1): the opencode-native permission mappers derive a
+    # rendered shell permission from the declared ``subagent-shell`` capability.
+    # Resolving the registry here mirrors agent_sync._load_artifact_capabilities
+    # (fail-soft: an unreadable registry yields {} so every provider resolves
+    # from its own entry). Without it the transform's UNSET sentinel allowed
+    # Bash silently for non-grant providers — a fail-open on the wrapper path.
+    from .providers import load_provider_capabilities
+    try:
+        provider_capabilities = load_provider_capabilities(agent_meta_root) or {}
+    except Exception:  # noqa: BLE001 — optional-file semantics: default enabled
+        provider_capabilities = {}
+
     now_managed: set[str] = set()
 
     ext_config = load_external_skills_config(agent_meta_root)
@@ -542,6 +554,7 @@ def sync_external_skills_for_provider(
             target_path=agent_target,
             provider_config=provider_config,
             log=log,
+            provider_capabilities=provider_capabilities,
         )
         # Route every external-skill write through write_checked/is_unchanged
         # so a byte-identical artifact is a no-op (log.skip) rather than an
