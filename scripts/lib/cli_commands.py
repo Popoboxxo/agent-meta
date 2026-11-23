@@ -822,6 +822,14 @@ def _handle_audit_config(ctx: _SyncContext) -> None:
     ctx.read_only = True
     report = audit_config(agent_meta_root, config_path)
     print(format_report(report))
+    # Issue #1141: unknown top-level keys are WARN-ONLY and surface on the
+    # shared audit path too. print_report returns 0 for warning-only findings;
+    # the return value is deliberately ignored so --audit-config stays rc 0.
+    from lib.consistency.config_unknown_keys import check_unknown_config_keys
+    from lib.consistency.report import print_report as _print_unknown_key_report
+    _unknown_key_findings = check_unknown_config_keys(agent_meta_root, config_path)
+    if _unknown_key_findings:
+        _print_unknown_key_report(_unknown_key_findings, ctx.project_root, changed_only=False)
     if args.apply:
         if args.dry_run:
             log.note("audit-config",
@@ -1671,6 +1679,11 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
     # `_run_consistency_checks` -- so --validate prints the family exactly once.
     from lib.consistency.temp_literals import check_temp_literals
     _strict_findings += check_temp_literals(agent_meta_root, project_root, config)
+    # Issue #1141 (WARN-ONLY): unknown top-level config keys. These are
+    # Severity.WARNING findings, so print_report() below returns 0 and neither
+    # consistency_errors nor the final exit code changes (AC-01/02/07).
+    from lib.consistency.config_unknown_keys import check_unknown_config_keys
+    _strict_findings += check_unknown_config_keys(agent_meta_root, config_path)
     # Issue #1167 (Task 20): canonical REQ-ID format in docs/REQUIREMENTS.md.
     # Silent with req-traceability off; Severity.ERROR findings fail --validate.
     from lib.consistency.req_format import check_req_ids

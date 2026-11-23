@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.13.0
-# changelog: 1.13.0: issue #1181 -- a granted role's sentinel is restricted to git add / non-amending git commit (all_git classifier field + IS_GRANT_SENTINEL gate); issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
+# version: 1.14.1
+# changelog: 1.14.1: issue #1217 (review fix) -- ask-class requires a PURE delete: co-occurring hard flags (-f/--force/--force-with-lease/--mirror/--prune/+refspec, branch -f) make the statement hard (AC-02, strictest wins within one statement); the scan no longer breaks after the first destructive statement while ask is still eligible, so a later hard statement wins; 1.14.0: issue #1217 -- destructive gate gains a dormant, fail-closed user-approval (ask) subclass for `git branch -D` / `git push --delete` / `git push :ref` only; activation DEFAULT OFF (runtime config key + harness interactivity signal), never agent/sentinel-triggerable, never permissionDecision:allow; strict/mutation blocks still win (exit 2); 1.13.0: issue #1181 -- a granted role's sentinel is restricted to git add / non-amending git commit (all_git classifier field + IS_GRANT_SENTINEL gate); issues #1169/#1238 -- one interpreter start reads all payload fields via hook_json_get_many (importable hook_json_many.py module); issue #1210 -- harness payload role field (`agent_type`, gated by the `hook-role-field` capability) cross-checks the self-declared sentinel and rejects a mismatch; 1.12.0: issue #1258 -- `git branch` with read-only list-mode flags (--list/-l, --contains, --no-contains, --merged, --no-merged, --points-at, -a/--all, -r/--remotes, --show-current) is no longer misread as branch creation when it carries a positional; modifying flags and bare `git branch <name>` stay mutations. 1.11.0: issue #1151 (audit G1) -- NotebookEdit/MultiEdit are judged like Edit and PowerShell like Bash (F6-01); an Agent/Task call with isolation "worktree", or one from a subagent that spawns `orchestrator`, is blocked (F3-03); `git stash` (bare/push/apply/...), mv, apply, notes, replace, update-index, config writes, fast-import, init, submodule update/add/... and gc are mutations, `stash list/show` and config reads stay read-only (F6-04); a sentinel on a main-thread call is discarded when the provider's payload carries a reliable agent_id (sync-time capability `hook-agent-id`, F6-05); the body of a $(...)/backtick substitution -- also inside double quotes -- is classified as its own statement (F6-03, part of #592); the mutation block message names the subagent instead of the main chat when agent_id is set and the fork-bomb hint only appears on a fork-bomb verdict (F6-08). 1.10.0: the sentinel grammar accepts an optional audit-only instance id (`#agent-meta:agent=<role> id=<orchestrator-id>`); the id is appended to the orchestrator audit line as `orchestrator_id=<id|unset>` and is NEVER read by the allow/deny path (OQ-2 = A, AC-11 P3). The id token is validated against the instance grammar `[a-z0-9][a-z0-9._-]{0,39}` (no `..`); an invalid id makes the whole sentinel unparseable, exactly like a malformed role.
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -973,6 +973,48 @@ def is_whole_tree_pathspec(p):
     return p in WHOLE_TREE_PATHSPECS or p.startswith(':/')
 
 
+def is_ask_class(subcmd, args, config_values):
+    """Narrow #1217 ask subclass: only PURE explicitly approved ref deletions.
+
+    A statement is ask-eligible only when its destructive verdict comes from
+    the delete operation alone -- any co-occurring hard indicator in the SAME
+    statement (force / mirror / prune / leading '+' refspec for push, force
+    for branch) makes it hard (strictest class wins WITHIN one statement).
+    Default is 'hard' for everything else. A config-driven RCE vector, a
+    fork bomb, a filesystem wipe or any other destructive verdict is NOT
+    ask-class, so it keeps the hard exit 2. Multi-statement commands win the
+    strictest class: one hard destructive statement disqualifies the whole
+    command from ask (tracked by the caller's ask_eligible flag).
+    """
+    if config_values:
+        return False
+    if subcmd == 'branch':
+        branch_value_opts = {'u', 'c', 'C', 'm', 'M'}
+        # '-f'/'--force' moves the tip -> hard, even alongside '-D'.
+        if '--force' in args or has_short_flag(args, 'f', branch_value_opts):
+            return False
+        # '-D' (forced delete); value opts must not be read as '-D'.
+        return has_short_flag(args, 'D', branch_value_opts)
+    if subcmd == 'push':
+        positionals = [a for a in args if not a.startswith('-')]
+        # Mirror/prune delete far more than the named ref; a leading '+' or
+        # any force flag makes the push hard regardless of --delete/':ref'.
+        if '--mirror' in args or '--prune' in args:
+            return False
+        if any(p.startswith('+') for p in positionals):
+            return False
+        for a in args:
+            if a in ('-f', '--force') or a.startswith('--force-with-lease'):
+                return False
+        if has_short_flag(args, 'f', {'o'}):
+            return False
+        if '--delete' in args:
+            return True
+        # ':dst' empty-source refspec deletes the remote ref.
+        return any(p.startswith(':') and len(p) > 1 for p in positionals)
+    return False
+
+
 def is_destructive(subcmd, args, config_values, stdin_bodies=None):
     # RCE via config applies regardless of the subcommand (issue #591). Keys
     # are matched case-insensitively; 'alias.<name>=<cmd>' is an RCE vector too
@@ -1379,12 +1421,23 @@ bom = 'none'
 # even when the git mutations themselves stay within the narrow add/commit
 # scope. Comments (incl. the sentinel line) are absent from this stream.
 all_git = True
+# #1217: ask subclass is opt-in and only for the two approved delete ops.
+# One hard-destructive statement disqualifies the whole command (strictest
+# class wins); a fork bomb or fs wipe is never ask-class.
+ask_eligible = True
+has_ask = False
+if fork_bomb:
+    ask_eligible = False
 # Quote/heredoc-aware statements from the shared lib (issue #943 (c)/(j),
 # #944 SR-B-16). Heredoc bodies are attached to the statement that opened
 # them; they are prose for command classification, except that
 # `update-ref --stdin` delete lines are inspected.
 for stmt, heredoc_bodies in _statement_stream:
-    if destructive:
+    # #1217 (review fix): only stop early once a HARD destructive verdict is
+    # known (strictest class already reached). While merely an ask-class
+    # delete was found, keep scanning -- a later hard statement such as
+    # `git reset --hard` must win and force exit 2 (AC-08 / strictest wins).
+    if destructive and not ask_eligible:
         break
     toks = tokens_of(stmt)
     idx = command_start(toks)
@@ -1394,6 +1447,7 @@ for stmt, heredoc_bodies in _statement_stream:
     args = toks[idx + 1:]
     if is_fs_destructive(cmd, args):
         destructive = True
+        ask_eligible = False
         break
     if cmd != 'git':
         all_git = False
@@ -1404,21 +1458,27 @@ for stmt, heredoc_bodies in _statement_stream:
     if is_destructive(subcmd, git_args, config_values,
                       heredoc_bodies if heredoc_bodies else None):
         destructive = True
+        if is_ask_class(subcmd, git_args, config_values):
+            has_ask = True
+        else:
+            ask_eligible = False
     if is_mutation(subcmd, git_args):
         mutation = True
         if not is_addcommit_scope(subcmd, git_args):
             mutation_scope_broad = True
     if subcmd == 'commit' and bom == 'none':
         bom = commit_message_bom(git_args)
-    if destructive:
-        break
+    # No break here: #1217 must keep scanning after an ask-class delete so a
+    # later hard statement can revoke ask eligibility (the top-of-loop guard
+    # stops only once a hard verdict makes the strictest class final).
 
 category = 'destructive' if destructive else ('mutation' if mutation else 'none')
 # #1151 F6-08: a fork-bomb verdict reports scope 'forkbomb' so the block
 # message names the fork-bomb scan only when it fired (scope is otherwise
 # irrelevant for 'destructive').
 scope = 'forkbomb' if fork_bomb else ('broad' if mutation_scope_broad else 'narrow')
-print(f'{category} {scope} {bom} {1 if all_git else 0}')
+ask_class = 1 if (destructive and has_ask and ask_eligible) else 0
+print(f'{category} {scope} {bom} {1 if all_git else 0} {ask_class}')
 PYEOF
 )
   _GIT_SCAN_RC=0
@@ -1428,7 +1488,7 @@ PYEOF
     echo "Failing closed (issue #943 (k)) — an unevaluable command must not be allowed." >&2
     exit 2
   fi
-  if [ "$(printf '%s' "$_GIT_SCAN_RAW" | awk 'NF{print NF}')" != "4" ]; then
+  if [ "$(printf '%s' "$_GIT_SCAN_RAW" | awk 'NF{print NF}')" != "5" ]; then
     echo "ORCHESTRATOR_GUARD: the git/destructive classifier returned malformed output." >&2
     echo "Failing closed (issue #943 (k)) — an unevaluable command must not be allowed." >&2
     exit 2
@@ -1437,6 +1497,15 @@ PYEOF
   _GIT_SCAN_SCOPE=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $2}')
   _GIT_BOM=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $3}')
   _GIT_SCAN_ALL_GIT=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $4}')
+  _GIT_SCAN_ASK_CLASS=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $5}')
+  case "$_GIT_SCAN_ASK_CLASS" in
+    0|1) ;;
+    *)
+      echo "ORCHESTRATOR_GUARD: the git/destructive classifier returned an unknown ask class '$_GIT_SCAN_ASK_CLASS'." >&2
+      echo "Failing closed (issue #1217)." >&2
+      exit 2
+      ;;
+  esac
   case "$_GIT_SCAN" in
     destructive|mutation|none) ;;
     *)
@@ -1476,15 +1545,73 @@ if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_BOM" != "none" ]; then
   exit 2
 fi
 
+# --- #1217 ask activation: config-driven, DEFAULT OFF, fail closed ------
+# Three independent conditions must ALL hold before an ask is even considered;
+# absence of any one leaves the original hard exit 2 untouched:
+#   1. activation: runtime config key orchestrator.destructive-ask.enabled
+#      (provider-agnostic, no provider-name branch). Any read/parse error
+#      resolves to OFF. This key is NOT set by this repo -> delivered
+#      behaviour remains exit 2 (spec OFFEN 1: activation deferred).
+#   2. interactivity: harness-set AGENT_META_HARNESS_INTERACTIVE=1. An agent
+#      cannot set the hook process environment from the command string, and
+#      no harness in this repo is confirmed to set it -> absent = headless.
+#   3. forgery-clean: no sentinel / no agent_id / no declared role on the
+#      call. Sentinels and model-written text can never trigger ask or grant
+#      approval; the approval itself is given only by the human in the
+#      harness after the native "ask" dialog. Never permissionDecision:allow.
+_ASK_CFG="$PROJECT_ROOT/.meta-config/project.yaml"
+_ASK_ENABLED=0
+if [ -f "$_ASK_CFG" ]; then
+  _ASK_ENABLED=$("$_PY" -c "
+import sys
+try:
+    import yaml
+    with open(sys.argv[1], encoding='utf-8-sig') as f:
+        c = yaml.safe_load(f) or {}
+    v = (c.get('orchestrator') or {}).get('destructive-ask', False)
+    if isinstance(v, dict):
+        v = v.get('enabled', False)
+    print('1' if str(v).strip().lower() in ('true', '1', 'yes', 'on') else '0')
+except Exception:
+    print('0')
+" "$_ASK_CFG" 2>/dev/null)
+fi
+case "$_ASK_ENABLED" in
+  0|1) ;;
+  *) echo "ORCHESTRATOR_GUARD: ask activation check produced no result; failing closed (#1217)." >&2
+     _ASK_ENABLED=0 ;;
+esac
+
+_ASK_INTERACTIVE=0
+if [ "${AGENT_META_HARNESS_INTERACTIVE:-}" = "1" ]; then
+  _ASK_INTERACTIVE=1
+fi
+
+_ASK_FORGERY_CLEAN=1
+if [ -n "${DECLARED_AGENT:-}" ] || [ -n "${AGENT_ID:-}" ] \
+   || [ "$IS_GIT_SENTINEL" = "1" ] || [ "$IS_ORCH_SENTINEL" = "1" ] \
+   || [ "$IS_ALLOWLIST_SENTINEL" = "1" ] || [ "$IS_GRANT_SENTINEL" = "1" ]; then
+  _ASK_FORGERY_CLEAN=0
+fi
+
 # --- Destructive-operation gate: applies regardless of sentinel --------
+# Ask is DEFERRED, not emitted here: only a flag is set and execution falls
+# through every later blocking gate (strict / mutation / grant). Any stricter
+# block exits 2 first, so a later deny always wins over ask (AC-08).
+_ASK_PENDING=0
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
-  echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
-  echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
-  if [ "$_GIT_SCAN_SCOPE" = "forkbomb" ]; then
-    echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2
+  if [ "$_ASK_ENABLED" = "1" ] && [ "$_GIT_SCAN_ASK_CLASS" = "1" ] \
+     && [ "$_ASK_INTERACTIVE" = "1" ] && [ "$_ASK_FORGERY_CLEAN" = "1" ]; then
+    _ASK_PENDING=1
+  else
+    echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
+    echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
+    if [ "$_GIT_SCAN_SCOPE" = "forkbomb" ]; then
+      echo "If this is a shell function: a body without an unquoted '}' in its first 512 characters is blocked by the fork-bomb scan (fail closed)." >&2
+    fi
+    echo "Ask the user to approve and run this command manually." >&2
+    exit 2
   fi
-  echo "Ask the user to approve and run this command manually." >&2
-  exit 2
 fi
 
 # Check if strict mode is enabled in project.yaml
@@ -1659,6 +1786,38 @@ if [ "$TOOL_NAME" = "Bash" ] && [ "$IS_GRANT_SENTINEL" = "1" ]; then
     echo "ORCHESTRATOR_GUARD: a granted commit role may only use its sentinel for \`git add\`/\`git commit\` (issue #1181)." >&2
     exit 2
   fi
+fi
+
+# --- #1217: emit the deferred ask ONLY after every blocking gate passed ---
+# The command is emitted unchanged (no 200-char truncation) as valid JSON;
+# only credential-like values are redacted. If JSON cannot be produced the
+# hook fails CLOSED with the original stderr text (AC-07). No approved/denied
+# audit is written without a harness event; 'asked' only records the offer.
+if [ "$_ASK_PENDING" = "1" ]; then
+  _ASK_JSON=$("$_PY" -c "
+import json, re, sys
+cmd = sys.argv[1]
+cmd = re.sub(r'(?i)\b(token|password|passwd|secret|api[_-]?key)([=:]\s*)(\S+)',
+             r'\1\2<redacted>', cmd)
+print(json.dumps({
+    'hookSpecificOutput': {
+        'hookEventName': 'PreToolUse',
+        'permissionDecision': 'ask',
+        'permissionDecisionReason': cmd + ' (class=ask, issue #1217)',
+    }
+}, ensure_ascii=False))
+" "$BASH_CMD" 2>/dev/null) || _ASK_JSON=""
+  if [ -z "$_ASK_JSON" ]; then
+    echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
+    echo "Ask the user to approve and run this command manually." >&2
+    exit 2
+  fi
+  _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
+  _AUDIT_LINE=$(printf '%s decision=asked class=ask cmd=%s' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
+  hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
+  printf '%s\n' "$_ASK_JSON"
 fi
 
 exit 0
