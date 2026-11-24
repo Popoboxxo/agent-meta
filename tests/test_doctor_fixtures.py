@@ -13,11 +13,13 @@ case below ``positive/`` or ``negative/``. The doctor runs in-process
 (``run_doctor``; the CLI is covered by ``test_doctor_cli.py``); the active set,
 registry load and ``subprocess`` are the only things stubbed, see ``_run_case``.
 
-Coverage matrix (30 seeds): all registered seeds are fixturable (the retired
-``instruction-soft-cap-chars`` seed owns no fixture directory). Seeds that need a stub
+Coverage matrix (31 seeds): all registered seeds are fixturable except
+``hooks-unknown-tool-name`` (#1323, framework-config-only); the retired
+``instruction-soft-cap-chars`` seed owns no fixture directory either. Seeds that need a stub
 because the real environment cannot be put into a small tree are marked
-``STUBBED`` below with the reason; ``NOT_FIXTURABLE`` is empty on purpose and
-exists so that a future gap must be named with a reason instead of silently
+``STUBBED`` below with the reason; ``NOT_FIXTURABLE`` now names the
+framework-config-only check (``hooks-unknown-tool-name``, #1323) with its reason,
+so that a future gap must be named with a reason instead of silently
 dropped (the meta test fails for any seed that has neither fixtures nor an entry).
 """
 
@@ -47,7 +49,14 @@ _REGISTRY = yaml.safe_load((_ROOT / "config" / "known-issues.yaml").read_text(en
 SEED_IDS = [e["id"] for e in _REGISTRY["issues"]]
 
 # Seed id -> reason. A seed listed here needs no fixture directory.
-NOT_FIXTURABLE = {}
+NOT_FIXTURABLE = {
+    # #1323: the check's data sources are the framework config and the hook
+    # source under agent_meta_root (always the real framework root here), not
+    # the fixture project tree. A negative fixture therefore cannot drive it;
+    # positive/negative cases live in tests/test_hook_known_tool_names_consistency.py.
+    "hooks-unknown-tool-name": "framework-config-only check: fixtures cannot change "
+                               "agent_meta_root; covered by the dedicated unit tests",
+}
 
 # Seeds whose detector cannot be driven by a small tree alone (stub in _run_case).
 STUBBED = {

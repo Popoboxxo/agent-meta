@@ -473,9 +473,13 @@ def _raw_findings(det: dict, env: Env) -> list:
         return [(c, SYNC_LOG_REL, msg, sev, {})
                 for c, msg, sev in _sync_log_entries(env) if fnmatch.fnmatch(c, check)]
     if source == "hooks":
-        from .consistency import hook_drift
+        from .consistency import hook_drift, hook_known_tool_names
 
         raws = hook_drift.check_hook_enablement_consistency(
+            env.project_root, env.agent_meta_root, env.config, env.provider_config)
+        # Issue #1323: config<->allow-list deltas are INFO findings (rc 0).
+        # The caller's check filter keeps the two hook checks separate.
+        raws += hook_known_tool_names.check_unknown_tool_names(
             env.project_root, env.agent_meta_root, env.config, env.provider_config)
     elif source in _CHECK_MODULES:
         if resolve_check_function(source, check) is None and not any(c in check for c in "*?["):
