@@ -89,8 +89,8 @@ Alle Pfade relativ zum Repo-Root; alle genannten Symbole/Dateien wurden gegen de
 
 **B1 — #1248 `# provider: …`-Header durch Protokoll-Header ersetzen** (S)
 - Dateien (verifiziert): `hooks/1-generic/dod-push-check.sh`, `hooks/1-generic/lifecycle-check.sh`, `hooks/1-generic/sync-on-config-change.sh` (je 1 Treffer `^# provider:`).
-- Contract: Header nennt Protokoll, z.B. `# protocol: tool-hook-v1`; kein Skript parst den Header als Provider-Schalter (Grep-Nachweis).
-- AC-1: Grep `^# provider:` in `hooks/`: 0. AC-2: Hook-Tests grün. Rebaseline: ja (Hook-Hashes), eigener Rebaseline-Commit.
+- Contract: Header nennt Protokoll, z.B. `# protocol: tool-hook-v1`; kein 1-generic-Hook deklariert `provider:`; `hooks.py` behält den `provider`-Filter für 0-external.
+- AC-1: Grep `^# provider:` in `hooks/1-generic/`: 0 (0-external-graphify-Guards bleiben Claude-only). AC-2: Hook-Tests grün. Rebaseline: ja (Hook-Hashes), eigener Rebaseline-Commit.
 
 **B2 — #1251 Projektverzeichnis aus Adapter-Variable statt `CLAUDE_PROJECT_DIR`** (S)
 - Dateien (verifiziert, Treffer): `hooks/1-generic/lib/hook_common.sh`, `artifact-path-guard.sh`, `orchestrator-guard-impl.sh`, `repo-containment-impl.sh`, `lib/kernel/containment.py`, `lib/kernel/model.py`.
@@ -252,6 +252,7 @@ Je Item ≥ 1 Commit; **Rebaseline-Commits separat** (nach dem auslösenden Item
 - Rahmen: ein Branch `feat/provider-agnostic-sync-hooks-wave-5`, ein PR.
 
 ## Änderungen an dieser Spec
+- 2026-11-23: B1 AC-1 auf `hooks/1-generic/` eingegrenzt; Grund: die 0-external-graphify-Guards bleiben Claude-only (Adapter-Verhalten unverifiziert). Status bleibt APPROVED.
 - 2026-11-23: APPROVED durch User; Q1–Q6 entschieden und aufgelöst.
 - 2026-11-23: Erstentwurf (DRAFT).
 - 2026-11-23: Revision 2 — A4-Modulliste abschliessend (6 Dateien, Rest als Nicht-Ziel/BAC-5-Ausnahme), A5 alle Strip-Aufrufstellen inkl. Opencode, Q5/Q6 getrennt mit Default-Annahme, Zielsatz/Rebaseline-Liste um #1269/#1262/#1251, Overlap-Map ergänzt, BAC-5-Regex vollständig.

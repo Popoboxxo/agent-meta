@@ -256,7 +256,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 19: #1248 Protokoll-Header (developer, S)
 **Files:** Modify `hooks/1-generic/dod-push-check.sh`, `hooks/1-generic/lifecycle-check.sh`, `hooks/1-generic/sync-on-config-change.sh`; Test: Modify `tests/test_hook_drift.py`.
 **Interfaces:** Produces `# protocol: tool-hook-v1` statt `# provider: …`; Consumes `hooks.py::parse_hook_metadata` (liest `provider`-Key als Filter ~L584 — Header-Wert darf nicht mehr als Provider-Schalter wirken; Grep-Nachweis, dass kein Hook `provider:` als Schalter nutzt, und dass `hook_protocol`-Semantik (`# hook_protocol:`) nicht kollidiert -> ggf. Key `protocol` gegen `hook_protocol` abgrenzen).
-- [ ] Step 1: Test (fail): Grep `^# provider:` in `hooks/` = 0; Hook-Registrierung unverändert.
+- [ ] Step 1: Test (fail): Grep `^# provider:` in `hooks/` = 0; Registrierung für Claude unverändert; für andere hook-fähige Provider ändert sie sich bewusst (spec Ziel L11; Hooks bleiben `enabled_by_default: false`).
 - [ ] Step 2: Header ersetzen.
 - [ ] Step 3: `--validate`; `pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py`.
 - [ ] Step 4: Commit `refactor: replace provider hook header with protocol header`
