@@ -13,6 +13,10 @@
 ### Security
 - **Full-shell expansion with mandatory acknowledgement (#1181, D18):** a grant renders a full `Bash` permission, not a git-only restriction; `acknowledge_full_shell: true` is required or the grant is rejected. Rendering and sentinel injection require both a provider with a verified `hook_protocol` and an active `orchestrator-guard`; on hookless providers the grant falls back to the derived authority and logs a WARN. The guard hardens sentinel-carrying commands to `git add` and a non-amending `git commit`. Commands without a sentinel are not attributable to a role — tracked as #1210 (formerly F-5) and explicitly **not** documented as a security boundary. Rollout: the guard hardening from #1151 ships before this grant; there is no automatic hook rollout.
 
+### Fixed
+- **OpenCode orchestrator dispatch vocabulary (#1344):** the generated OpenCode orchestrator now dispatches through the source-verified built-in `subagent(agent="<named role>")` primitive instead of the non-existent `task(subagent_type=...)` / `route_intent` calls. Named roles that cannot be resolved fail closed to `main_chat` (no silent `general` downgrade). The generic template's changed text is PAL-gated so every other provider renders byte-identically to the pre-change state apart from the orchestrator version line (PATCH bump `8.12.4` → `8.12.5`). AC-01, standalone, slimming/topology/compact goldens and the golden-corpus digest were re-pinned to the intended output; no test assertion or tolerance was weakened.
+- Unknown tool name consistency check for hook allow-list (#1323)
+
 ## [2.0.0] - 2026-11-20
 
 ### Added

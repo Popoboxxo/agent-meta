@@ -1674,6 +1674,12 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
     # disk or unregistered in settings.json fails OPEN otherwise.
     from lib.consistency.hook_drift import check_hook_enablement_consistency
     _strict_findings += check_hook_enablement_consistency(project_root, agent_meta_root, config, _provider_config)
+    # Issue #1323 (INFO, non-destructive): config-derived tool names vs. the
+    # hand-maintained hook_known_tool_name allow-list. Never increments
+    # consistency_errors -- print_report() derives rc from ERROR only, so
+    # --validate / --audit-config stay at rc 0 even under --strict.
+    from lib.consistency.hook_known_tool_names import check_unknown_tool_names
+    _strict_findings += check_unknown_tool_names(project_root, agent_meta_root, config, _provider_config)
     # Temp-literal family (SPEC-tmp-sink-injection AC-21/IC-11/IC-18): WARNING
     # only, never an exit-code change (ADR-06). Reported here -- and skipped by
     # `_run_consistency_checks` -- so --validate prints the family exactly once.

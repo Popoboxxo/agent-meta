@@ -80,10 +80,12 @@ Jeder Provider bekommt angepasste Notation:
 
 | Provider | Notation | Beispiel |
 |----------|----------|----------|
-| Opencode | `task()` Tool-Calls | `task(subagent_type="developer", prompt="...")` |
+| Opencode | `subagent()` Tool-Calls | `subagent(agent="developer", prompt="...")` |
 | Claude | `background` Tool-Calls | `background(agent="developer", prompt="...")` |
 | Gemini | `define_subagent` + `invoke_subagent` | `invoke_subagent("developer", "...")` |
 | Continue | Sequentieller Text | `1. @developer ...` |
+
+**Opencode-Dispatch-Semantik (#1344):** Der Orchestrator ist die primäre Session-Instanz; Stages werden als Subagenten über das einzige native Primitive `subagent(agent="<named role>")` dispatchet (`agent` ist der Pflicht-Parameter; `description`/`prompt` folgen der üblichen Subagent-Konvention). `task()` und `route_intent` sind auf Opencode keine eingebauten Tools und werden nicht emittiert. Rollennamen stammen aus `routing.rules`/`name_index`. Ist eine benannte Rolle im Runtime nicht verfügbar, eskaliert der Orchestrator fail-closed an `main_chat` — ein stiller Downgrade auf `general` ist untersagt. Die Notation ist datengetrieben in `config/delegation-syntax.yaml` und `config/provider-capabilities.yaml` hinterlegt; andere Provider bleiben unverändert.
 
 ## Approval Gates (Abnahme)
 

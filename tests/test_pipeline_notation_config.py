@@ -62,7 +62,7 @@ REQUIRED_NOTATION_KEYS = {
 # in this consistency matrix because their legacy notation predates the
 # ``delegate`` phrasing alignment.
 _DISPATCH_CONSISTENCY = {
-    "Opencode": ("task(", "task("),
+    "Opencode": ("subagent(", "subagent("),
     "Gemini": ("invoke_subagent(", "invoke_subagent"),
     "Continue": ("@{agent}", "@<ziel-agent>"),
     "Codex": ("spawn_agent(", "spawn_agent"),

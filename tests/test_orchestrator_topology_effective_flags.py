@@ -23,6 +23,11 @@ every provider-scoped render seam overwrites the seven flags via
 ``_provider_topology_flags`` (T4–T6). The AC-30 ratchet below fails if a render
 seam starts reading (or importing) the global basis directly.
 
+Rebaseline (issue #1344): the Opencode ``unset-derived-subagent`` golden body
+was re-pinned via ``render_orchestrator`` after the dispatch vocabulary moved
+from ``task(subagent_type=…)`` to ``subagent(agent=…)``; the frozen 8.11.1
+frontmatter pins are kept, only the rendered body was regenerated.
+
 Run: python3 -m pytest tests/test_orchestrator_topology_effective_flags.py -q
 """
 from __future__ import annotations

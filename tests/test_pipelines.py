@@ -1094,8 +1094,8 @@ def test_loop_ref_renders_resolved_generator_critic_and_max_iterations():
     block = _generate_pipeline_block(
         pipeline, "Opencode", reflection_pairs=_CONCEPT_PAIRS
     )
-    assert 'subagent_type="concept-specifier"' in block
-    assert 'subagent_type="concept-reviewer"' in block
+    assert 'subagent(agent="concept-specifier"' in block
+    assert 'subagent(agent="concept-reviewer"' in block
     assert "Max iterations: 3" in block
 
 
@@ -1108,8 +1108,8 @@ def test_loop_ref_renders_from_real_role_defaults_without_explicit_pairs():
         s for s in pipelines["concept-driven-dev"]["stages"] if s["id"] == "review"
     ]}
     block = _generate_pipeline_block(stage_pipeline, "Opencode")
-    assert 'subagent_type="concept-specifier"' in block
-    assert 'subagent_type="concept-reviewer"' in block
+    assert 'subagent(agent="concept-specifier"' in block
+    assert 'subagent(agent="concept-reviewer"' in block
     assert "Max iterations: 3" in block
 
 

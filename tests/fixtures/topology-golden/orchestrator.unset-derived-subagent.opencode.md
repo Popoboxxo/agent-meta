@@ -100,9 +100,9 @@ Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-dri
 ### `feature-lifecycle`
 Execution mode: parallel_group
 
-1. task(subagent_type="git", prompt="Feature-Branch anlegen") → warten bis abgeschlossen
+1. subagent(agent="git", prompt="Feature-Branch anlegen") → warten bis abgeschlossen
 ⏸ Abnahme erforderlich vor Stage 'approve' — warte auf explizite Nutzerbestätigung, bevor validator startet.
-2. task(subagent_type="validator", prompt="Spec/Plan-Gate: freigegebene Spec/Plan (Status: APPROVED) per plan_ref belegen (S-Klasse: entfällt) — fehlt sie, Abbruch und Route auf concept-driven-dev") → warten bis abgeschlossen
+2. subagent(agent="validator", prompt="Spec/Plan-Gate: freigegebene Spec/Plan (Status: APPROVED) per plan_ref belegen (S-Klasse: entfällt) — fehlt sie, Abbruch und Route auf concept-driven-dev") → warten bis abgeschlossen
 
 **implement** — Plan-driven: Agent aus payload.plan_ref (Stage-ID 'implement') übernehmen.
 
@@ -114,95 +114,95 @@ Execution mode: parallel_group
 
 
 **validate-and-document** — Parallel dispatch:
-  - task(subagent_type="validator", prompt="DoD-Check")
-  - task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW aktualisieren")
+  - subagent(agent="validator", prompt="DoD-Check")
+  - subagent(agent="documenter", prompt="CODEBASE_OVERVIEW aktualisieren")
 
-3. task(subagent_type="git", prompt="Commit (Format: Rule commit-conventions) + PR") → warten bis abgeschlossen
+3. subagent(agent="git", prompt="Commit (Format: Rule commit-conventions) + PR") → warten bis abgeschlossen
 
 ### `quick-fix`
 Execution mode: sequential
 
-1. task(subagent_type="developer", prompt="Bugfix") → warten bis abgeschlossen
-2. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
+1. subagent(agent="developer", prompt="Bugfix") → warten bis abgeschlossen
+2. subagent(agent="git", prompt="Commit + Push") → warten bis abgeschlossen
 
 ### `bugfix`
 Execution mode: loop
 
-1. task(subagent_type="bug-feature-analyzer", prompt="Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen.") → warten bis abgeschlossen
-2. task(subagent_type="bug-feature-analyzer", prompt="Root-Cause belegen: root_cause + prior_attempts. Ein Symptom-Fix erfüllt das Gate nicht — ohne belegte Ursache wird fix nicht betreten.") → warten bis abgeschlossen
-3. task(subagent_type="developer", prompt="Bugfix implementieren") → warten bis abgeschlossen
+1. subagent(agent="bug-feature-analyzer", prompt="Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen.") → warten bis abgeschlossen
+2. subagent(agent="bug-feature-analyzer", prompt="Root-Cause belegen: root_cause + prior_attempts. Ein Symptom-Fix erfüllt das Gate nicht — ohne belegte Ursache wird fix nicht betreten.") → warten bis abgeschlossen
+3. subagent(agent="developer", prompt="Bugfix implementieren") → warten bis abgeschlossen
 
 **review** — REPEAT_UNTIL Loop:
-  - task(subagent_type="developer", prompt="Code-Qualität, Blast-Radius, SOLID/DRY prüfen")
-  - task(subagent_type="code-reviewer", prompt="Review / Critic feedback")
+  - subagent(agent="developer", prompt="Code-Qualität, Blast-Radius, SOLID/DRY prüfen")
+  - subagent(agent="code-reviewer", prompt="Review / Critic feedback")
   Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
-4. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
+4. subagent(agent="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
 ### `concept-development`
 Execution mode: loop
 
-1. task(subagent_type="ideation", prompt="Recherche: Stand der Technik, Optionen, Quellen, Trade-offs") → warten bis abgeschlossen
+1. subagent(agent="ideation", prompt="Recherche: Stand der Technik, Optionen, Quellen, Trade-offs") → warten bis abgeschlossen
 
 **concept** — REPEAT_UNTIL Loop:
-  - task(subagent_type="ideation", prompt="Konzept/Design-Doc erstellen und Review-Feedback einarbeiten")
-  - task(subagent_type="concept-reviewer", prompt="Review / Critic feedback")
+  - subagent(agent="ideation", prompt="Konzept/Design-Doc erstellen und Review-Feedback einarbeiten")
+  - subagent(agent="concept-reviewer", prompt="Review / Critic feedback")
   Max iterations: 3 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
-2. task(subagent_type="requirements", prompt="Konzept in REQs überführen") → warten bis abgeschlossen
+2. subagent(agent="requirements", prompt="Konzept in REQs überführen") → warten bis abgeschlossen
 
 ### `concept-driven-dev`
 Execution mode: loop
 
-1. task(subagent_type="explorer", prompt="Codebase-/Kontext-Analyse (read-only): betroffene Dateien, Patterns, Risiko-Zonen, empfohlener Approach") → warten bis abgeschlossen
-2. task(subagent_type="ideation", prompt="Klassifikation Spike/Bounded/Architectural inkl. S/M/L/XL-Mapping (F7-Zusatzkriterium)") → warten bis abgeschlossen
-3. task(subagent_type="concept-specifier", prompt="Technische Spezifikation schreiben (Interface-Contracts, Datenfluss, Akzeptanzkriterien) — XL-Tasks: vorab Systemdesign über concept-architect") → warten bis abgeschlossen
+1. subagent(agent="explorer", prompt="Codebase-/Kontext-Analyse (read-only): betroffene Dateien, Patterns, Risiko-Zonen, empfohlener Approach") → warten bis abgeschlossen
+2. subagent(agent="ideation", prompt="Klassifikation Spike/Bounded/Architectural inkl. S/M/L/XL-Mapping (F7-Zusatzkriterium)") → warten bis abgeschlossen
+3. subagent(agent="concept-specifier", prompt="Technische Spezifikation schreiben (Interface-Contracts, Datenfluss, Akzeptanzkriterien) — XL-Tasks: vorab Systemdesign über concept-architect") → warten bis abgeschlossen
 
 **review** — REPEAT_UNTIL Loop:
-  - task(subagent_type="concept-specifier", prompt="Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings mit Severity")
-  - task(subagent_type="concept-reviewer", prompt="Review / Critic feedback")
+  - subagent(agent="concept-specifier", prompt="Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings mit Severity")
+  - subagent(agent="concept-reviewer", prompt="Review / Critic feedback")
   Max iterations: 3 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
 ⏸ Abnahme erforderlich vor Stage 'approve' — warte auf explizite Nutzerbestätigung, bevor concept-reviewer startet.
-4. task(subagent_type="concept-reviewer", prompt="Abnahme der Spec (Status: APPROVED) — explizite Nutzerfreigabe") → warten bis abgeschlossen
-5. task(subagent_type="planner", prompt="Umsetzungsplan gegen die freigegebene Spec (Plan-Template, pipeline_stages, F6-Graph-Validator)") → warten bis abgeschlossen
-6. task(subagent_type="developer", prompt="Implementierung gegen die freigegebene Spezifikation — Tier nach Task-Größe (S/M/L/XL): S junior-developer, M developer, L senior-developer, XL principal-developer") → warten bis abgeschlossen
+4. subagent(agent="concept-reviewer", prompt="Abnahme der Spec (Status: APPROVED) — explizite Nutzerfreigabe") → warten bis abgeschlossen
+5. subagent(agent="planner", prompt="Umsetzungsplan gegen die freigegebene Spec (Plan-Template, pipeline_stages, F6-Graph-Validator)") → warten bis abgeschlossen
+6. subagent(agent="developer", prompt="Implementierung gegen die freigegebene Spezifikation — Tier nach Task-Größe (S/M/L/XL): S junior-developer, M developer, L senior-developer, XL principal-developer") → warten bis abgeschlossen
 
 **review-req** — REPEAT_UNTIL Loop:
-  - task(subagent_type="developer", prompt="Task-Review Stufe 1 — Requirement-Treue gegen die Akzeptanzkriterien des Tasks (vor der Qualitätsprüfung)")
-  - task(subagent_type="validator", prompt="Review / Critic feedback")
+  - subagent(agent="developer", prompt="Task-Review Stufe 1 — Requirement-Treue gegen die Akzeptanzkriterien des Tasks (vor der Qualitätsprüfung)")
+  - subagent(agent="validator", prompt="Review / Critic feedback")
   Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
 
 **review-quality** — REPEAT_UNTIL Loop:
-  - task(subagent_type="developer", prompt="Task-Review Stufe 2 — Code-Qualität und Blast-Radius")
-  - task(subagent_type="code-reviewer", prompt="Review / Critic feedback")
+  - subagent(agent="developer", prompt="Task-Review Stufe 2 — Code-Qualität und Blast-Radius")
+  - subagent(agent="code-reviewer", prompt="Review / Critic feedback")
   Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
 
 **validate** — Parallel dispatch:
-  - task(subagent_type="validator", prompt="DoD-Check + Traceability")
-  - task(subagent_type="tester", prompt="Tests grün, keine Regression")
+  - subagent(agent="validator", prompt="DoD-Check + Traceability")
+  - subagent(agent="tester", prompt="Tests grün, keine Regression")
 
 
 ### `refactor`
 Execution mode: loop
 
-1. task(subagent_type="senior-developer", prompt="Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten") → warten bis abgeschlossen
-2. task(subagent_type="developer", prompt="Refactoring implementieren ohne funktionale Änderungen") → warten bis abgeschlossen
+1. subagent(agent="senior-developer", prompt="Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten") → warten bis abgeschlossen
+2. subagent(agent="developer", prompt="Refactoring implementieren ohne funktionale Änderungen") → warten bis abgeschlossen
 
 **review** — REPEAT_UNTIL Loop:
-  - task(subagent_type="developer", prompt="Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten")
-  - task(subagent_type="code-reviewer", prompt="Review / Critic feedback")
+  - subagent(agent="developer", prompt="Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten")
+  - subagent(agent="code-reviewer", prompt="Review / Critic feedback")
   Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
-3. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
+3. subagent(agent="git", prompt="Commit + Push") → warten bis abgeschlossen
 
 ### `docs-update`
 Execution mode: sequential
 
-1. task(subagent_type="documenter", prompt="Dokumentation aktualisieren") → warten bis abgeschlossen
-2. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
+1. subagent(agent="documenter", prompt="Dokumentation aktualisieren") → warten bis abgeschlossen
+2. subagent(agent="git", prompt="Commit + Push") → warten bis abgeschlossen
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 (z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:
@@ -346,26 +346,26 @@ All "yes" → start. Otherwise resolve first.
 
 | User says | Action |
 |-----------|--------|
-| Single task | → `route_intent` (or the derived routing rule) → target agent |
+| Single task | → die abgeleitete Routing-Regel (`name_index`) → target agent |
 | Same tasks, independent | FANOUT — capability-gated dispatch, mechanics below |
 | Mixed tasks | PARALLEL_GROUP — capability-gated dispatch, mechanics below |
-| Complex feature | → `route_intent` (or the derived routing rule) → pipeline match → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
+| Complex feature | → die abgeleitete Routing-Regel (`name_index`) → pipeline match → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
 
 Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
 **Dispatch mechanics (capability-gated, issue #265):** FANOUT/PARALLEL_GROUP follow the provider's verified parallel contract — batched dispatch (all calls in one response), explicit collect (named harness tool), or sequential fallback (one at a time). Never invent a `fanout()` tool: use the generated dispatch patterns below verbatim.
 
-FANOUT — Alle task()-Calls in EINER Antwort absetzen, dann laufen sie parallel:
+FANOUT — Alle subagent()-Calls in EINER Antwort absetzen, dann laufen sie parallel:
 ```
-task(subagent_type="<agent_1>", description="<desc_1>", prompt="<task_1>")
-task(subagent_type="<agent_2>", description="<desc_2>", prompt="<task_2>")
+subagent(agent="<agent_1>", description="<desc_1>", prompt="<task_1>")
+subagent(agent="<agent_2>", description="<desc_2>", prompt="<task_2>")
 # Alle Calls in derselben Antwort → parallele Ausführung
 ```
 
-PARALLEL_GROUP — Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort:
+PARALLEL_GROUP — Mehrere subagent()-Calls mit verschiedenen agent-Namen in einer Antwort:
 ```
-task(subagent_type="<agent_fg>", description="<desc>", prompt="<task>")
-task(subagent_type="<agent_bg>", description="<desc>", prompt="<task>")
+subagent(agent="<agent_fg>", description="<desc>", prompt="<task>")
+subagent(agent="<agent_bg>", description="<desc>", prompt="<task>")
 ```
 
 **Static pre-dispatch validation (issue #265):** the dispatch plan is validated before dispatch — file affinity (see next line), dependency graph (cycles/deadlocks fail the plan), over-commitment (more tasks than 4 → split into several barrier groups). A failed validation means: sequentialize or merge tasks — never dispatch against it.
@@ -496,6 +496,7 @@ After 2 failures on the same intent → ask user for clarification.
 2. Fallback: ask-user via `main_chat` → meta-feedback → main-chat
 3. Never execute, guess, or abort on your own.
 
+**Fail-closed named-role dispatch:** Resolve every dispatch target from `routing.rules`/`name_index`. If a named role is not available in the runtime, escalate to `main_chat` — never silently downgrade to `general` or another substitute role, and never dispatch without a resolved target.
 ## 12. Few-shot patterns
 Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 → read `.agent-meta/agents/1-generic/_wf-orchestrator-reference.md` when needed.

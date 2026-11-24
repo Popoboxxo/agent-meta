@@ -118,10 +118,10 @@ All "yes" → start. Otherwise resolve first.
 
 | User says | Action |
 |-----------|--------|
-| Single task | → `route_intent` (or the derived routing rule) → target agent |
+| Single task | → [PAL_ROUTE_SOURCE_PHRASE — not available outside a full agent-meta install] → target agent |
 | Same tasks, independent | FANOUT — capability-gated dispatch, mechanics below |
 | Mixed tasks | PARALLEL_GROUP — capability-gated dispatch, mechanics below |
-| Complex feature | → `route_intent` (or the derived routing rule) → pipeline match → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
+| Complex feature | → [PAL_ROUTE_SOURCE_PHRASE — not available outside a full agent-meta install] → pipeline match → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
 
 Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
@@ -205,6 +205,8 @@ After 2 failures on the same intent → ask user for clarification.
 1. Max 1 clarifying question
 2. Fallback: ask-user via `main_chat` → meta-feedback → main-chat
 3. Never execute, guess, or abort on your own.
+
+**Fail-closed named-role dispatch:** Resolve every dispatch target from `routing.rules`/`name_index`. If a named role is not available in the runtime, escalate to `main_chat` — never silently downgrade to `general` or another substitute role, and never dispatch without a resolved target.
 
 ## 12. Few-shot patterns
 Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)

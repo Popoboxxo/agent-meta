@@ -947,7 +947,7 @@ def test_all_prose_matches_golden(tmp_path):
 #: the legitimate rebaseline lands in the same commit as the change that
 #: causes it, so a `base..HEAD` diff cannot distinguish an approved rebaseline
 #: from later drift. A content pin keeps the guard meaningful in both layouts.
-_GOLDEN_CORPUS_SHA256 = "1adfabb86796bf36ff6bc77be2fbbc73c2557bfe24482c0603c339d77a10e6e4"
+_GOLDEN_CORPUS_SHA256 = "e59b6889afe66f55aac99d8e7c73588c9fa1f30000c2b46f2ea3bf992c549fc3"
 
 
 def _golden_corpus_paths():
@@ -978,7 +978,8 @@ def test_golden_gate_file_untouched_by_this_issue():
     ``99be710e`` -> ``47e338cb`` -> ``6fde198b`` -> ``aee986c8`` ->
     ``14efcb23`` -> ``a9f23fc4`` -> ``1adfabb8``; #1335 + T21:
     slimming-golden corpus rebaselined (payload attribution variant C + REQ
-    gating)). Unapproved drift still fails loudly.
+    gating); #1344: orchestrator 8.12.5 version pins in five goldens plus the
+    equivalence-harness reason log). Unapproved drift still fails loudly.
     """
     actual = _golden_corpus_digest()
     assert actual == _GOLDEN_CORPUS_SHA256, (

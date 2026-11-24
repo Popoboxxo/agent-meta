@@ -5570,10 +5570,15 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # compact-golden (version / generated-from pins) were re-frozen. Digests recomputed with
 # `_fixture_tree_sha256` from the rebaselined trees. Reason: #T21: version bump after
 # REQ-gating content change. No assertion or whitelist weakened.
+# #1344: subagent dispatch + orchestrator 8.12.5; ac01-baseline re-pinned via its --write
+# helper (13 hashes: nine provider orchestrator artifacts + four Opencode pipeline-details),
+# slimming-golden/compact-golden via their version / generated-from pins. All three digests
+# recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`. No assertion or
+# whitelist weakened; re-pin records intended output.
 _FIXTURE_TREES = {
-    "ac01-baseline": "bdf5afa54b0c4285252de51dad2daa14e70d8d50bf46e46695a2347e1423bfd5",
-    "slimming-golden": "932036d57b48d267bc83a764dce5629bd979d3df81b15336d87a487d5c143177",
-    "compact-golden": "7160f5c5d38b7cc9e1298963a85c4845cbcf7d3ca927954f8fab39ad6405267d",
+    "ac01-baseline": "9d0353940fb6d6f0143c2dfb9c7aa97adfd0c5347d1e67875d65a93c165ab724",
+    "slimming-golden": "09fadca4ca14f5bf5493531907cb23008e083cf56b5a984ddf87d445f22705a8",
+    "compact-golden": "8b6efb0b4d0984b604a97cdd0c228b6fdb8e8d7654b8c88cbdcb2be4ae219dad",
 }
 
 

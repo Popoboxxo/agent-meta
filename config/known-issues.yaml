@@ -390,6 +390,19 @@ issues:
     introduced-in: 2.0.0-beta.1
     fixed-in: null
 
+  - id: hooks-unknown-tool-name
+    title: Tool name in provider config is missing from the hook allow-list (or vice versa)
+    applies_to: []
+    target: {artifact: hooks_config_file}
+    detector: {kind: finding-ref, check: hooks.unknown-tool-name, source: hooks}
+    severity: INFO
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/consistency/hook_known_tool_names.py, date: '2026-11-23'}
+    fix-hint: Review hook_known_tool_name in hooks/1-generic/lib/hook_common.sh against the provider tool config; keep the allow-list closed and add names deliberately.
+    fix-owner: agent-meta
+    introduced-in: 2.0.0
+    fixed-in: null
+
   - id: sync-pending
     title: Generated artifacts are out of date with the sources
     applies_to: []

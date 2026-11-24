@@ -32,6 +32,8 @@ delegation_syntax:
     fanout: "FANOUT — Alle Agent()-Aufrufe in EINER Antwort absetzen, dann laufen sie parallel:\n```\nAgent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\nAgent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")\n# Beide Calls in derselben Antwort → parallele Ausführung\n```"
     parallel_group: "PARALLEL_GROUP — Hintergrund-Tasks mit `run_in_background=True`, Vordergrund-Tasks normal:\n```\nAgent(subagent_type=\"<fg_agent>\", prompt=\"<fg_task>\")\nAgent(subagent_type=\"<bg_agent>\", prompt=\"<bg_task>\", run_in_background=True)\n# Beide Calls in derselben Antwort absetzen\n```"
     fallback: "Delegiere diese Aufgabe via `Agent(subagent_type=\"orchestrator\", prompt=\"<task>\")` an den Orchestrator."
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "true"
     parallel_pattern: "**Parallel-Pattern (konkret):**\n```\n# Vordergrund:\nAgent(subagent_type=\"validator\", prompt=\"DoD-Check für ...\")\n# Gleichzeitig im Hintergrund:\nAgent(subagent_type=\"documenter\", prompt=\"Update CODEBASE_OVERVIEW ...\", run_in_background=True)\n# Dann warten bis Hintergrund fertig, dann:\nAgent(subagent_type=\"git\", prompt=\"Commit und PR erstellen ...\")\n```\n"
@@ -50,27 +52,35 @@ delegation_syntax:
       Audit-Log-Pflicht: jeden Override-Versuch (applied|rejected) im
       Delegations-Tracker vermerken (issue #346).
 
+  # Issue #1344: OpenCode's only built-in subagent dispatch primitive is
+  # `subagent(agent=...)` (source: anomalyco/opencode@dev subagent.ts,
+  # export const name = "subagent"; agent: Schema.String). `description`/`prompt`
+  # follow the standard Claude-style subagent calling convention — only `agent`
+  # is source-verified. `task()` / `route_intent` are NOT OpenCode built-ins.
   Opencode:
     pipeline_notation:
-      task_fmt: 'task(subagent_type="{agent}", prompt="{task}")'
+      task_fmt: 'subagent(agent="{agent}", prompt="{task}")'
       mention_fmt: "@{agent} {task}"
       loop_start: "REPEAT_UNTIL Loop:"
-      loop_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      loop_item: '  - subagent(agent="{agent}", prompt="{task}")'
       parallel_start: "Parallel dispatch:"
-      parallel_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      parallel_item: '  - subagent(agent="{agent}", prompt="{task}")'
       fanout_start: "FANOUT({count}, {agent}):"
-      fanout_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      fanout_item: '  - subagent(agent="{agent}", prompt="{task}")'
       conditional_start: "Conditional execution:"
       conditional_item: '  - Condition evaluated by {agent}: {task}'
       sequential_start: ""
-      sequential_item: '{index}. task(subagent_type="{agent}", prompt="{task}")'
-    delegate: "Delegiere via `task(subagent_type=\"<ziel-agent>\", description=\"<kurzbeschreibung>\", prompt=\"<vollständiger-task-text>\"). Ersetze die Platzhalter entsprechend."
-    fanout: "FANOUT — Alle task()-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\ntask(subagent_type=\"<agent_1>\", description=\"<desc_1>\", prompt=\"<task_1>\")\ntask(subagent_type=\"<agent_2>\", description=\"<desc_2>\", prompt=\"<task_2>\")\n# Alle Calls in derselben Antwort → parallele Ausführung\n```"
-    parallel_group: "PARALLEL_GROUP — Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort:\n```\ntask(subagent_type=\"<agent_fg>\", description=\"<desc>\", prompt=\"<task>\")\ntask(subagent_type=\"<agent_bg>\", description=\"<desc>\", prompt=\"<task>\")\n```"
-    fallback: "@orchestrator <task>"
+      sequential_item: '{index}. subagent(agent="{agent}", prompt="{task}")'
+    delegate: "Delegiere via `subagent(agent=\"<ziel-agent>\", description=\"<kurzbeschreibung>\", prompt=\"<vollständiger-task-text>\")`. Ersetze `<ziel-agent>` mit einer benannten Rolle aus `routing.rules`/`name_index`."
+    fanout: "FANOUT — Alle subagent()-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\nsubagent(agent=\"<agent_1>\", description=\"<desc_1>\", prompt=\"<task_1>\")\nsubagent(agent=\"<agent_2>\", description=\"<desc_2>\", prompt=\"<task_2>\")\n# Alle Calls in derselben Antwort → parallele Ausführung\n```"
+    parallel_group: "PARALLEL_GROUP — Mehrere subagent()-Calls mit verschiedenen agent-Namen in einer Antwort:\n```\nsubagent(agent=\"<agent_fg>\", description=\"<desc>\", prompt=\"<task>\")\nsubagent(agent=\"<agent_bg>\", description=\"<desc>\", prompt=\"<task>\")\n```"
+    fallback: "Eskaliere an `main_chat`: benannte Rolle im Runtime nicht verfügbar — kein stiller Downgrade auf `general`."
+    dispatch_reject_call: '`subagent(agent="orchestrator")`'
+    route_source_phrase: 'die abgeleitete Routing-Regel (`name_index`)'
+    fail_closed_dispatch: "true"
     bootstrap: "file-based"
     tool_preamble: "true"
-    parallel_pattern: "**Parallel-Dispatch (Opencode):**\nFANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\nPARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\nBARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n\n```\n# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\ntask(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n# Alle drei Calls in derselben Antwort → parallele Ausführung\n# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n```\n\nLimit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
+    parallel_pattern: "**Parallel-Dispatch (Opencode):**\nFANOUT: Alle N subagent()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\nPARALLEL_GROUP: Mehrere subagent()-Calls mit verschiedenen agent-Namen in einer Antwort.\nBARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n\n```\n# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\nsubagent(agent=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\nsubagent(agent=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\nsubagent(agent=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n# Alle drei Calls in derselben Antwort → parallele Ausführung\n# Ergebnisse als Array [result_A, result_B, result_C]\n```\n\nLimit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
     handoff: *handoff-json
 
   Gemini:
@@ -98,6 +108,8 @@ delegation_syntax:
     fanout: "FANOUT — Alle invoke_subagent-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\ninvoke_subagent(\"<agent_1>\", \"<task_1>\")\ninvoke_subagent(\"<agent_2>\", \"<task_2>\")\n# Beide Calls in derselben Antwort → parallele Ausführung\n```"
     parallel_group: "PARALLEL_GROUP — Mehrere invoke_subagent-Calls in EINER Antwort absetzen; die Gemini-Runtime führt unabhängige Tool-Calls automatisch parallel aus:\n```\ninvoke_subagent(\"<agent_1>\", \"<task_1>\")\ninvoke_subagent(\"<agent_2>\", \"<task_2>\")\n```"
     fallback: "Bearbeite folgende Aufgabe selbst, mit höchster Sorgfalt: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "api-define_subagent"
     bootstrap_sequence:
       - type: "api_call"
@@ -125,6 +137,8 @@ delegation_syntax:
     fanout: "Führe folgende Aufgaben nacheinander aus (Continue unterstützt keine parallele Subagent-Ausführung):\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Führe folgende Aufgaben nacheinander aus:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     fallback: "@orchestrator <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "config-based"
     # OQ-2: this target is KEPT (annotated, not removed). The generated
     # `.continue/config.yaml` remains the config-based bootstrap surface; Task 10
@@ -174,6 +188,8 @@ delegation_syntax:
     fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     fallback: "Bearbeite: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false
@@ -202,6 +218,8 @@ delegation_syntax:
     fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Bearbeite diese Aufgaben nacheinander:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     fallback: "Bearbeite: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false
@@ -230,6 +248,8 @@ delegation_syntax:
     fanout: "FANOUT — Alle spawn_agent-Calls in EINER Antwort absetzen (multi_agent ist stable default-on):\n```\nspawn_agent(agent_type=\"<agent_1>\", message=\"<task_1>\")\nspawn_agent(agent_type=\"<agent_2>\", message=\"<task_2>\")\n```\nErgebnisse via `wait_agent` einsammeln."
     parallel_group: "PARALLEL_GROUP — Mehrere spawn_agent-Calls in einer Antwort (`fork_context` steuert die Kontext-Vererbung); `wait_agent` sammelt alle Ergebnisse ein."
     fallback: "Bearbeite: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false
@@ -261,6 +281,8 @@ delegation_syntax:
     fanout: "FANOUT — Bearbeite diese Aufgaben der Reihe nach (parallele Subagent-Ausführung ist für ZCode nicht verifiziert):\n1. Agent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\n2. Agent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")"
     parallel_group: "PARALLEL_GROUP — Bearbeite diese Aufgaben der Reihe nach:\n1. Agent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\n2. Agent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")"
     fallback: "Bearbeite: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false
@@ -288,6 +310,8 @@ delegation_syntax:
     fanout: "FANOUT — Für gleichförmige Fan-out-Aufgaben `AgentSwarm` nutzen:\n```\nAgentSwarm(prompt_template=\"<task_template>\", items=[<item_1>, <item_2>, ...])\n```\n(bis 128 Items, aggregierter Report). Alternativ mehrere Agent-Calls in einer Antwort."
     parallel_group: "PARALLEL_GROUP — AgentSwarm mit prompt_template + items-Array für den Fan-out; einzelne abweichende Aufgaben als separate Agent-Calls in derselben Antwort."
     fallback: "Bearbeite: <task>"
+    dispatch_reject_call: '`task(subagent_type="orchestrator")`'
+    route_source_phrase: '`route_intent` (or the derived routing rule)'
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false

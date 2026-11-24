@@ -156,6 +156,12 @@ class DelegationSyntaxEngine:
         "PAL_TOOL_PREAMBLE": "tool_preamble",
         "PAL_PARALLEL_PATTERN": "parallel_pattern",
         "PAL_HANDOFF": "handoff",
+        # Issue #1344: capability-gated template text. Each key is defined per
+        # provider in delegation-syntax.yaml; absent keys evaluate to empty, so
+        # only the provider that declares them (Opencode) renders its branch.
+        "PAL_DISPATCH_REJECT_CALL": "dispatch_reject_call",
+        "PAL_ROUTE_SOURCE_PHRASE": "route_source_phrase",
+        "PAL_FAIL_CLOSED_DISPATCH": "fail_closed_dispatch",
     }
 
     def __init__(self, config_dir: Path | None = None) -> None:
