@@ -198,3 +198,14 @@ prefix; `ui-ux-designer` drops the trailing `- ` blank bullet). Every frozen met
 region is left untouched; the other 51 goldens, `_GOLDEN_ROLE_COUNT` (58), the normalization
 table and `compact-golden` are unchanged. No assertion or whitelist was weakened. The AC-T4
 digest was re-pinned accordingly; see the log in `tests/test_template_slimming_equivalence.py`.
+
+## Diff manifest — #1344 rebaseline (2026-11-23)
+
+**Reason:** #1344: subagent dispatch + orchestrator 8.12.5 PATCH bump; re-pin records intended
+output. Five orchestrator goldens re-pinned in their frontmatter pins only —
+`slimming-golden/orchestrator.md`, `compact-golden/orchestrator.md` and the three
+`topology-golden/orchestrator.*.md` files: `version:` 8.12.4 -> 8.12.5 and
+`generated-from: 1-generic/orchestrator.md@8.12.4` -> `@8.12.5`. Values read from the
+authoritative source template. Frozen meta tokens, `{{PYTEST_BASETEMP}}` token, `model:` pins,
+normalization table and `_GOLDEN_ROLE_COUNT` (58) unchanged; every body line byte-identical.
+No assertion or whitelist weakened. AC-T4 digests recomputed with `_fixture_tree_sha256`.

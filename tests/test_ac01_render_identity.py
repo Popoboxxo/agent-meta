@@ -1162,6 +1162,15 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   followed via ``_fixture_tree_sha256`` (``3e80abe6..`` -> ``bdf5afa5..``). Re-pin records
   intended output, not a test fix.
 
+- #1344 (subagent dispatch + orchestrator 8.12.5, PATCH bump): #1344 added legacy delegation
+  keys so every non-Opencode provider renders byte-identically to the pre-change state; the
+  only cross-provider delta is the orchestrator version line (8.12.4 -> 8.12.5) plus the
+  intended Opencode PAL dispatch notes. Manifest regenerated with this harness's own
+  ``--write`` helper: **13 of 1195 hashes moved; 0 added/removed** — the nine matrix-active
+  orchestrator artifacts and the four Opencode ``pipeline-details/*.md`` files.
+  ``AC01_EXCEPTIONS`` is NOT extended. AC-T4 digest recomputed via ``_fixture_tree_sha256``.
+  Re-pin records intended output, not a test fix.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 

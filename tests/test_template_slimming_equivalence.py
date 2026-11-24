@@ -306,6 +306,14 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   pins, ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and every body line stay untouched.
   No assertion or whitelist weakened. AC-T4 digests recomputed with ``_fixture_tree_sha256``.
 
+* #1344 (subagent dispatch + orchestrator 8.12.5, PATCH bump): exactly five orchestrator
+  goldens re-pinned in their ``version:`` / ``generated-from:`` pins only (slimming-golden,
+  compact-golden and the three topology-orchestrator goldens). Values read from the
+  authoritative source template, not guessed. All frozen meta tokens, ``{{PYTEST_BASETEMP}}``
+  tokens, ``model:`` pins, ``_GOLDEN_ROLE_COUNT`` (58), the normalization table and every body
+  line stay untouched; the other 53 goldens are unchanged. No assertion or whitelist weakened.
+  AC-T4 digests recomputed with ``_fixture_tree_sha256``; re-pin records intended output.
+
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
 """
