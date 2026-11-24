@@ -116,6 +116,16 @@ from lib.knowledge import sync_knowledge_engine  # noqa: F401  (deliberate re-ex
 # Entry point
 # ---------------------------------------------------------------------------
 
+class _BackupLabelAction(argparse.Action):
+    """Store the label; hint on stderr when the deprecated --label spelling is used."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if option_string == "--label":
+            print("[DEPRECATED] --label is deprecated, use --backup-label",
+                  file=sys.stderr)
+        setattr(namespace, self.dest, values)
+
+
 def _normalize_check_dry_run(args) -> None:
     """--check is a read-only CI gate: it must never allow real writes.
 
@@ -494,15 +504,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                          default=None,
                          help="Create a timestamped backup of provider directories "
                               "and project config. Pass provider names or omit for all. "
-                              "Use --label to add a description.")
+                              "Use --backup-label to add a description.")
     # #1203: `--labels` is reserved for the issue-taxonomy CLI (#1188).
     # `allow_abbrev=False` above already keeps `--labels` from silently
-    # binding to `--label`; the explicit alias gives callers a permanent,
-    # unambiguous spelling while `--label` stays backward compatible.
-    parser.add_argument("--label", "--backup-label", metavar="TEXT", default=None,
+    # binding to `--label`; `--backup-label` is the canonical, unambiguous
+    # spelling while `--label` stays as a deprecated alias (same dest).
+    parser.add_argument("--backup-label", "--label", metavar="TEXT", default=None,
+                        dest="label", action=_BackupLabelAction,
                         help="Optional label/description for --backup. "
-                             "--backup-label is the unambiguous alias; "
-                             "--label is kept for backward compatibility.")
+                             "--label is a deprecated alias of --backup-label.")
     parser.add_argument("--restore", metavar="ARCHIVE",
                         help="Restore provider directories from a backup archive. "
                              "Use --restore-providers to select specific providers.")

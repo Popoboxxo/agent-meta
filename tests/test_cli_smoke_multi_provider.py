@@ -129,7 +129,7 @@ def test_checkpoint_with_every_provider(project_lifecycle):
 
 def test_backup_restore_delete_roundtrip(project_lifecycle):
     project = project_lifecycle
-    _ok(project, "--backup", "--label", "smoke")
+    _ok(project, "--backup", "--backup-label", "smoke")
     listing = _ok(project, "--list-backups").stdout
     match = re.search(r"([A-Za-z0-9._-]+\.(?:zip|tar\.gz|tgz))", listing)
     assert match, f"no backup archive listed:\n{listing}"

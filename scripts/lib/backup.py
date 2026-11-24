@@ -15,7 +15,7 @@ Config in project.yaml:
       auto-backup-before-sync: false
 
 CLI:
-    python scripts/sync.py --backup [--label "My label"] [Provider...]
+    python scripts/sync.py --backup [--backup-label "My label"] [Provider...]
     python scripts/sync.py --restore <archive.zip>
     python scripts/sync.py --list-backups
     python scripts/sync.py --delete-backup <archive.zip>
