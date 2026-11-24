@@ -461,6 +461,19 @@ def resolve_discovery_paths(provider_cfg: dict) -> dict:
     return resolved
 
 
+def _legacy_path_exists(paths: list[Path], log: SyncLog, stage: str) -> bool:
+    """Gate predicate for one-time migration stages (#1242).
+
+    True when at least one legacy path exists. Fail-open: an unreadable check
+    logs a warning and returns True so the stage runs as before.
+    """
+    try:
+        return any(p.exists() for p in paths)
+    except (OSError, ValueError) as exc:
+        log.warn(f"{stage}: legacy-path check failed ({exc}); running migration")
+        return True
+
+
 def migrate_discovery_artifacts(
     project_root: Path,
     provider_cfg: dict,
@@ -539,6 +552,16 @@ def apply_discovery_migration(
     resolved = resolve_discovery_paths(provider_cfg)
     if not (isinstance(provider_cfg, dict) and provider_cfg.get("agent-discovery") is True):
         return resolved, []
+    discovery = provider_cfg.get("discovery")
+    if isinstance(discovery, dict):
+        legacy = [
+            project_root / provider_cfg[k]
+            for k in _DISCOVERY_PATH_KEYS
+            if isinstance(provider_cfg.get(k), str) and provider_cfg[k]
+            and isinstance(discovery.get(k), str) and discovery[k] != provider_cfg[k]
+        ]
+        if not _legacy_path_exists(legacy, log, "discovery-migration"):
+            return resolved, []
     results = migrate_discovery_artifacts(project_root, provider_cfg, log, dry_run=dry_run, ts=ts)
     return resolved, results
 
@@ -674,6 +697,13 @@ def migrate_provider_paths(
     requires_flag = spec.get("requires-flag")
     if requires_flag and provider_cfg.get(requires_flag) is not True:
         return []
+    try:
+        legacy = [safe_path(project_root, e["remove"]) for e in spec.get("removals", [])]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        log.warn(f"provider-migration[{provider}]: legacy-path check failed ({exc}); running migration")
+    else:
+        if not _legacy_path_exists(legacy, log, f"provider-migration[{provider}]"):
+            return []
     from datetime import datetime
 
     removal_ts = ts or datetime.now().strftime("%Y%m%d-%H%M%S")
