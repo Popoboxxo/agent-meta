@@ -373,6 +373,20 @@ def owns_opencode_surface(provider_config: dict, provider: str) -> bool:
     return _non_empty_string(mcp_config.get("committed-file"))
 
 
+def opencode_writers_reachable(
+    project_root: Path, provider_config: dict, provider: str
+) -> bool:
+    """Call-site gate for the v2 writers: owns the surface OR a state file exists.
+
+    The state-file arm keeps the rollback path reachable (spec A3, Q2); the
+    writers themselves still decide what to do (unchanged internals).
+    """
+    if owns_opencode_surface(provider_config, provider):
+        return True
+    pc = _provider_entry(provider_config, provider)
+    return opencode_state_path(Path(project_root), pc).is_file()
+
+
 def _owned_committed_file(provider_config: dict) -> str | None:
     """The owner's ``committed-file``, accepting a single entry or a registry.
 

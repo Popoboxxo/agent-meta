@@ -107,6 +107,7 @@ from lib.mcp_deny import sync_mcp_deny
 from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
+    opencode_writers_reachable,
     sync_opencode_v2_managed_keys,
     v2_active,
 )
@@ -1762,19 +1763,24 @@ def _sync_stage_per_provider(
         # Deliberately outside the ``== "permission"`` block above (Spec-A
         # freeze): the writer is a no-op for non-owners and without v2/state,
         # and the run-scoped registry makes it order-independent.
-        sync_opencode_v2_managed_keys(
-            project_root, config, provider, provider_config,
-            agent_meta_root, log, args.dry_run,
-            claimed_files=opencode_claimed_files,
+        _opencode_v2_reachable = opencode_writers_reachable(
+            project_root, provider_config, provider
         )
+        if _opencode_v2_reachable:
+            sync_opencode_v2_managed_keys(
+                project_root, config, provider, provider_config,
+                agent_meta_root, log, args.dry_run,
+                claimed_files=opencode_claimed_files,
+            )
         # D2 / AC-D7: the dedicated ``cli_file`` of the same surface, directly
         # after the managed-key merge and outside the ``== "permission"`` block.
         # A no-op for non-owners, without ``cli_file`` (v1) or without a
         # configured ``cli`` object (except a recorded rollback).
-        sync_opencode_cli_file(
-            project_root, config, provider, provider_config,
-            log, args.dry_run,
-        )
+        if _opencode_v2_reachable:
+            sync_opencode_cli_file(
+                project_root, config, provider, provider_config,
+                log, args.dry_run,
+            )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,
