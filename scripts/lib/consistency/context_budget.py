@@ -237,9 +237,12 @@ def check_over_hard_cap(
             continue
         if stat["bytes"] >= stat["cap"]:
             caps = capabilities.get(provider) or {}
+            context_file = str(caps.get("context_file", ""))
+            others = [o for o in active_providers if o != provider and context_file and context_file == (capabilities.get(o) or {}).get("context_file")]
             findings.append(_warn(
-                "context.over-hard-cap", str(caps.get("context_file", "")),
-                f"{provider}: entry file ({stat['bytes']} bytes) exceeds hard cap ({stat['cap']} bytes)",
+                "context.over-hard-cap", context_file,
+                f"{provider}: entry file ({stat['bytes']} bytes) exceeds hard cap ({stat['cap']} bytes)"
+                + (f" (shared with: {', '.join(others)})" if others else ""),
                 "shrink the entry file (profile compact, move content into lazy skills)"))
     return findings
 
