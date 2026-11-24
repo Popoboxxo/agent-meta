@@ -214,7 +214,7 @@ def _update_settings_hooks(
     if settings_path.exists():
         settings = load_json_file(settings_path, on_error="default", default=None)
         if settings is None:
-            log.warning("settings.json could not be parsed — hooks section not updated")
+            log.warning(f"{settings_path_rel} could not be parsed — hooks section not updated")
             return
     else:
         if not active_entries:
