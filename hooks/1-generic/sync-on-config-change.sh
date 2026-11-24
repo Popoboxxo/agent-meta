@@ -3,7 +3,7 @@
 # version: 1.1.1
 # event: PostToolUse
 # matcher: Write|Edit
-# provider: Claude
+# protocol: tool-hook-v1
 # description: Trigger sync pending-task when .meta-config/project.yaml changes
 # enabled_by_default: false
 

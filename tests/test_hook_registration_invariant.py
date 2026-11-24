@@ -152,6 +152,17 @@ def test_protocol_scoped_adapter_only_deployed_for_its_protocol(tmp_path):
     assert (gemini_project / ".agents" / "hooks" / "antigravity-json-adapter.sh").exists()
 
 
+def test_generic_hook_registered_for_antigravity_when_enabled(tmp_path):
+    """#1248: without a `provider:` header dod-push-check reaches Antigravity."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root, provider="Gemini", hooks_cfg={"dod-push-check": {"enabled": True}})
+
+    config = (project_root / ".agents" / "hooks.json").read_text(encoding="utf-8")
+    assert "dod-push-check" in config
+
+
 def test_manual_hook_is_never_registered_even_when_enabled(tmp_path):
     """`event: Manual` is not a native runtime event — enabling it must not
     write a 'Manual' bucket into settings.json."""

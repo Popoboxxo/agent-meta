@@ -581,6 +581,7 @@ def sync_hooks(
         hook_stem = Path(output_name).stem
 
 
+        # `protocol:` is descriptive only; `hook_protocol:` scopes deployment.
         # Provider filter: skip hook if it declares a specific provider that doesn't match
         hook_provider = meta.get("provider", "")
         if hook_provider and hook_provider != provider:
