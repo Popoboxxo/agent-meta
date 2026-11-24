@@ -447,3 +447,32 @@ def check_builder_known_set(agent_meta_root: Path) -> list[Finding]:
                     "Provide it from a builder in BUILDERS or fix the name.",
                 ))
     return findings
+
+
+# #1198: single-brace form of a known variable (e.g. ``{SE_BASE_DIR}``) is never
+# substituted by sync.py; it silently ships literally. Runtime placeholders
+# (``{parent_path}``, ``{FolderName}``) are not in the known set and stay silent.
+_SINGLE_BRACE_RE = re.compile(r'(?<![{$])\{([A-Z][A-Z0-9_]*)\}(?!\})')
+
+
+def check_single_brace_known_vars(agent_meta_root: Path) -> list[Finding]:
+    """ERROR for ``{KNOWN_VAR}`` (single brace) in template roots.
+
+    Scope: agents/*/*.md, rules/*/*.md, templates/**/*.md; code spans and
+    fenced blocks are ignored (documented examples)."""
+    findings: list[Finding] = []
+    known = _BUILTIN_VARS | load_project_vars(agent_meta_root)
+    paths = [p for pat in ("agents/*/*.md", "rules/*/*.md")
+             for p in agent_meta_root.glob(pat)]
+    paths += agent_meta_root.glob("templates/**/*.md")
+    for path in sorted(set(paths)):
+        body = path.read_text(encoding="utf-8")
+        body = re.sub(r'```.*?```', '', body, flags=re.DOTALL)
+        body = re.sub(r'`[^`\n]+`', '', body)
+        for var in sorted(set(_SINGLE_BRACE_RE.findall(body)) & known):
+            findings.append(Finding(
+                Severity.ERROR, "placeholders.single-brace", _rel(path, agent_meta_root),
+                f"Known variable '{{{var}}}' uses single braces and is never substituted.",
+                f"Write '{{{{{var}}}}}'.",
+            ))
+    return findings
