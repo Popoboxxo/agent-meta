@@ -85,11 +85,32 @@ def _subst_vscode(value: str, secrets: dict | None) -> str:
 
 def _subst_for_format(fmt: str | None):
     """Placeholder substitution function for one provider-config format."""
-    if fmt in ("opencode-json", "opencode-json-v2"):
-        return _subst_opencode
-    if fmt == "vscode-settings":
-        return _subst_vscode
-    return _subst
+    return _SUBST_BY_FORMAT.get(fmt, _subst)
+
+
+_SUBST_BY_FORMAT = {
+    "opencode-json": _subst_opencode,
+    "opencode-json-v2": _subst_opencode,
+    "vscode-settings": _subst_vscode,
+}
+
+# Per-format entry-shape traits consumed by ``_build_connection_entry``.
+_FORMAT_TRAITS = {
+    "opencode-json": frozenset({"opencode", "enabled-flag"}),
+    "opencode-json-v2": frozenset({"opencode", "opencode-v2"}),
+    "vscode-settings": frozenset({"vscode"}),
+    "antigravity-mcp-json": frozenset({"antigravity"}),
+    "continue-yaml": frozenset({"continue"}),
+    "kimi-json": frozenset({"kimi"}),
+}
+
+# Formats whose servers are written per managed path (not by replacing the
+# whole MCP key); see ``generate_provider_configs``.
+_MANAGED_PATH_FORMATS = frozenset({"opencode-json-v2"})
+
+
+def _is_managed_path_format(format_key: str | None) -> bool:
+    return format_key in _MANAGED_PATH_FORMATS
 
 
 # Documented opencode v2 connection keys (spec §3.5, Amendment B1). The writer
@@ -219,12 +240,13 @@ def _build_connection_entry(
     conn_type = conn.get("type", "")
     orig_type = conn_type
 
-    is_opencode = fmt in ("opencode-json", "opencode-json-v2")
-    is_opencode_v2 = fmt == "opencode-json-v2"
-    is_vscode = fmt == "vscode-settings"
-    is_antigravity = fmt == "antigravity-mcp-json"
-    is_continue = fmt == "continue-yaml"
-    is_kimi = fmt == "kimi-json"
+    traits = _FORMAT_TRAITS.get(fmt, frozenset())
+    is_opencode = "opencode" in traits
+    is_opencode_v2 = "opencode-v2" in traits
+    is_vscode = "vscode" in traits
+    is_antigravity = "antigravity" in traits
+    is_continue = "continue" in traits
+    is_kimi = "kimi" in traits
     subst = _subst_for_format(fmt)
 
     if is_opencode:
@@ -244,7 +266,7 @@ def _build_connection_entry(
             entry["transport"] = "sse"
     else:
         entry["type"] = conn_type
-        if fmt == "opencode-json":
+        if "enabled-flag" in traits:
             entry["enabled"] = True
 
     if orig_type == "sse":
@@ -850,7 +872,7 @@ def generate_provider_configs(
         local_path is not None and local_entries and local_path == committed_path
     )
     if not same_file_secrets_write:
-        if fmt == "opencode-json-v2":
+        if _is_managed_path_format(fmt):
             # v2 manages one path per server (``mcp.servers.<name>``) instead
             # of replacing ``mcp`` wholesale, so user servers survive and a
             # deactivated server is rolled back per path (spec §3.5, M-3).
@@ -957,33 +979,36 @@ def _write_provider_config(
     writes the nested ``mcp.servers`` shape.
     """
     _warn_kimi_unresolved_env_refs(path, mcp_entries, fmt, log, project_root)
-    if fmt in ("claude-settings", "gemini-settings", "antigravity-mcp-json", "kimi-json"):
-        _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "opencode-json":
-        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "opencode-json-v2":
-        # v2 writes the nested `mcp.servers` key and replaces any flat v1
-        # server map left under `mcp` (the v2 contract allows no flat keys
-        # next to `servers`).
-        _update_opencode_v2_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                        verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "vscode-settings":
-        # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...}
-        # settings shape — NOT the Claude {"mcpServers": ...} key
-        # (issue #674 Phase 3.3).
-        _update_json_config(path, "servers", mcp_entries, log, dry_run, allow_secrets, config=config,
-                             verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "continue-yaml":
-        _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                      verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "codex-toml-mcp":
-        _update_codex_toml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                  verify_gitignored=verify_gitignored, project_root=project_root)
-    elif fmt == "zcode-json":
-        _update_zcode_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
-                                  verify_gitignored=verify_gitignored, project_root=project_root)
-    else:
-        log.warning(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
+    writer = _FORMAT_WRITERS.get(fmt)
+    if writer is None:
+        log.warning(
+            f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}"
+            f" (valid formats: {', '.join(sorted(_FORMAT_WRITERS))})"
+        )
+        return
+    writer(path, mcp_entries, log, dry_run, allow_secrets, config=config,
+           verify_gitignored=verify_gitignored, project_root=project_root)
 
+
+def _json_key_writer(mcp_key: str):
+    def _write(path, mcp_entries, log, dry_run, allow_secrets, **kwargs):
+        _update_json_config(path, mcp_key, mcp_entries, log, dry_run, allow_secrets, **kwargs)
+    return _write
+
+
+# format key -> writer(path, entries, log, dry_run, allow_secrets, **kwargs).
+# Unknown keys are reported by ``_write_provider_config`` with this key list.
+_FORMAT_WRITERS = {
+    "claude-settings": _json_key_writer("mcpServers"),
+    "gemini-settings": _json_key_writer("mcpServers"),
+    "antigravity-mcp-json": _json_key_writer("mcpServers"),
+    "kimi-json": _json_key_writer("mcpServers"),
+    "opencode-json": _json_key_writer("mcp"),
+    # v2 writes the nested `mcp.servers` key and replaces any flat v1 server map.
+    "opencode-json-v2": _update_opencode_v2_json_config,
+    # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...} (#674).
+    "vscode-settings": _json_key_writer("servers"),
+    "continue-yaml": _update_continue_yaml_config,
+    "codex-toml-mcp": _update_codex_toml_config,
+    "zcode-json": _update_zcode_json_config,
+}
