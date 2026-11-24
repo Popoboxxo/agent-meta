@@ -31,6 +31,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.lib.delegation_syntax import DelegationSyntaxEngine  # noqa: E402
 from scripts.lib.variables import (  # noqa: E402
     strip_inactive_conditional_blocks,
     substitute,
@@ -123,10 +124,16 @@ def _flags(*, primary: bool, explicit: bool, topology: str) -> dict:
     }
 
 
-def _render(path: Path, flags: dict) -> str:
+def _render(path: Path, flags: dict, *, provider: str | None = None) -> str:
     source = path.read_text(encoding="utf-8")
     text = substitute(source, flags, path.name, None)
-    return strip_inactive_conditional_blocks(text, flags)
+    text = strip_inactive_conditional_blocks(text, flags)
+    if provider is not None:
+        # #1344: the singleton paragraph is capability-gated via {{PAL_*}}.
+        # Resolve it through the shared delegation-syntax registry (never a
+        # hand-written string) so the golden remains a real rendered artifact.
+        text = DelegationSyntaxEngine().apply(text, provider)
+    return text
 
 
 def _derived_primary() -> dict:
@@ -178,8 +185,13 @@ def test_declared_subagent_keeps_historic_wording():
 
 
 def test_declared_primary_has_a_golden_fixture():
-    """AC-27: the declared ``primary`` singleton paragraph is frozen."""
-    rendered = _render(_ORCHESTRATOR, _declared_primary())
+    """AC-27: the declared ``primary`` singleton paragraph is frozen.
+
+    #1344: ``{{PAL_DISPATCH_REJECT_CALL}}`` is now provider-gated; the frozen
+    golden holds the Claude (non-Opencode) dispatch wording, resolved via the
+    delegation-syntax registry instead of being pinned in the test.
+    """
+    rendered = _render(_ORCHESTRATOR, _declared_primary(), provider="Claude")
     paragraph = next(
         (
             line

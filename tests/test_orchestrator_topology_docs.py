@@ -12,6 +12,10 @@ The link check mirrors the ``scripts/lib/consistency/docs.py`` pattern: Markdown
 links are extracted with a regex and their targets are resolved against the
 containing file's directory; a missing target is a defect, not a warning.
 
+Rebaseline (issue #1344): the ``derived-primary.opencode`` golden was re-pinned
+via ``render_orchestrator`` after the Opencode dispatch form changed from
+``task(subagent_type="orchestrator")`` to ``subagent(agent="orchestrator")``.
+
 Run: python3 -m pytest tests/test_orchestrator_topology_docs.py -q
 """
 

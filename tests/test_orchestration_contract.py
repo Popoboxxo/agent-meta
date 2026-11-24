@@ -903,8 +903,8 @@ def test_fanout_contract_missing_mechanism_while_parallel(tmp_path):
     root = _fixture_root(tmp_path)
     _rewrite_yaml(
         root / "config" / "provider-capabilities.yaml",
-        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via task() tool",
-        "    barrier_collect: true\n    description: \"Agent-Orchestrierung via task() tool",
+        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
+        "    barrier_collect: true\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
     )
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
@@ -915,8 +915,8 @@ def test_fanout_contract_unknown_mechanism(tmp_path):
     root = _fixture_root(tmp_path)
     _rewrite_yaml(
         root / "config" / "provider-capabilities.yaml",
-        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via task() tool",
-        "    fanout_mechanism: warp-drive\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via task() tool",
+        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
+        "    fanout_mechanism: warp-drive\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
     )
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
@@ -927,8 +927,8 @@ def test_fanout_contract_barrier_collect_mismatch(tmp_path):
     root = _fixture_root(tmp_path)
     _rewrite_yaml(
         root / "config" / "provider-capabilities.yaml",
-        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via task() tool",
-        "    fanout_mechanism: native-batch\n    barrier_collect: false\n    description: \"Agent-Orchestrierung via task() tool",
+        "    fanout_mechanism: native-batch\n    barrier_collect: true\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
+        "    fanout_mechanism: native-batch\n    barrier_collect: false\n    description: \"Agent-Orchestrierung via subagent(agent=…) Dispatch",
     )
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
@@ -939,8 +939,8 @@ def test_fanout_contract_sequential_wording_missing(tmp_path):
     root = _fixture_root(tmp_path)
     _rewrite_yaml(
         root / "config" / "delegation-syntax.yaml",
-        '    fanout: "Bearbeite diese Aufgaben der Reihe nach:\\n1. @<agent_1> <task_1>\\n2. @<agent_2> <task_2>"\n    parallel_group: "Bearbeite diese Aufgaben der Reihe nach:\\n1. @<agent_1> <task_1>\\n2. @<agent_2> <task_2>"\n    fallback: "Bearbeite: <task>"\n    bootstrap: "file-based"\n    tool_preamble: "false"\n    auto_parallel: false\n    parallel_pattern: "**Parallel-Pattern:**\\nGitHub Copilot',
-        '    fanout: "Alle Agent-Calls in EINER Antwort absetzen"\n    parallel_group: "Mehrere Calls in einer Antwort"\n    fallback: "Bearbeite: <task>"\n    bootstrap: "file-based"\n    tool_preamble: "false"\n    auto_parallel: false\n    parallel_pattern: "**Parallel-Pattern:**\\nGitHub Copilot',
+        '    fanout: "Bearbeite diese Aufgaben der Reihe nach:\\n1. @<agent_1> <task_1>\\n2. @<agent_2> <task_2>"\n    parallel_group: "Bearbeite diese Aufgaben der Reihe nach:\\n1. @<agent_1> <task_1>\\n2. @<agent_2> <task_2>"\n    fallback: "Bearbeite: <task>"\n    dispatch_reject_call: \'`task(subagent_type="orchestrator")`\'\n    route_source_phrase: \'`route_intent` (or the derived routing rule)\'\n    bootstrap: "file-based"\n    tool_preamble: "false"\n    auto_parallel: false\n    parallel_pattern: "**Parallel-Pattern:**\\nGitHub Copilot',
+        '    fanout: "Alle Agent-Calls in EINER Antwort absetzen"\n    parallel_group: "Mehrere Calls in einer Antwort"\n    fallback: "Bearbeite: <task>"\n    dispatch_reject_call: \'`task(subagent_type="orchestrator")`\'\n    route_source_phrase: \'`route_intent` (or the derived routing rule)\'\n    bootstrap: "file-based"\n    tool_preamble: "false"\n    auto_parallel: false\n    parallel_pattern: "**Parallel-Pattern:**\\nGitHub Copilot',
     )
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
