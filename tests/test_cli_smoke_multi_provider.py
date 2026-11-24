@@ -144,3 +144,39 @@ def test_deactivate_and_reactivate_provider(project_lifecycle):
     assert not (project / ".codex").exists(), "deactivated provider artifacts must be removed"
     _ok(project, "--activate-providers", "Codex")
     assert (project / ".codex").is_dir(), "reactivation must regenerate the provider tree"
+
+
+def test_update_ext_check_reports_drift_without_writing(project_lifecycle):
+    """#1269 AC-4: --update-ext --check exits 1 on drift; file stays unchanged."""
+    ext = project_lifecycle / ".claude" / "3-project" / "am-developer-ext.md"
+    ext.parent.mkdir(parents=True, exist_ok=True)
+    ext.write_text("<!-- agent-meta:managed-begin v=deadbeef -->\nhand\n"
+                   "<!-- agent-meta:managed-end -->\n", encoding="utf-8")
+    before = ext.read_text(encoding="utf-8")
+    try:
+        result = _sync(project_lifecycle, "--update-ext", "--check")
+        assert result.returncode == 1, result.stdout[-800:] + result.stderr[-800:]
+        assert ext.read_text(encoding="utf-8") == before
+        result = _sync(project_lifecycle, "--update-ext")  # warning + skip, not an error
+        assert result.returncode == 0 and ext.read_text(encoding="utf-8") == before
+    finally:
+        ext.unlink()
+
+
+@pytest.mark.parametrize("body,strict_rc", [
+    ("<!-- agent-meta:managed-begin v=deadbeef -->\nhand\n<!-- agent-meta:managed-end -->\n", 1),
+    ("<!-- agent-meta:managed-begin v=deadbeef -->\nno end marker\n", 1),
+])
+def test_validate_extension_drift_warns_and_strict_fails(project_lifecycle, body, strict_rc):
+    """#1269: --validate warns (exit 0), --validate --strict exits 1; no traceback."""
+    ext = project_lifecycle / ".claude" / "3-project" / "am-developer-ext.md"
+    ext.parent.mkdir(parents=True, exist_ok=True)
+    ext.write_text(body, encoding="utf-8")
+    try:
+        warn = _ok(project_lifecycle, "--validate")
+        assert "extension.drift" in warn.stdout + warn.stderr
+        strict = _sync(project_lifecycle, "--validate", "--strict")
+        assert "Traceback" not in strict.stdout + strict.stderr
+        assert strict.returncode == strict_rc
+    finally:
+        ext.unlink()

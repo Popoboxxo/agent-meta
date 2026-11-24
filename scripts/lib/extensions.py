@@ -5,7 +5,9 @@ from pathlib import Path
 
 from .io import safe_path
 from .log import SyncLog
-from .managed_block import ManagedBlockError, replace_block
+from .managed_block import (
+    ManagedBlockError, has_block, has_drift, replace_block, stamp_block,
+)
 
 CLAUDE_EXT_DIR = ".claude/3-project"
 EXT_SUFFIX = "-ext"
@@ -81,10 +83,10 @@ def _render_extension_managed_block(
     """
     from .context import omit_unresolved_placeholder_lines
 
-    return omit_unresolved_placeholder_lines(
+    return stamp_block(omit_unresolved_placeholder_lines(
         render_managed_block(variables, source_label, log, agent_meta_root),
         log, source_label,
-    )
+    ))
 
 
 def update_managed_block(existing: str, new_managed: str) -> str:
@@ -140,22 +142,52 @@ def update_extensions(
     log: SyncLog,
     dry_run: bool,
     agent_meta_root: Path | None = None,
-):
-    """Update the managed block in all existing extension files."""
+    force: bool = False,
+    role: str | None = None,
+) -> list:
+    """Update the managed block in all existing extension files.
+
+    Files with a missing marker or a hand-edited block (hash drift) are warned
+    about and skipped unless *force*. *role* limits the run to one extension. Returns the drifted/skipped file names.
+    """
+    from .roles import build_role_map
+
+    drifted: list = []
+    matched = 0
     ext_dir = project_root / CLAUDE_EXT_DIR
     if not ext_dir.exists():
         log.skip(CLAUDE_EXT_DIR, "directory not found — no extensions to update")
-        return
+        return drifted
+
+    roles = list(build_role_map(agent_meta_root or Path(__file__).resolve().parent.parent.parent))
 
     for ext_file in sorted(ext_dir.glob(f"*{EXT_SUFFIX}.md")):
         existing = ext_file.read_text(encoding="utf-8")
+        rel = ext_file.relative_to(project_root)
+        stem = ext_file.name[: -len(EXT_SUFFIX + ".md")]
+        # longest role wins, so "am-senior-developer" is not the "developer" extension
+        owner = max((r for r in roles if stem == r or stem.endswith("-" + r)),
+                    key=len, default=None)
+        if role and owner != role:
+            continue
+        matched += 1
+        if owner is None:
+            log.warn(f"{rel}: no template role for this extension (orphan)")
         new_managed = _render_extension_managed_block(
             variables, str(ext_file.name), log, agent_meta_root
         )
         try:
+            if not has_block(existing):
+                log.warn(f"{rel}: managed-begin marker missing — skipped")
+                drifted.append(ext_file.name)
+                continue
+            if has_drift(existing) and not force:
+                log.warn(f"{rel}: managed block edited manually (hash drift) — skipped, use --force")
+                drifted.append(ext_file.name)
+                continue
             new_content = update_managed_block(existing, new_managed)
         except ManagedBlockError as exc:
-            log.warn(f"{ext_file.relative_to(project_root)}: {exc} — skipped")
+            log.warn(f"{rel}: {exc} — skipped")
             continue
 
         if new_content == existing:
@@ -164,3 +196,6 @@ def update_extensions(
             log.action("UPDATE", str(ext_file.relative_to(project_root)), "managed block")
             if not dry_run:
                 ext_file.write_text(new_content, encoding="utf-8")
+    if role and not matched:
+        log.warn(f"--role {role}: no extension file matches")
+    return drifted

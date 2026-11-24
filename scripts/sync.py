@@ -131,7 +131,8 @@ def _validate_doctor_flags(parser, args) -> None:
         return
     out_allowed = getattr(args, "optimize_config", False)
     stray = [flag for flag, used in (
-        ("--strict", args.strict), ("--provider", args.provider is not None),
+        ("--strict", args.strict and not getattr(args, "validate", False)),
+        ("--provider", args.provider is not None),
         ("--out", args.out is not None and not out_allowed)) if used]
     if stray:
         parser.error(f"{', '.join(stray)} can only be used together with --doctor")
@@ -314,7 +315,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "The sync-pending check runs 'sync.py --check --dry-run' "
                              "(about 25 s).")
     parser.add_argument("--strict", action="store_true",
-                        help="With --doctor: WARNING findings exit 1, an invalid registry "
+                        help="With --validate: extension managed-block drift exits 1. "
+                             "With --doctor: WARNING findings exit 1, an invalid registry "
                              "entry (doctor.registry-invalid) is an ERROR and exits 2")
     parser.add_argument("--provider", nargs="+", action="extend", metavar="P", default=None,
                         help="With --doctor: only check these active providers")
@@ -334,7 +336,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="Create extension file for ROLE (or 'all'). "
                              "Does not overwrite existing files.")
     parser.add_argument("--update-ext", action="store_true",
-                        help="Update managed block in all existing extension files")
+                        help="Update managed block in all existing extension files. Hand-edited "
+                             "blocks are skipped (warning) unless --force; --role ROLE limits "
+                             "the run; --check lists drift without writing (exit 1)")
     parser.add_argument("--create-rule", metavar="NAME",
                         help="Create .claude/rules/<NAME>.md template (never overwrites)")
     parser.add_argument("--create-hook", metavar="NAME",
@@ -506,7 +510,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         default=None,
                         help="Which providers to restore from --restore (default: all)")
     parser.add_argument("--force", action="store_true",
-                        help="Clean restore: remove the existing provider "
+                        help="With --update-ext: overwrite hand-edited managed blocks. "
+                             "With --restore: clean restore, remove the existing provider "
                              "directory before restoring it (--restore). Without "
                              "it, backup files are merged over the existing tree.")
     parser.add_argument("--list-backups", action="store_true",
@@ -554,7 +559,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", metavar="PATH",
                         help="Path to skill directory within the submodule repo")
     parser.add_argument("--role", metavar="ROLE",
-                        help="Agent role name for the generated wrapper agent")
+                        help="Agent role name (--add-skill: wrapper agent; --update-ext: "
+                             "only that role's extension)")
     parser.add_argument("--entry", metavar="FILE", default="SKILL.md",
                         help="Entry file within the skill directory (default: SKILL.md)")
     return parser

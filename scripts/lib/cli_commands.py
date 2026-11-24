@@ -900,10 +900,15 @@ def _handle_update_ext(ctx: _SyncContext) -> None:
     variables = ctx.variables
 
     mode = "update-ext"
-    update_extensions(project_root, variables, log, args.dry_run,
-                      agent_meta_root=agent_meta_root)
+    # --check forces dry_run (see _normalize_check_dry_run): drift is shown, nothing written.
+    drifted = update_extensions(project_root, variables, log, args.dry_run,
+                                agent_meta_root=agent_meta_root,
+                                force=args.force, role=args.role)
 
     ctx.mode = mode
+    if args.check and drifted:
+        # --check exits 1 via the common tail when log.errors is non-empty.
+        log.error("extensions", f"drift in {len(drifted)} file(s): {', '.join(drifted)}")
 
 
 def _handle_create_rule(ctx: _SyncContext) -> None:
@@ -1715,6 +1720,21 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
             _strict_findings.append(Finding(
                 Severity.WARNING, "mcp-deny.missing-rule", Path(config_path).name,
                 _message,
+            ))
+    # #1269: hand-edited extension managed blocks; error only with --strict (Q5).
+    from lib.extensions import CLAUDE_EXT_DIR, EXT_SUFFIX
+    from lib.managed_block import ManagedBlockError, has_block, has_drift
+    for _ext in sorted((project_root / CLAUDE_EXT_DIR).glob(f"*{EXT_SUFFIX}.md")):
+        _text = _ext.read_text(encoding="utf-8")
+        try:
+            _drift = has_block(_text) and has_drift(_text)
+            _why = "managed block edited manually (hash drift); update-ext skips it unless --force"
+        except ManagedBlockError as _exc:
+            _drift, _why = True, f"broken managed block markers: {_exc}"
+        if _drift:
+            _strict_findings.append(Finding(
+                Severity.ERROR if args.strict else Severity.WARNING,
+                "extension.drift", _ext.name, _why,
             ))
     _strict_exit_code = 0
     if _strict_findings:

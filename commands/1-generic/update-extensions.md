@@ -20,13 +20,18 @@ Stop.
 
 **Step 1 — Targeted or full update**
 
-If $ARGUMENTS provides a role name:
-- Update only that extension: `python .agent-meta/scripts/sync.py --update-ext`
-  (sync.py --update-ext updates all extensions; note which role the user asked about)
-- After update, show only the diff for that file.
+Run from the project root (sync.py lives in the agent-meta checkout, by default `.agent-meta/`):
 
-If $ARGUMENTS is empty:
-- Update all extensions: `python .agent-meta/scripts/sync.py --update-ext`
+- Preview drift without writing (exit 1 if a block was edited by hand):
+  `python .agent-meta/scripts/sync.py --update-ext --check`
+- All extensions: `python .agent-meta/scripts/sync.py --update-ext`
+- Single role (when $ARGUMENTS names one):
+  `python .agent-meta/scripts/sync.py --update-ext --role <role-name>`
+- Overwrite hand-edited managed blocks: add `--force`.
+
+Extensions whose managed block was edited by hand (hash drift) or whose marker
+is missing are skipped with a warning (any change inside the block counts as drift,
+including trailing spaces or CRLF line endings); ask before using `--force`.
 
 **Step 2 — Report changes**
 
