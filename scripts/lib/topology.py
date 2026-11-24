@@ -2,7 +2,10 @@
 
 SPEC-orchestrator-topology-2026-11-03 (issue #1077).
 
-This is the ONE resolver for the ``orchestrator.topology`` position axis. It is
+This is the ONE resolver for the ``orchestrator.topology`` position axis (WHERE
+the orchestrator agent lives). It is NOT ``context_file.topology``, which selects
+the context-file layout (``unified`` | ``per-provider``) and is resolved in
+``context.py``; the two keys share a name but are independent axes. It is
 a leaf module: it writes nothing, resolves no orchestrator mode (``mode`` is
 passed in already resolved) and never branches on a provider name. Provider
 differences come exclusively from the capability data
