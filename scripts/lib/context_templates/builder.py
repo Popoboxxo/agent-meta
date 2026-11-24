@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..frontmatter import strip_frontmatter
+from ..managed_block import MANAGED_BLOCK_RE  # noqa: F401  (re-export)
 from ..substitution import constant_lookup, substitute_placeholders
 from ..variables import _placeholder_keep
 
@@ -25,10 +26,6 @@ _ESCAPE_RE = re.compile(r"\{\{%\s*([^%}]+?)\s*%\}\}")
 
 # Agent-meta managed block (HTML comment form) shared by the context writers
 # and the run-1 fixpoint convergence.
-MANAGED_BLOCK_RE = re.compile(
-    r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-    re.DOTALL,
-)
 
 
 def substitute_managed_block(text: str, managed_block: str) -> str:

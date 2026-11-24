@@ -1,11 +1,11 @@
 """Extension file management: create, update managed block."""
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from .io import safe_path
 from .log import SyncLog
+from .managed_block import ManagedBlockError, replace_block
 
 CLAUDE_EXT_DIR = ".claude/3-project"
 EXT_SUFFIX = "-ext"
@@ -89,17 +89,7 @@ def _render_extension_managed_block(
 
 def update_managed_block(existing: str, new_managed: str) -> str:
     """Replace the managed block in an existing extension file."""
-    pattern = re.compile(
-        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-        re.DOTALL,
-    )
-    if pattern.search(existing):
-        # Function replacement: new_managed is rendered template content and
-        # must be inserted verbatim — a raw replacement string would
-        # interpret backslashes as escapes (#674).
-        return pattern.sub(lambda _m: new_managed, existing, count=1)
-    # No block found — prepend (should not happen in normal flow)
-    return new_managed + "\n\n" + existing
+    return replace_block(existing, new_managed)
 
 
 def create_extension(
@@ -162,7 +152,11 @@ def update_extensions(
         new_managed = _render_extension_managed_block(
             variables, str(ext_file.name), log, agent_meta_root
         )
-        new_content = update_managed_block(existing, new_managed)
+        try:
+            new_content = update_managed_block(existing, new_managed)
+        except ManagedBlockError as exc:
+            log.warn(f"{ext_file.relative_to(project_root)}: {exc} — skipped")
+            continue
 
         if new_content == existing:
             log.note_unchanged(str(ext_file.relative_to(project_root)))

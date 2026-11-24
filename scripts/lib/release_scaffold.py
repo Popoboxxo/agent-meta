@@ -19,11 +19,12 @@ from .config import substitute
 from .extensions import update_managed_block
 from .io import safe_path, write_checked
 from .log import SyncLog
+from .managed_block import MANAGED_BEGIN, MANAGED_END, ManagedBlockError
 
 TARGET = "docs/RELEASE_PROCESS.md"
 _TEMPLATE_DIR = "templates/docs"
-_MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
-_MANAGED_END = "<!-- agent-meta:managed-end -->"
+_MANAGED_BEGIN = MANAGED_BEGIN
+_MANAGED_END = MANAGED_END
 _PROJECT_STUB_TEMPLATE_PATH = "templates/managed-block-project-stub.md"
 
 # Sensible defaults so an unset-but-expected placeholder never leaks a raw
@@ -86,7 +87,11 @@ def scaffold_release_process(agent_meta_root: Path, project_root: Path,
 
     target = safe_path(project_root, TARGET)
     if target.exists():
-        content = update_managed_block(target.read_text(encoding="utf-8"), managed)
+        try:
+            content = update_managed_block(target.read_text(encoding="utf-8"), managed)
+        except ManagedBlockError as exc:
+            log.warn(f"{TARGET}: {exc} — skipped")
+            return
     else:
         content = managed + _load_project_stub(agent_meta_root)
 

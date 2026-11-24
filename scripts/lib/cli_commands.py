@@ -43,6 +43,7 @@ from lib.config import (
     read_version,
 )
 from lib.config_audit import apply_audit, audit_config, format_report
+from lib.managed_block import MANAGED_BEGIN, MANAGED_END  # noqa: F401  (re-export)
 from lib.context import only_variables
 from lib.deactivation import (
     activate_providers,
@@ -106,8 +107,6 @@ from lib.viz import cleanup_old_sessions, generate_viz
 # ---------------------------------------------------------------------------
 
 EXT_SUFFIX = "-ext"
-MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
-MANAGED_END   = "<!-- agent-meta:managed-end -->"
 LOGFILE = "sync.log"
 EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
 
