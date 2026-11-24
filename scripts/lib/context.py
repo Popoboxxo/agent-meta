@@ -3667,7 +3667,11 @@ def sync_prompts_for_continue(
         extract_frontmatter_field,
         target_filename,
     )
-    from .provider_transform import _make_slim_body, _strip_claude_specific_lines
+    from .provider_transform import (
+        _make_slim_body,
+        _strip_extension_hook_lines,
+        should_strip_extension_hook,
+    )
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
@@ -3727,7 +3731,8 @@ def sync_prompts_for_continue(
 
         # Strip original frontmatter, optionally slim the body
         body = _strip_frontmatter(content)
-        body = _strip_claude_specific_lines(body)
+        if should_strip_extension_hook((provider_config or {}).get(provider)):
+            body = _strip_extension_hook_lines(body)
         if prompt_mode == "slim":
             body = _make_slim_body(body)
 

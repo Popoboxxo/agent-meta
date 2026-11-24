@@ -69,7 +69,7 @@ Custom agents are **plain Markdown with a YAML frontmatter block** (V10 — the
 kimi-cli YAML-spec heritage is disproven). agent-meta uses the **default transform
 path** (no new `frontmatter-mechanism` value): `model: inject` per role +
 `strip-fields` (`memory`, `temperature`, `top_p`, `top_k`, `stop_sequences`,
-`max_output_tokens`) + `strip-claude-lines`.
+`max_output_tokens`) (Extension-Hook lines are stripped because the provider lacks `extension_hook_path`).
 
 Native frontmatter fields: `name` (optional, kebab-case, filename fallback),
 `description` (required), `whenToUse`, `override`, `tools` (YAML list or
