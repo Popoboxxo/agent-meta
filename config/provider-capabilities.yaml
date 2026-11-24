@@ -213,17 +213,25 @@ capabilities:
     subagent-shell: true                # issue #1329: decision (a) grant — Opencode workers get the shell tool
     subagent-shell-verified-state: VERIFIED-RUNTIME  # verified harness support for spawned workers
     route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
-    native_agent_tools: ["task"]
+    # Issue #1344: OpenCode's built-in dispatch primitive is `subagent` with a
+    # required `agent` param (source anomalyco/opencode@dev subagent.ts).
+    native_agent_tools: ["subagent"]
+    dispatch_tool: "subagent"
+    # Source-documented, not verified against an installed consumer version:
+    # `agent` is source-confirmed; description/prompt are the standard subagent
+    # calling convention (review minor, SPEC-DECISION-1344).
+    dispatch_signature_verified_state: DOCUMENTED-SOURCE
+    missing_role_fallback: "main_chat"  # fail closed, never a silent `general` downgrade
     worker_control_tools: []             # IC-1: no verified worker-control tool
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
-    # Issue #265: all task() calls in one response run in parallel and the
+    # Issue #265: all subagent() calls in one response run in parallel and the
     # turn completes only when all finish — "BARRIER: Automatisch" is already
     # documented in the Opencode parallel_pattern (delegation-syntax.yaml).
     fanout_mechanism: native-batch
     barrier_collect: true
-    description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
+    description: "Agent-Orchestrierung via subagent(agent=…) Dispatch, dateibasierte Agent-Registrierung."
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
     # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. agents_md_precedence=nearest is UNVERIFIED (not in study). Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
