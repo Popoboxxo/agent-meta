@@ -372,8 +372,8 @@ def test_override_decision_matches_kernel(tmp_path, monkeypatch, path, blocked):
 
 def test_hook_version_changelog_and_python39_static_contract():
     source = _IMPL_PATH.read_text(encoding="utf-8")
-    assert "# version: 1.9.0" in source
-    assert "# changelog: 1.9.0:" in source
+    assert "# version: 1.10.0" in source
+    assert "# changelog: 1.10.0:" in source
     assert "#1275a" in source
     for path in (
         _LIB_DIR / "hook_containment_path.py",

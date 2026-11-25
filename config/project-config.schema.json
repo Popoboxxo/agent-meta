@@ -2907,6 +2907,18 @@
           "default": true,
           "description": "Master switch. true = writes are confined to the repo root (plus the tmp-sink when enabled). false = today's unrestricted behavior."
         },
+        "protected_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [
+            "external/",
+            ".agent-meta/"
+          ],
+          "description": "Root-relative directory prefixes protected from direct writes. A present list replaces the defaults; valid path = entries from an existing .gitmodules are always appended. Paths are canonicalized and de-duplicated. Invalid runtime values fail safe to the defaults plus .gitmodules."
+        },
         "provider-overrides": {
           "type": "object",
           "description": "Override repo_containment.enabled per provider. Keys are registered provider names (Claude, Codex, Gemini, Opencode, ...). Providers without an entry inherit the project value. Resolution: provider override > project value > framework default true.",

@@ -333,8 +333,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 28: #1275b Config-Auflösung + Skill-Text (developer, S)
 **Files:** Modify `scripts/lib/repo_containment.py`, `config/project-config.schema.json`, `.claude/skills/submodule-protection/SKILL.md`; Test: Modify `tests/test_repo_containment_schema.py`.
 **Interfaces:** Produces Schema-Key `repo_containment.protected_paths` (Liste), Syncer-Auflösung in den Hook (gleiche Präzedenz wie bestehende Config-Auflösung); Skill-Text „`.gitmodules` falls vorhanden". Konsumiert Task 27.
-- [ ] Step 1: Test (fail): Schema akzeptiert Liste, Default greift. Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_repo_containment_schema.py tests/test_protected_paths.py`.
-- [ ] Step 4: Commit `feat: add repo_containment.protected_paths config key`
+- [x] Step 1: Test (fail): Schema akzeptiert Liste, Default greift. Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_repo_containment_schema.py tests/test_protected_paths.py`.
+- [x] Step 4: Commit `feat: add repo_containment.protected_paths config key` — nicht ausgeführt (explizites User-Veto); Commit-Freigabe im finalen Report.
 - AC: B4 AC-1 (Default-Liste greift), AC-3 (Override-Config), AC-4 (`.gitmodules`-Pfade ergänzt); Schema validiert Liste von Strings.
 
 ### Task 29: Rebaseline #1275 (developer)

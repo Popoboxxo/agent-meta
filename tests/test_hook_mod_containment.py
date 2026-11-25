@@ -436,8 +436,8 @@ def test_missing_python_fails_closed(tmp_path):
 
 def test_shell_inventory_version_and_inline_python_allowlist():
     source = _IMPL_PATH.read_text(encoding="utf-8")
-    assert "# version: 1.9.0" in source
-    assert "1.9.0" in source
+    assert "# version: 1.10.0" in source
+    assert "1.10.0" in source
     assert "#1238b1" in source
     assert not re.search(r"(?m)^\s*(?:cat\s+)?<<-?\s*(['\"])PYEOF?\1", source)
     inline = [

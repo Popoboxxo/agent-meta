@@ -2,10 +2,12 @@
 """Path-containment verdict for the deployed repo-containment shell hook.
 
 Issue #1238b1: importable replacement for the inline Python verdict.  Issue
-#1275a adds protected submodule paths.  Any error produces no ALLOW verdict,
-so the shell caller blocks (fail closed).  This is a convention boundary, not
-a security boundary.
+#1275a adds protected submodule paths; #1275b routes the configured effective
+list from the config module as JSON.  Any error produces no ALLOW verdict, so
+the shell caller blocks (fail closed).  This is a convention boundary, not a
+security boundary.
 """
+import json
 import os
 import posixpath
 import re
@@ -16,6 +18,23 @@ import sys
 _DEFAULT_PROTECTED_PATHS = ("external", ".agent-meta")
 _GITMODULES_PATH_RE = re.compile(r"^\s*path\s*=\s*(.*?)\s*$", re.IGNORECASE)
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+
+
+def normalize_protected_path(path):
+    """Mirror the syncer/config-module canonicalization and safety rules."""
+    if not isinstance(path, str) or not path:
+        return None
+    if any(ord(ch) < 32 for ch in path):
+        return None
+    canonical = path.replace("\\", "/")
+    if canonical.startswith("/") or _WINDOWS_DRIVE_RE.match(canonical):
+        return None
+    if ".." in canonical.split("/"):
+        return None
+    normalized = posixpath.normpath(canonical)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
+        return None
+    return normalized
 
 
 def within(base, target):
@@ -60,25 +79,43 @@ def gitmodules_paths(root):
     return paths
 
 
-def protected_roots(root):
-    """Resolve defaults plus valid root-relative ``.gitmodules`` paths."""
+def protected_roots(root, configured=None):
+    """Resolve protected directory roots from config plus ``.gitmodules``.
+
+    ``configured=None`` preserves the legacy defaults-plus-gitmodules call
+    contract. A supplied list has already replaced the defaults in the config
+    module; gitmodules paths are appended again here as defense in depth.
+    Malformed supplied data raises so the CLI emits no ALLOW verdict.
+    """
+    root_real = os.path.realpath(root)
+    if configured is None:
+        configured = list(_DEFAULT_PROTECTED_PATHS)
+    if not isinstance(configured, list):
+        raise ValueError("protected paths must be a list")
+
     roots = []
-    for raw in (*_DEFAULT_PROTECTED_PATHS, *gitmodules_paths(root)):
-        canonical = raw.replace("\\", "/")
-        if not canonical or _WINDOWS_DRIVE_RE.match(canonical):
+    seen = set()
+    configured_paths = []
+    for raw in configured:
+        normalized = normalize_protected_path(raw)
+        if normalized is None:
+            raise ValueError("invalid protected path")
+        configured_paths.append(normalized)
+    for raw in (*configured_paths, *gitmodules_paths(root_real)):
+        normalized = normalize_protected_path(raw)
+        if normalized is None:
             continue
-        normalized = posixpath.normpath(canonical)
-        if normalized in (".", "..") or normalized.startswith(("../", "/")):
+        candidate = os.path.realpath(os.path.join(root_real, normalized))
+        if candidate == root_real or not within(root_real, candidate):
             continue
-        candidate = os.path.realpath(os.path.join(root, normalized))
-        if candidate == root or not within(root, candidate):
-            continue
-        if candidate not in roots:
+        key = os.path.normcase(candidate)
+        if key not in seen:
+            seen.add(key)
             roots.append(candidate)
     return roots
 
 
-def path_verdict(root, workdir, sink_enabled, sink_path, raw):
+def path_verdict(root, workdir, sink_enabled, sink_path, raw, protected_paths=None):
     """Return ALLOW, BLOCK_SINK, BLOCK_PROTECTED or BLOCK for one target."""
     if not raw:
         return "BLOCK"
@@ -89,7 +126,7 @@ def path_verdict(root, workdir, sink_enabled, sink_path, raw):
     # The override deliberately bypasses only this protected-path gate.  Root
     # containment and the tmp-sink rule below remain unchanged.
     if os.environ.get("AM_ALLOW_PROTECTED_WRITE") != "1":
-        for protected_root in protected_roots(root):
+        for protected_root in protected_roots(root, protected_paths):
             if within(protected_root, target):
                 return "BLOCK_PROTECTED"
 
@@ -105,16 +142,22 @@ def path_verdict(root, workdir, sink_enabled, sink_path, raw):
 def main(argv: list[str], stdin: str) -> int:
     """Print ALLOW, BLOCK_SINK, BLOCK_PROTECTED or BLOCK for one write target."""
     del stdin
-    if len(argv) != 5:
+    if len(argv) not in (5, 6):
         return 1
     root = os.path.realpath(argv[0])
     workdir = os.path.realpath(argv[1])
     sink_enabled = argv[2] == "1"
     sink_path = argv[3]
     raw = argv[4]
-
+    protected_paths = None
     try:
-        verdict = path_verdict(root, workdir, sink_enabled, sink_path, raw)
+        if len(argv) == 6:
+            protected_paths = json.loads(argv[5])
+            if protected_paths is not None and not isinstance(protected_paths, list):
+                return 1
+        verdict = path_verdict(
+            root, workdir, sink_enabled, sink_path, raw, protected_paths
+        )
     except Exception:
         return 1
     print(verdict)

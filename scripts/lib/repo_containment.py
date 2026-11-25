@@ -16,6 +16,12 @@ Provider selection is data-driven through
 ``config["repo_containment"]["provider-overrides"]`` keyed by the registered
 provider name. There is intentionally no ``if provider == "Name"`` branch
 anywhere in this module (provider-agnostic policy).
+
+Protected write paths are project-scoped: a present
+``repo_containment.protected_paths`` list replaces the framework defaults,
+then valid paths from an existing ``.gitmodules`` are appended. The optional
+``project_root`` argument to :func:`resolve_effective_repo_containment` enables
+that filesystem contribution; the deployed hook mirrors the same contract.
 """
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ import ntpath
 import os
 import posixpath
 import re
+import shlex
 import shutil
 import stat
 import sys
@@ -36,6 +43,7 @@ from typing import Any, Callable, Optional
 # non-exiting resolver and the Q1 materialization block.
 # ---------------------------------------------------------------------------
 DEFAULT_REPO_CONTAINMENT_ENABLED = True
+DEFAULT_PROTECTED_PATHS = ("external/", ".agent-meta/")
 DEFAULT_TMP_SINK_ENABLED = True
 DEFAULT_TMP_SINK_PATH = ".tmp"
 DEFAULT_TMP_SINK_GITIGNORE = True
@@ -51,6 +59,7 @@ TMP_SINK_GITIGNORE_CONTENT = "*\n!.gitignore\n"
 # does not catch it on POSIX, so reject it explicitly here to keep the rule
 # identical across platforms (mirrors the Admin-UI client-side validation).
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+_GITMODULES_PATH_RE = re.compile(r"^\s*path\s*=\s*(.*?)\s*$", re.IGNORECASE)
 
 # Windows-only path hazards, rejected on every host so a sink path means the
 # same directory everywhere (IC-15 Nr. 27 a, F-45).
@@ -82,6 +91,129 @@ SOURCE_SAFE_FALLBACK = "safe-fallback"
 _UNSET = object()
 
 
+def normalize_protected_path(path: Any) -> Optional[str]:
+    """Return a canonical root-relative protected path, or ``None``.
+
+    Protected paths are compared as directory prefixes by the deployed hook.
+    They therefore accept spaces and quotes (JSON transports them safely), but
+    reject empty/control-character values, absolute/drive/UNC paths, ``..``
+    segments and the project root itself. Backslashes are normalized before
+    POSIX ``normpath`` so every provider resolves the same spelling.
+    """
+    if not isinstance(path, str) or not path:
+        return None
+    if any(ord(ch) < 32 for ch in path):
+        return None
+    canonical = path.replace("\\", "/")
+    if canonical.startswith("/") or _WINDOWS_DRIVE_RE.match(canonical):
+        return None
+    if ".." in canonical.split("/"):
+        return None
+    normalized = posixpath.normpath(canonical)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
+        return None
+    return normalized
+
+
+def _dedupe_protected_paths(paths: list[str]) -> list[str]:
+    """De-duplicate canonical paths case-insensitively, preserving order."""
+    seen = set()
+    result = []
+    for path in paths:
+        key = path.casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(path)
+    return result
+
+
+def gitmodules_protected_paths(project_root: "str | os.PathLike[str]") -> list[str]:
+    """Read valid ``path =`` entries from an existing root ``.gitmodules``.
+
+    Missing, unreadable or malformed values contribute no extra paths. Git
+    quoting/comments use the stdlib lexer; unsafe paths are discarded by
+    :func:`normalize_protected_path`.
+    """
+    try:
+        root = Path(project_root)
+        with (root / ".gitmodules").open(encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except (OSError, TypeError, ValueError, UnicodeError):
+        return []
+
+    paths = []
+    for line in lines:
+        match = _GITMODULES_PATH_RE.match(line)
+        if match is None:
+            continue
+        lexer = shlex.shlex(match.group(1), posix=True)
+        lexer.whitespace = "\t\r\n"
+        lexer.whitespace_split = True
+        lexer.commenters = "#;"
+        try:
+            values = list(lexer)
+        except ValueError:
+            continue
+        if len(values) != 1:
+            continue
+        normalized = normalize_protected_path(values[0])
+        if normalized is not None:
+            paths.append(normalized)
+    return _dedupe_protected_paths(paths)
+
+
+def resolve_protected_paths(
+    config: dict | None,
+    project_root: "str | os.PathLike[str] | None" = None,
+    *,
+    findings: Optional[list[ContainmentFinding]] = None,
+) -> list[str]:
+    """Resolve configured/default protected paths plus ``.gitmodules``.
+
+    Merge contract: an absent key uses the framework defaults; a present list
+    REPLACES those defaults (including an explicit empty list); valid paths
+    from an existing ``.gitmodules`` are then appended. Values are
+    canonicalized and de-duplicated case-insensitively in first-seen order.
+    A malformed list or any invalid entry fails safe to the defaults plus
+    ``.gitmodules`` and emits a finding -- never to an empty protection set.
+    """
+    if findings is None:
+        findings = []
+    raw = config.get("repo_containment") if isinstance(config, dict) else None
+    rc = raw if isinstance(raw, dict) else {}
+    configured = rc.get("protected_paths", _UNSET)
+
+    if configured is _UNSET:
+        base = list(DEFAULT_PROTECTED_PATHS)
+    elif not isinstance(configured, list):
+        findings.append(ContainmentFinding(
+            "warning",
+            "repo-containment.protected-paths",
+            "'repo_containment.protected_paths' must be a list of strings, got "
+            f"{type(configured).__name__}; using defaults "
+            f"{list(DEFAULT_PROTECTED_PATHS)!r}.",
+        ))
+        base = list(DEFAULT_PROTECTED_PATHS)
+    else:
+        normalized = [normalize_protected_path(value) for value in configured]
+        if any(value is None for value in normalized):
+            findings.append(ContainmentFinding(
+                "warning",
+                "repo-containment.protected-paths",
+                "'repo_containment.protected_paths' contains an invalid path; "
+                f"using defaults {list(DEFAULT_PROTECTED_PATHS)!r}.",
+            ))
+            base = list(DEFAULT_PROTECTED_PATHS)
+        else:
+            base = normalized
+
+    canonical_base = [normalize_protected_path(value) for value in base]
+    paths = [value for value in canonical_base if value is not None]
+    if project_root is not None:
+        paths.extend(gitmodules_protected_paths(project_root))
+    return _dedupe_protected_paths(paths)
+
+
 @dataclass
 class ContainmentFinding:
     """One non-fatal resolution finding (never raises, never exits)."""
@@ -103,6 +235,9 @@ class ResolvedRepoContainment:
             :data:`SOURCE_PROVIDER_OVERRIDE`, :data:`SOURCE_PROJECT`,
             :data:`SOURCE_DEFAULT`, :data:`SOURCE_SAFE_FALLBACK`.
         provider: provider name the resolution was requested for (or ``None``).
+        protected_paths: canonical root-relative write-protected paths,
+            including valid entries from an existing ``.gitmodules`` when a
+            project root was supplied.
         tmp_sink_enabled: whether the scratch sink is sanctioned/provisioned.
         tmp_sink_path: validated project-relative scratch path.
         tmp_sink_gitignore: whether the framework should gitignore the sink.
@@ -114,6 +249,11 @@ class ResolvedRepoContainment:
     enabled: bool
     source: str
     provider: str | None = None
+    protected_paths: list[str] = field(
+        default_factory=lambda: [
+            normalize_protected_path(path) for path in DEFAULT_PROTECTED_PATHS
+        ]
+    )
     tmp_sink_enabled: bool = DEFAULT_TMP_SINK_ENABLED
     tmp_sink_path: str = DEFAULT_TMP_SINK_PATH
     tmp_sink_gitignore: bool = DEFAULT_TMP_SINK_GITIGNORE
@@ -414,6 +554,7 @@ def default_repo_containment_block() -> dict:
     """
     return {
         "enabled": DEFAULT_REPO_CONTAINMENT_ENABLED,
+        "protected_paths": list(DEFAULT_PROTECTED_PATHS),
         "tmp-sink": {
             "enabled": DEFAULT_TMP_SINK_ENABLED,
             "path": DEFAULT_TMP_SINK_PATH,
@@ -498,6 +639,8 @@ def _resolve_bool(
 def resolve_effective_repo_containment(
     config: dict | None,
     provider: str | None = None,
+    *,
+    project_root: "str | os.PathLike[str] | None" = None,
 ) -> ResolvedRepoContainment:
     """Resolve the effective repo-containment state — never exits, never raises.
 
@@ -507,7 +650,9 @@ def resolve_effective_repo_containment(
     falls back safe-side to ``True`` and emits a WARNING finding (F4).
 
     The tmp-sink settings are resolved independently of the master switch,
-    each falling back to its framework default.
+    each falling back to its framework default. Protected paths use the
+    explicit merge contract documented on :func:`resolve_protected_paths`;
+    ``project_root`` enables the optional ``.gitmodules`` contribution.
     """
     findings: list[ContainmentFinding] = []
 
@@ -571,10 +716,13 @@ def resolve_effective_repo_containment(
             ))
             path = DEFAULT_TMP_SINK_PATH
 
+    protected_paths = resolve_protected_paths(config, project_root, findings=findings)
+
     return ResolvedRepoContainment(
         enabled=enabled,
         source=source,
         provider=provider,
+        protected_paths=protected_paths,
         tmp_sink_enabled=sink_enabled,
         tmp_sink_path=path,
         tmp_sink_gitignore=sink_gitignore,
