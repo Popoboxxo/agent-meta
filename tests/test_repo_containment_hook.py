@@ -35,6 +35,7 @@ from tests.timeouts import SCRIPT_TIMEOUT
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment-impl.sh"
+_LIB_DIR = _REPO_ROOT / "hooks" / "1-generic" / "lib"
 
 #: Process ``cwd`` for the guard runs (ADR-3). Bound by ``_bind_decoy``; it is
 #: a project-carrying decoy, never the repo checkout and never a payload root.
@@ -986,8 +987,7 @@ def test_wrapper_and_compound_shapes_inside_root_stay_allowed(tmp_path, template
 
 
 def test_detector_crash_fails_closed(tmp_path):
-    """Verifier note: the detector ended in `|| true`, so a Python crash
-    ALLOWED the command. A crash must block."""
+    """A crash in the extracted Bash write-target module must block."""
     root = _project(tmp_path)
     shim_dir = tmp_path / "detector-shim"
     shim_dir.mkdir()
@@ -995,8 +995,8 @@ def test_detector_crash_fails_closed(tmp_path):
     shim = shim_dir / "python3"
     shim.write_text(
         "#!/bin/sh\n"
-        'case "${2:-}" in\n'
-        '  *WRITE_ALL*) exit 1 ;;\n'
+        'case "${1:-}" in\n'
+        '  */hook_containment_shell.py) exit 1 ;;\n'
         "esac\n"
         'exec "' + real + '" "$@"\n',
         encoding="utf-8",
@@ -1063,18 +1063,21 @@ def _deployed_hook(project: Path, provider_dir: str = ".claude") -> Path:
         _HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     (hooks / "repo-containment-impl.sh").write_text(
         _IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-    (hooks / "lib" / "hook_common.sh").write_text(
-        (_REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh").read_text(
-            encoding="utf-8"),
-        encoding="utf-8",
-    )
-    # #1161 Pkt5: hook_json_get_many loads its importable parser module from
-    # the same lib/ directory; sync.py deploys it next to hook_common.sh.
-    shutil.copy(
-        _IMPL_PATH.parent / "lib" / "hook_json_many.py",
-        hooks / "lib" / "hook_json_many.py",
-    )
+    shutil.copy(_LIB_DIR / "hook_common.sh", hooks / "lib" / "hook_common.sh")
+    # sync_hook_lib deploys every flat lib/*.py file (include_py=True), not
+    # only hook_json_many.py; keep this manual deployment fixture identical.
+    for module in sorted(_LIB_DIR.glob("*.py")):
+        shutil.copy(module, hooks / "lib" / module.name)
     return hooks / "repo-containment.sh"
+
+
+def test_deployed_hook_copies_all_flat_python_modules(tmp_path):
+    """Pin the production lib/*.py deployment contract for manual fixtures."""
+    project = _config_at(tmp_path / "a")
+    hook = _deployed_hook(project)
+    expected = {source.name for source in _LIB_DIR.glob("*.py")}
+    deployed = {path.name for path in (hook.parent / "lib").glob("*.py")}
+    assert deployed == expected
 
 
 def test_payload_cwd_cannot_redefine_the_deployed_jail_root(tmp_path):

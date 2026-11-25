@@ -293,8 +293,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 
 ### Task 24a: #1238b1 `repo-containment-impl.sh` (senior-developer, M-Teil 2a)
 **Files:** Modify `hooks/1-generic/repo-containment-impl.sh` (Heredocs 521/771/886, `-c` 1379; 274 trivial -> Allowlist); Create `hooks/1-generic/lib/hook_containment_*.py` (<= 3 flache Module); Test: Create `tests/test_hook_mod_containment.py`. (<= 5 Dateien)
-- [ ] Step 1: Unit-Tests je Modul (fail), Fail-closed (#595) per Test. Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_containment.py tests/test_repo_containment_hook.py tests/test_hook_lib_sync.py` (kein `test_hook_drift`, siehe Pin-Tabelle).
-- [ ] Step 4: Commit `refactor: extract repo-containment hook python into modules`
+- [x] Step 1: Unit-Tests je Modul (fail), Fail-closed (#595) per Test. Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_containment.py tests/test_repo_containment_hook.py tests/test_hook_lib_sync.py` (kein `test_hook_drift`, siehe Pin-Tabelle).
+- [x] Step 4: Commit `refactor: extract repo-containment hook python into modules`
 - AC: B3 AC-1, AC-2.
 
 ### Task 24b: #1238b2 `artifact-path-guard.sh` + `orchestrator-guard-impl.sh` (senior-developer, M-Teil 2b)
