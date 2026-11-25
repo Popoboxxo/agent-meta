@@ -7,6 +7,8 @@ hook_dod_push_config.py
 hook_dod_push_payload.py
 hook_dod_push_policy.py
 hook_dod_push_report.py
+hook_gate_artifact_freshness.py
+hook_gate_viz_log.py
 hook_guard_artifact.py
 hook_guard_policy.py
 hook_guard_scan.py

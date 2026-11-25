@@ -318,7 +318,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 - AC: B3 AC-1..AC-3.
 
 ### Task 26: Rebaseline #1238 (developer)
-- [ ] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1238: extracted hook modules"`; `--validate`; `pytest tests/test_hook_drift.py tests/test_hook_registration_invariant.py tests/test_managed_index_alignment.py`.
+- [x] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1238: extracted hook modules"`; `--validate`; `pytest tests/test_hook_drift.py tests/test_hook_registration_invariant.py tests/test_managed_index_alignment.py`.
 - Commit: `chore: rebaseline hook hashes for extracted modules (#1238)`
 
 ### Task 27: #1275a Schutzpfad-Prüfung im deployten Hook (senior-developer, S/M-Teil 1)
