@@ -324,10 +324,10 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 27: #1275a Schutzpfad-Prüfung im deployten Hook (senior-developer, S/M-Teil 1)
 **Files:** Modify `hooks/1-generic/repo-containment-impl.sh`, `hooks/1-generic/lib/kernel/containment.py` (Spiegel, Precondition 1+5: nicht deployt, vom Hook nicht aufgerufen); evtl. Modul aus T24a; Test: Create `tests/test_protected_paths.py` (inkl. Paritätstest).
 **Interfaces:** Produces Block (exit 2) für Edit/Write/NotebookEdit und Bash-Redirect-Ziele unter `repo_containment.protected_paths` (Default `external/`, `.agent-meta/`, plus `path =` aus vorhandener `.gitmodules`); Override `AM_ALLOW_PROTECTED_WRITE=1`; `_META_SUBMODULE`-Ausnahme bleibt für Lesen; Convention boundary.
-- [ ] Step 1: Tests (fail): Write `external/foo` -> Block mit Meldung; `docs/foo` -> erlaubt; Override -> erlaubt; `.gitmodules` `path = foo` -> `foo/a` blockt (AC-1..4).
-- [ ] Step 1b: Paritätstest (fail ohne Spiegel): gleiche Pfad-/Redirect-Eingaben ergeben im Hook (Subprozess) und in `kernel/containment.py::check_containment` dieselbe Block/Allow-Entscheidung (zwei Implementierungen -> Drift-Schutz; Alternative: Spiegel weglassen und in PR dokumentieren).
-- [ ] Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_protected_paths.py tests/test_repo_containment_hook.py tests/test_hook_kernel.py`.
-- [ ] Step 4: Commit `feat: block writes to protected submodule paths in hooks`
+- [x] Step 1: Tests (fail): Write `external/foo` -> Block mit Meldung; `docs/foo` -> erlaubt; Override -> erlaubt; `.gitmodules` `path = foo` -> `foo/a` blockt (AC-1..4).
+- [x] Step 1b: Paritätstest (fail ohne Spiegel): gleiche Pfad-/Redirect-Eingaben ergeben im Hook (Subprozess) und in `kernel/containment.py::check_containment` dieselbe Block/Allow-Entscheidung (zwei Implementierungen -> Drift-Schutz; Alternative: Spiegel weglassen und in PR dokumentieren).
+- [x] Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_protected_paths.py tests/test_repo_containment_hook.py tests/test_hook_kernel.py`.
+- [x] Step 4: Commit `feat: block writes to protected submodule paths in hooks`
 - AC: B4 AC-1..AC-4.
 
 ### Task 28: #1275b Config-Auflösung + Skill-Text (developer, S)
