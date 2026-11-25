@@ -313,8 +313,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 25b: #1238c2 `artifact-freshness.sh` + `viz-log.sh` + Regex-Nachweis (senior-developer, M-Teil 3b)
 **Files:** Modify `hooks/1-generic/release-gates/artifact-freshness.sh` (:68), `hooks/1-generic/viz-log.sh` (:19, :56); Create `hooks/1-generic/lib/hook_gate_*.py` (<= 2 flache Module); Test: Create `tests/test_hook_mod_gates.py`. (<= 5 Dateien)
 **Interfaces:** `artifact-freshness.sh` liegt in `release-gates/` (separater Deploy via `sync_release_gates`); Modul-Pfad relativ zum deployten `lib/`-Ordner des Hook-Dirs auflösen (nicht relativ zum Gate-Skript) — Test mit Zielprojekt-Layout.
-- [ ] Step 1: Unit-Tests (fail). Step 2: extrahieren. Step 3: Abschluss-Check AC-3: `INLINE_PY_RX` (Precondition 2) über `hooks/1-generic/*.sh` + `lib/hook_common.sh` (ohne Kommentarzeilen) = 0 Treffer ausser der Allowlist (`tests/test_hook_mod_gates.py::test_inline_py_allowlist`, je Eintrag Begründung); `--validate`; `pytest tests/test_hook_mod_gates.py tests/test_hook_lib_sync.py`.
-- [ ] Step 4: Commit `refactor: extract gate hook python into modules`
+- [x] Step 1: Unit-Tests (fail). Step 2: extrahieren. Step 3: Abschluss-Check AC-3: `INLINE_PY_RX` (Precondition 2) über `hooks/1-generic/*.sh` + `lib/hook_common.sh` (ohne Kommentarzeilen) = 0 Treffer ausser der Allowlist (`tests/test_hook_mod_gates.py::test_inline_py_allowlist`, je Eintrag Begründung); `--validate`; `pytest tests/test_hook_mod_gates.py tests/test_hook_lib_sync.py`.
+- [x] Step 4: Commit `refactor: extract gate hook python into modules`
 - AC: B3 AC-1..AC-3.
 
 ### Task 26: Rebaseline #1238 (developer)
