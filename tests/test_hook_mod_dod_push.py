@@ -37,11 +37,17 @@ from lib.hook_plugins import sync_hook_lib  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
 
 _BASH = shutil.which("bash") or "bash"
+# CLI modules: each is invoked from the hook through one deployed path
+# literal (see test_hook_has_no_extracted_inline_python_and_has_version_changelog).
 _MODULES = (
     "hook_dod_push_payload.py",
     "hook_dod_push_config.py",
     "hook_dod_push_classify.py",
+    "hook_dod_push_report.py",
 )
+# Library module: imported by the reporter, verified by the hook's fail-closed
+# preflight and tested directly (issue #1238c1 MB-1).
+_POLICY_MODULE = "hook_dod_push_policy.py"
 
 
 def _load_module(filename: str):
@@ -138,6 +144,7 @@ def test_module_contract_python39_stdlib_and_provider_neutral(filename):
     assert imports <= {
         "__future__", "collections", "json", "os", "re", "shlex",
         "subprocess", "sys", "yaml", "hook_push_arg_parser", "hook_shell_scan",
+        "hook_dod_push_policy",
     }
     for provider_name in ("Claude", "Gemini", "Codex", "Copilot", "OpenCode"):
         assert provider_name not in source
@@ -326,7 +333,7 @@ def test_modules_deploy_flat_and_hook_uses_target_layout(tmp_path):
     repo = _init_repo(tmp_path / "repo", "main")
     hook = _deploy_hook(repo)
     deployed_lib = hook.parent / "lib"
-    for filename in _MODULES:
+    for filename in (*_MODULES, _POLICY_MODULE):
         deployed = deployed_lib / filename
         assert deployed.is_file()
         assert deployed.parent == deployed_lib
@@ -382,8 +389,8 @@ def test_hook_classifier_budget_timeout_blocks(tmp_path):
 
 def test_hook_has_no_extracted_inline_python_and_has_version_changelog():
     source = _HOOK_PATH.read_text(encoding="utf-8")
-    assert "# version: 2.6.0" in source
-    assert "v2.6.0" in source
+    assert "# version: 2.7.0" in source
+    assert "v2.7.0" in source
     assert "#1238c1" in source
     assert not re.search(r"python3\s+-c\b", source)
     assert not re.search(r"<<-?\s*(['\"])PY\1", source)

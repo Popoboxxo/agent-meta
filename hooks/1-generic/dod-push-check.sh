@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.6.0
+# version: 2.7.0
 # event: PreToolUse
 # matcher: Bash
 # protocol: tool-hook-v1
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.6.0: issue #1238c1 -- move payload-state, config reading and push classification into flat deployed Python modules; reuse the T23 shell scanner and push-argument parser and keep fail-closed behavior without Python or modules. v2.5.4: issue #1161 Pkt5 -- tool_name and tool_input.command are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of two separate field-read interpreter starts; the hook_json_usable probe and the R2-2 unreadable-payload re-check are unchanged. v2.5.3: a naive-split fragment cut out of the quoted text of a non-executing text consumer (gh --body "... && git push ...", echo, printf) is no longer blocked as a push with a quote spanning a command separator; wrappers (bash -c, eval, xargs) stay fail-closed. v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main; unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.7.0: issue #1238c1 -- MB-1 SRP split of what was left in Bash: the Branch-Guard verdict mapping, the test-gate state machine, the result-cache key and the test-result classification moved into hook_dod_push_policy.py (pure, side-effect free functions) and every user-visible message into hook_dod_push_report.py (one reporter scene per path, message to the stream the hook already used); the shell keeps orchestration only, its exit codes stay 0=allow/2=block and a missing module still fails closed. No message, exit or cache/timeout/branch-guard behaviour change. v2.6.0: issue #1238c1 -- move payload-state, config reading and push classification into flat deployed Python modules; reuse the T23 shell scanner and push-argument parser and keep fail-closed behavior without Python or modules. v2.5.4: issue #1161 Pkt5 -- tool_name and tool_input.command are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of two separate field-read interpreter starts; the hook_json_usable probe and the R2-2 unreadable-payload re-check are unchanged. v2.5.3: a naive-split fragment cut out of the quoted text of a non-executing text consumer (gh --body "... && git push ...", echo, printf) is no longer blocked as a push with a quote spanning a command separator; wrappers (bash -c, eval, xargs) stay fail-closed. v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main; unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -80,13 +80,16 @@ if ! declare -F hook_protected_branches >/dev/null 2>&1 \
   exit 2
 fi
 
-# The extracted readers/classifier and their shared T23 dependencies must be
-# deployed together.  A missing module must not turn a config read into an empty
-# value (which could skip the test gate) or silently disable classification.
+# The extracted readers/classifier/reporter and their shared T23 dependencies
+# must be deployed together.  A missing module must not turn a config read into
+# an empty value (which could skip the test gate) or silently disable
+# classification or message rendering.
 for _module in \
   hook_dod_push_payload.py \
   hook_dod_push_config.py \
   hook_dod_push_classify.py \
+  hook_dod_push_policy.py \
+  hook_dod_push_report.py \
   hook_push_arg_parser.py \
   hook_shell_scan.py; do
   if [ ! -f "$SCRIPT_DIR/lib/$_module" ] || [ ! -r "$SCRIPT_DIR/lib/$_module" ]; then
@@ -95,6 +98,11 @@ for _module in \
     exit 2
   fi
 done
+
+# The reporter renders every user-visible message and returns the hook action
+# as its exit status (see its module docstring); the policy module it imports
+# holds the decision rules.
+_REPORTER="$SCRIPT_DIR/lib/hook_dod_push_report.py"
 
 # Issue #954: a python3 that exits 0 with garbage (broken PATH shim) would
 # otherwise hand garbage back as tool_name/command, and the hook would treat
@@ -255,8 +263,9 @@ _BUDGET=()
 command -v timeout >/dev/null 2>&1 && _BUDGET=(timeout -k 2 "$CLASSIFY_BUDGET")
 # Protected set: main + master + the configured main branch, from one helper
 # (issue #949, #1033). Passed to the classifier (space-separated; ref names
-# cannot contain whitespace) AND used verbatim in the block message below, so
-# the classifier and the message can never disagree.
+# cannot contain whitespace) AND to the block message (comma-separated, same
+# substitution as before), so the classifier and the message can never
+# disagree.
 PROTECTED_LIST=$(hook_protected_branches "$MAIN_BRANCH")
 # The deployed classifier imports the shared T23 argument walk and shell
 # scanner.  Its three shared-walk consumers are documented here because the
@@ -273,33 +282,23 @@ PUSH_CLASS=$(${_BUDGET[@]+"${_BUDGET[@]}"} python3 \
 )
 _CLASS_RC=$?
 
-case "$PUSH_CLASS" in
-  none) exit 0 ;;
-  tag) IS_TAG_ONLY_PUSH=true ;;
-  push) IS_TAG_ONLY_PUSH=false ;;
-  # Branch-Guard (worktree branch detection): the classifier names the branch the push runs on
-  # (effective -C/cd directory, else the hook cwd) when it is protected.
-  "onbranch "*)
-    echo "Branch-Guard: Push blocked — you are on '${PUSH_CLASS#onbranch }'." >&2
-    echo "Create a feature branch first: git checkout -b feat/<topic>" >&2
-    echo "Direct pushes to $MAIN_BRANCH are not allowed by DoD policy." >&2
-    echo "" >&2
-    echo "If this is intentional (release, hotfix), disable the hook temporarily:" >&2
-    echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable." >&2
-    exit 2
-    ;;
+# Branch-Guard verdict: the reporter maps the classifier line to the hook
+# action and renders the block reason (on stderr, issue #593). Its exit
+# status is an internal protocol with this shell, not the hook's status:
+#   0 = tag-only or plain push -> run the test gate below
+#   3 = not a push at all       -> allow
+#   2 = blocked                  -> the reason is already on stderr
+# Any other status (crash) is a broken deployment and blocks.
+python3 "$_REPORTER" branch \
+  "$_CLASS_RC" "$CLASSIFY_BUDGET" "$MAIN_BRANCH" "${PROTECTED_LIST// /, }" \
+  0<<<"$PUSH_CLASS"
+_VERDICT_RC=$?
+case "$_VERDICT_RC" in
+  0) : ;;
+  3) exit 0 ;;
+  2) exit 2 ;;
   *)
-    _REASON="${PUSH_CLASS#block }"
-    [ "${PUSH_CLASS%% *}" = "block" ] || _REASON="push classification failed (fail closed)"
-    [ "$_CLASS_RC" -eq 124 ] && _REASON="push classification exceeded ${CLASSIFY_BUDGET}s (fail closed)"
-    echo "Branch-Guard: Push blocked — $_REASON." >&2
-    # #949/#1033: the same helper that built the classifier's PROTECTED set
-    # built this message's list — one definition, no duplicate branch names.
-    _PROTECTED_BRANCHES="${PROTECTED_LIST// /, }"
-    echo "Protected branches: $_PROTECTED_BRANCHES. Push a feature branch and open a PR instead." >&2
-    echo "" >&2
-    echo "If this is intentional (release, hotfix), disable the hook temporarily:" >&2
-    echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable." >&2
+    echo "DoD-Check: Branch-Guard verdict reporter failed (fail closed)." >&2
     exit 2
     ;;
 esac
@@ -312,25 +311,6 @@ if [ -z "$TEST_CMD" ] && [ -n "$CONFIG_FILE" ]; then
   TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")  # runtime-reader:variables.TEST_COMMAND
 fi
 
-if [ -z "$TEST_CMD" ] && [ -z "$CONFIG_FILE" ]; then
-  # No config file located at all — surface this instead of silently skipping.
-  # Not a block (exit 0) so stdout is fine here (issue #593 only requires
-  # stderr for messages on a *blocking* path).
-  echo "DoD-Check: no project config found (.meta-config/project.yaml)."
-  echo "The test gate could not be evaluated. Either run from within the project,"
-  echo "or export AGENT_META_TEST_COMMAND='<your-test-command>' to enable it."
-  echo "Push allowed (Branch-Guard passed, but test gate was NOT enforced)."
-  exit 0
-fi
-
-if [ -z "$TEST_CMD" ]; then
-  echo "DoD-Check: TEST_COMMAND not configured — skipping test gate."
-  echo "Set variables.TEST_COMMAND in .meta-config/project.yaml or"
-  echo "export AGENT_META_TEST_COMMAND='<your-test-command>' to enable."
-  echo "Push allowed (Branch-Guard passed, no test gate configured)."
-  exit 0
-fi
-
 # --- Result cache keyed by commit SHA (issue #594) ----------------------
 # A full test suite run inline on every single `git push` can block for
 # minutes with no cap, even when nothing test-relevant changed since the
@@ -339,17 +319,13 @@ fi
 # (HEAD sha, TEST_CMD) pair per-repo under .git/ (never synced, never
 # committed) and skip straight to "allow" on a cache hit. Any change to
 # either the commit or the configured TEST_CMD invalidates the cache.
+# The reporter reads the file and applies the key rule (hook_dod_push_policy
+# cache_matches); this shell only resolves the paths.
 GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || echo "")
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 CACHE_FILE=""
 if [ -n "$GIT_DIR" ] && [ -n "$HEAD_SHA" ]; then
   CACHE_FILE="$GIT_DIR/agent-meta-dod-push-check-cache"
-  if [ -f "$CACHE_FILE" ] && [ "$(cat "$CACHE_FILE" 2>/dev/null)" = "$HEAD_SHA
-$TEST_CMD" ]; then
-    echo "DoD-Check: tests already passed for commit ${HEAD_SHA:0:12} with this TEST_COMMAND (cached) — skipping re-run."
-    echo "Delete $CACHE_FILE to force a re-run."
-    exit 0
-  fi
 fi
 
 # --- Timeout (issue #594) ------------------------------------------------
@@ -360,33 +336,46 @@ if [ -z "$TEST_TIMEOUT" ] && [ -n "$CONFIG_FILE" ]; then
 fi
 TEST_TIMEOUT="${TEST_TIMEOUT:-300}"
 
-echo "DoD-Check: Running '$TEST_CMD' (timeout: ${TEST_TIMEOUT}s)..."
+_HAS_TIMEOUT=0
+command -v timeout >/dev/null 2>&1 && _HAS_TIMEOUT=1
+
+# Test-gate state, cache key and the "Running ..." announcement are rendered
+# by the reporter. Its exit status is the internal protocol:
+#   0 = run the tests now    3 = allow, no config found
+#   4 = allow, no TEST_COMMAND     5 = allow, cached pass for this commit
+# Anything else (crash) is a broken deployment and blocks.
+python3 "$_REPORTER" gate \
+  "$CONFIG_FILE" "$TEST_CMD" "$CACHE_FILE" "$HEAD_SHA" \
+  "$TEST_TIMEOUT" "$_HAS_TIMEOUT"
+_GATE_RC=$?
+case "$_GATE_RC" in
+  0) : ;;
+  3|4|5) exit 0 ;;
+  *)
+    echo "DoD-Check: test-gate reporter failed (fail closed)." >&2
+    exit 2
+    ;;
+esac
+
 _TEST_RC=0
-if command -v timeout >/dev/null 2>&1; then
+if [ "$_HAS_TIMEOUT" -eq 1 ]; then
   # Note: TEST_CMD executed via bash -c (no eval) — value from project.yaml
   # Issue #753: inject set -uo pipefail so pipeline exit codes are not masked
   timeout "${TEST_TIMEOUT}s" bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 else
-  echo "DoD-Check: 'timeout' command not available on this system — running the test gate without a hard time limit." >&2
   bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 fi
 
-if [ "$_TEST_RC" -ne 0 ]; then
-  echo "" >&2
-  if [ "$_TEST_RC" -eq 124 ] && command -v timeout >/dev/null 2>&1; then
-    echo "DoD-Check TIMED OUT after ${TEST_TIMEOUT}s: '$TEST_CMD'." >&2
-    echo "Raise the limit via variables.TEST_TIMEOUT in .meta-config/project.yaml (or AGENT_META_TEST_TIMEOUT), or fix a hanging test." >&2
-  else
-    echo "DoD-Check FAILED: Tests must pass before pushing." >&2
-  fi
-  echo "Fix failing tests and retry, or disable the hook temporarily." >&2
-  exit 2
-fi
+# Pass/fail/timeout message: the reporter blocks (exit 2) on a failing or
+# timed-out run; any other non-zero status is a broken deployment and blocks
+# as well (the tests passed, but the gate cannot report them).
+python3 "$_REPORTER" result "$_TEST_RC" "$TEST_TIMEOUT" "$_HAS_TIMEOUT" "$TEST_CMD"
+_RESULT_RC=$?
+[ "$_RESULT_RC" -eq 0 ] || exit 2
 
 if [ -n "$CACHE_FILE" ]; then
   mkdir -p "$(dirname "$CACHE_FILE")" 2>/dev/null || true
   printf '%s\n%s' "$HEAD_SHA" "$TEST_CMD" > "$CACHE_FILE" 2>/dev/null || true
 fi
 
-echo "DoD-Check passed."
 exit 0
