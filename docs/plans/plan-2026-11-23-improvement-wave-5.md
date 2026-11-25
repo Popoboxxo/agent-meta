@@ -306,8 +306,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 25a: #1238c1 `dod-push-check.sh` (senior-developer, M-Teil 3a)
 **Files:** Modify `hooks/1-generic/dod-push-check.sh` (:106, :170, :285, :1508); Create `hooks/1-generic/lib/hook_dod_push_*.py` (<= 4 flache Module); Test: Create `tests/test_hook_mod_dod_push.py`. (<= 6 Dateien)
 **Interfaces:** Consumes T23 (`hook_push_arg_parser_py`/`hook_shell_scan_py` aus `hook_common.sh` sind in :285 gesplict — Modul-Aufruf muss denselben Code laden, Verhalten byte-identisch).
-- [ ] Step 1: Unit-Tests (fail), Fail-closed ohne `python3` (#595). Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_dod_push.py tests/test_hook_lib_sync.py tests/test_hook_common_lib.py` (kein `test_hook_drift`).
-- [ ] Step 4: Commit `refactor: extract dod-push-check python into modules`
+- [x] Step 1: Unit-Tests (fail), Fail-closed ohne `python3` (#595). Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_dod_push.py tests/test_hook_lib_sync.py tests/test_hook_common_lib.py` (kein `test_hook_drift`).
+- [x] Step 4: Commit `refactor: extract dod-push-check python into modules`
 - AC: B3 AC-1, AC-2.
 
 ### Task 25b: #1238c2 `artifact-freshness.sh` + `viz-log.sh` + Regex-Nachweis (senior-developer, M-Teil 3b)
