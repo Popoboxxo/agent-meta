@@ -1,9 +1,10 @@
 #!/bin/bash
 # hook: artifact-path-guard
-# version: 1.0.0
+# version: 1.1.0
 # event: PreToolUse
 # matcher: ""
 # description: Route artifact writes into the configured artifact-locations class path.
+# changelog: 1.1.0: issue #1251 -- read the project anchor exclusively from adapter-owned AM_PROJECT_DIR; preserve payload-cwd walk-up and fail-open missing-data behavior
 # enabled_by_default: false
 
 # Routing convention, NOT a security boundary (issue #1186, T16, spec §4.5).
@@ -40,11 +41,11 @@ if [ -z "$FILE_PATH" ]; then
   exit 0
 fi
 
-# Resolve the project root: $CLAUDE_PROJECT_DIR when it carries .meta-config/,
+# Resolve the project root: $AM_PROJECT_DIR when it carries .meta-config/,
 # else the nearest ancestor of the payload cwd holding the resolved data file.
 ROOT=""
-if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR/.meta-config" ]; then
-  ROOT="$CLAUDE_PROJECT_DIR"
+if [ -n "${AM_PROJECT_DIR:-}" ] && [ -d "$AM_PROJECT_DIR/.meta-config" ]; then
+  ROOT="$AM_PROJECT_DIR"
 else
   CWD_RAW=$(hook_json_get "$INPUT" "cwd")
   case "$CWD_RAW" in
@@ -61,7 +62,7 @@ else
   esac
 fi
 if [ -z "$ROOT" ]; then
-  ROOT="${CLAUDE_PROJECT_DIR:-}"
+  ROOT="${AM_PROJECT_DIR:-}"
 fi
 
 DATA_FILE="$ROOT/.meta-config/artifact-locations.resolved.json"

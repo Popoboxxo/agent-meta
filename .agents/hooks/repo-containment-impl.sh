@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.6.1
-# changelog: 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, $CLAUDE_PROJECT_DIR (hook environment) and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
+# version: 1.7.0
+# changelog: 1.7.0: issue #1251 -- fixed jail root and Bash variable expansion use adapter-owned AM_PROJECT_DIR exclusively; deployment-layout and payload-anchor fallbacks remain unchanged; 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, the hook-environment project-dir variable and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -84,7 +84,7 @@
 #
 # Fixed jail root (v1.4.0, #944 SR-B-18): the repo root prefers an anchor that
 # does NOT come from the payload, in this order:
-#   1. $CLAUDE_PROJECT_DIR, when it carries `.meta-config/`;
+#   1. $AM_PROJECT_DIR, when it carries `.meta-config/`;
 #   2. the deployment layout `<root>/.claude/hooks/` this file lives in, when
 #      `<root>` carries `.meta-config/`.
 # Before this, a session whose shell was outside the project (or a forged
@@ -325,7 +325,7 @@ fi
 
 # --- Fixed jail root (issue #944 SR-B-18) -----------------------------
 # Preferred over every payload-derived anchor. 1) the harness-set
-# $CLAUDE_PROJECT_DIR when it carries .meta-config/; 2) the deployment layout
+# $AM_PROJECT_DIR when it carries .meta-config/; 2) the deployment layout
 # <root>/.claude/hooks/ this script was synced into. Running straight from the
 # source tree (agent-meta's hooks/1-generic/) matches neither, so the tests
 # and ad-hoc runs keep the documented payload-anchor behaviour below.
@@ -338,8 +338,8 @@ fi
 # (review finding F5): that silently lets a payload cwd choose the jail.
 resolve_fixed_root() {
   local candidate root
-  if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR/.meta-config" ]; then
-    root="$(resolve_realpath "$CLAUDE_PROJECT_DIR")"
+  if [ -n "${AM_PROJECT_DIR:-}" ] && [ -d "$AM_PROJECT_DIR/.meta-config" ]; then
+    root="$(resolve_realpath "$AM_PROJECT_DIR")"
     if [ -z "$root" ]; then
       return 2
     fi
@@ -372,7 +372,7 @@ FIXED_ROOT="$(resolve_fixed_root)" || _FIXED_ROOT_RC=$?
 if [ "$_FIXED_ROOT_RC" -eq 1 ] && [ -z "$FIXED_ROOT" ]; then
   : # no fixed root applies; the payload anchor is the documented fallback
 elif [ "$_FIXED_ROOT_RC" -ne 0 ] || [ -z "$FIXED_ROOT" ]; then
-  echo "REPO_CONTAINMENT: the fixed jail root (\$CLAUDE_PROJECT_DIR or the deployment layout) could not be resolved." >&2
+  echo "REPO_CONTAINMENT: the fixed jail root (\$AM_PROJECT_DIR or the deployment layout) could not be resolved." >&2
   echo "Failing closed (review finding F5) — a selected root must never degrade to the payload anchor." >&2
   exit 2
 fi
@@ -960,13 +960,13 @@ def is_dev_target(target):
 
 HOME = os.environ.get("HOME") or os.path.expanduser("~")
 # Variables whose value the hook knows; an unset one stays a '$' word.
-KNOWN_VARS = {"HOME": HOME, "CLAUDE_PROJECT_DIR": os.environ.get("CLAUDE_PROJECT_DIR")}
+KNOWN_VARS = {"HOME": HOME, "AM_PROJECT_DIR": os.environ.get("AM_PROJECT_DIR")}
 
 
 def expand_home(target):
     # '~', '~/x', '~user/x', '$HOME/x' and '${HOME}/x' name a real place
     # outside the repo (#1151 F6-06: they used to be skipped as literal text
-    # or as a '$' variable); $CLAUDE_PROJECT_DIR is expanded from the hook
+    # or as a '$' variable); $AM_PROJECT_DIR is expanded from the hook
     # environment the same way. Any other '$VAR' stays unresolved (known gap).
     if target.startswith("~"):
         return os.path.expanduser(target)

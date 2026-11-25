@@ -278,7 +278,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 - AC: B2 AC-1, AC-2 (unverändert). Hinweis: Adapter-Stelle (wo `AM_PROJECT_DIR` aus `CLAUDE_PROJECT_DIR` gesetzt wird) im Inventar benennen; für T21 gilt der User-Override zur 8-Datei-Grenze, kein Swap.
 
 ### Task 22: Rebaseline #1251 (bedingt, developer)
-- [ ] Nur wenn `python3 scripts/rebaseline.py --check-only` Hook-Hash-Pins rot meldet: `python3 scripts/rebaseline.py --reason "#1251: AM_PROJECT_DIR"`; sonst entfällt.
+- [x] Nur wenn `python3 scripts/rebaseline.py --check-only` Hook-Hash-Pins rot meldet: `python3 scripts/rebaseline.py --reason "#1251: AM_PROJECT_DIR"`; sonst entfällt.
 - Commit (falls nötig): `chore: rebaseline hook hashes for AM_PROJECT_DIR (#1251)`
 
 ### Task 23: #1238a Heredocs in `hook_common.sh` -> Module (senior-developer, M-Teil 1)
