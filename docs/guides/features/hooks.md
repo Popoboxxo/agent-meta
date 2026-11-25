@@ -255,17 +255,24 @@ Der `dod-push-check`-Hook liest den Test-Command aus:
 
 ## sync-on-config-change: Automatische Re-Sync
 
-Dieser Hook erkennt wenn `.meta-config/project.yaml` geändert wird und triggert automatische `sync.py`-Re-Generierung.
+Dieser Hook startet bei jeder Änderung an `.meta-config/project.yaml` direkt einen `sync.py`-Lauf im Projekt-Root.
 
 **Trigger:**
-- Write oder Edit-Tool-Aufruf auf `.meta-config/project.yaml`
-- Wird nach dem Schreiben erkannt (PostToolUse-Event)
+- PostToolUse auf einem erfolgreichen `Write`/`Edit` von `.meta-config/project.yaml`
+- Ein fehlgeschlagener Tool-Aufruf löst keinen Sync aus
 
 **Aktion:**
-1. Hook prüft ob `.meta-config/project.yaml` geändert wurde
-2. Schreibt pending-task in `.claude/pending-tasks.md` für `agent-meta-manager`
-3. `agent-meta-manager` merkt beim nächsten Start dass sync.py laufen muss
-4. agent-meta-manager führt `sync.py` aus und updated alle context files
+1. Hook ermittelt den Projekt-Root (`AM_PROJECT_DIR`, sonst Walk-up vom Payload-`cwd`, sonst Deployment-Layout)
+2. Hook ermittelt `scripts/sync.py` (`SOC_AGENT_META_ROOT`, sonst `<project>/.agent-meta`, sonst `<project>/external/agent-meta`, sonst Self-Hosting-Layout)
+3. Hook führt im Projekt-Root `python3 scripts/sync.py --config <project>/.meta-config/project.yaml` aus und regeneriert damit alle Context-Dateien
+
+Kein Pending-Task, kein `agent-meta-manager`-Umweg: die Änderung ist nach dem Tool-Aufruf bereits nachgezogen.
+
+**Betriebsgarantien:**
+- **Fail-open:** Der Hook ist keine Security-Kontrolle und beendet sich immer mit 0 — fehlt Python, `sync.py`, das Hilfs-Modul oder die Projekt-Config, wird der Re-Sync übersprungen statt den Schreibvorgang zu blockieren.
+- **Timeout:** harter Deckel pro Lauf, `SOC_SYNC_TIMEOUT` (Default `60` s, ungültige oder `0`-Werte fallen auf den Default zurück); ohne GNU `timeout` greift ein Bash-Watcher.
+- **Rekursionsbremse:** Der Kind-Prozess läuft mit `SOC_SYNC_ON_CONFIG_CHANGE=1`; ein Sync, der den Hook erneut erreicht, kehrt sofort zurück.
+- **Meldung:** Endet der Lauf mit rc≠0, schreibt der Hook einen Hinweis auf stderr und verlangt einen manuellen `python3 scripts/sync.py`-Lauf. Sonst bleibt er still.
 
 **Konfiguration:**
 
@@ -273,12 +280,9 @@ Dieser Hook erkennt wenn `.meta-config/project.yaml` geändert wird und triggert
 hooks:
   sync-on-config-change:
     enabled: true
-
-lifecycle-triggers:
-  on-config-change:
-    - agent: agent-meta-manager
-      task: "Re-run sync.py to regenerate provider context files."
 ```
+
+Es gibt keinen zusätzlichen Lifecycle-Eintrag: der Hook heißt `sync-on-config-change` und bewirkt genau das.
 
 **Vorteil:** Keine manuellen `sync.py`-Aufrufe nötig — regeneration läuft vollautomatisch.
 

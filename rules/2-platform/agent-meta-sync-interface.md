@@ -67,27 +67,27 @@ Neuer Sidecar-Datei: `.meta-config/context-hashes.json`
 
 ### sync-on-config-change Hook (Automatische Re-Sync)
 
-Neuer Hook in `hooks/1-generic/sync-on-config-change.sh`
+Hook: `hooks/1-generic/sync-on-config-change.sh`
 
-**Trigger:** PostToolUse — reagiert auf Write/Edit-Operationen die `.meta-config/project.yaml` verändern
+**Trigger:** PostToolUse — reagiert auf erfolgreiche Write/Edit-Operationen, die `.meta-config/project.yaml` verändern
 
-**Aktion:** 
-- Erkennt wenn Projekt-Config geändert wurde (z.B. neue Provider hinzugefügt, Rolle aktiviert)
-- Schreibt Lifecycle-Task für `agent-meta-manager` in `.claude/pending-tasks.md`
-- `agent-meta-manager` merkt beim nächsten Start dass sync.py erneut laufen muss
+**Aktion:**
+- Erkennt wenn Projekt-Config geändert wurde (z.B. neuer Provider, Rolle aktiviert)
+- Ermittelt Projekt-Root (`AM_PROJECT_DIR`, sonst Walk-up vom Payload-`cwd`, sonst Deployment-Layout) und `scripts/sync.py` (`SOC_AGENT_META_ROOT`, sonst `<project>/.agent-meta`, sonst `<project>/external/agent-meta`)
+- Führt direkt im Projekt-Root `python3 scripts/sync.py --config <project>/.meta-config/project.yaml` aus — kein Pending-Task, kein `agent-meta-manager`-Umweg
+- Exit-Code des Hooks bleibt immer 0; ein fehlgeschlagener Lauf meldet sich nur auf stderr (Hinweis auf manuellen Sync)
+
+**Betriebsgrenzen:** Fail-open (keine Security-Kontrolle), harter Timeout `SOC_SYNC_TIMEOUT` (Default 60 s), Rekursionsbremse über `SOC_SYNC_ON_CONFIG_CHANGE=1` im Kind-Prozess. Nur erfolgreiche Writes lösen aus; ein fehlgeschlagener Tool-Aufruf nicht.
 
 **Konfiguration in project.yaml:**
 
 ```yaml
-lifecycle-triggers:
-  on-config-change:
-    - agent: agent-meta-manager
-      task: "Re-run sync.py — project.yaml has changed."
-
 hooks:
   sync-on-config-change:
     enabled: true
 ```
+
+Kein `lifecycle-triggers.on-config-change`-Eintrag: der Hook triggert den Sync selbst.
 
 **Vorteil:** Keine manuellen Sync-Aufrufe nötig wenn Konfiguration sich ändert — vollautomatische Reconciliation.
 
@@ -98,11 +98,9 @@ hooks:
 ```
 Developer ändert .meta-config/project.yaml
         ↓
-sync-on-config-change Hook erkennt änderung
+sync-on-config-change Hook erkennt die Änderung (PostToolUse, erfolgreicher Write/Edit)
         ↓
-lifecycle_check.py schreibt pending-task für agent-meta-manager
-        ↓
-agent-meta-manager führt sync.py aus
+Hook ruft im Projekt-Root scripts/sync.py --config .meta-config/project.yaml auf
         ↓
 sync.py vergleicht context-hashes.json mit aktuellen Hashes
         ↓
