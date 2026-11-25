@@ -10,11 +10,12 @@ spec: docs/specs/2026-11-23-provider-agnostic-sync-hooks-wave-5-spec.md
 
 > Status: APPROVED (2026-11-23, Freigabe: User)
 > **Spec:** `docs/specs/2026-11-23-provider-agnostic-sync-hooks-wave-5-spec.md` (Status APPROVED, 2026-11-23, SPEC-provider-agnostic-sync-hooks-wave-5)
+> **Dokumentationsstand:** 2026-11-25; Quellen: ausdrücklicher User-Override zu T21 und bestätigter T14-Befund (kein Help-Text-Pin).
 
 **Goal:** 20 Issues (Cluster A scripts/lib, B Hooks, C MCP/Config/Tests) provider-agnostisch abarbeiten; ein Branch, ein PR, >= 1 Commit je Item, Rebaseline separat.
 **Architecture:** Keine neue Architektur ausser `scripts/lib/managed_block.py` (A6), Dispatch-Tabellen (A4), flache Hook-Python-Module in `hooks/1-generic/lib/` (B3), `schemas/provider-entry.schema.json` (C3). Provider-Unterschiede nur über Config-Keys/Capabilities (Skill `provider-agnostic`).
 **Tech Stack:** Python 3.9 stdlib (+PyYAML-Ausnahme, `jsonschema` optional), Bash-Hooks, pytest, YAML/Markdown. Neue Module: `from __future__ import annotations`, kein `match`, kein `X | Y` zur Laufzeit (R7).
-**Effort:** siehe `effort-estimator` (Text-Referenz; Spec-Grössen: 11 S, 9 M-Items, hier zerlegt in 46 Tasks <= 8 Dateien; T24/T25 je in a/b gesplittet).
+**Effort:** siehe `effort-estimator` (Text-Referenz; Spec-Grössen: 11 S, 9 M-Items, hier zerlegt in 46 Tasks <= 8 Dateien; T21 per User-Override 2026-11-25 mit 15 Dateien; T24/T25 je in a/b gesplittet).
 
 ## Global Constraints
 
@@ -22,7 +23,7 @@ spec: docs/specs/2026-11-23-provider-agnostic-sync-hooks-wave-5-spec.md
 - >= 1 Commit je Item; Rebaseline-Commits eigene Tasks direkt nach dem auslösenden Commit (Helfer `python3 scripts/rebaseline.py`, Spec `docs/specs/2026-11-15-rebaseline-helper-spec.md`; Aufruf vorher mit `--help` prüfen).
 - Commits: Conventional Commits, Englisch, <= 72 Zeichen, Imperativ, kein BOM; Trailer laut Projekt-Config verbatim im Footer. Commit-Anwendung durch Caller/Orchestrator, Push/PR nur `git`-Agent.
 - Jeder Commit grün: `python3 scripts/sync.py --validate` (exit 0) + die genannten pytest-Dateien. Hash-/Golden-Pin-Tests (`test_hook_drift`, `test_managed_index_alignment`, `test_generated_file_drift`, `test_ac01_render_identity`) stehen in Trigger-Commits **nicht** in der genannten Liste (siehe Pin-Tabelle); Rebaseline-Aufruf immer `python3 scripts/rebaseline.py --reason "<issue>"` (Write-Modus erzwingt `--reason`), vorab `--check-only`. Rote A-Refactor-Goldens (#1254/#1253/#1255/#1268) stoppen den Branch (BAC-4); Rebaseline dort ist ein Befund, kein Schritt.
-- Swap-Regel (Spec): bei > 8 Dateien, nicht byte-identischem Refactor-Diff, 2 erfolglosen Fix-Iterationen -> Item zurückstellen, Reserve einwechseln, PR-Body + Spec-Changelog ergänzen.
+- Swap-Regel (Spec): bei > 8 Dateien, nicht byte-identischem Refactor-Diff, 2 erfolglosen Fix-Iterationen -> Item zurückstellen, Reserve einwechseln, PR-Body + Spec-Changelog ergänzen. Ausnahme: ausschliesslich T21 gemäss User-Override 2026-11-25 (15 Dateien; `scripts/lib/hooks.py` explizite Overlap-Ausnahme; AC unverändert; kein Swap).
 - Keine neue Dependency (BAC-7); `pyproject.toml`/`requirements.txt` unverändert.
 - Rebase auf `main` nach Cluster A (Task 18) und nach Cluster B (Task 32); Merge-Konflikte an Baselines -> Rebaseline neu, nicht von Hand mergen.
 - Zwei-Stufen-Review je Task laut `plan-ledger` (review-req dann review-quality); Checkboxen werden vom Ledger-Writer gesetzt.
@@ -57,7 +58,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 - **A** `scripts/lib/{topology,sync_pipeline,opencode_v2_config,isolation,mcp,mcp_provider_config,repo_containment,provider_transform,context,extensions,managed_block(neu),cli_commands,release_scaffold,hooks,log}.py`, `scripts/lib/context_templates/builder.py`, `scripts/lib/consistency/{placeholders,context_budget}.py`, `scripts/sync.py`, `config/{ai-providers.yaml,project-config.schema.json}`, `templates/managed-block.md`, `commands/1-generic/update-extensions.md`, `tests/`.
 - **B** `hooks/1-generic/{dod-push-check,lifecycle-check,sync-on-config-change,artifact-path-guard,orchestrator-guard-impl,repo-containment-impl,viz-log}.sh`, `hooks/1-generic/release-gates/artifact-freshness.sh`, `hooks/1-generic/lib/{hook_common.sh,hook_*.py (neue flache Module, Namen je Task)}`, `hooks/1-generic/lib/kernel/{containment,model}.py`, `scripts/lib/{mcp,mcp_deny,repo_containment}.py`, `rules/1-generic/mcp-guardrails.md`, `.claude/skills/submodule-protection/SKILL.md`, Baselines.
 - **C** `scripts/lib/{mcp_health,config,providers,context_report,pipelines}.py`, `schemas/provider-entry.schema.json`, `docs/howto/new-mcp-server.md`, `tests/{conftest.py,test_mcp_health.py,test_mcp_server_checklist.py,test_context_budgets.py,...}`, `scripts/measure_context_repin.py`, `.claude/skills/conventions/SKILL.md`.
-- **F6 (Datei-Overlap):** Overlap-Map der Spec ist Reihenfolgevertrag; Hot-Files: `sync_pipeline.py` (T2->T3->T5), `provider_transform.py` + `ai-providers.yaml` (nur T6; T35 liest die YAML nur als Schema-Ziel, T7/T9/T15 fassen sie laut Files-Blöcken nicht an), `context.py` (T7->T9->T17 bedingt), `extensions.py` (T8->T10), `cli_commands.py`/`sync.py` (T9->T11->T13), `repo_containment.py` (T4->T28), `config/project-config.schema.json` (T1->T28), `mcp*.py` (T5->T30->T31), `hook_common.sh` + Hooks (T19->T21->T23->T24a->T24b->T25a->T25b->T27->T31).
+- **F6 (Datei-Overlap):** Overlap-Map der Spec ist Reihenfolgevertrag; Hot-Files: `sync_pipeline.py` (T2->T3->T5), `provider_transform.py` + `ai-providers.yaml` (nur T6; T35 liest die YAML nur als Schema-Ziel, T7/T9/T15 fassen sie laut Files-Blöcken nicht an), `context.py` (T7->T9->T17 bedingt), `extensions.py` (T8->T10), `cli_commands.py`/`sync.py` (T9->T11->T13), `repo_containment.py` (T4->T28), `config/project-config.schema.json` (T1->T28), `mcp*.py` (T5->T30->T31), `hook_common.sh` + Hooks (T19->T21->T23->T24a->T24b->T25a->T25b->T27->T31); `scripts/lib/hooks.py` ist für T21 als explizite Overlap-Ausnahme zu #1086(b) zugelassen.
 
 ## Traceability (BAC-6): AC -> Task
 
@@ -74,7 +75,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 | #1198 | AC-1, AC-2, AC-3 | T15 | `test_placeholder_grace_and_derivation.py`, neu `test_single_brace_known_var.py` |
 | #1086 | AC-1 (a–f), AC-2, AC-3 | T16, T17 | `test_sync_log.py`, `test_sync_log_output.py`, neu `test_sync_ux_consistency.py` |
 | #1248 | AC-1, AC-2 | T19, T20(R) | `test_hook_drift.py`, `test_hook_registration_invariant.py` |
-| #1251 | AC-1, AC-2 | T21, T22(R, bedingt) | `test_hook_kernel.py`, `test_repo_containment_hook.py`, `test_orchestrator_guard_hook.py` |
+| #1251 | AC-1, AC-2 | T21, T22(R, bedingt) | 15 Dateien laut Task-21 Files-Block; gezielte Tests siehe Task-21 Step 3 |
 | #1238 | AC-1, AC-2, AC-3 | T23, T24a, T24b, T25a, T25b, T26(R) | neu `test_hook_mod_common.py`, `test_hook_mod_containment.py`, `test_hook_mod_guards.py`, `test_hook_mod_dod_push.py`, `test_hook_mod_gates.py`; `test_hook_common_lib.py`, `test_hook_lib_sync.py`, `test_hook_single_parse.py` |
 | #1275 | AC-1..AC-4 | T27, T28, T29(R) | `test_repo_containment_hook.py`, `test_repo_containment_schema.py`, neu `test_protected_paths.py` (inkl. Kernel-Paritätstest) |
 | #1263 | AC-1, AC-2, AC-3 | T30, T31, T32(R) | `test_mcp_deny.py`, neu `test_mcp_guardrails_sync.py` |
@@ -93,160 +94,160 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 
 ### Task 0: Branch + Inventar (Rolle: git, dann developer)
 **Files:** Add (nur Commit, keine Inhaltsänderung): `docs/plans/plan-2026-11-23-improvement-wave-5.md`, `docs/specs/2026-11-23-provider-agnostic-sync-hooks-wave-5-spec.md` (beide bereits vorhanden/untracked). **Interfaces:** Produces Branch `feat/provider-agnostic-sync-hooks-wave-5`, Inventar-Notiz im PR-Body-Entwurf.
-- [ ] Step 1: `git` legt Branch von `main` an (Arbeitsbaum: `opencode.json` ist modifiziert -> nicht committen, vorher klären/stashen lassen durch git-Agent; nur die zwei Doku-Dateien oben werden committed).
-- [ ] Step 2: Baseline-Messung `python3 scripts/sync.py --validate` + `pytest --collect-only -q | tail -1` (Testanzahl-Ausgangsstand für BAC-2/#1240 notieren).
-- [ ] Step 3: `INLINE_PY_RX`-/Provider-Namens-Greps (Precondition 2, BAC-5) als Ausgangsstand protokollieren.
+- [x] Step 1: `git` legt Branch von `main` an (Arbeitsbaum: `opencode.json` ist modifiziert -> nicht committen, vorher klären/stashen lassen durch git-Agent; nur die zwei Doku-Dateien oben werden committed).
+- [x] Step 2: Baseline-Messung `python3 scripts/sync.py --validate` + `pytest --collect-only -q | tail -1` (Testanzahl-Ausgangsstand für BAC-2/#1240 notieren).
+- [x] Step 3: `INLINE_PY_RX`-/Provider-Namens-Greps (Precondition 2, BAC-5) als Ausgangsstand protokollieren.
 - Commit: `docs: add wave 5 spec and plan`
 
 ### Task 1: #1243 Topologie-Naming (developer, S)
 **Files:** Modify `config/project-config.schema.json`, `scripts/lib/topology.py`; Test: Create `tests/test_topology_naming.py`.
 **Interfaces:** Consumes `orchestrator.topology`/`context_file.topology`; Produces unterscheidbare Schema-`description`, Docstring-Abgrenzung, Alias+Deprecation nur falls Rename.
-- [ ] Step 1: Test schreiben (fail): beide Keys gesetzt -> `--validate` exit 0, `description`-Texte der zwei Schema-Keys verschieden.
-- [ ] Step 2: Schema-Descriptions + Docstring ändern; Rename nur mit lesbarem Alt-Key + Deprecation-Hinweis.
-- [ ] Step 3: `python3 scripts/sync.py --validate`; `pytest tests/test_topology_naming.py tests/test_orchestrator_topology_schema.py tests/test_context_topology_schema.py`.
-- [ ] Step 4: Commit `refactor: disambiguate topology config key naming`
+- [x] Step 1: Test schreiben (fail): beide Keys gesetzt -> `--validate` exit 0, `description`-Texte der zwei Schema-Keys verschieden.
+- [x] Step 2: Schema-Descriptions + Docstring ändern; Rename nur mit lesbarem Alt-Key + Deprecation-Hinweis.
+- [x] Step 3: `python3 scripts/sync.py --validate`; `pytest tests/test_topology_naming.py tests/test_orchestrator_topology_schema.py tests/test_context_topology_schema.py`.
+- [x] Step 4: Commit `refactor: disambiguate topology config key naming`
 - AC: Spec A1 AC-1/AC-2.
 
 ### Task 2: #1242 One-time-Migrationsstages gaten (developer, S)
 **Files:** Modify `scripts/lib/sync_pipeline.py`; Test: Create `tests/test_migration_stage_gate.py`.
 **Interfaces:** Consumes `config/provider-migrations.yaml`; Produces Gate-Prädikat (Alt-Pfad existiert) vor `apply_discovery_migration`, `apply_provider_migrations`, `migrate_provider_paths`; fail-open + Warnung bei Prüffehler.
-- [ ] Step 1: Test (fail): migriertes Fixture, 2. sync ruft `migrate_managed_artifact` nicht auf (Spy), Ausgabe byte-identisch; Fixture mit Alt-Pfaden migriert genau einmal.
-- [ ] Step 2: Gate implementieren.
-- [ ] Step 3: `--validate`; `pytest tests/test_migration_stage_gate.py tests/test_migration_paths.py tests/test_progress_file_migration.py`.
-- [ ] Step 4: Commit `refactor: gate one-time migration stages on legacy paths`
+- [x] Step 1: Test (fail): migriertes Fixture, 2. sync ruft `migrate_managed_artifact` nicht auf (Spy), Ausgabe byte-identisch; Fixture mit Alt-Pfaden migriert genau einmal.
+- [x] Step 2: Gate implementieren.
+- [x] Step 3: `--validate`; `pytest tests/test_migration_stage_gate.py tests/test_migration_paths.py tests/test_progress_file_migration.py`.
+- [x] Step 4: Commit `refactor: gate one-time migration stages on legacy paths`
 - AC: A2 AC-1/AC-2.
 
 ### Task 3: #1254 opencode_v2 am Aufrufort gaten (developer, S, byte-identisch)
 **Files:** Modify `scripts/lib/sync_pipeline.py`, `scripts/lib/opencode_v2_config.py`; Test: Create `tests/test_opencode_gate_call_site.py`.
 **Interfaces:** Consumes `owns_opencode_surface(provider_config, provider)`, `v2_active`; Produces Gate am Aufruf (`sync_opencode_v2_managed_keys`, `sync_opencode_cli_file`): `owns surface OR State-Datei vorhanden` (Q2, Rollback bleibt erreichbar).
-- [ ] Step 1: Test (fail): Nicht-Owner ohne State -> Spy-Writer nicht aufgerufen; Nicht-Owner MIT State -> Rollback-Pfad läuft; Grep-Test auf Provider-Namensvergleiche in `sync_pipeline.py` = 0.
-- [ ] Step 2: Gate sichtbar am Aufrufort; Writer-Interna unverändert.
-- [ ] Step 3: Golden-Diff leer (Sync über alle Provider-Fixtures, `git diff` auf Goldens leer); `--validate`; `pytest tests/test_opencode_gate_call_site.py tests/test_opencode_v2_schema.py tests/test_isolation_v2_topology_reconcile.py`.
-- [ ] Step 4: Commit `refactor: gate opencode v2 writers at call site by capability`
+- [x] Step 1: Test (fail): Nicht-Owner ohne State -> Spy-Writer nicht aufgerufen; Nicht-Owner MIT State -> Rollback-Pfad läuft; Grep-Test auf Provider-Namensvergleiche in `sync_pipeline.py` = 0.
+- [x] Step 2: Gate sichtbar am Aufrufort; Writer-Interna unverändert.
+- [x] Step 3: Golden-Diff leer (Sync über alle Provider-Fixtures, `git diff` auf Goldens leer); `--validate`; `pytest tests/test_opencode_gate_call_site.py tests/test_opencode_v2_schema.py tests/test_isolation_v2_topology_reconcile.py`.
+- [x] Step 4: Commit `refactor: gate opencode v2 writers at call site by capability`
 - AC: A3 AC-1..3, BAC-4.
 
 ### Task 4: #1253a Isolation-Writer Dispatch (senior-developer, M-Teil 1)
 **Files:** Modify `scripts/lib/isolation.py`, `scripts/lib/repo_containment.py`; Test: Create `tests/test_dispatch_tables.py` (Teil Isolation).
 **Interfaces:** Produces Tabelle `format_key -> writer` für Isolation (Schlüssel aus Provider-Config); unbekannter Key -> Fehler mit Liste gültiger Keys (exit 1). Consumes `_opencode_v2_gate_permissions`, `_sync_opencode_v2_gate_permissions`.
-- [ ] Step 1: Test (fail): unbekannter Key -> Fehlermeldung mit Key-Liste; Isolation-Output pro Provider unverändert.
-- [ ] Step 2: Dispatch-Tabelle einführen, bestehende if/elif ersetzen.
-- [ ] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_dispatch_tables.py tests/test_secrets_and_isolation.py tests/test_isolation_v2_topology_reconcile.py tests/test_repo_containment_schema.py`.
-- [ ] Step 4: Commit `refactor: dispatch isolation writers via format-key table`
+- [x] Step 1: Test (fail): unbekannter Key -> Fehlermeldung mit Key-Liste; Isolation-Output pro Provider unverändert.
+- [x] Step 2: Dispatch-Tabelle einführen, bestehende if/elif ersetzen.
+- [x] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_dispatch_tables.py tests/test_secrets_and_isolation.py tests/test_isolation_v2_topology_reconcile.py tests/test_repo_containment_schema.py`.
+- [x] Step 4: Commit `refactor: dispatch isolation writers via format-key table`
 - AC: A4 AC-1, AC-3 (Teil), BAC-4.
 
 ### Task 5: #1253b MCP-Format-Writer Dispatch (senior-developer, M-Teil 2)
 **Files:** Modify `scripts/lib/mcp_provider_config.py`, `scripts/lib/mcp.py`, `scripts/lib/opencode_v2_config.py`, `scripts/lib/sync_pipeline.py`; Test: Modify `tests/test_dispatch_tables.py`.
 **Interfaces:** Produces Tabelle für `fmt ==`-Ketten (~L88-90, ~L222-227, ~L247, ~L960-984) nutzend `V2_MCP_FORMAT`-Muster; Consumes Task 4.
-- [ ] Step 1: Test (fail): unbekannter MCP-Format-Key -> Fehler mit Key-Liste; Grep `\bfmt\s*(==|in)\b` nur Tabellen-Lookup.
-- [ ] Step 2: Tabelle einführen, Ketten entfernen.
-- [ ] Step 3: Golden-Diff leer; BAC-5-Regex über die 6 In-Scope-Module + `sync_pipeline.py`: 0 Treffer (Nachweis fürs PR); `--validate`; `pytest tests/test_dispatch_tables.py tests/test_mcp_health.py tests/test_mcp_deny.py`.
-- [ ] Step 4: Commit `refactor: dispatch mcp format writers via format-key table`
+- [x] Step 1: Test (fail): unbekannter MCP-Format-Key -> Fehler mit Key-Liste; Grep `\bfmt\s*(==|in)\b` nur Tabellen-Lookup.
+- [x] Step 2: Tabelle einführen, Ketten entfernen.
+- [x] Step 3: Golden-Diff leer; BAC-5-Regex über die 6 In-Scope-Module + `sync_pipeline.py`: 0 Treffer (Nachweis fürs PR); `--validate`; `pytest tests/test_dispatch_tables.py tests/test_mcp_health.py tests/test_mcp_deny.py`.
+- [x] Step 4: Commit `refactor: dispatch mcp format writers via format-key table`
 - AC: A4 AC-1..AC-4, BAC-4/5.
 
 ### Task 6: #1255a Capability `extension_hook_path` + Strip-Hilfsfunktion (senior-developer, M-Teil 1)
 **Files:** Modify `config/ai-providers.yaml`, `scripts/lib/provider_transform.py`; Test: Create `tests/test_extension_hook_path.py`.
 **Interfaces:** Produces neuer optionaler String-Key `extension_hook_path` (nur beim Claude-Provider, `.claude/3-project/`), Funktion `_strip_extension_hook_lines` (ersetzt `_strip_claude_specific_lines`), eine gemeinsame Prüfhilfe `should_strip_extension_hook(spec)`; Flag `strip-claude-lines` entfällt (7 Stellen in YAML). Leer = fehlend. Consumes bestehende Aufrufe ~L640, ~L783, ~L1042, ~L1304.
-- [ ] Step 1: Test (fail): je Provider-Typ (Opencode, ein Flag-Provider, Claude) Extension-Zeile fehlt bzw. ist vorhanden; Opencode-Verhalten (unbedingte Stellen) reproduziert heutiges Ergebnis.
-- [ ] Step 2: YAML + Funktion + 4 Aufrufstellen in `provider_transform.py` umstellen (Verhalten je Provider identisch).
-- [ ] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_extension_hook_path.py tests/test_provider_transform_topology.py tests/test_provider_transform_topology_generic.py`.
-- [ ] Step 4: Commit `refactor: replace strip-claude-lines flag with extension_hook_path`
+- [x] Step 1: Test (fail): je Provider-Typ (Opencode, ein Flag-Provider, Claude) Extension-Zeile fehlt bzw. ist vorhanden; Opencode-Verhalten (unbedingte Stellen) reproduziert heutiges Ergebnis.
+- [x] Step 2: YAML + Funktion + 4 Aufrufstellen in `provider_transform.py` umstellen (Verhalten je Provider identisch).
+- [x] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_extension_hook_path.py tests/test_provider_transform_topology.py tests/test_provider_transform_topology_generic.py`.
+- [x] Step 4: Commit `refactor: replace strip-claude-lines flag with extension_hook_path`
 - AC: A5 AC-1, AC-3 (Teil), BAC-4.
 
 ### Task 7: #1255b `context.py`-Aufrufstelle + Rest-Grep (senior-developer, M-Teil 2)
 **Files:** Modify `scripts/lib/context.py`; Test: Modify `tests/test_extension_hook_path.py`.
 **Interfaces:** Consumes Task-6-Hilfsfunktion; Produces 5. Aufrufstelle (Import ~L3670, Nutzung ~L3730) über dieselbe Hilfsfunktion.
-- [ ] Step 1: Test (fail): AC-4 (alle fünf Aufrufstellen -> gleiche Funktion, Grep-Test) + AC-2 (0 Treffer `strip-claude-lines`/`_strip_claude_specific_lines` in `config/`, `scripts/`).
-- [ ] Step 2: `context.py` umstellen.
-- [ ] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_extension_hook_path.py tests/test_context_managed_block_shrink.py tests/test_context_budgets.py`.
-- [ ] Step 4: Commit `refactor: route context extension-line stripping through capability`
+- [x] Step 1: Test (fail): AC-4 (alle fünf Aufrufstellen -> gleiche Funktion, Grep-Test) + AC-2 (0 Treffer `strip-claude-lines`/`_strip_claude_specific_lines` in `config/`, `scripts/`).
+- [x] Step 2: `context.py` umstellen.
+- [x] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_extension_hook_path.py tests/test_context_managed_block_shrink.py tests/test_context_budgets.py`.
+- [x] Step 4: Commit `refactor: route context extension-line stripping through capability`
 - AC: A5 AC-2, AC-4, BAC-4.
 
 ### Task 8: #1268a Modul `managed_block.py` + `extensions.py` (senior-developer, M-Teil 1)
 **Files:** Create `scripts/lib/managed_block.py`; Modify `scripts/lib/extensions.py`; Test: Create `tests/test_managed_block.py`.
 **Interfaces:** Produces `render_block(marker_id: str, body: str) -> str`, `replace_block(text: str, body: str, marker_id: str = "agent-meta") -> str`, `ManagedBlockError` (fehlender/doppelter End-Marker, Datei unverändert); Marker-Syntax unverändert. Consumes Inventar (Spec A6).
-- [ ] Step 0: Inventar gegen Issue (6 Implementierungen) abgleichen; Abweichung -> Befund an User.
-- [ ] Step 1: Test (fail): Fixtures der migrierten Anwendungsfälle byte-identisch; kaputter Marker -> `ManagedBlockError`, Datei unverändert.
-- [ ] Step 2: Modul schreiben; `extensions.py` (`update_managed_block:90`, `render_managed_block:51`) darauf umstellen.
-- [ ] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_managed_block.py tests/test_context_managed_block_shrink.py tests/test_native_extensions_whitelist.py`.
-- [ ] Step 4: Commit `refactor: add managed_block module and adopt it in extensions`
+- [x] Step 0: Inventar gegen Issue (6 Implementierungen) abgleichen; Abweichung -> Befund an User.
+- [x] Step 1: Test (fail): Fixtures der migrierten Anwendungsfälle byte-identisch; kaputter Marker -> `ManagedBlockError`, Datei unverändert.
+- [x] Step 2: Modul schreiben; `extensions.py` (`update_managed_block:90`, `render_managed_block:51`) darauf umstellen.
+- [x] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_managed_block.py tests/test_context_managed_block_shrink.py tests/test_native_extensions_whitelist.py`.
+- [x] Step 4: Commit `refactor: add managed_block module and adopt it in extensions`
 - AC: A6 AC-1, AC-2 (Teil), BAC-4.
 
 ### Task 9: #1268b Übrige Managed-Block-Ersetzer migrieren (senior-developer, M-Teil 2)
 **Files:** Modify `scripts/lib/context.py` (~L49, ~L679, ~L1070, Continue-Form L2032), `scripts/lib/context_templates/builder.py`, `scripts/lib/cli_commands.py` (`MANAGED_BEGIN:109`), `scripts/lib/release_scaffold.py` (`_MANAGED_BEGIN:25`); Test: Modify `tests/test_managed_block.py`.
 **Interfaces:** Consumes `managed_block`; Detektoren (`generated_file_drift.py`, `consistency/context_size.py`, `external_tools_drift.py`) unberührt. Continue-Sonderform muss byte-identisch bleiben.
-- [ ] Step 1: Test (fail): Grep-Test `managed-begin\s*-->\.\*\?` in den Inventar-Dateien = 0 ausserhalb `managed_block.py`.
-- [ ] Step 2: Regex-Ersetzer entfernen/umstellen.
-- [ ] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_managed_block.py tests/test_context_managed_block_shrink.py tests/test_cli_smoke_multi_provider.py tests/test_release_checklist_schema.py`.
-- [ ] Step 4: Commit `refactor: unify managed block writers on managed_block module`
+- [x] Step 1: Test (fail): Grep-Test `managed-begin\s*-->\.\*\?` in den Inventar-Dateien = 0 ausserhalb `managed_block.py`.
+- [x] Step 2: Regex-Ersetzer entfernen/umstellen.
+- [x] Step 3: Golden-Diff leer; `--validate`; `pytest tests/test_managed_block.py tests/test_context_managed_block_shrink.py tests/test_cli_smoke_multi_provider.py tests/test_release_checklist_schema.py`.
+- [x] Step 4: Commit `refactor: unify managed block writers on managed_block module`
 - AC: A6 AC-1..AC-3, BAC-4.
 
 ### Task 10: #1269a Marker-Hash + Drift-Logik (senior-developer, M-Teil 1)
 **Files:** Modify `scripts/lib/extensions.py`, `scripts/lib/managed_block.py`, `templates/managed-block.md`; Test: Create `tests/test_extensions_drift.py`.
 **Interfaces:** Produces Marker `<!-- agent-meta:managed-begin v=<hash> -->` (Hash über Body; Altform ohne `v=` lesbar), Hash-Mismatch -> WARN + Skip ausser `--force`, fehlender Marker -> Warnung statt Prepend (`extensions.py:101-102`), Orphan-Rolle -> Warnung (Q5: Drift = Warnung+Skip, Fehler nur mit `--strict`).
-- [ ] Step 1: Tests (fail): happy, drift, missing marker, orphan role, Altform-Kompatibilität (AC-1..3, AC-5).
-- [ ] Step 2: implementieren.
-- [ ] Step 3: `--validate`; `pytest tests/test_extensions_drift.py tests/test_managed_block.py`.
-- [ ] Step 4: Commit `feat: add hash-based drift protection for extension blocks`
+- [x] Step 1: Tests (fail): happy, drift, missing marker, orphan role, Altform-Kompatibilität (AC-1..3, AC-5).
+- [x] Step 2: implementieren.
+- [x] Step 3: `--validate`; `pytest tests/test_extensions_drift.py tests/test_managed_block.py`.
+- [x] Step 4: Commit `feat: add hash-based drift protection for extension blocks`
 - AC: A7 AC-1, AC-2, AC-3, AC-5.
 
 ### Task 11: #1269b CLI `--check`/`--role`/`--force` + Command-Text (developer, M-Teil 2)
 **Files:** Modify `scripts/lib/cli_commands.py`, `scripts/sync.py`, `commands/1-generic/update-extensions.md`; Test: Modify `tests/test_extensions_drift.py`, `tests/test_cli_smoke_multi_provider.py`.
 **Interfaces:** Produces `update-extensions --check` (kein Schreiben, exit != 0 bei Drift), `--role <name>`, `--force`; `--validate` exit 1 bei Drift nur mit `--strict`.
-- [ ] Step 1: Tests (fail): AC-4, `--strict`-Verhalten, argparse akzeptiert Flags.
-- [ ] Step 2: implementieren; Command-Text und Sync-Pfad angleichen.
-- [ ] Step 3: `--validate`; `pytest tests/test_extensions_drift.py tests/test_cli_smoke_multi_provider.py`.
-- [ ] Step 4: Commit `feat: add check, role and force flags to update-extensions`
+- [x] Step 1: Tests (fail): AC-4, `--strict`-Verhalten, argparse akzeptiert Flags.
+- [x] Step 2: implementieren; Command-Text und Sync-Pfad angleichen.
+- [x] Step 3: `--validate`; `pytest tests/test_extensions_drift.py tests/test_cli_smoke_multi_provider.py`.
+- [x] Step 4: Commit `feat: add check, role and force flags to update-extensions`
 - AC: A7 AC-4, (6).
 
 ### Task 12: Rebaseline #1269 (developer)
 **Files:** Modify betroffene Baselines (Hash-/Golden-Dateien laut Helfer-Ausgabe; erwartet `generated-file-hashes.json`, Extension-/Managed-Block-Goldens).
-- [ ] Step 1: Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1269: extension marker hash"`; Diff prüfen: nur Marker-`v=<hash>`-Änderungen.
-- [ ] Step 2: `--validate` + `pytest tests/test_extensions_drift.py tests/test_managed_index_alignment.py`.
-- [ ] Step 3: Commit `chore: rebaseline hashes for extension marker hash (#1269)`
+- [x] Step 1: Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1269: extension marker hash"`; Diff prüfen: nur Marker-`v=<hash>`-Änderungen.
+- [x] Step 2: `--validate` + `pytest tests/test_extensions_drift.py tests/test_managed_index_alignment.py`.
+- [x] Step 3: Commit `chore: rebaseline hashes for extension marker hash (#1269)`
 
 ### Task 13: #1203 `--backup-label` mit Alias (developer, S)
 **Files:** Modify `scripts/sync.py` (`--label` ~L494), `scripts/lib/cli_commands.py`; Test: Create `tests/test_backup_label_flag.py`.
 **Interfaces:** Produces kanonisch `--backup-label`, `--label` deprecated Alias (Hinweis stderr), Help nennt beide.
-- [ ] Step 1: Test (fail): beide Namen gleiches Backup, Deprecation auf stderr, `--help` nennt `--backup-label`.
-- [ ] Step 2: implementieren.
-- [ ] Step 3: `--validate`; `pytest tests/test_backup_label_flag.py tests/test_backup_robustness.py tests/test_backup_round_trip_804.py`.
-- [ ] Step 4: Commit `feat: add --backup-label and deprecate --label alias`
+- [x] Step 1: Test (fail): beide Namen gleiches Backup, Deprecation auf stderr, `--help` nennt `--backup-label`.
+- [x] Step 2: implementieren.
+- [x] Step 3: `--validate`; `pytest tests/test_backup_label_flag.py tests/test_backup_robustness.py tests/test_backup_round_trip_804.py`.
+- [x] Step 4: Commit `feat: add --backup-label and deprecate --label alias`
 - AC: A9 AC-1..AC-3.
 
-### Task 14: Rebaseline #1203 (bedingt, developer)
-- [ ] Nur wenn Help-Text gepinnt ist und Pin-Test rot wird: `python3 scripts/rebaseline.py --check-only`, dann `python3 scripts/rebaseline.py --reason "#1203: help-text pin for --backup-label"`, sonst Task entfällt (im Ledger als „entfällt" markieren).
+### Task 14: Rebaseline #1203 (entfallen: kein Help-Text-Pin, geprüft 2026-11-25; developer)
+- [x] Nur wenn Help-Text gepinnt ist und Pin-Test rot wird: `python3 scripts/rebaseline.py --check-only`, dann `python3 scripts/rebaseline.py --reason "#1203: help-text pin for --backup-label"`, sonst Task entfällt (im Ledger als „entfällt" markieren).
 - Commit (falls nötig): `chore: rebaseline help-text pin for --backup-label`
 
 ### Task 15: #1198 Single-Brace Regressionsschutz (developer, S, verify-first)
 **Files:** Modify `scripts/lib/consistency/placeholders.py`; Test: Create `tests/test_single_brace_known_var.py`.
 **Interfaces:** Produces Check: Single-Brace `{<bekannte Variable>}` in `agents/`, `rules/`, `templates/` -> WARN -> `--validate`-Fehler; Laufzeit-Platzhalter (`{parent_path}`, `{FolderName}`) lösen nichts aus (Q1: nur Regressions-Check + Issue-Kommentar, kein Template-Umbau).
-- [ ] Step 1: Test (fail): künstlich eingefügtes `{SE_BASE_DIR}` -> `--validate` exit 1; `{parent_path}` -> kein Fehler; Grep `{SE_BASE_DIR}` single in `agents/ rules/ templates/` = 0.
-- [ ] Step 2: Check implementieren (nutzt Variablenliste ~L106/L201); `provider_transform.py`/`ai-providers.yaml` NICHT anfassen.
-- [ ] Step 3: `--validate` (exit 0 auf dem Repo); `pytest tests/test_single_brace_known_var.py tests/test_placeholder_grace_and_derivation.py tests/test_project_context_placeholder_ratchet.py`.
-- [ ] Step 4: Commit `feat: warn on single-brace known placeholders (#1198)` (neuer Check in `placeholders.py` = Produktcode; nur falls der Check bereits existiert und nur Tests fehlen: `test:`)
+- [x] Step 1: Test (fail): künstlich eingefügtes `{SE_BASE_DIR}` -> `--validate` exit 1; `{parent_path}` -> kein Fehler; Grep `{SE_BASE_DIR}` single in `agents/ rules/ templates/` = 0.
+- [x] Step 2: Check implementieren (nutzt Variablenliste ~L106/L201); `provider_transform.py`/`ai-providers.yaml` NICHT anfassen.
+- [x] Step 3: `--validate` (exit 0 auf dem Repo); `pytest tests/test_single_brace_known_var.py tests/test_placeholder_grace_and_derivation.py tests/test_project_context_placeholder_ratchet.py`.
+- [x] Step 4: Commit `feat: warn on single-brace known placeholders (#1198)` (neuer Check in `placeholders.py` = Produktcode; nur falls der Check bereits existiert und nur Tests fehlen: `test:`)
 - AC: A10 AC-1..AC-3. Kein Rebaseline.
 
 ### Task 16: #1086 a–d Tests + `hooks.py` settings-Label (developer, S)
 **Files:** Modify `scripts/lib/hooks.py` (~L216, ~L732, ~L748 -> `hooks_config_file`); Test: Create `tests/test_sync_ux_consistency.py`; Modify `tests/test_sync_log.py` (nur falls Pin passt).
 **Interfaces:** (a) `_config_rel_label` Test (alle fünf Aufrufer `project_root`), (b) hartkodiertes `settings.json` aus `hooks_config_file`, (c) `skip` vs `note_unchanged` pinnen, (d) `SyncLog.warn`-Dedup pinnen. Nicht-Ziele g, h, i unberührt.
-- [ ] Step 1: Tests (a)(c)(d) (grün, Pin) + (b) (fail).
-- [ ] Step 2: (b) fixen.
-- [ ] Step 3: `--validate`; `pytest tests/test_sync_ux_consistency.py tests/test_sync_log.py tests/test_sync_log_output.py tests/test_antigravity_hooks_registration.py`; Exit-Codes unverändert.
-- [ ] Step 4: Commit `fix: derive hook config label from provider config key`
+- [x] Step 1: Tests (a)(c)(d) (grün, Pin) + (b) (fail).
+- [x] Step 2: (b) fixen.
+- [x] Step 3: `--validate`; `pytest tests/test_sync_ux_consistency.py tests/test_sync_log.py tests/test_sync_log_output.py tests/test_antigravity_hooks_registration.py`; Exit-Codes unverändert.
+- [x] Step 4: Commit `fix: derive hook config label from provider config key`
 - AC: A8 a–d, AC-2, AC-3.
 
 ### Task 17: #1086 e–f Context-Budget-Meldung + Personal-Legacy-Pin (developer, S)
 **Files:** Modify `scripts/lib/consistency/context_budget.py` (`check_over_hard_cap` ~L240); Modify `tests/test_sync_ux_consistency.py`; `scripts/lib/context.py` nur falls Pin-Test rot (`CLAUDE_PERSONAL_LEGACY_FILE:3192`, `init_claude_personal`).
 **Interfaces:** (e) Hard-Cap-Meldung nennt geteilte Datei wie die Soft-Cap-Variante (`others`), (f) Migrationsverhalten per Test gepinnt.
-- [ ] Step 1: Tests (e) fail, (f) Pin.
-- [ ] Step 2: (e) angleichen; (f) nur bei rotem Test ändern.
-- [ ] Step 3: `--validate`; `pytest tests/test_sync_ux_consistency.py tests/test_context_budgets.py`.
-- [ ] Step 4: Commit `fix: name shared context file in hard-cap message`
+- [x] Step 1: Tests (e) fail, (f) Pin.
+- [x] Step 2: (e) angleichen; (f) nur bei rotem Test ändern.
+- [x] Step 3: `--validate`; `pytest tests/test_sync_ux_consistency.py tests/test_context_budgets.py`.
+- [x] Step 4: Commit `fix: name shared context file in hard-cap message`
 - AC: A8 e–f, AC-2, AC-3. Ist ein Teilproblem schon korrekt: nur Test-Commit (`test: pin ...`).
 
 ### Task 18: Cluster-A-Abschluss: Rebase + Gesamtprüfung (git, tester)
-- [ ] Step 1: `--validate` + voller `pytest`; BAC-5-Grep-Nachweis für Cluster A notieren.
-- [ ] Step 2: `git` rebased Branch auf `main`; bei Baseline-Konflikt: Rebaseline-Helfer neu (kein Hand-Merge); Ergebnis erneut `--validate`.
+- [x] Step 1: `--validate` + voller `pytest`; BAC-5-Grep-Nachweis für Cluster A notieren.
+- [x] Step 2: `git` rebased Branch auf `main`; bei Baseline-Konflikt: Rebaseline-Helfer neu (kein Hand-Merge); Ergebnis erneut `--validate`.
 - Kein eigener Commit (ausser Konfliktauflösung: `chore: rebaseline after rebase on main`).
 
 ---
@@ -256,24 +257,25 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 19: #1248 Protokoll-Header (developer, S)
 **Files:** Modify `hooks/1-generic/dod-push-check.sh`, `hooks/1-generic/lifecycle-check.sh`, `hooks/1-generic/sync-on-config-change.sh`; Test: Modify `tests/test_hook_drift.py`.
 **Interfaces:** Produces `# protocol: tool-hook-v1` statt `# provider: …`; Consumes `hooks.py::parse_hook_metadata` (liest `provider`-Key als Filter ~L584 — Header-Wert darf nicht mehr als Provider-Schalter wirken; Grep-Nachweis, dass kein Hook `provider:` als Schalter nutzt, und dass `hook_protocol`-Semantik (`# hook_protocol:`) nicht kollidiert -> ggf. Key `protocol` gegen `hook_protocol` abgrenzen).
-- [ ] Step 1: Test (fail): Grep `^# provider:` in `hooks/` = 0; Registrierung für Claude unverändert; für andere hook-fähige Provider ändert sie sich bewusst (spec Ziel L11; Hooks bleiben `enabled_by_default: false`).
-- [ ] Step 2: Header ersetzen.
-- [ ] Step 3: `--validate`; `pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py`.
-- [ ] Step 4: Commit `refactor: replace provider hook header with protocol header`
+- [x] Step 1: Test (fail): Grep `^# provider:` in `hooks/` = 0; Registrierung für Claude unverändert; für andere hook-fähige Provider ändert sie sich bewusst (spec Ziel L11; Hooks bleiben `enabled_by_default: false`).
+- [x] Step 2: Header ersetzen.
+- [x] Step 3: `--validate`; `pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py`.
+- [x] Step 4: Commit `refactor: replace provider hook header with protocol header`
 - AC: B1 AC-1, AC-2.
 
 ### Task 20: Rebaseline #1248 (developer)
-- [ ] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1248: hook protocol header"` (Hook-Hashes); `--validate`; `pytest tests/test_hook_drift.py`.
+- [x] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1248: hook protocol header"` (Hook-Hashes); `--validate`; `pytest tests/test_hook_drift.py`.
 - Commit: `chore: rebaseline hook hashes for protocol header (#1248)`
 
 ### Task 21: #1251 `AM_PROJECT_DIR` Adapter-Variable (senior-developer, S)
-**Files:** Modify `hooks/1-generic/lib/hook_common.sh`, `hooks/1-generic/artifact-path-guard.sh`, `hooks/1-generic/orchestrator-guard-impl.sh`, `hooks/1-generic/repo-containment-impl.sh`, `hooks/1-generic/lib/kernel/containment.py`, `hooks/1-generic/lib/kernel/model.py`; Test: Modify `tests/test_hook_kernel.py`, `tests/test_repo_containment_hook.py`.
+**Files:** Modify `scripts/lib/hooks.py`, `hooks/1-generic/antigravity-json-adapter.sh`, `hooks/1-generic/lib/hook_common.sh`, `hooks/1-generic/artifact-path-guard.sh`, `hooks/1-generic/orchestrator-guard-impl.sh`, `hooks/1-generic/repo-containment-impl.sh`, `hooks/1-generic/lib/kernel/containment.py`, `hooks/1-generic/lib/kernel/model.py`, `tests/test_hook_registration_invariant.py`, `tests/test_antigravity_hooks_registration.py`, `tests/test_repo_containment_hook.py`, `tests/test_orchestrator_guard_hook.py`, `tests/test_artifact_path_guard_hook.py`, `tests/test_hook_kernel.py`, `tests/test_artifact_locations_scenario.py`.
+**User-Override (2026-11-25):** Grund: Inventar: mindestens 10 Dateien für den AC-Kern; 15 Dateien für die vollständige Testabdeckung, daher Aufhebung der 8-Datei-Grenze nur für T21; `scripts/lib/hooks.py` wird als explizite Overlap-Ausnahme zugelassen; AC unverändert; kein Swap.
 **Interfaces:** Produces genau eine Variable `AM_PROJECT_DIR` (Adapter setzt sie; `CLAUDE_PROJECT_DIR` nur im Claude-Adapter gelesen); ungesetzt -> bisherige Auflösung (cwd/git root), kein Abbruch. Fixed-Anchor-Tests (`test_fixed_anchor_*`, `test_payload_cwd_cannot_redefine*`) bleiben grün.
 - [ ] Step 1: Test (fail): Grep `CLAUDE_PROJECT_DIR` in `hooks/1-generic/` nur im Adapter-Pfad; `AM_PROJECT_DIR` gesetzt/ungesetzt.
 - [ ] Step 2: umstellen.
-- [ ] Step 3: `--validate`; `pytest tests/test_hook_kernel.py tests/test_repo_containment_hook.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_common_lib.py`.
+- [ ] Step 3: `--validate`; `python3 -m pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_kernel.py tests/test_artifact_locations_scenario.py tests/test_hook_common_lib.py`.
 - [ ] Step 4: Commit `refactor: read project dir from adapter variable in hooks`
-- AC: B2 AC-1, AC-2. Hinweis: Adapter-Stelle (wo `AM_PROJECT_DIR` aus `CLAUDE_PROJECT_DIR` gesetzt wird) im Inventar benennen; bei > 8 Dateien Swap-Regel.
+- AC: B2 AC-1, AC-2 (unverändert). Hinweis: Adapter-Stelle (wo `AM_PROJECT_DIR` aus `CLAUDE_PROJECT_DIR` gesetzt wird) im Inventar benennen; für T21 gilt der User-Override zur 8-Datei-Grenze, kein Swap.
 
 ### Task 22: Rebaseline #1251 (bedingt, developer)
 - [ ] Nur wenn `python3 scripts/rebaseline.py --check-only` Hook-Hash-Pins rot meldet: `python3 scripts/rebaseline.py --reason "#1251: AM_PROJECT_DIR"`; sonst entfällt.
@@ -456,6 +458,6 @@ Nach Cluster A (Task 18), Cluster B (Task 32) und vor dem PR: Annahmen prüfen (
 ## Self-Review
 
 - Jeder Task mappt auf genau eine Rolle (Mehrrollen-Tasks 0/18/32 sind Gate-Tasks ohne Dateiänderung; vor Ausführung je auf eine Rolle festlegen: 0 git, 18 tester, 32 developer + separater git-Schritt).
-- Tasks <= 8 Dateien: ja, geprüft (grösster: T21 mit 8 inkl. 2 Tests, danach T24b <= 7, T25a <= 6; T24/T25 der Erstfassung (9 bzw. >= 11 Dateien) in a/b gesplittet); Spec-M-Items #1253/#1255/#1268/#1269/#1238/#1275/#1263/#1239 in 2–3 Tasks zerlegt, #1240 per Grep-Ergebnis (Split-Regel).
+- Tasks <= 8 Dateien: ja, ausgenommen T21 gemäss User-Override 2026-11-25 mit exakt 15 Dateien (grösster regulärer Task: T24b <= 7, danach T25a <= 6; T24/T25 der Erstfassung (9 bzw. >= 11 Dateien) in a/b gesplittet); `scripts/lib/hooks.py` ist für T21 explizite Overlap-Ausnahme; AC unverändert; kein Swap. Spec-M-Items #1253/#1255/#1268/#1269/#1238/#1275/#1263/#1239 in 2–3 Tasks zerlegt, #1240 per Grep-Ergebnis (Split-Regel).
 - Keine Dateiüberlappung innerhalb einer Parallel-Gruppe: es gibt keine `parallel_group`.
 - `pipeline_stages` deckt die `plan-driven`-Stage `implement` ab (Task 1 = erster Implementierungs-Task; Task 0 ist Gate).
