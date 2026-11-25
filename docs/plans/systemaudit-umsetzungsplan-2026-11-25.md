@@ -11,7 +11,7 @@
 
 - Aktueller Branch ist der neueste nicht-`main` Branch (`feat/provider-agnostic-sync-hooks-wave-5`).
 - **Wave 5** = Provider-agnostische Sync-Hooks (Issues #1248, #1269, #1086).
-- Code-Review für die drei neuen/veränderten Hooks vergibt **CHANGES_REQUESTED** (Rating C) — Merge des Branches ist aktuell blockiert.
+- Code-Review für die drei neuen/veränderten Hooks vergibt **CHANGES_REQUESTED** (Rating C = mangelhafte Code-Qualität im Review-Raster) — Merge des Branches ist aktuell blockiert.
 - Knowledge-Wiki ist strukturell aktuell (letztes Update 2026-11-21), enthält aber Widersprüche.
 - Mehrere Must- und Should-Requirements aus `docs/REQUIREMENTS.md` sind noch offen.
 
@@ -176,6 +176,16 @@ Diese Requirements sind in `docs/REQUIREMENTS.md` als Must markiert, blockieren 
 **Ziel:** Offene Issues und Should-Requirements angehen.  
 **Zeit:** je Sub-Stream S–M  
 **Exit-Kriterien pro Sub-Stream:** Issue geschlossen oder PR approved & merged.
+
+**Priorisierung (P2 → niedrigere Prio):**
+1. 6.1 Intent-Routing (#779) — betrifft alle Routings-Entscheidungen
+2. 6.3 Liveness-Verification (#681) — betrifft Dispatch-Zuverlässigkeit
+3. 6.2 HACS-Best-Practices (#676) — betrifft HACS-Plattform
+4. 6.4 Merge-Policy (#783) — betrifft git-Rolle
+5. 6.7 Provider Context — User Notes (`REQ-CTX-01`) — betrifft Context-Files
+6. 6.8 Post-Upgrade-Cleanup (#1359) — betrifft Upgrade-Erfahrung
+7. 6.5 Web-Best-Practices Preset (#679) — neues Platform-Preset
+8. 6.6 Cross-Cutting Literature Findings (#778) — rein informativ
 
 #### 6.1 Intent-Routing (#779)
 - `openscad-developer` in `config/routing/intents.yaml` und `role-defaults.yaml` aufnehmen
