@@ -1,5 +1,5 @@
 """Regression tests for hooks/1-generic/lib/hook_common.sh (issue #601 dedup,
-#596 redaction, #599 GRAPHIFY_BIN validation).
+#596 redaction, #599 GRAPHIFY_BIN validation, #1238a module emitters).
 
 This shared helper lib is sourced by other hook scripts (orchestrator-guard.sh,
 dod-push-check.sh, lifecycle-check.sh, sync-on-config-change.sh, and the
@@ -79,6 +79,20 @@ def test_hook_have_python_true_when_python3_present():
 def test_hook_python_bin_prefers_python3():
     r = _call("hook_python_bin")
     assert r.stdout.strip() == "python3"
+
+
+@pytest.mark.parametrize("emitter", [
+    "hook_shell_scan_py",
+    "hook_shell_resolver_py",
+    "hook_push_arg_parser_py",
+])
+def test_python_source_emitters_fail_closed_without_python(tmp_path, emitter):
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    r = _call(emitter, {"PATH": str(empty)})
+    assert r.returncode == 1
+    assert r.stdout == ""
+    assert r.stderr == ""
 
 
 # --- hook_json_get --------------------------------------------------------

@@ -284,11 +284,11 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 23: #1238a Heredocs in `hook_common.sh` -> Module (senior-developer, M-Teil 1)
 **Files:** Modify `hooks/1-generic/lib/hook_common.sh`; Create `hooks/1-generic/lib/hook_*.py` (je Heredoc ein flaches Modul, `main(argv: list[str], stdin: str) -> int`); Test: Create `tests/test_hook_mod_common.py`; Modify `tests/test_hook_common_lib.py`.
 **Interfaces:** Precondition 1 (flach, Präzedenz `hook_json_many.py`); Aufruf `python3 "$module_dir/<modul>.py"`; Exit-Codes/Verhalten identisch; Fail-closed ohne `python3` (#595) bleibt.
-- [ ] Step 0: Precondition 1+2 verifizieren (Deploy-Test: `tests/test_hook_lib_sync.py` deckt neues `lib/*.py` ab; Zielprojekt-Kopie unter `<hooks_dir>/lib/`).
-- [ ] Step 1: Unit-Tests je Modul (fail), inkl. Test fail-closed ohne `python3`.
-- [ ] Step 2: 4 Heredocs extrahieren.
-- [ ] Step 3: `--validate`; `pytest tests/test_hook_mod_common.py tests/test_hook_common_lib.py tests/test_hook_lib_sync.py tests/test_hook_single_parse.py`.
-- [ ] Step 4: Commit `refactor: extract hook_common heredocs into python modules`
+- [x] Step 0: Precondition 1+2 verifizieren (Deploy-Test: `tests/test_hook_lib_sync.py` deckt neues `lib/*.py` ab; Zielprojekt-Kopie unter `<hooks_dir>/lib/`).
+- [x] Step 1: Unit-Tests je Modul (fail), inkl. Test fail-closed ohne `python3`.
+- [x] Step 2: 4 Heredocs extrahieren.
+- [x] Step 3: `--validate`; `pytest tests/test_hook_mod_common.py tests/test_hook_common_lib.py tests/test_hook_lib_sync.py tests/test_hook_single_parse.py`.
+- [x] Step 4: Commit `refactor: extract hook_common heredocs into python modules`
 - AC: B3 AC-1, AC-2.
 
 ### Task 24a: #1238b1 `repo-containment-impl.sh` (senior-developer, M-Teil 2a)
