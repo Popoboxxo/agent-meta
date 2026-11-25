@@ -170,12 +170,10 @@ def _rendered_guard(tmp_path, agent_id_capability: str, role_field_capability: s
     (hooks_dir / "lib").mkdir(parents=True)
     shutil.copy(_HOOK_PATH, hooks_dir / _HOOK_PATH.name)
     shutil.copy(_IMPL_PATH.parent / "lib" / "hook_common.sh", hooks_dir / "lib" / "hook_common.sh")
-    # #1169/#1238: the shell shim loads the importable parser module from the
-    # same lib/ directory — sync.py deploys it next to hook_common.sh.
-    shutil.copy(
-        _IMPL_PATH.parent / "lib" / "hook_json_many.py",
-        hooks_dir / "lib" / "hook_json_many.py",
-    )
+    # #1169/#1238: the shell shims load importable modules from the same lib/
+    # directory — sync.py deploys every flat *.py next to hook_common.sh.
+    for module in sorted((_IMPL_PATH.parent / "lib").glob("*.py")):
+        shutil.copy(module, hooks_dir / "lib" / module.name)
     impl = (_IMPL_PATH.read_text(encoding="utf-8")
             .replace("{{AGENT_META_HOOK_AGENT_ID}}", agent_id_capability)
             .replace("{{AGENT_META_HOOK_ROLE_FIELD}}", role_field_capability))
@@ -2288,15 +2286,15 @@ def test_lone_surrogate_benign_command_is_allowed(tmp_path):
 
 def _classifier_python_shim(tmp_path, body: str) -> dict:
     """PATH whose python3 is the real interpreter EXCEPT for the classifier
-    script (recognised by the MUTATING marker)."""
+    module (recognised by its deployed flat lib/ filename)."""
     shim_dir = tmp_path / "classifier-shim"
     shim_dir.mkdir()
     real = shutil.which("python3") or "python3"
     shim = shim_dir / "python3"
     shim.write_text(
         "#!/bin/sh\n"
-        'case "${2:-}" in\n'
-        "  *MUTATING*) " + body + " ;;\n"
+        'case "${1:-}" in\n'
+        "  *hook_guard_scan.py*) " + body + " ;;\n"
         "esac\n"
         'exec "' + real + '" "$@"\n',
         encoding="utf-8",
@@ -2333,6 +2331,43 @@ def test_classifier_garbage_output_fails_closed(tmp_path):
     )
     assert result.returncode == 2, result.stderr
     assert "malformed output" in result.stderr
+
+
+@pytest.mark.parametrize("all_git", ["x", "2", "01", "true"])
+def test_classifier_malformed_all_git_flag_fails_closed_before_allowlist(tmp_path, all_git):
+    """Field 4 must be binary; malformed output must not reach an allow path."""
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    env = _classifier_python_shim(
+        tmp_path, f"printf 'mutation narrow none {all_git} 0\\n'; exit 0"
+    )
+    payload = {
+        **_bash_payload("#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"),
+        "cwd": tmp_path.as_posix(),
+    }
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+        timeout=SCRIPT_TIMEOUT,
+    )
+    assert result.returncode == 2, result.stderr
+    assert f"unknown all-git flag '{all_git}'" in result.stderr
+    assert "Failing closed" in result.stderr
+
+
+@pytest.mark.parametrize("command,all_git", [("echo ok", "0"), ("git status", "1")])
+def test_classifier_valid_all_git_flags_still_allow(tmp_path, command, all_git):
+    """Validated field-4 values preserve the existing allow behavior."""
+    env = _classifier_python_shim(
+        tmp_path, f"printf 'none narrow none {all_git} 0\\n'; exit 0"
+    )
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps({**_bash_payload(command), "cwd": tmp_path.as_posix()}),
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+        timeout=SCRIPT_TIMEOUT,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def _meta_project(path: Path, orchestrator_block: str) -> Path:

@@ -299,8 +299,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 
 ### Task 24b: #1238b2 `artifact-path-guard.sh` + `orchestrator-guard-impl.sh` (senior-developer, M-Teil 2b)
 **Files:** Modify `hooks/1-generic/artifact-path-guard.sh` (:79), `hooks/1-generic/orchestrator-guard-impl.sh` (:586 Heredoc; `-c` 345/502/517/1390/1479 extrahieren oder per Allowlist begründen); Create `hooks/1-generic/lib/hook_guard_*.py` (<= 3 flache Module); Test: Create `tests/test_hook_mod_guards.py`. (<= 7 Dateien)
-- [ ] Step 1: Unit-Tests je Modul (fail), Fail-closed (#595) je Hook. Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_guards.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_notebook_multiedit.py`.
-- [ ] Step 4: Commit `refactor: extract guard hook python into modules`
+- [x] Step 1: Unit-Tests je Modul (fail), Fail-closed (#595) je Hook. Step 2: extrahieren. Step 3: `--validate`; `pytest tests/test_hook_mod_guards.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_notebook_multiedit.py`.
+- [x] Step 4: Commit `refactor: extract guard hook python into modules`
 - AC: B3 AC-1, AC-2.
 
 ### Task 25a: #1238c1 `dod-push-check.sh` (senior-developer, M-Teil 3a)
