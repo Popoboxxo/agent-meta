@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from .frontmatter import _fm_inner, _split_frontmatter
@@ -109,10 +110,10 @@ def _add_frontmatter_field(content: str, field: str, value: str) -> str:
 
 
 def _md_to_toml(content: str, stem: str) -> str:
-    """Convert a Claude-style .md command to a Gemini .toml command.
+    """Convert a Claude-style .md command to a TOML command.
 
     Extracts description from frontmatter and the body as prompt.
-    Replaces $ARGUMENTS with double-brace args (Gemini syntax).
+    Replaces $ARGUMENTS with double-brace args syntax.
 
     TOML escaping: basic multiline strings cannot contain 3+ consecutive
     quotes. We escape the third quote so the sequence no longer terminates
@@ -144,6 +145,47 @@ def _md_to_toml(content: str, stem: str) -> str:
     return f'description = "{desc_escaped}"\nprompt = """\n{escaped}\n"""\n'
 
 
+#: Content transform for one ``commands_format`` value: ``(content, stem) -> str``.
+CommandTransform = Callable[[str, str], str]
+
+
+def _markdown_command_transform(content: str, stem: str) -> str:
+    """``commands_format: markdown`` — the source is copied unchanged."""
+    return content
+
+
+def _invokable_command_transform(content: str, stem: str) -> str:
+    """``commands_format: continue`` — inject ``invokable: true`` into frontmatter."""
+    return _add_frontmatter_field(content, "invokable", "true")
+
+
+#: Format key (declared as ``commands_format`` in config/ai-providers.yaml) to
+#: content transform. Dispatch is this table lookup only — the key is a config
+#: value, never a provider name (REQ-PROV-01). A new output format is one table
+#: entry, no branch in ``sync_commands_for_provider``.
+COMMAND_FORMAT_TRANSFORMS: dict[str, CommandTransform] = {
+    "markdown": _markdown_command_transform,
+    "continue": _invokable_command_transform,
+    "toml": _md_to_toml,
+}
+
+
+def _command_transform(commands_format: str, provider: str) -> CommandTransform:
+    """Resolve the content transform for a declared ``commands_format`` value.
+
+    An unknown key fails loudly with the list of valid keys, so a typo in
+    ``config/ai-providers.yaml`` never silently falls through to a wrong format.
+    """
+    try:
+        return COMMAND_FORMAT_TRANSFORMS[commands_format]
+    except KeyError:
+        valid = ", ".join(COMMAND_FORMAT_TRANSFORMS)
+        raise SyncError(
+            f"Provider '{provider}': unknown commands_format "
+            f"{commands_format!r} — supported: {valid} (issue #735)."
+        ) from None
+
+
 def sync_commands_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -161,10 +203,9 @@ def sync_commands_for_provider(
     config/provider-capabilities.yaml gates the path, and the target directory,
     output extension and content format come from config/ai-providers.yaml
     (``commands_dir`` / ``commands_ext`` / ``commands_format`` /
-    ``commands_managed_index``). No provider-name branching:
-      - ``commands_format: markdown`` — copied as-is (.md)
-      - ``commands_format: continue`` — ``invokable: true`` injected into frontmatter
-      - ``commands_format: toml``     — converted from .md to provider TOML
+    ``commands_managed_index``). No provider-name branching: the declared
+    ``commands_format`` value is looked up in ``COMMAND_FORMAT_TRANSFORMS``
+    (``markdown`` / ``continue`` / ``toml``); an unknown value fails loudly.
 
     An unsupported provider gets one explicit INFO line instead of the old
     silent ``return``; a provider that declares support without a
@@ -217,6 +258,9 @@ def sync_commands_for_provider(
     managed_index_path = target_dir / pc.get("commands_managed_index", ".agent-meta-managed")
     output_ext = pc.get("commands_ext", ".md")
     commands_format = pc.get("commands_format", "markdown")
+    # Resolved once per provider, before anything is written: an unknown key
+    # fails loudly instead of falling through to a wrong format.
+    transform = _command_transform(commands_format, provider)
 
     # IC-01/IC-08 (R-06): route the index read through the shared helper so a
     # corrupt/unreadable index is fail-closed (warn + treat as empty).
@@ -236,7 +280,8 @@ def sync_commands_for_provider(
         target_dir.mkdir(parents=True, exist_ok=True)
 
     for source_path, output_name in sources:
-        # Rewrite extension for providers that use a different format (e.g. Gemini → .toml)
+        # Rewrite extension for providers that use a different output format
+        # (declared as ``commands_ext``), e.g. .md -> .toml.
         stem = Path(output_name).stem
         final_name = stem + output_ext
         target_path = safe_path(target_dir, final_name)
@@ -256,16 +301,7 @@ def sync_commands_for_provider(
             content = substitute(content, variables, rel_source, log)
             content = strip_inactive_conditional_blocks(content, variables)
 
-        if commands_format == "continue":
-            content = _add_frontmatter_field(content, "invokable", "true")
-        elif commands_format == "toml":
-            content = _md_to_toml(content, stem)
-        elif commands_format != "markdown":
-            raise SyncError(
-                f"Provider '{provider}': unknown commands_format "
-                f"{commands_format!r} — supported: markdown, continue, toml "
-                "(issue #735)."
-            )
+        content = transform(content, stem)
 
         now_managed.add(final_name)
         rel_out = str(target_path.relative_to(project_root))
