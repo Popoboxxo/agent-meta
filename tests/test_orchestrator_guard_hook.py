@@ -114,11 +114,10 @@ def _neutral_tmp_project(tmp_path):
 
 
 def _clean_env() -> dict:
-    # SR-B-11: the hook prefers $CLAUDE_PROJECT_DIR over the payload cwd. A
-    # value inherited from a surrounding Claude Code session would silently
-    # retarget every tmp_path fixture at that project (and its audit log),
-    # so tests never inherit it -- tests that need it set it explicitly.
+    # SR-B-11: the hook prefers the adapter-owned $AM_PROJECT_DIR. Never
+    # inherit either project variable from the surrounding provider session.
     env = dict(os.environ)
+    env.pop("AM_PROJECT_DIR", None)
     env.pop("CLAUDE_PROJECT_DIR", None)
     return env
 
@@ -1722,7 +1721,7 @@ def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
     assert "impl crashed" not in result.stderr
 
 
-# --- SR-B-11: project root resolution (walk-up / $CLAUDE_PROJECT_DIR) --------
+# --- SR-B-11: project root resolution (walk-up / $AM_PROJECT_DIR) ------------
 
 def _strict_tree(tmp_path) -> Path:
     proj = tmp_path / "proj"
@@ -1749,22 +1748,35 @@ def test_strict_mode_found_from_subdirectory(tmp_path):
     assert "STRICT MODE" in result.stderr
 
 
-def test_strict_mode_found_via_claude_project_dir(tmp_path):
+def test_strict_mode_found_via_am_project_dir(tmp_path):
     proj = _strict_tree(tmp_path)
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    result = _run_with(_MAIN_THREAD_WRITE, elsewhere, {"CLAUDE_PROJECT_DIR": str(proj)})
+    result = _run_with(
+        _MAIN_THREAD_WRITE, elsewhere,
+        {"AM_PROJECT_DIR": str(proj), "CLAUDE_PROJECT_DIR": str(elsewhere)},
+    )
     assert result.returncode == 2, f"stderr={result.stderr!r}"
 
 
+def test_claude_project_dir_is_ignored(tmp_path):
+    proj = _strict_tree(tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    result = _run_with(
+        _MAIN_THREAD_WRITE, elsewhere, {"CLAUDE_PROJECT_DIR": str(proj)}
+    )
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
 @pytest.mark.parametrize("bogus", ["", "/nonexistent/sr-b-11", "<no-meta>"])
-def test_unusable_claude_project_dir_falls_back_to_walk_up(tmp_path, bogus):
+def test_unusable_am_project_dir_falls_back_to_walk_up(tmp_path, bogus):
     proj = _strict_tree(tmp_path)
     if bogus == "<no-meta>":
         empty = tmp_path / "no-meta"  # exists, but has no .meta-config/
         empty.mkdir()
         bogus = str(empty)
-    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub", {"CLAUDE_PROJECT_DIR": bogus})
+    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub", {"AM_PROJECT_DIR": bogus})
     assert result.returncode == 2, f"stderr={result.stderr!r}"
 
 

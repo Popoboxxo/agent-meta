@@ -271,10 +271,10 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 **Files:** Modify `scripts/lib/hooks.py`, `hooks/1-generic/antigravity-json-adapter.sh`, `hooks/1-generic/lib/hook_common.sh`, `hooks/1-generic/artifact-path-guard.sh`, `hooks/1-generic/orchestrator-guard-impl.sh`, `hooks/1-generic/repo-containment-impl.sh`, `hooks/1-generic/lib/kernel/containment.py`, `hooks/1-generic/lib/kernel/model.py`, `tests/test_hook_registration_invariant.py`, `tests/test_antigravity_hooks_registration.py`, `tests/test_repo_containment_hook.py`, `tests/test_orchestrator_guard_hook.py`, `tests/test_artifact_path_guard_hook.py`, `tests/test_hook_kernel.py`, `tests/test_artifact_locations_scenario.py`.
 **User-Override (2026-11-25):** Grund: Inventar: mindestens 10 Dateien für den AC-Kern; 15 Dateien für die vollständige Testabdeckung, daher Aufhebung der 8-Datei-Grenze nur für T21; `scripts/lib/hooks.py` wird als explizite Overlap-Ausnahme zugelassen; AC unverändert; kein Swap.
 **Interfaces:** Produces genau eine Variable `AM_PROJECT_DIR` (Adapter setzt sie; `CLAUDE_PROJECT_DIR` nur im Claude-Adapter gelesen); ungesetzt -> bisherige Auflösung (cwd/git root), kein Abbruch. Fixed-Anchor-Tests (`test_fixed_anchor_*`, `test_payload_cwd_cannot_redefine*`) bleiben grün.
-- [ ] Step 1: Test (fail): Grep `CLAUDE_PROJECT_DIR` in `hooks/1-generic/` nur im Adapter-Pfad; `AM_PROJECT_DIR` gesetzt/ungesetzt.
-- [ ] Step 2: umstellen.
-- [ ] Step 3: `--validate`; `python3 -m pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_kernel.py tests/test_artifact_locations_scenario.py tests/test_hook_common_lib.py`.
-- [ ] Step 4: Commit `refactor: read project dir from adapter variable in hooks`
+- [x] Step 1: Test (fail): Grep `CLAUDE_PROJECT_DIR` in `hooks/1-generic/` nur im Adapter-Pfad; `AM_PROJECT_DIR` gesetzt/ungesetzt.
+- [x] Step 2: umstellen.
+- [x] Step 3: `--validate`; `python3 -m pytest tests/test_hook_registration_invariant.py tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py tests/test_orchestrator_guard_hook.py tests/test_artifact_path_guard_hook.py tests/test_hook_kernel.py tests/test_artifact_locations_scenario.py tests/test_hook_common_lib.py`.
+- [x] Step 4: Commit `refactor: read project dir from adapter variable in hooks`
 - AC: B2 AC-1, AC-2 (unverändert). Hinweis: Adapter-Stelle (wo `AM_PROJECT_DIR` aus `CLAUDE_PROJECT_DIR` gesetzt wird) im Inventar benennen; für T21 gilt der User-Override zur 8-Datei-Grenze, kein Swap.
 
 ### Task 22: Rebaseline #1251 (bedingt, developer)

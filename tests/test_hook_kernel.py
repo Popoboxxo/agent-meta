@@ -26,6 +26,11 @@ from kernel import containment, git_gate, identity, model  # noqa: E402
 # model — NormEvent / Decision contract
 # ---------------------------------------------------------------------------
 class TestModel:
+    def test_project_dir_contract_is_adapter_owned(self):
+        contract = f"{model.__doc__}\n{model.NormEvent.__doc__}"
+        assert "AM_PROJECT_DIR" in contract
+        assert "CLAUDE_PROJECT_DIR" not in contract
+
     def test_norm_event_defaults(self):
         ev = model.NormEvent(tool_kind="read")
         assert ev.tool_kind == "read"
@@ -105,6 +110,10 @@ class TestIdentity:
 # containment — path containment against project_dir
 # ---------------------------------------------------------------------------
 class TestContainment:
+    def test_contract_is_adapter_owned(self):
+        assert "AM_PROJECT_DIR" in containment.__doc__
+        assert "CLAUDE_PROJECT_DIR" not in containment.__doc__
+
     def test_write_inside_root_is_allowed(self, tmp_path):
         root = tmp_path / "project"
         root.mkdir()

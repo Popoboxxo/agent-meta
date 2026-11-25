@@ -1,9 +1,10 @@
 """Lexical path-containment gate (provider-neutral).
 
-The kernel reads ``project_dir`` from ``NormEvent`` -- never from
-``CLAUDE_PROJECT_DIR`` (concept C7/D.3 step 2). The root is the normalized
-``project_dir``; a nested ``.agent-meta`` checkout is not part of the jail and
-is skipped, mirroring ``hook_is_meta_submodule_dir`` in hook_common.sh.
+The kernel reads ``project_dir`` from ``NormEvent`` -- normalized by adapters
+from ``AM_PROJECT_DIR``, never directly from a provider environment variable
+(concept C7/D.3 step 2). The root is the normalized ``project_dir``; a nested
+``.agent-meta`` checkout is not part of the jail and is skipped, mirroring
+``hook_is_meta_submodule_dir`` in hook_common.sh.
 """
 from __future__ import annotations
 

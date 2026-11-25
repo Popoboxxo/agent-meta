@@ -885,10 +885,9 @@ def test_outdated_helper_lib_fails_closed(tmp_path):
 
 
 def _clean_env() -> dict:
-    """Never inherit $CLAUDE_PROJECT_DIR: the fixed jail root (SR-B-18) prefers
-    it, so a value from the surrounding Claude session would retarget the
-    tests. Tests that need it set it explicitly."""
+    """Never inherit a project anchor from the surrounding provider session."""
     env = dict(os.environ)
+    env.pop("AM_PROJECT_DIR", None)
     env.pop("CLAUDE_PROJECT_DIR", None)
     return env
 
@@ -1095,13 +1094,14 @@ def test_payload_cwd_cannot_redefine_the_deployed_jail_root(tmp_path):
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
 
 
-def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
+def test_am_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
     """SR-B-18: even when the process cwd is a project-carrying directory,
-    $CLAUDE_PROJECT_DIR wins over the payload cwd."""
+    $AM_PROJECT_DIR wins over the payload cwd and the legacy provider variable."""
     project_a = _config_at(tmp_path / "a")
     project_b = _config_at(tmp_path / "b")
     env = _clean_env()
-    env["CLAUDE_PROJECT_DIR"] = str(project_a)
+    env["AM_PROJECT_DIR"] = str(project_a)
+    env["CLAUDE_PROJECT_DIR"] = str(project_b)
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
@@ -1110,6 +1110,39 @@ def test_claude_project_dir_is_a_fixed_anchor_from_the_source_tree(tmp_path):
     )
     assert result.returncode == 2, result.stderr
     assert f"repo root: {os.path.realpath(project_a)}" in result.stderr
+
+
+def test_claude_project_dir_is_ignored(tmp_path):
+    """Only the adapter-owned AM_PROJECT_DIR may select a fixed root."""
+    project = _config_at(tmp_path / "payload-project")
+    decoy = _config_at(tmp_path / "legacy-decoy")
+    env = _clean_env()
+    env["CLAUDE_PROJECT_DIR"] = str(decoy)
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(project / "x.py", project)),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("bogus", ["", "/nonexistent/am-project-dir", "<no-meta>"])
+def test_unusable_am_project_dir_keeps_the_payload_fallback(tmp_path, bogus):
+    root = _project(tmp_path)
+    if bogus == "<no-meta>":
+        empty = tmp_path / "no-meta"
+        empty.mkdir()
+        bogus = str(empty)
+    env = _clean_env()
+    env["AM_PROJECT_DIR"] = bogus
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(_write_payload(root / "notes.md", root)),
+        capture_output=True, text=True, cwd=str(_DECOY_ROOT), env=env,
+        timeout=SCRIPT_TIMEOUT,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("provider_dir", [".claude", ".agents", ".gemini"])
@@ -1202,7 +1235,7 @@ def test_f5_unresolvable_fixed_root_fails_closed(tmp_path):
     project_a = _config_at(tmp_path / "a")
     project_b = _config_at(tmp_path / "b")
     env = _realpath_failing_env(tmp_path, project_a)
-    env["CLAUDE_PROJECT_DIR"] = str(project_a)
+    env["AM_PROJECT_DIR"] = str(project_a)
     result = subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(_write_payload(project_b / "x.py", project_b)),
@@ -1452,7 +1485,7 @@ def test_cd_inside_a_subshell_still_scopes_writes_inside_it(tmp_path, template):
 
 def _run_with_project_dir(payload: dict, project_dir: Path) -> subprocess.CompletedProcess:
     env = _clean_env()
-    env["CLAUDE_PROJECT_DIR"] = str(project_dir)
+    env["AM_PROJECT_DIR"] = str(project_dir)
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)], input=json.dumps(payload), capture_output=True,
         text=True, cwd=str(_DECOY_ROOT), env=env, timeout=SCRIPT_TIMEOUT,
@@ -1460,12 +1493,12 @@ def _run_with_project_dir(payload: dict, project_dir: Path) -> subprocess.Comple
 
 
 @pytest.mark.parametrize("command", [
-    'cd "$CLAUDE_PROJECT_DIR" && echo hi > .tmp/a.txt',
-    "cd ${CLAUDE_PROJECT_DIR}/sub && touch x",
+    'cd "$AM_PROJECT_DIR" && echo hi > .tmp/a.txt',
+    "cd ${AM_PROJECT_DIR}/sub && touch x",
     'cd "$PWD" && echo hi > .tmp/a.txt',
 ])
 def test_known_variables_resolve_as_cd_targets(tmp_path, command):
-    """Review F2: $CLAUDE_PROJECT_DIR / $PWD used to be unresolvable cd
+    """Review F2: $AM_PROJECT_DIR / $PWD used to be unresolvable cd
     targets, so the following relative write was blocked."""
     root = _project(tmp_path)
     result = _run_with_project_dir(_bash_payload(command, root), root)
@@ -1473,8 +1506,8 @@ def test_known_variables_resolve_as_cd_targets(tmp_path, command):
 
 
 @pytest.mark.parametrize("command", [
-    'cd "$CLAUDE_PROJECT_DIR/.." && touch x',
-    "touch $CLAUDE_PROJECT_DIR/../x",
+    'cd "$AM_PROJECT_DIR/.." && touch x',
+    "touch $AM_PROJECT_DIR/../x",
     'cd "$PWD/.." && touch x',
 ])
 def test_known_variables_outside_the_root_are_blocked(tmp_path, command):
@@ -1485,7 +1518,7 @@ def test_known_variables_outside_the_root_are_blocked(tmp_path, command):
 
 def test_unset_project_dir_stays_an_unresolvable_cd_target(tmp_path):
     root = _project(tmp_path)
-    result = _run_hook(_bash_payload('cd "$CLAUDE_PROJECT_DIR" && touch x', root))
+    result = _run_hook(_bash_payload('cd "$AM_PROJECT_DIR" && touch x', root))
     assert result.returncode == 2, result.stderr
     assert "cannot resolve" in result.stderr
 

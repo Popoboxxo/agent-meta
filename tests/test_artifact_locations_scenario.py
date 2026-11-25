@@ -124,7 +124,7 @@ def _run_guard_hook(project: Path, target: str) -> subprocess.CompletedProcess[s
         "cwd": str(project),
     }
     env = dict(os.environ)
-    env["CLAUDE_PROJECT_DIR"] = str(project)
+    env["AM_PROJECT_DIR"] = str(project)
     return subprocess.run(
         [_BASH, str(_GUARD_HOOK)],
         input=json.dumps(payload), capture_output=True, text=True,
