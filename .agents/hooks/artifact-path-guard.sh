@@ -1,10 +1,10 @@
 #!/bin/bash
 # hook: artifact-path-guard
-# version: 1.1.0
+# version: 1.2.0
 # event: PreToolUse
 # matcher: ""
 # description: Route artifact writes into the configured artifact-locations class path.
-# changelog: 1.1.0: issue #1251 -- read the project anchor exclusively from adapter-owned AM_PROJECT_DIR; preserve payload-cwd walk-up and fail-open missing-data behavior
+# changelog: 1.2.0: issue #1238b2 -- delegate artifact classification to the deployed flat hook_guard_artifact.py module; preserve routing statuses and fail-open behavior; 1.1.0: issue #1251 -- read the project anchor exclusively from adapter-owned AM_PROJECT_DIR; preserve payload-cwd walk-up and fail-open missing-data behavior
 # enabled_by_default: false
 
 # Routing convention, NOT a security boundary (issue #1186, T16, spec §4.5).
@@ -77,131 +77,7 @@ MARKERS=".gitkeep .gitignore .keep"
 
 # One stdlib JSON pass over the pre-resolved file; emits one status line:
 # ALLOW | WARN:<message> | BLOCK:<message> | FAIL:<message>.
-RESULT="$(python3 - "$DATA_FILE" "$FILE_PATH" "$ROOT" "$MARKERS" <<'PY'
-import fnmatch
-import json
-import os
-import sys
-
-data_path, file_path, root, markers_raw = sys.argv[1:5]
-markers = set(markers_raw.split())
-
-try:
-    with open(data_path, encoding="utf-8") as fh:
-        data = json.load(fh)
-except Exception:
-    print("FAIL:artifact-path-guard: WARN: unreadable data file (corrupt JSON); allowing (fail-open)")
-    sys.exit(0)
-
-
-def matches(relpath, pattern):
-    """Mirror lib.artifact_status._pattern_matches (framework preset shapes)."""
-    pattern = pattern.replace("\\", "/")
-    if not pattern:
-        return False
-    if pattern.endswith("/**"):
-        return relpath.startswith(pattern[:-2])
-    if pattern.endswith("/"):
-        return relpath.startswith(pattern)
-    if "**" in pattern:
-        return relpath.startswith(pattern.split("**", 1)[0])
-    if any(c in pattern for c in "*?["):
-        return fnmatch.fnmatchcase(relpath, pattern)
-    return relpath == pattern or relpath.startswith(pattern + "/")
-
-
-def matches_any(relpath, patterns):
-    return any(matches(relpath, p) for p in (patterns or []))
-
-
-# Normalize the target to a project-relative POSIX path.
-target = file_path.replace("\\", "/")
-if os.path.isabs(target):
-    root_norm = os.path.realpath(root)
-    target_norm = os.path.realpath(target)
-    try:
-        rel = os.path.relpath(target_norm, root_norm).replace("\\", "/")
-    except ValueError:
-        rel = target_norm.replace("\\", "/")
-    if rel == ".." or rel.startswith("../") or os.path.isabs(rel):
-        print("ALLOW")  # outside the project root: repo-containment's job
-        sys.exit(0)
-else:
-    rel = target
-    while rel.startswith("./"):
-        rel = rel[2:]
-    if not rel or rel == "." or rel.startswith("../"):
-        print("ALLOW")
-        sys.exit(0)
-
-# 1. Directory markers are never blocked (scaffold exception, §3.5).
-if os.path.basename(rel) in markers:
-    print("ALLOW")
-    sys.exit(0)
-
-classes = data.get("classes") or []
-legacy = data.get("legacy") or []
-unmanaged = data.get("unmanaged") or []
-strict = bool(data.get("strict", False))
-
-# 2. unmanaged[] -> allow in both modes (D-8).
-if matches_any(rel, unmanaged):
-    print("ALLOW")
-    sys.exit(0)
-
-# 3. legacy[] -> block in both modes.  Legacy is BEFORE class-path release,
-#    otherwise the flat ADR legacy glob inside docs/adr would be ineffective.
-if matches_any(rel, legacy):
-    print("BLOCK:artifact-path-guard: '%s' targets a legacy[] path; place new artifacts under an artifact-locations class path or add a legacy entry." % rel)
-    sys.exit(0)
-
-# 4. Class path (or a declared file-set file) -> allow.
-for cls in classes:
-    path = cls.get("path")
-    if path:
-        path = path.replace("\\", "/").rstrip("/")
-        if rel == path or rel.startswith(path + "/"):
-            print("ALLOW")
-            sys.exit(0)
-    else:
-        for pat in (cls.get("patterns") or []):
-            pat = pat.replace("\\", "/")
-            if not any(c in pat for c in "*?{}[]") and rel == pat:
-                print("ALLOW")
-                sys.exit(0)
-
-# Guess the intended class from a path segment, for the repair hint.
-expected = None
-expected_cls = None
-for cls in classes:
-    name = cls.get("name") or ""
-    path = cls.get("path")
-    if path and name and name in rel.split("/"):
-        expected = path.replace("\\", "/").rstrip("/")
-        expected_cls = name
-        break
-
-# 5. Managed tree (top-level segment of a declared class path) -> misroute.
-managed_roots = set()
-for cls in classes:
-    path = cls.get("path")
-    if path:
-        first = path.replace("\\", "/").strip("/").split("/", 1)[0]
-        if first:
-            managed_roots.add(first)
-
-if rel.split("/", 1)[0] in managed_roots:
-    hint = ("expected '%s' (classes.%s.path)" % (expected, expected_cls)
-            if expected else "expected a declared artifact-locations class path")
-    message = ("artifact-path-guard: '%s' is a misroute in a managed tree; %s; "
-               "add to artifact-locations.classes.<x>.path or a legacy entry." % (rel, hint))
-    print(("BLOCK:" if strict else "WARN:") + message)
-    sys.exit(0)
-
-# 6. Root: outside all managed trees -> allow.
-print("ALLOW")
-PY
-)"
+RESULT="$(python3 "$SCRIPT_DIR/lib/hook_guard_artifact.py" "$DATA_FILE" "$FILE_PATH" "$ROOT" "$MARKERS")"
 
 case "$RESULT" in
   ALLOW)   exit 0 ;;

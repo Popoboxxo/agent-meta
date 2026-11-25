@@ -1,2 +1,17 @@
 hook_common.sh
+hook_containment_config.py
+hook_containment_path.py
+hook_containment_shell.py
+hook_dod_push_classify.py
+hook_dod_push_config.py
+hook_dod_push_payload.py
+hook_dod_push_policy.py
+hook_dod_push_report.py
+hook_guard_artifact.py
+hook_guard_policy.py
+hook_guard_scan.py
 hook_json_many.py
+hook_lifecycle_event.py
+hook_push_arg_parser.py
+hook_shell_resolver.py
+hook_shell_scan.py
