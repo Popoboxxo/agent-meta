@@ -42,17 +42,39 @@ HOOK_TEMPLATE_SH = """\
 # description: %(description)s
 # enabled_by_default: false
 
-# Claude Code passes hook context as JSON on stdin.
-# Exit 0 = allow, exit 2 = block (stdout shown to Claude as context).
-# See docs/guides/hooks.md for full documentation.
+# The harness passes the hook context as JSON on stdin.
+# Exit 0 = allow, exit 2 = block. On exit 2 only stderr reaches the agent —
+# write the block reason to stderr (stdout is ignored).
+# Full reference: docs/guides/features/hooks.md — section "Hook-Laufzeit"
+#
+# This starter allows every call. Replace the policy check below.
+
+set -uo pipefail
+
+# Shared helpers (hook_json_get, hook_json_get_many, hook_have_python).
+# sync.py deploys them to <hooks_dir>/lib/hook_common.sh next to this script.
+# A project hook is not a security control, so it fails OPEN here: a missing
+# lib or interpreter lets the call through. Security gates fail CLOSED instead
+# (source ... || exit 2 plus hook_json_usable) -- see hook_common.sh.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null || exit 0
+hook_have_python || exit 0
 
 INPUT=$(cat)
 
-# TODO: implement hook logic here
-# tip: use python3 to parse JSON from $INPUT
-# example check:
-#   TOOL_NAME=$(echo "$INPUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('tool_name',''))")
+# Read one payload field: hook_json_get <json> <dotted.path> [default]
+TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
+# Only act on the tool this hook is registered for (see matcher above).
+[ "$TOOL_NAME" = "Bash" ] || exit 0
+
+# ---- policy check ---------------------------------------------------------
+# Inspect more fields the same way, e.g.
+#   COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
+# hook_json_get_many reads several fields in ONE interpreter start
+# (NUL-terminated fields plus an "ok" trailer) -- see lib/hook_common.sh.
+# To block a call: print the reason to stderr and exit 2.
+# ---------------------------------------------------------------------------
 exit 0
 """
 
