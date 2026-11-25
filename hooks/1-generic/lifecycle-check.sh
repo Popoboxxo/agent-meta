@@ -1,11 +1,12 @@
 #!/bin/bash
 # hook: lifecycle-check
-# version: 1.1.1
+# version: 1.2.0
 # event: PostToolUse
 # matcher: Bash
 # protocol: tool-hook-v1
 # description: Detects git lifecycle events (tag push, merge, version bump) and writes pending tasks to .claude/pending-tasks.md
 # enabled_by_default: false
+# changelog: v1.2.0: MB-2 (docs/plans/systemaudit-umsetzungsplan-2026-11-25.md) -- the event detection no longer matches a regular expression against the raw command string; lib/hook_lifecycle_event.py classifies every shell statement with the shared tokenizer (hook_shell_scan statement split, hook_shell_resolver command word, hook_push_arg_parser push walk). Quoted prose ('echo "git push"'), text consumers ('git push' as an argument of a text tool), comments and option values ('git push -o --tags') no longer raise events, while 'git -C <path> push' and command wrappers still do. Event names, the release/bump/merge precedence and the 'git describe' bump heuristic are unchanged; a plain 'git commit' still raises no event (the former on-commit arm was unreachable). Still fails OPEN when python or the module is missing.
 
 set -uo pipefail
 
@@ -60,53 +61,29 @@ fi
 # ---------------------------------------------------------------------------
 # Detect lifecycle event from the git command that just ran
 # ---------------------------------------------------------------------------
+# The command-word detection lives in lib/hook_lifecycle_event.py: it splits
+# the command into shell statements with the shared tokenizer
+# (hook_shell_scan), resolves the real command word (hook_shell_resolver) and
+# walks a `git push` with the shared argument parser, instead of matching a
+# regular expression against the raw command text. That is what keeps quoted
+# prose ('echo "git push"'), text consumers ('git push' passed as an argument
+# of a text tool), comments and push-option values ('git push -o --tags') from
+# raising events, while `git -C <repo> push` and wrappers ('sudo git push')
+# still resolve.
+#
+# One line on stdout: none | on-release | on-merge | on-version-bump-*. This
+# hook is informational automation, so everything unexpected -- a missing
+# module, a failing interpreter, an unknown line -- fails OPEN (exit 0) here
+# instead of blocking the tool call. The version-bump classification asks git
+# for the previous tag (git describe --tags --abbrev=0 HEAD~1) inside the
+# module, exactly like the former shell heuristic.
 
-EVENT=""
-
-# on-release: git push with a tag (git push origin v1.2.3 or git push --tags)
-if printf '%s' "$COMMAND" | grep -qE 'git push' && \
-   printf '%s' "$COMMAND" | grep -qE '(--tags?|v[0-9]+\.[0-9]+\.[0-9]+)'; then
-  EVENT="on-release"
-
-# on-version-bump-*: commit message contains "bump version to X.Y.Z" or "chore: bump"
-elif printf '%s' "$COMMAND" | grep -qE 'git commit'; then
-  COMMIT_MSG=$(printf '%s' "$COMMAND" | grep -oP '(?<=-m ["\x27]).*(?=["\x27])' | head -1)
-  if printf '%s' "$COMMIT_MSG" | grep -qiE 'bump.*version|version.*bump|chore.*bump'; then
-    # Detect patch/minor/major from version numbers in commit message
-    # Heuristic: look for X.Y.Z pattern
-    VERSION=$(printf '%s' "$COMMIT_MSG" | grep -oP '\d+\.\d+\.\d+' | head -1)
-    if [ -n "$VERSION" ]; then
-      PATCH=$(printf '%s' "$VERSION" | cut -d. -f3)
-      MINOR=$(printf '%s' "$VERSION" | cut -d. -f2)
-      MAJOR=$(printf '%s' "$VERSION" | cut -d. -f1)
-      # Check if previous tag exists to determine bump type
-      PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
-      if [ -n "$PREV_TAG" ]; then
-        PREV_MAJOR=$(printf '%s' "$PREV_TAG" | cut -d. -f1)
-        PREV_MINOR=$(printf '%s' "$PREV_TAG" | cut -d. -f2)
-        if [ "$MAJOR" != "$PREV_MAJOR" ]; then
-          EVENT="on-version-bump-major"
-        elif [ "$MINOR" != "$PREV_MINOR" ]; then
-          EVENT="on-version-bump-minor"
-        else
-          EVENT="on-version-bump-patch"
-        fi
-      else
-        EVENT="on-version-bump-patch"
-      fi
-    fi
-  fi
-
-# on-merge: git merge command or commit on main after a branch
-elif printf '%s' "$COMMAND" | grep -qE 'git merge|gh pr merge'; then
-  EVENT="on-merge"
-
-# on-commit: any successful git commit (broad catch — only fires if configured)
-elif printf '%s' "$COMMAND" | grep -qE 'git commit'; then
-  EVENT="on-commit"
-fi
-
-[ -n "$EVENT" ] || exit 0
+_EVENT_PY="$SCRIPT_DIR/lib/hook_lifecycle_event.py"
+EVENT=$(printf '%s' "$COMMAND" | python3 "$_EVENT_PY" 2>/dev/null)
+case "$EVENT" in
+  on-release|on-merge|on-commit|on-version-bump-patch|on-version-bump-minor|on-version-bump-major) ;;
+  *) exit 0 ;;
+esac
 
 # Fire the lifecycle check
 python3 "$LIFECYCLE_PY" "$EVENT"
