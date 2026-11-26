@@ -29,7 +29,14 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+from tests.conftest import ALL_PROVIDERS  # noqa: E402
+
 BASELINE = "41dd69ac"
+# Every registered provider except the one owning the PAL gate. Derived from the
+# central registry (issue #1240) instead of an eight-name copy, so a new
+# provider joins these gate assertions automatically.
+_NON_OPENCODE_PROVIDERS = tuple(p for p in ALL_PROVIDERS if p != "Opencode")
+
 SYNTAX_FILE = REPO_ROOT / "config" / "delegation-syntax.yaml"
 CAPS_FILE = REPO_ROOT / "config" / "provider-capabilities.yaml"
 
@@ -227,9 +234,7 @@ def _neutralize_version_metadata(rendered: str) -> str:
     )
 
 
-@pytest.mark.parametrize("provider", [
-    "Claude", "Gemini", "Continue", "Copilot", "Codex", "ZCode", "KimiCode", "Mammouth",
-])
+@pytest.mark.parametrize("provider", _NON_OPENCODE_PROVIDERS)
 def test_other_provider_render_byte_identical_to_baseline(
     provider: str, tmp_path: Path, baseline_root: Path
 ):
@@ -262,8 +267,7 @@ def test_pal_dispatch_reject_call_is_gated():
     engine = DelegationSyntaxEngine(config_dir=REPO_ROOT / "config")
     probe = "{{PAL_DISPATCH_REJECT_CALL}}"
     assert engine.apply(probe, "Opencode") == '`subagent(agent="orchestrator")`'
-    for provider in ("Claude", "Gemini", "Continue", "Copilot", "Codex",
-                     "ZCode", "KimiCode", "Mammouth"):
+    for provider in _NON_OPENCODE_PROVIDERS:
         assert engine.apply(probe, provider) == '`task(subagent_type="orchestrator")`', provider
 
 
@@ -274,6 +278,5 @@ def test_pal_fail_closed_block_is_gated():
     engine = DelegationSyntaxEngine(config_dir=REPO_ROOT / "config")
     probe = "{{#if PAL_FAIL_CLOSED_DISPATCH}}\nFAIL-CLOSED-RULE\n{{/if}}\n"
     assert "FAIL-CLOSED-RULE" in engine.apply(probe, "Opencode")
-    for provider in ("Claude", "Gemini", "Continue", "Copilot", "Codex",
-                     "ZCode", "KimiCode", "Mammouth"):
+    for provider in _NON_OPENCODE_PROVIDERS:
         assert "FAIL-CLOSED-RULE" not in engine.apply(probe, provider), provider

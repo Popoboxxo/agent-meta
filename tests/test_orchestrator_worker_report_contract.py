@@ -22,6 +22,7 @@ from lib.log import SyncLog
 from lib.provider_transform import transform_agent_content_for_provider
 from lib.providers import load_provider_capabilities, load_providers_config
 from lib.variables import strip_inactive_conditional_blocks
+from tests.conftest import ALL_PROVIDERS  # noqa: E402
 
 _TEMPLATE = (REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
 _CONFIG = {
@@ -225,12 +226,6 @@ def test_worker_control_prose_names_only_active_provider_tools(provider):
 # the check reduces to "no foreign tool literal leaks into the prose", which
 # is the strongest claim their format can carry.
 
-_ALL_PROVIDERS = (
-    "Claude", "Gemini", "Opencode", "Continue", "Copilot",
-    "Mammouth", "Codex", "ZCode", "KimiCode",
-)
-
-
 def _frontmatter_tools(provider: str, text: str) -> set[str] | None:
     """FM tools of a rendered agent, or None when the format has no tools key.
 
@@ -244,7 +239,7 @@ def _frontmatter_tools(provider: str, text: str) -> set[str] | None:
     return set(fm.get("tools") or [])
 
 
-@pytest.mark.parametrize("provider", _ALL_PROVIDERS)
+@pytest.mark.parametrize("provider", ALL_PROVIDERS)
 def test_all_providers_tool_mentions_subset_of_frontmatter(provider):
     """O15: named worker-control tools ⊆ declared capability ⊆ FM tools.
 

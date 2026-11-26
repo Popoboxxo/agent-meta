@@ -34,20 +34,9 @@ from lib.gitignore import (  # noqa: E402
     is_inside_provider_root,
     provider_root_dirs_for,
 )
+from tests.conftest import ALL_PROVIDERS  # noqa: E402
 
 _PROVIDERS_CONFIG = _REPO_ROOT / "config" / "ai-providers.yaml"
-
-ALL_PROVIDERS = [
-    "Claude",
-    "Gemini",
-    "Opencode",
-    "Continue",
-    "Copilot",
-    "Mammouth",
-    "Codex",
-    "ZCode",
-    "KimiCode",
-]
 
 
 def _load_provider_config() -> dict:

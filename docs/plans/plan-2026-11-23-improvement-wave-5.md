@@ -401,8 +401,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 37: #1240 Provider-Enumeration zentralisieren (developer, M)
 **Files:** Modify `tests/conftest.py`, `tests/test_context_budgets.py` und weitere per Grep (`("Claude", "Gemini"`, `_PROVIDERS =`) gefundene Tests (<= 8 Dateien; sonst Swap/Split nach Test-Verzeichnis).
 **Interfaces:** Produces `ALL_PROVIDERS` (Konstante/Fixture aus Registry via C3-Loader); leere Registry -> laut fehlschlagen; Consumes Task 36.
-- [ ] Step 1: Collect-Count vorher notieren; Test (fail): leere Registry -> Fixture-Fehler. Step 2: umstellen. Step 3: Collect-Count gleich (AC-2); Grep hartkodierte Tupel = 0 ausser Zentraldatei; `--validate`; voller `pytest`.
-- [ ] Step 4: Commit `test: centralize provider enumeration in conftest`
+- [x] Step 1: Collect-Count vorher notieren; Test (fail): leere Registry -> Fixture-Fehler. Step 2: umstellen. Step 3: Collect-Count gleich (AC-2); Grep hartkodierte Tupel = 0 ausser Zentraldatei; `--validate`; voller `pytest`.
+- [x] Step 4: Commit `test: centralize provider enumeration in conftest`
 - AC: C4 AC-1, AC-2.
 
 ### Task 38: #1115 Re-Pin-Helfer `--profile compact` (developer, S)

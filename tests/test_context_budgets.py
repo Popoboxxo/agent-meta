@@ -33,7 +33,6 @@ from pathlib import Path
 from typing import Dict, List, Mapping, Sequence, Tuple
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -41,11 +40,17 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import context_report as cr  # noqa: E402
 from lib.providers import load_provider_capabilities, load_providers_config  # noqa: E402
 from lib.tmp_paths import resolve_tmp_paths  # noqa: E402
+from tests.conftest import ALL_PROVIDERS  # noqa: E402
 from tests.test_ac01_render_identity import _make_project  # noqa: E402
 
 TOLERANCE_MIN_BYTES = 256
 TOLERANCE_RATIO = 0.02
 TOLERANCE_MAX_BYTES = 4096
+
+#: Compatibility export: the re-pin helper (``scripts/measure_context_repin.py``)
+#: imports ``_PROVIDERS`` from this module. It is an alias of the central
+#: registry constant (issue #1240), so helper and tests cannot drift apart.
+_PROVIDERS = ALL_PROVIDERS
 
 # Ist-values in bytes (data table). Matches Spec section 2 (Claude orchestrator
 # 90,691 B, CLAUDE.md ~2.5 KB, Claude rules 17.9-18.3 KB, AGENTS.md 25.6 KB / Gemini 33 KB).
@@ -345,17 +350,12 @@ def check_ceilings(report: Mapping[str, Mapping], ceilings: Mapping[str, Mapping
     return violations
 
 
-_PROVIDERS = sorted(
-    yaml.safe_load((REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
-)
-
-
 @pytest.fixture(scope="module")
 def measured(tmp_path_factory):
     root = tmp_path_factory.mktemp("budgets")
     mappings = cr.merge_provider_mappings(
         load_providers_config(REPO_ROOT, {}), load_provider_capabilities(REPO_ROOT))
-    projects = {p: _make_project(root, p) for p in _PROVIDERS}
+    projects = {p: _make_project(root, p) for p in ALL_PROVIDERS}
     return projects, mappings
 
 
@@ -367,7 +367,7 @@ def _measure(projects, mappings) -> dict:
 
 
 def test_ac07_every_registered_provider_has_ceilings():
-    assert sorted(FULL_BUDGET_CEILINGS) == _PROVIDERS
+    assert tuple(sorted(FULL_BUDGET_CEILINGS)) == ALL_PROVIDERS
 
 
 def test_ac07_full_profile_within_ceilings(measured):
@@ -378,7 +378,7 @@ def test_ac07_full_profile_within_ceilings(measured):
 def test_ac07_inflated_artifact_exceeds_ceiling(measured):
     """Meta-test: really growing a rendered artifact makes the check fail."""
     projects, mappings = measured
-    provider = _PROVIDERS[0]
+    provider = ALL_PROVIDERS[0]
     caps = mappings[provider]
     target = projects[provider] / caps["agents_dir"] / ("orchestrator" + (caps.get("agent_ext") or ".md"))
     original = target.read_bytes()
@@ -634,8 +634,14 @@ COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
 }
 
 # The AGENTS.md providers share one context file; measured in a single project
-# with all of them active (`compact`).
-_AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "ZCode")
+# with all of them active (`compact`). Derived from the registry by the declared
+# ``context_file`` (issue #1240): a provider that moves to AGENTS.md joins the
+# shared-file measurement automatically, no list to maintain here.
+_AGENTS_MD_CONTEXT_PROVIDERS = tuple(
+    provider
+    for provider in ALL_PROVIDERS
+    if (load_providers_config(REPO_ROOT, {}).get(provider) or {}).get("context_file") == "AGENTS.md"
+)
 # MERGE RE-PIN (2026-10-26): measured 12,193 B on the merged tree; the branch value
 # already carried #1015 + fix A, and #1013's evidence gates are role-body text that
 # does not enter this shared entry file. Main's 11,257 B predates the #1015 roles.
@@ -718,7 +724,7 @@ def measured_compact(tmp_path_factory):
     mappings = _matrix_mappings()
     report: dict = {}
     works: dict = {}
-    for provider in _PROVIDERS:
+    for provider in ALL_PROVIDERS:
         config = _matrix_config(root, provider, [provider])
         work = root / (provider + "-work")
         paths = resolve_tmp_paths(root / provider, {})
@@ -732,11 +738,11 @@ def measured_compact(tmp_path_factory):
 def measured_compact_multi(tmp_path_factory):
     root = tmp_path_factory.mktemp("budgets-compact-multi")
     mappings = _matrix_mappings()
-    config = _matrix_config(root, "multi", _AGENTS_MD_PROVIDERS)
+    config = _matrix_config(root, "multi", _AGENTS_MD_CONTEXT_PROVIDERS)
     work = root / "work"
     paths = resolve_tmp_paths(root / "multi", {})
     cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact", paths=paths)
-    return cr.measure_artifacts(work, _AGENTS_MD_PROVIDERS, mappings)
+    return cr.measure_artifacts(work, _AGENTS_MD_CONTEXT_PROVIDERS, mappings)
 
 
 def test_compact_profile_within_ceilings(measured_compact):
@@ -747,7 +753,7 @@ def test_compact_profile_within_ceilings(measured_compact):
 def test_compact_inflated_artifact_exceeds_ceiling(measured_compact):
     """Meta-test: really growing a compact render makes the check fail."""
     _report, mappings, works = measured_compact
-    provider = _PROVIDERS[0]
+    provider = ALL_PROVIDERS[0]
     caps = mappings[provider]
     target = works[provider] / caps["agents_dir"] / (
         "orchestrator" + (caps.get("agent_ext") or ".md"))
@@ -775,7 +781,7 @@ def test_compact_targets_are_labelled_estimates():
 def test_compact_target_check_flags_grown_artifact(measured_compact):
     """A value above its byte target trips the check; the exact target does not."""
     report, _mappings, _works = measured_compact
-    provider = _PROVIDERS[0]
+    provider = ALL_PROVIDERS[0]
     stat = report[provider]["orchestrator"]
     tight = (f"{provider} orchestrator", stat["bytes"] - 1, "bytes", "pin")
     exact = (f"{provider} orchestrator", stat["bytes"], "bytes", "pin")
@@ -820,5 +826,7 @@ def test_compact_multi_provider_entry_file_below_hard_cap(measured_compact_multi
     assert entry["bytes"] < 32768
     assert entry["bytes"] <= _ceiling(_IST_COMPACT_MULTI_AGENTS_MD)
     # all AGENTS.md providers read the same shared file
-    assert {measured_compact_multi[p]["entry-file"]["bytes"] for p in _AGENTS_MD_PROVIDERS} == {
-        entry["bytes"]}
+    shared = {
+        measured_compact_multi[p]["entry-file"]["bytes"] for p in _AGENTS_MD_CONTEXT_PROVIDERS
+    }
+    assert shared == {entry["bytes"]}
