@@ -358,7 +358,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 
 ### Task 32: Rebaseline #1263 + Rebase auf main (developer, git)
 - [x] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1263: mcp deny list"`; `--validate`; Commit: `chore: rebaseline settings and rule hashes for mcp deny (#1263)`
-- [ ] `git` rebased auf `main` (Cluster-B-Ende); Konflikte -> Rebaseline neu. BAC-5-Grep-Nachweis (`# provider:` in `hooks/` = 0).
+- [x] `git` rebased auf `main` (Cluster-B-Ende); Konflikte -> Rebaseline neu. BAC-5-Grep-Nachweis (`# provider:` in `hooks/` = 0).
 
 ---
 
