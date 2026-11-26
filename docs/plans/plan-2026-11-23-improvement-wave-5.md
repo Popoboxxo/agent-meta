@@ -408,8 +408,8 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 38: #1115 Re-Pin-Helfer `--profile compact` (developer, S)
 **Files:** Modify `scripts/measure_context_repin.py`, `.claude/skills/conventions/SKILL.md`; Test: Modify `tests/test_context_repin_helper.py`.
 **Interfaces:** `--profile {full,compact}` (Default `full`); `compact` druckt Block gegen `_IST_COMPACT` (`tests/test_context_budgets.py:609`); Idempotenz: zweiter Lauf -> kein Block, exit 0; `TOLERANCE_MAX_BYTES = 4096` unverändert.
-- [ ] Step 1: Tests (fail): AC-1 (exit 1 bei Abweichung, sonst 0/leer), AC-3 (Skill nennt Befehl wörtlich). Step 2: implementieren. Step 3: `pytest tests/test_context_repin_helper.py tests/test_context_budgets.py`; `--validate`.
-- [ ] Step 4: Commit `feat: support compact profile in context repin helper`
+- [x] Step 1: Tests (fail): AC-1 (exit 1 bei Abweichung, sonst 0/leer), AC-3 (Skill nennt Befehl wörtlich). Step 2: implementieren. Step 3: `pytest tests/test_context_repin_helper.py tests/test_context_budgets.py`; `--validate`.
+- [x] Step 4: Commit `feat: support compact profile in context repin helper`
 - AC: C5 AC-1..AC-3.
 
 ---
