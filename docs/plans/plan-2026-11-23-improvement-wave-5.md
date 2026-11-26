@@ -357,7 +357,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 **Umsetzung:** `sync_mcp_deny` schreibt für Provider mit verifiziertem `hook_protocol` OHNE `supports-permission-deny`-Capability ein Manifest `<hooks_dir>/lib/mcp-deny.json` (gleiche Quelle `build_mcp_deny_rules`, Provenance-Marker, Stale-Cleanup; Provider mit Capability behalten `permissions.deny`, ein managed Hook-Manifest wird dort entfernt). `hook_common.sh` 1.13.0 liest es über `hook_mcp_tool_denied` im `mcp__<server>__<tool>`-Zweig von `hook_known_tool_name` (gemeinsamer Checkpoint beider fail-closed Guards → Exit 2); exakter Quoted-Match, fehlendes/leeres Manifest = dokumentiertes fail-open (Convention boundary), kein Python, keine Provider-Namenslogik. Realer Hook-Lauf gegen `repo-containment.sh` mit Payload: Exit 2 + MCP_GUARD-Meldung auf stderr.
 
 ### Task 32: Rebaseline #1263 + Rebase auf main (developer, git)
-- [ ] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1263: mcp deny list"`; `--validate`; Commit: `chore: rebaseline settings and rule hashes for mcp deny (#1263)`
+- [x] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1263: mcp deny list"`; `--validate`; Commit: `chore: rebaseline settings and rule hashes for mcp deny (#1263)`
 - [ ] `git` rebased auf `main` (Cluster-B-Ende); Konflikte -> Rebaseline neu. BAC-5-Grep-Nachweis (`# provider:` in `hooks/` = 0).
 
 ---

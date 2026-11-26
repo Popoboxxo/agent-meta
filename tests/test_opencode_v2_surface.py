@@ -5576,7 +5576,7 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # recomputed from the rebaselined fixture bytes with `_fixture_tree_sha256`. No assertion or
 # whitelist weakened; re-pin records intended output.
 _FIXTURE_TREES = {
-    "ac01-baseline": "ead73de0571035898411d9ea83a228517b98257b22f76fbf4aee3e01ef684da9",
+    "ac01-baseline": "8994ef4038fa91f33c570b1d297f352d8e8a306a7b1e9b35b6bb61675112b6b7",
     "slimming-golden": "09fadca4ca14f5bf5493531907cb23008e083cf56b5a984ddf87d445f22705a8",
     "compact-golden": "8b6efb0b4d0984b604a97cdd0c228b6fdb8e8d7654b8c88cbdcb2be4ae219dad",
 }
