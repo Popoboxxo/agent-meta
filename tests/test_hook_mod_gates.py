@@ -46,7 +46,7 @@ _INLINE_PY_ALLOWLIST = {
         "Outside the #1238 hook-extraction scope; this is the existing thin "
         "bridge that imports lib.auto_github_release.main.",
     ),
-    "repo-containment-impl.sh:319": (
+    "repo-containment-impl.sh:335": (
         '"$_PY" -c',
         "Trivial one-line os.path.realpath bridge with no control flow; "
         "extracting it would add a module dependency to the security hot path.",
