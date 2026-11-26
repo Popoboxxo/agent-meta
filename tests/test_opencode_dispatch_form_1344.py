@@ -11,7 +11,8 @@ Regression contract (data-driven, provider-agnostic):
 * the wrong vocabulary lives in ``config/delegation-syntax.yaml`` and
   ``config/provider-capabilities.yaml`` — this test fails when it is reintroduced;
 * every generic-template text change is gated by a PAL key that is truthy only
-  for Opencode, so all other providers keep their 41dd69ac bytes;
+  for Opencode, so all other providers keep their 41dd69ac bytes — with the one
+  intentional exception of #1255 (see ``_neutralize_extension_hook_lines``);
 * no generated provider output is written — rendering happens in ``tmp_path``.
 
 Run: python3 -m pytest tests/test_opencode_dispatch_form_1344.py -q
@@ -234,23 +235,108 @@ def _neutralize_version_metadata(rendered: str) -> str:
     )
 
 
+#: The Extension-Hook line as emitted by the 1-generic templates. #1255 replaced
+#: the unconditional `strip-claude-lines` flag with the `extension_hook_path`
+#: capability: a provider that owns this path (Claude) now *keeps* the line,
+#: every other provider still drops it. ``BASELINE`` (41dd69ac) predates #1255,
+#: so for Claude the baseline render lacks a line the current render keeps.
+_EXTENSION_HOOK_PREFIX = "> **Extension:**"
+_EXTENSION_HOOK_PATH = ".claude/3-project/"
+
+
+def _neutralize_extension_hook_lines(rendered: str) -> str:
+    """Drop exactly the #1255 Extension-Hook delta on both comparison sides.
+
+    Mirrors the production transform (``_strip_extension_hook_lines`` in
+    ``scripts/lib/provider_transform.py``: line-based removal of
+    ``> **Extension:** ... .claude/3-project/ ...``) *and* the subsequent
+    ``_reassemble_body`` splices that lstrip the post-frontmatter body. Both
+    halves are required: without the seam normalization the removed line leaves
+    its surrounding blank lines behind.
+
+    The neutralization is only applied to a side that actually carries such a
+    line; everything else — dispatch vocabulary, syntax examples, prose — stays
+    byte-exact, which
+    ``test_neutralizer_does_not_mask_dispatch_bytes`` pins down.
+    """
+    kept: list[str] = []
+    removed = 0
+    for line in rendered.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith(_EXTENSION_HOOK_PREFIX) and _EXTENSION_HOOK_PATH in stripped:
+            removed += 1
+            continue
+        kept.append(line)
+    if not removed:
+        return rendered
+
+    text = "".join(kept)
+    fm_end = text.find("\n---", 3) if text.startswith("---") else -1
+    if fm_end == -1:
+        return text
+    body_start = fm_end + 4
+    body = text[body_start:]
+    if body.startswith("\n"):
+        text = text[:body_start] + "\n" + body.lstrip("\n")
+    return text
+
+
+def _normalize(rendered: str) -> str:
+    """Apply both release-volatile normalizations used by the byte contract."""
+    return _neutralize_extension_hook_lines(_neutralize_version_metadata(rendered))
+
+
 @pytest.mark.parametrize("provider", _NON_OPENCODE_PROVIDERS)
 def test_other_provider_render_byte_identical_to_baseline(
     provider: str, tmp_path: Path, baseline_root: Path
 ):
     """AC-6: the PAL gate is absent for other providers, so their rendered
     orchestrator is byte-for-byte the 41dd69ac artifact (not just config data),
-    except for the two coordinated version-metadata values."""
+    except for the two coordinated version-metadata values and the #1255
+    Extension-Hook capability delta."""
     now = _render_orchestrator(provider, tmp_path / "now", REPO_ROOT)
     base = _render_orchestrator(provider, tmp_path / "base", baseline_root)
-    assert _neutralize_version_metadata(now) == _neutralize_version_metadata(base)
+    assert _normalize(now) == _normalize(base)
 
 
 def test_baseline_other_providers_used_stale_form(baseline_root: Path, tmp_path: Path):
     """Guard the guard: the baseline really did carry the old form elsewhere."""
     base = _render_orchestrator("Claude", tmp_path / "claude-base", baseline_root)
     now = _render_orchestrator("Claude", tmp_path / "claude-now", REPO_ROOT)
-    assert _neutralize_version_metadata(base) == _neutralize_version_metadata(now)
+    assert _normalize(base) == _normalize(now)
+
+
+def test_neutralizer_only_drops_extension_hook_lines():
+    """Negative probe: nothing but the #1255 hook line may be neutralized."""
+    sample = (
+        "---\nname: probe\n---\n"
+        "\n"
+        "> **Extension:** If `.claude/3-project/probe-ext.md` exists → read it.\n"
+        "\n"
+        "> **Note:** keep me verbatim\n"
+        "dispatch: `task(subagent_type=\"orchestrator\")`\n"
+    )
+    assert _neutralize_extension_hook_lines(sample) == (
+        "---\nname: probe\n---\n"
+        "> **Note:** keep me verbatim\n"
+        "dispatch: `task(subagent_type=\"orchestrator\")`\n"
+    )
+
+    # A hook line for another provider's project directory is not the #1255 delta.
+    foreign = "> **Extension:** see `.gemini/3-project/probe-ext.md`\n"
+    assert _neutralize_extension_hook_lines(foreign) == foreign
+
+    # No hook line at all -> identity, so unrelated blank lines stay exact.
+    plain = "---\nname: probe\n---\n\n\nbody\n"
+    assert _neutralize_extension_hook_lines(plain) == plain
+
+
+def test_neutralizer_does_not_mask_dispatch_bytes(baseline_root: Path, tmp_path: Path):
+    """The neutralizer must not hide a dispatch-vocabulary regression."""
+    base = _normalize(_render_orchestrator("Claude", tmp_path / "b", baseline_root))
+    now = _normalize(_render_orchestrator("Claude", tmp_path / "n", REPO_ROOT))
+    assert now == base
+    assert now.replace("background(agent=", "subagent(agent=") != base
 
 
 def test_non_opencode_render_keeps_legacy_dispatch_vocabulary(tmp_path):
