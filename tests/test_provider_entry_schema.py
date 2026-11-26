@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import config, providers  # noqa: E402
+from lib.context_report import merge_provider_mappings  # noqa: E402
 
 _SCHEMA_PATH = REPO_ROOT / "schemas" / "provider-entry.schema.json"
 _REGISTRY_PATH = REPO_ROOT / "config" / "ai-providers.yaml"
@@ -226,3 +227,107 @@ def test_missing_schema_is_optional(tmp_path, monkeypatch):
 def test_existing_validate_contract_unchanged():
     """The repo registry passes the same gate the CLI runs (exit 0 path)."""
     assert providers.validate_provider_registry(REPO_ROOT) == []
+
+
+# --- AC-3: merging the two capability sources (Q6) --------------------------
+#
+# ``config/ai-providers.yaml`` is the leading capability source (Q6). The
+# secondary ``config/provider-capabilities.yaml`` only *adds* keys; a key that
+# both sources declare with different values is a hard error naming both
+# locations — never a silent override in either direction.
+
+
+def test_merge_takes_capability_keys_from_secondary_source():
+    provider_config = {
+        "providers": {"Acme": {"agents_dir": ".acme/agents", "context_file": "ACME.md"}}
+    }
+    capabilities = {"Acme": {"commands": True, "runtime_gate": "hook"}}
+    merged = merge_provider_mappings(provider_config, capabilities)
+    assert merged["Acme"] == {
+        "agents_dir": ".acme/agents",
+        "context_file": "ACME.md",
+        "commands": True,
+        "runtime_gate": "hook",
+    }
+
+
+def test_merge_identical_value_in_both_sources_is_not_a_conflict():
+    provider_config = {"providers": {"Acme": {"agents_dir": ".acme/agents", "has_hooks": True}}}
+    capabilities = {"Acme": {"has_hooks": True}}
+    merged = merge_provider_mappings(provider_config, capabilities)
+    assert merged["Acme"]["has_hooks"] is True
+
+
+def test_merge_conflict_names_both_sources_and_values():
+    provider_config = {"providers": {"Acme": {"agents_dir": ".acme/agents", "has_hooks": True}}}
+    capabilities = {"Acme": {"has_hooks": False}}
+
+    with pytest.raises(providers.ProviderSourceConflict) as exc:
+        merge_provider_mappings(provider_config, capabilities)
+
+    assert isinstance(exc.value, providers.SyncError)
+    message = str(exc.value)
+    # Provider + key
+    assert "'Acme'" in message and "'has_hooks'" in message
+    # Leading source: file, YAML path, value
+    assert "config/ai-providers.yaml" in message
+    assert "providers.Acme.has_hooks" in message
+    assert "True" in message
+    # Secondary source: file, YAML path, value
+    assert "config/provider-capabilities.yaml" in message
+    assert "capabilities.Acme.has_hooks" in message
+    assert "False" in message
+
+
+def test_merge_conflict_reports_every_offending_key():
+    provider_config = {
+        "providers": {"Acme": {"agents_dir": ".acme/agents", "has_hooks": True, "has_rules": True}}
+    }
+    capabilities = {"Acme": {"has_hooks": False, "has_rules": False}}
+
+    with pytest.raises(providers.ProviderSourceConflict) as exc:
+        merge_provider_mappings(provider_config, capabilities)
+
+    message = str(exc.value)
+    assert "'has_hooks'" in message and "'has_rules'" in message
+
+
+def test_shipped_registries_merge_without_conflict():
+    """The Ist-Katalog is conflict-free: the merge is a pure union today."""
+    provider_config = providers.load_providers_config(REPO_ROOT)
+    capabilities = providers.load_provider_capabilities(REPO_ROOT)
+    merged = merge_provider_mappings(provider_config, capabilities)
+    assert set(merged) == set(provider_config)
+    for name, merged_entry in merged.items():
+        for key, value in provider_config[name].items():
+            assert merged_entry[key] == value, (name, key)
+
+
+def _conflicting_framework_root(tmp_path: Path) -> Path:
+    """Framework root whose two capability sources disagree about ``has_hooks``."""
+    (tmp_path / "schemas").mkdir()
+    shutil.copy(_SCHEMA_PATH, tmp_path / "schemas" / _SCHEMA_PATH.name)
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "ai-providers.yaml").write_text(
+        "providers:\n  Acme:\n    agents_dir: .acme/agents\n"
+        "    context_file: ACME.md\n    has_hooks: true\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "provider-capabilities.yaml").write_text(
+        "capabilities:\n  Acme:\n    has_hooks: false\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_validate_reports_cross_source_conflict(tmp_path, monkeypatch, capsys):
+    """AC-3 at CLI level: --validate exits 1 and names both source files."""
+    root = _conflicting_framework_root(tmp_path)
+    monkeypatch.setattr(config, "_framework_root", lambda: root)
+    with pytest.raises(SystemExit) as exc:
+        config._validate_provider_registry(tmp_path / ".meta-config" / "project.yaml")
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "Acme" in err and "has_hooks" in err
+    assert "config/ai-providers.yaml" in err
+    assert "config/provider-capabilities.yaml" in err

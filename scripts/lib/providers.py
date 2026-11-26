@@ -5,7 +5,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 
 from .frontmatter import REFERENCE_STANDARDS_FIELD
 from .io import (
@@ -21,7 +21,23 @@ _logger = logging.getLogger(__name__)
 PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
 _PROVIDERS_CONFIG_JSON = "providers.config.json"
-PROVIDER_CAPABILITIES_YAML = "config/provider-capabilities.yaml"  # legacy fallback
+PROVIDER_CAPABILITIES_YAML = "config/provider-capabilities.yaml"  # secondary source
+
+#: Provider-map section key of each capability source document. The loaders
+#: unwrap them already; the conflict/merge helpers accept both shapes (raw
+#: document and unwrapped map) so tests and callers can pass either.
+PROVIDERS_SECTION = "providers"
+CAPABILITIES_SECTION = "capabilities"
+
+
+class ProviderSourceConflict(SyncError):
+    """Both capability sources declare the same provider key differently (Q6).
+
+    ``config/ai-providers.yaml`` is the leading source; a differing duplicate
+    in ``config/provider-capabilities.yaml`` is a configuration error naming
+    both file locations, never a silent override in either direction.
+    """
+
 
 #: JSON Schema of one provider registry entry (issue #1239 / C3).
 #: Validated by ``config._validate_provider_registry`` on every ``load_config``
@@ -439,6 +455,10 @@ def load_providers_config(
 def load_provider_capabilities(agent_meta_root: Path) -> dict:
     """Load the `capabilities:` block of config/provider-capabilities.yaml.
 
+    Secondary capability source (Q6): it only *adds* keys to the entries of
+    ``config/ai-providers.yaml`` (see :func:`merge_capability_sources`); a key
+    both sources declare with different values is a conflict, not an override.
+
     Framework config; a missing or malformed file yields ``{}`` (optional-file
     semantics — callers fall back to ai-providers.yaml).
 
@@ -456,6 +476,89 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
         return {}
     caps = data.get("capabilities", {})
     return caps if isinstance(caps, dict) else {}
+
+
+def _mapping_section(document: object, section: str) -> Mapping:
+    """Provider map of a registry document (``<section>:`` wrapper or bare map)."""
+    if not isinstance(document, Mapping):
+        return {}
+    nested = document.get(section)
+    if isinstance(nested, Mapping):
+        return nested
+    return document
+
+
+def _provider_source_conflict(provider: object, key: str, leading: object,
+                              secondary: object) -> str:
+    """Conflict message naming both file locations, both YAML paths and both values."""
+    return (
+        f"provider {provider!r}: key {key!r} conflicts between sources — "
+        f"{PROVIDERS_CONFIG_YAML} {PROVIDERS_SECTION}.{provider}.{key}={leading!r} "
+        f"(leading source, Q6) vs {PROVIDER_CAPABILITIES_YAML} "
+        f"{CAPABILITIES_SECTION}.{provider}.{key}={secondary!r}"
+    )
+
+
+def provider_source_conflicts(
+    provider_config: Mapping, capabilities: Mapping
+) -> list[str]:
+    """Messages for every key the two capability sources declare differently.
+
+    ``config/ai-providers.yaml`` is the leading capability source (Q6); the
+    capability matrix may only *add* keys. A key present in both with identical
+    values is not a conflict (the merge is a no-op). Providers declared only in
+    the capability matrix, and non-mapping entries, are skipped — they have no
+    pair of locations to compare. Deterministic order (provider, then key).
+    """
+    leading = _mapping_section(provider_config, PROVIDERS_SECTION)
+    secondary = _mapping_section(capabilities, CAPABILITIES_SECTION)
+    messages: list[str] = []
+    for provider in sorted(leading, key=str):
+        entry = leading[provider]
+        caps = secondary.get(provider)
+        if not isinstance(entry, Mapping) or not isinstance(caps, Mapping):
+            continue
+        for key in sorted(caps, key=str):
+            if key in entry and entry[key] != caps[key]:
+                messages.append(
+                    _provider_source_conflict(provider, str(key), entry[key], caps[key])
+                )
+    return messages
+
+
+def merge_capability_sources(provider_config: Mapping, capabilities: Mapping) -> dict:
+    """Merge the two capability sources, ``ai-providers.yaml`` leading (Q6).
+
+    Every ``config/ai-providers.yaml`` value is copied verbatim and is never
+    overridden; a ``config/provider-capabilities.yaml`` key is added only where
+    the registry entry has no value yet. A differing duplicate raises
+    :class:`ProviderSourceConflict` naming both file locations — the check runs
+    before the merge, so a conflict never yields a partial result and is never
+    resolved silently in either direction.
+
+    Fail-safe on shape only: a non-mapping document, entry or capability block
+    is skipped (mirrors the previous merge behaviour); missing files are the
+    loaders' business (they return ``{}``).
+    """
+    conflicts = provider_source_conflicts(provider_config, capabilities)
+    if conflicts:
+        header = "provider capability sources conflict ({} conflict(s))".format(
+            len(conflicts))
+        raise ProviderSourceConflict(header + ":\n  " + "\n  ".join(conflicts))
+
+    leading = _mapping_section(provider_config, PROVIDERS_SECTION)
+    secondary = _mapping_section(capabilities, CAPABILITIES_SECTION)
+    merged: dict = {}
+    for provider, entry in leading.items():
+        if not isinstance(entry, Mapping):
+            continue
+        combined = dict(entry)
+        caps = secondary.get(provider)
+        if isinstance(caps, Mapping):
+            for key, value in caps.items():
+                combined.setdefault(key, value)
+        merged[provider] = combined
+    return merged
 
 
 def load_provider_entry_schema(agent_meta_root: Path) -> dict:
@@ -695,10 +798,13 @@ def validate_provider_registry(
     Optional-file semantics: a missing schema file or an empty/absent registry
     returns ``[]`` — never raises. *document* lets tests (and future callers)
     inject a registry instead of reading the framework file.
+
+    Also reports cross-source conflicts (AC-3, Q6): a provider key that
+    ``config/provider-capabilities.yaml`` declares with a different value than
+    the leading ``config/ai-providers.yaml`` is a violation naming both file
+    locations, so ``--validate`` exits 1 instead of a silent override. This
+    check is independent of the schema file and of ``jsonschema``.
     """
-    schema = load_provider_entry_schema(agent_meta_root)
-    if not schema:
-        return []
     if document is None:
         data, _ = _load_yaml_or_json(
             Path(agent_meta_root) / PROVIDERS_CONFIG_YAML,
@@ -713,13 +819,20 @@ def validate_provider_registry(
     if not isinstance(providers, dict):
         return []
 
+    messages = provider_source_conflicts(
+        providers, load_provider_capabilities(Path(agent_meta_root)))
+
+    schema = load_provider_entry_schema(agent_meta_root)
+    if not schema:
+        return sorted(messages)
+
     if _JSONSCHEMA_AVAILABLE:
         validator = _jsonschema.Draft7Validator(schema)
-        messages = _jsonschema_error_messages(
+        messages.extend(_jsonschema_error_messages(
             sorted(validator.iter_errors(providers), key=lambda e: list(e.path)),
-        )
+        ))
     else:
-        messages = _fallback_validate_registry(providers, schema)
+        messages.extend(_fallback_validate_registry(providers, schema))
     return sorted(messages)
 
 
