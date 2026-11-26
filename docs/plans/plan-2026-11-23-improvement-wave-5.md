@@ -351,9 +351,10 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 31: #1263b Hook-Fallback-Check (senior-developer, S)
 **Files:** Modify `hooks/1-generic/lib/hook_common.sh` (+ evtl. Modul aus T23), `scripts/lib/mcp_deny.py`; Test: Modify `tests/test_hook_common_lib.py`.
 **Interfaces:** Provider ohne `permissions.deny`-Capability: Hook blockt verbotenen Tool-Aufruf (Block-Pfad, nicht neue Provider-Namenslogik).
-- [ ] Step 1: Test (fail): AC-3 (Aufruf eines verbotenen Tools geblockt). Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_hook_common_lib.py tests/test_mcp_deny.py`.
-- [ ] Step 4: Commit `feat: block denied mcp tools in hook fallback path`
+- [x] Step 1: Test (fail): AC-3 (Aufruf eines verbotenen Tools geblockt). Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_hook_common_lib.py tests/test_mcp_deny.py`.
+- [x] Step 4: Commit `feat: block denied mcp tools in hook fallback path` — nicht ausgeführt (Auftrag T31: kein Commit); Commit-Freigabe im finalen Report.
 - Hinweis PR (R3): Deny-Semantik wirkt erst nach Sync/Neustart.
+**Umsetzung:** `sync_mcp_deny` schreibt für Provider mit verifiziertem `hook_protocol` OHNE `supports-permission-deny`-Capability ein Manifest `<hooks_dir>/lib/mcp-deny.json` (gleiche Quelle `build_mcp_deny_rules`, Provenance-Marker, Stale-Cleanup; Provider mit Capability behalten `permissions.deny`, ein managed Hook-Manifest wird dort entfernt). `hook_common.sh` 1.13.0 liest es über `hook_mcp_tool_denied` im `mcp__<server>__<tool>`-Zweig von `hook_known_tool_name` (gemeinsamer Checkpoint beider fail-closed Guards → Exit 2); exakter Quoted-Match, fehlendes/leeres Manifest = dokumentiertes fail-open (Convention boundary), kein Python, keine Provider-Namenslogik. Realer Hook-Lauf gegen `repo-containment.sh` mit Payload: Exit 2 + MCP_GUARD-Meldung auf stderr.
 
 ### Task 32: Rebaseline #1263 + Rebase auf main (developer, git)
 - [ ] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1263: mcp deny list"`; `--validate`; Commit: `chore: rebaseline settings and rule hashes for mcp deny (#1263)`

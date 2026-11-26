@@ -1,8 +1,8 @@
 #!/bin/bash
 # lib: hook_common
-# version: 1.12.0
+# version: 1.13.0
 # description: Shared helper functions sourced by other hook scripts (issue #601 dedup)
-# changelog: v1.12.0: issue #1238a -- move the three executable Python heredocs into flat hook_shell_scan.py, hook_shell_resolver.py and hook_push_arg_parser.py modules; shell emitters keep byte-identical source output and fail closed when Python or a deployed module is unavailable; v1.11.0: issue #1251 -- expose and export exactly AM_PROJECT_DIR as the adapter-owned project anchor; no root resolution or provider-specific fallback in this library; v1.10.0: issues #1169/#1238 -- hook_json_get_many reads several payload fields in ONE interpreter start via the importable hook_json_many.py module (NUL-terminated fields + `ok` trailer; parse errors and NUL in a requested value fail the whole call); v1.9.0: issue #1151 (audit G1) -- hook_known_tool_name matches the documented tools table (adds EndConversation, ListAgents, ListMcpResourcesTool, LSP, PowerShell, ReadMcpResourceTool, ReportFindings, SendFeedback, ShareOnboardingGuide, WaitForMcpServers, Workflow; F6-02); hook_shell_scan_py emits the body of every $(...)/backtick substitution outside single quotes -- double-quoted ones included -- as extra statements (command_substitutions, nesting capped at 32 and failing closed beyond, F6-03) and offers split_shell_statements_with_ops (the operator that ended each statement, for cd tracking, F6-07); v1.8.1: hook_known_tool_name also knows SubagentHandback (subagent report channel; blocking it lost every subagent result); v1.8.0: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData) — the closed allow-list blocked the whole task/cron/artifact surface, #1078; EnterWorktree/ExitWorktree stay blocked on purpose; v1.7.0: hook_shell_scan_py — is_fork_bomb ends a function body at the depth-matching '}' inside the 512-character window instead of the first unquoted one, so bombs with a brace or ${...} before the self-call are detected (#1050); an exhausted window still fails closed; v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
+# changelog: v1.13.0: issue #1263b -- hook fallback for providers without the native `supports-permission-deny` capability: hook_mcp_tool_denied consults the synced <lib>/mcp-deny.json deny manifest (same source as permissions.deny) and the mcp__<server>__<tool> branch of hook_known_tool_name refuses a listed tool with a clear stderr reason, so the two fail-closed guards block it with exit 2; missing/empty manifest fails open (convention boundary), no python required and no provider name consulted; v1.12.0: issue #1238a -- move the three executable Python heredocs into flat hook_shell_scan.py, hook_shell_resolver.py and hook_push_arg_parser.py modules; shell emitters keep byte-identical source output and fail closed when Python or a deployed module is unavailable; v1.11.0: issue #1251 -- expose and export exactly AM_PROJECT_DIR as the adapter-owned project anchor; no root resolution or provider-specific fallback in this library; v1.10.0: issues #1169/#1238 -- hook_json_get_many reads several payload fields in ONE interpreter start via the importable hook_json_many.py module (NUL-terminated fields + `ok` trailer; parse errors and NUL in a requested value fail the whole call); v1.9.0: issue #1151 (audit G1) -- hook_known_tool_name matches the documented tools table (adds EndConversation, ListAgents, ListMcpResourcesTool, LSP, PowerShell, ReadMcpResourceTool, ReportFindings, SendFeedback, ShareOnboardingGuide, WaitForMcpServers, Workflow; F6-02); hook_shell_scan_py emits the body of every $(...)/backtick substitution outside single quotes -- double-quoted ones included -- as extra statements (command_substitutions, nesting capped at 32 and failing closed beyond, F6-03) and offers split_shell_statements_with_ops (the operator that ended each statement, for cd tracking, F6-07); v1.8.1: hook_known_tool_name also knows SubagentHandback (subagent report channel; blocking it lost every subagent result); v1.8.0: hook_known_tool_name also knows ToolSearch and the other current built-ins (ToolSearch, TaskCreate, TaskUpdate, TaskList, TaskGet, Monitor, ScheduleWakeup, CronCreate, CronDelete, CronList, EnterPlanMode, PushNotification, RemoteTrigger, SendUserFile, Artifact, ArtifactComments, ArtifactData) — the closed allow-list blocked the whole task/cron/artifact surface, #1078; EnterWorktree/ExitWorktree stay blocked on purpose; v1.7.0: hook_shell_scan_py — is_fork_bomb ends a function body at the depth-matching '}' inside the 512-character window instead of the first unquoted one, so bombs with a brace or ${...} before the self-call are detected (#1050); an exhausted window still fails closed; v1.6.0: hook_known_tool_name knows Agent, SendMessage and the other current built-ins (Agent replaced Task, so the closed allow-list blocked all delegation); EnterWorktree/ExitWorktree stay blocked on purpose (no-worktree-isolation); v1.5.0: hook_shell_scan_py — the fork-bomb detector reads a function name exactly at any length (the 64-character cap is gone; the reverse scans of two '()' pairs cannot overlap, so it stays linear) and fails closed when a body has no unquoted '}' in its first 512 characters, blocking the candidate instead of skipping it (deliberate false-alarm class: long inline function bodies); the body still ends at the first unquoted '}' without brace nesting — known gap, documented in `rules/1-generic/branch-guard.md` (#943 follow-up); v1.4.0: hook_shell_resolver_py — one command-word resolver (wrapper grammar with positional arity, transparent '--', `case … in` arms, function bodies, subshells/groups, leading keywords) shared by the fail-closed guards instead of a per-hook copy; repo-containment-impl.sh uses it so its write-target detector resolves the same command word orchestrator-guard-impl.sh does (its inline copy is unchanged here, see the emitter's adoption note); v1.3.1: hook_shell_scan_py now keeps its quote state in sync for ANSI-C ($'...') and locale ($"...") quoting (review finding F1), stops tracking a heredoc delimiter it cannot resolve so the body is over-scanned instead of hiding the rest of the command (F2, deliberate divergence from bash: bash does not expand the delimiter either, but an unknown delimiter must not license skipping input), and cuts a trailing '#' comment from the cleaned code as well as from the statement stream (F4); v1.3.0: hook_shell_scan_py — one quote/heredoc-aware shell statement splitter plus the linear-time fork-bomb detector, shared by both fail-closed guards (#943 (a)/(c)/(j), #944 SR-B-16); hook_is_meta_submodule_dir — the project-root walk-ups skip a nested .agent-meta checkout's own .meta-config/ when an enclosing project has one (#943 (l)); v1.2.0: hook_known_tool_name is the single allow-list both fail-closed guards use before classifying a payload — an empty, non-string or unrecognized tool_name now blocks instead of falling through their `*) exit 0` allow branch (review finding M2, #954 follow-up), and the header names the three guards that source this lib and verify the interpreter; v1.1.0: hook_protected_branches + hook_push_arg_parser_py — the protected-branch set and the git-push flag/short-cluster walk of dod-push-check.sh live here once instead of being built twice (#949), hook_json_usable detects an interpreter that exits 0 with garbage, exits non-zero or is missing — the probe sentinel now lives in the payload and its fallback default is distinct, so a failing interpreter can no longer look usable (#954); v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
 #
 # NOT a hook itself — no `event`/`matcher` header, sync.py never registers it
 # in settings.json. Deployed verbatim to <hooks_dir>/lib/hook_common.sh
@@ -158,6 +158,49 @@ hook_json_usable() {
         '__hook_json_probe__' 'hook-json-bad')" = "hook-json-ok" ]
 }
 
+# hook_mcp_deny_manifest_path
+# Prints the absolute path of the hook deny manifest. sync_mcp_deny() writes
+# it to <hooks_dir>/lib/mcp-deny.json, i.e. right next to this file, for
+# providers WITHOUT the native `supports-permission-deny` capability
+# (scripts/lib/mcp_deny.py, issue #1263b). Resolving it from this file's own
+# location keeps the lookup provider-agnostic: no project-root walk-up, no
+# provider name, no payload field.
+hook_mcp_deny_manifest_path() {
+  local module_dir
+  module_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  printf '%s/%s' "$module_dir" "mcp-deny.json"
+}
+
+# hook_mcp_tool_denied <tool_name>
+# Returns 0 (DENIED) when <tool_name> is listed in the synced deny manifest,
+# 1 otherwise. Both surfaces — native `permissions.deny` and this manifest —
+# are fed by lib/mcp_deny.py::build_mcp_deny_rules from ONE source
+# (config/plugin-catalog.yaml `tools.blocked`), so the hook is a transport,
+# never a second deny list.
+#
+# Match semantics: the EXACT quoted `mcp__<server>__<tool>` token, so
+# `mcp__srv__read` never matches `mcp__srv__read_secret`. Only the
+# `mcp__<server>__<tool>` namespace is looked at; built-ins are untouched.
+#
+# Fail-open by design (convention boundary, NOT a security boundary): a
+# missing, unreadable or empty manifest (no blocked tools) allows the call.
+# No python interpreter is required and no provider name is consulted. The
+# reason goes to stderr because only stderr reaches the model on exit 2.
+hook_mcp_tool_denied() {
+  local tool="${1:-}" manifest
+  case "$tool" in
+    mcp__?*__?*) ;;
+    *) return 1 ;;
+  esac
+  manifest="$(hook_mcp_deny_manifest_path)"
+  [ -r "$manifest" ] || return 1
+  grep -qF "\"$tool\"" "$manifest" 2>/dev/null || return 1
+  printf '%s\n' \
+    "MCP_GUARD: '$tool' is on the blocked MCP tool list (config/plugin-catalog.yaml tools.blocked, issue #1263)." \
+    "Call refused by the hook fallback for providers without native permission deny." >&2
+  return 0
+}
+
 # hook_known_tool_name <tool_name>
 # Returns 0 when <tool_name> is a tool name the framework's hook contract
 # knows, 1 for anything else (including the empty string). Single source of
@@ -182,7 +225,9 @@ hook_json_usable() {
 #     ArtifactData) and ToolSearch (#1078),
 #   * Claude Code's MCP namespace `mcp__<server>__<tool>`: open-ended by
 #     design and never classified as a write tool by either guard, so
-#     blocking it would break every MCP call without protecting anything.
+#     blocking it wholesale would break every MCP call without protecting
+#     anything. The single exception is a tool listed in the synced hook deny
+#     manifest (hook_mcp_tool_denied, issue #1263b).
 # Raw provider-native tool names (Antigravity's `write_to_file`,
 # `run_command`, ...) are deliberately NOT listed: hooks only ever see the
 # normalized Claude names because antigravity-json-adapter.sh translates
@@ -196,8 +241,16 @@ hook_json_usable() {
 # intended fail-closed direction, not an accident.
 hook_known_tool_name() {
   case "$1" in
-    # Claude Code's open-ended MCP namespace (mcp__server__tool).
-    mcp__?*__?*) return 0 ;;
+    # Claude Code's open-ended MCP namespace (mcp__server__tool). Normally a
+    # pass-through, but a tool listed in the synced hook deny manifest is
+    # refused here: this is the ONE checkpoint both fail-closed guards (and
+    # artifact-path-guard.sh) call for every PreToolUse payload, so the
+    # fallback needs no per-provider wiring. issue #1263b.
+    mcp__?*__?*)
+      if hook_mcp_tool_denied "$1"; then
+        return 1
+      fi
+      return 0 ;;
     # Claude Code built-ins. Write/Edit/Bash are intercepted by both guards;
     # the others pass through untouched, but must still be identifiable.
     # Agent is the delegation tool (it replaced Task, which stays listed for
