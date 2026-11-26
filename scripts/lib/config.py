@@ -98,6 +98,7 @@ from .providers import (
     provider_has_capability,
     registered_provider_names,
     resolve_providers,
+    validate_provider_registry,
 )
 from .reflection import (
     apply_project_overrides,
@@ -898,6 +899,12 @@ def _validate_config(config: dict, config_path: Path) -> None:
        'ai-provider'/'ai-providers'/'default-provider' names abort the sync
        instead of silently falling back to Claude (issue #732).
 
+    2b. Hard-fatal provider-entry schema check (_validate_provider_registry):
+       every entry of the framework's config/ai-providers.yaml must satisfy
+       schemas/provider-entry.schema.json; an unknown key, a type error or a
+       missing required field aborts with provider + field (issue #1239).
+       stdlib fallback when jsonschema is not installed — same message contract.
+
     3. Hard-fatal orchestrator topology checks
        (_validate_orchestrator_topology): unknown enum values and same-scope
        ``main-chat`` x topology contradictions abort the sync (stderr +
@@ -921,6 +928,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
     """
     _validate_model_inheritance(config, config_path)
     _validate_providers(config, config_path)
+    _validate_provider_registry(config_path)
     _validate_orchestrator_topology(config, config_path)
     _validate_repo_containment(config, config_path)
     _validate_artifact_locations(config, config_path, _framework_root())
@@ -1032,6 +1040,43 @@ def _validate_providers(config: dict, config_path: Path) -> None:
                 _reject(item, "ai-providers")
     elif isinstance(raw, str) and raw not in known:
         _reject(raw, "ai-providers")
+
+
+def _validate_provider_registry(config_path: Path) -> None:
+    """Hard-reject invalid provider registry entries (issue #1239 / C3).
+
+    Validates the framework's ``config/ai-providers.yaml`` against
+    ``schemas/provider-entry.schema.json``: a known-keys-only entry contract
+    (unknown key -> error), declared value types (type error -> error) and the
+    required identity fields. Every violation prints ``provider '<name>':
+    ... '<field>'`` and aborts with ``sys.exit(1)``, so ``sync.py --validate``
+    fails loudly instead of the sync silently reading a misspelled key.
+
+    ``jsonschema`` is optional: ``providers.validate_provider_registry`` has a
+    stdlib fallback with the same message contract, so this check runs in both
+    environments (unlike the warn-only project-config schema block below).
+    """
+    try:
+        errors = validate_provider_registry(_framework_root())
+    except (OSError, ValueError, SyncError):
+        # Optional-file semantics: an unreadable framework registry is not a
+        # project-config error (load_providers_config has its own guard).
+        return
+    if not errors:
+        return
+    print(
+        f"ERROR: {config_path}: invalid provider registry entry "
+        f"({len(errors)} violation(s)):",
+        file=sys.stderr,
+    )
+    for message in errors:
+        print(f"  {message}", file=sys.stderr)
+    print(
+        "  Fix: correct the field, or extend "
+        "schemas/provider-entry.schema.json when a new key is intended.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 #: Token replaced in ``TEST_COMMANDS``/``CODE_QUALITY_RULES`` (IC-05/AC-13).

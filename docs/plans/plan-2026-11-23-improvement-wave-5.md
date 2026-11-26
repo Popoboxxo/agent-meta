@@ -383,9 +383,11 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 35: #1239a Provider-Entry-Schema + Validate (senior-developer, M-Teil 1)
 **Files:** Create `schemas/provider-entry.schema.json`; Modify `scripts/lib/config.py` (Muster L130, `jsonschema` optional mit Fallback), `scripts/lib/providers.py`; Test: Create `tests/test_provider_entry_schema.py`.
 **Interfaces:** Schema enthält neue Keys aus T3–T7 (`extension_hook_path`, Format-Keys); Nicht-Ziele: `update_providers_enum` (`schema.py`), Defaults-Tabelle `external_tools_drift.py:192-194`; keine neue Dependency.
-- [ ] Step 1: Tests (fail): AC-1 (alle Einträge valide), AC-2 (unbekannter Key/Typfehler -> exit 1 mit Eintrag+Feld). Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_provider_entry_schema.py tests/test_provider_options_schema.py`.
-- [ ] Step 4: Commit `feat: add json schema for provider registry entries`
+- [x] Step 1: Tests (fail): AC-1 (alle Einträge valide), AC-2 (unbekannter Key/Typfehler -> exit 1 mit Eintrag+Feld). Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_provider_entry_schema.py tests/test_provider_options_schema.py`.
+- [x] Step 4: Commit `feat: add json schema for provider registry entries` — nicht ausgeführt (Auftrag T35: kein Commit); Commit-Freigabe im finalen Report.
 - AC: C3 AC-1, AC-2, BAC-7.
+- Umsetzung: `schemas/provider-entry.schema.json` (draft-07) modelliert die Entry-Map mit `additionalProperties: false` auf Entry-Ebene, Pflichtfeldern `agents_dir`/`context_file` und den neuen Keys (`extension_hook_path`, `mcp-config.*`, `commands_format`, `surface-*`). `providers.validate_provider_registry()` validiert die Registry; `jsonschema` optional, stdlib-Fallback mit identischem Meldungsvertrag (`provider '<name>': unknown key '<field>'`). Anbindung in `config._validate_config` -> `_validate_provider_registry` (exit 1, Muster `_validate_providers`). Nicht-Ziele unberührt: `schema.update_providers_enum`, `external_tools_drift`-Defaults, keine neue Dependency.
+- Verifikation: `python3 scripts/sync.py --validate` exit 0. `pytest tests/test_provider_entry_schema.py tests/test_provider_options_schema.py` exit 0 (43 passed).
 
 ### Task 36: #1239b Capability-Quellen mergen + `pipelines.py` (senior-developer, M-Teil 2)
 **Files:** Modify `scripts/lib/context_report.py` (`merge_provider_mappings:205`), `scripts/lib/providers.py` (`load_providers_config:313`, `load_provider_capabilities:422`), `scripts/lib/pipelines.py` (~L56); Test: Modify `tests/test_provider_entry_schema.py`, `tests/test_pipelines.py`.

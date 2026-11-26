@@ -1,7 +1,9 @@
 """Provider configuration loading and resolution."""
 from __future__ import annotations
 
+import json
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +22,21 @@ PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
 _PROVIDERS_CONFIG_JSON = "providers.config.json"
 PROVIDER_CAPABILITIES_YAML = "config/provider-capabilities.yaml"  # legacy fallback
+
+#: JSON Schema of one provider registry entry (issue #1239 / C3).
+#: Validated by ``config._validate_provider_registry`` on every ``load_config``
+#: (therefore by ``sync.py --validate`` and every sync). ``jsonschema`` is
+#: optional: the stdlib fallback below emits the same
+#: ``provider '<name>': ... '<field>'`` contract, so no new dependency is
+#: introduced (ADR-0001: PyYAML stays the only runtime exception).
+PROVIDER_ENTRY_SCHEMA = "schemas/provider-entry.schema.json"
+
+try:  # optional dependency — mirrors config.py's jsonschema import
+    import jsonschema as _jsonschema
+    _JSONSCHEMA_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised via monkeypatch in tests
+    _jsonschema = None
+    _JSONSCHEMA_AVAILABLE = False
 
 
 def resolve_agent_meta_root(project_root: Path) -> Path:
@@ -439,6 +456,271 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
         return {}
     caps = data.get("capabilities", {})
     return caps if isinstance(caps, dict) else {}
+
+
+def load_provider_entry_schema(agent_meta_root: Path) -> dict:
+    """Load ``schemas/provider-entry.schema.json`` ({} if missing/unreadable).
+
+    Optional-file semantics: a framework checkout without the schema keeps
+    working (the provider-registry check is skipped), mirroring the
+    ``project-config.schema.json`` handling in ``config._validate_config``.
+    """
+    schema_path = Path(agent_meta_root) / PROVIDER_ENTRY_SCHEMA
+    try:
+        with schema_path.open(encoding="utf-8") as f:
+            schema = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return schema if isinstance(schema, dict) else {}
+
+
+_JSON_TYPE_PREDICATES = {
+    "object": lambda value: isinstance(value, dict),
+    "array": lambda value: isinstance(value, list),
+    "string": lambda value: isinstance(value, str),
+    "boolean": lambda value: isinstance(value, bool),
+    "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+    "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+    "null": lambda value: value is None,
+}
+
+
+def _json_type_name(value: object) -> str:
+    """JSON type name of a parsed YAML/JSON value (bools are not integers)."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return type(value).__name__
+
+
+def _join_field(parent: str, key: object) -> str:
+    """Dotted field path relative to the provider entry (``mcp-config.format``)."""
+    key = str(key)
+    return f"{parent}.{key}" if parent else key
+
+
+def _resolve_local_ref(root_schema: dict, node: dict) -> dict:
+    """Resolve a local ``#/definitions/<name>`` reference (identity otherwise)."""
+    ref = node.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/"):
+        return node
+    target: object = root_schema
+    for part in ref[2:].split("/"):
+        if not isinstance(target, dict) or part not in target:
+            return node
+        target = target[part]
+    return target if isinstance(target, dict) else node
+
+
+def _fallback_validate_node(
+    value: object,
+    schema: dict,
+    root_schema: dict,
+    field: str,
+    provider: object,
+    messages: list[str],
+) -> None:
+    """Validate one node against the schema subset used by our schema file.
+
+    Supports ``type`` (string or list), ``properties``, ``required``,
+    ``additionalProperties`` (false or schema), ``items``, ``minProperties``,
+    ``enum`` and local ``$ref``. That subset is exactly what
+    ``schemas/provider-entry.schema.json`` uses, so the fallback reproduces the
+    jsonschema contract without the dependency.
+    """
+    schema = _resolve_local_ref(root_schema, schema)
+    expected = schema.get("type")
+    if expected is not None:
+        expected_types = [expected] if isinstance(expected, str) else list(expected)
+        matches = any(
+            _JSON_TYPE_PREDICATES.get(name, lambda _value: True)(value)
+            for name in expected_types
+        )
+        if not matches:
+            messages.append(
+                f"provider {provider!r}: field '{field or '(entry)'}' must be "
+                f"{' or '.join(expected_types)} (got {_json_type_name(value)})"
+            )
+            return
+
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in enum:
+        allowed = ", ".join(repr(item) for item in enum)
+        messages.append(
+            f"provider {provider!r}: field '{field or '(entry)'}' must be one of "
+            f"{allowed} (got {value!r})"
+        )
+
+    if isinstance(value, dict):
+        minimum = schema.get("minProperties")
+        if isinstance(minimum, int) and len(value) < minimum:
+            messages.append(
+                f"provider {provider!r}: field '{field or '(entry)'}' must "
+                f"declare at least {minimum} key(s)"
+            )
+        properties = schema.get("properties") or {}
+        for key in schema.get("required") or []:
+            if key not in value:
+                messages.append(
+                    f"provider {provider!r}: missing required field "
+                    f"'{_join_field(field, key)}'"
+                )
+        additional = schema.get("additionalProperties", True)
+        for key, item in value.items():
+            child = properties.get(key)
+            if isinstance(child, dict):
+                _fallback_validate_node(
+                    item, child, root_schema, _join_field(field, key), provider,
+                    messages)
+            elif additional is False:
+                messages.append(
+                    f"provider {provider!r}: unknown key "
+                    f"'{_join_field(field, key)}'"
+                )
+            elif isinstance(additional, dict):
+                _fallback_validate_node(
+                    item, additional, root_schema, _join_field(field, key),
+                    provider, messages)
+    elif isinstance(value, list):
+        items = schema.get("items")
+        if isinstance(items, dict):
+            for index, item in enumerate(value):
+                _fallback_validate_node(
+                    item, items, root_schema, _join_field(field, index), provider,
+                    messages)
+
+
+def _fallback_validate_registry(providers: dict, schema: dict) -> list[str]:
+    """Validate the provider map with the stdlib fallback walker."""
+    messages: list[str] = []
+    minimum = schema.get("minProperties")
+    if isinstance(minimum, int) and len(providers) < minimum:
+        messages.append(
+            f"provider registry: must declare at least {minimum} entry(ies) "
+            f"(got {len(providers)})"
+        )
+    entry_schema = schema.get("additionalProperties")
+    if not isinstance(entry_schema, dict):
+        return messages
+    for name, entry in providers.items():
+        _fallback_validate_node(entry, entry_schema, schema, "", name, messages)
+    return messages
+
+
+def _jsonschema_error_messages(errors) -> list[str]:
+    """Translate ``jsonschema`` errors into the shared message contract.
+
+    The messages are byte-identical to :func:`_fallback_validate_registry`
+    (provider + dotted field), so a project without ``jsonschema`` sees the
+    same diagnostics as one with it.
+    """
+    messages: list[str] = []
+    for err in errors:
+        path = list(err.path)
+        if not path:
+            messages.append(f"provider registry: {err.message}")
+            continue
+        provider = path[0]
+        parent = ".".join(str(part) for part in path[1:])
+        validator = err.validator
+        if validator == "additionalProperties":
+            names = re.findall(r"'([^']+)'", err.message)
+            for name in names or ["?"]:
+                messages.append(
+                    f"provider {provider!r}: unknown key "
+                    f"'{_join_field(parent, name)}'"
+                )
+        elif validator == "required":
+            instance = err.instance if isinstance(err.instance, dict) else {}
+            required = err.validator_value or []
+            for key in required:
+                if key not in instance:
+                    messages.append(
+                        f"provider {provider!r}: missing required field "
+                        f"'{_join_field(parent, key)}'"
+                    )
+        elif validator == "type":
+            expected = err.validator_value
+            expected_types = [expected] if isinstance(expected, str) else list(expected)
+            messages.append(
+                f"provider {provider!r}: field '{parent or '(entry)'}' must be "
+                f"{' or '.join(expected_types)} (got {_json_type_name(err.instance)})"
+            )
+        elif validator == "enum":
+            allowed = ", ".join(repr(item) for item in (err.validator_value or []))
+            messages.append(
+                f"provider {provider!r}: field '{parent or '(entry)'}' must be "
+                f"one of {allowed} (got {err.instance!r})"
+            )
+        elif validator == "minProperties":
+            minimum = err.validator_value
+            messages.append(
+                f"provider {provider!r}: field '{parent or '(entry)'}' must "
+                f"declare at least {minimum} key(s)"
+            )
+        else:
+            # Unknown keyword: keep the jsonschema wording, still provider-prefixed.
+            messages.append(
+                f"provider {provider!r}: field '{parent or '(entry)'}': "
+                f"{err.message}"
+            )
+    return messages
+
+
+def validate_provider_registry(
+    agent_meta_root: Path, *, document: dict | None = None
+) -> list[str]:
+    """Validate ``config/ai-providers.yaml`` against the provider-entry schema.
+
+    Returns one message per violation, each naming the provider and the dotted
+    field (``provider 'Claude': unknown key 'agents_dirr'``), sorted for a
+    deterministic output. An empty list means the registry is valid.
+
+    Contract (AC-2): unknown key or a type error is a violation, which
+    ``config._validate_provider_registry`` turns into ``exit 1``. ``jsonschema``
+    is used when installed; otherwise the stdlib fallback produces the same
+    messages (optional dependency, ADR-0001 unchanged).
+
+    Optional-file semantics: a missing schema file or an empty/absent registry
+    returns ``[]`` — never raises. *document* lets tests (and future callers)
+    inject a registry instead of reading the framework file.
+    """
+    schema = load_provider_entry_schema(agent_meta_root)
+    if not schema:
+        return []
+    if document is None:
+        data, _ = _load_yaml_or_json(
+            Path(agent_meta_root) / PROVIDERS_CONFIG_YAML,
+            Path(agent_meta_root) / _PROVIDERS_CONFIG_LEGACY,
+            Path(agent_meta_root) / _PROVIDERS_CONFIG_JSON,
+        )
+    else:
+        data = document
+    if not isinstance(data, dict) or not data:
+        return []
+    providers = data.get("providers", data)
+    if not isinstance(providers, dict):
+        return []
+
+    if _JSONSCHEMA_AVAILABLE:
+        validator = _jsonschema.Draft7Validator(schema)
+        messages = _jsonschema_error_messages(
+            sorted(validator.iter_errors(providers), key=lambda e: list(e.path)),
+        )
+    else:
+        messages = _fallback_validate_registry(providers, schema)
+    return sorted(messages)
 
 
 def provider_has_capability(pc: dict | None, capability: str) -> bool:
