@@ -338,7 +338,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 - AC: B4 AC-1 (Default-Liste greift), AC-3 (Override-Config), AC-4 (`.gitmodules`-Pfade ergänzt); Schema validiert Liste von Strings.
 
 ### Task 29: Rebaseline #1275 (developer)
-- [ ] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1275: protected paths"`; `--validate`; Commit: `chore: rebaseline hashes for protected paths (#1275)`
+- [x] Rebaseline: `python3 scripts/rebaseline.py --check-only` (Diff prüfen), dann `python3 scripts/rebaseline.py --reason "#1275: protected paths"`; `--validate`; Commit: `chore: rebaseline hashes for protected paths (#1275)`
 
 ### Task 30: #1263a MCP-Deny-Liste aus Registry (senior-developer, S/M-Teil 1)
 **Files:** Modify `scripts/lib/mcp.py`, `scripts/lib/mcp_deny.py`, `rules/1-generic/mcp-guardrails.md`; Test: Create `tests/test_mcp_guardrails_sync.py`; Modify `tests/test_mcp_deny.py`.

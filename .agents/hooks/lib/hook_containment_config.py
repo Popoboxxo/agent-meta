@@ -3,12 +3,14 @@
 
 Issue #1238b1: importable, fail-closed replacement for the inline Python
 reader.  PyYAML remains the documented optional runtime exception; without it
-the guard stays enabled and never honours an opt-out.
+the guard stays enabled and never honours an opt-out. Issue #1275b adds the
+structured effective protected-path list used by the deployed shell hook.
 """
 import json
 import os
 import posixpath
 import re
+import shlex
 import sys
 
 
@@ -20,6 +22,8 @@ _RESERVED = frozenset(
     + ["LPT%d" % i for i in range(1, 10)]
 )
 _FORBIDDEN_CHARS = frozenset('<>"|?*')
+_DEFAULT_PROTECTED_PATHS = ("external/", ".agent-meta/")
+_GITMODULES_PATH_RE = re.compile(r"^\s*path\s*=\s*(.*?)\s*$", re.IGNORECASE)
 # Lower-cased protected segment prefixes (framework dirs + provider_root_dirs).
 _PROTECTED = (
     (".git",), (".claude",), (".meta-config",), (".agents",), (".codex",),
@@ -31,6 +35,101 @@ _PROTECTED = (
 def canonical_path(path):
     """Backslash -> slash BEFORE normpath, always POSIX-style."""
     return posixpath.normpath(path.replace("\\", "/"))
+
+
+def normalize_protected_path(path):
+    """Mirror scripts/lib/repo_containment.py::normalize_protected_path."""
+    if not isinstance(path, str) or not path:
+        return None
+    if any(ord(ch) < 32 for ch in path):
+        return None
+    canonical = path.replace("\\", "/")
+    if canonical.startswith("/") or _WINDOWS_DRIVE_RE.match(canonical):
+        return None
+    if ".." in canonical.split("/"):
+        return None
+    normalized = posixpath.normpath(canonical)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
+        return None
+    return normalized
+
+
+def _dedupe_protected_paths(paths):
+    seen = set()
+    result = []
+    for path in paths:
+        key = path.casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(path)
+    return result
+
+
+def _gitmodules_paths(root):
+    try:
+        with open(os.path.join(root, ".gitmodules"), encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except (OSError, UnicodeError):
+        return []
+    paths = []
+    for line in lines:
+        match = _GITMODULES_PATH_RE.match(line)
+        if match is None:
+            continue
+        lexer = shlex.shlex(match.group(1), posix=True)
+        lexer.whitespace = "\t\r\n"
+        lexer.whitespace_split = True
+        lexer.commenters = "#;"
+        try:
+            values = list(lexer)
+        except ValueError:
+            continue
+        if len(values) != 1:
+            continue
+        normalized = normalize_protected_path(values[0])
+        if normalized is not None:
+            paths.append(normalized)
+    return _dedupe_protected_paths(paths)
+
+
+def effective_protected_paths(config_file, config):
+    """Resolve the same protected-path merge contract as the syncer.
+
+    A present list replaces the defaults; existing ``.gitmodules`` paths are
+    appended. Invalid configuration fails safe to defaults + ``.gitmodules``
+    and is reported on stderr rather than silently widening the allow-list.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(config_file)))
+    raw = config.get("repo_containment") if isinstance(config, dict) else None
+    rc = raw if isinstance(raw, dict) else {}
+    configured = rc.get("protected_paths", _UNSET)
+    if configured is _UNSET:
+        base = list(_DEFAULT_PROTECTED_PATHS)
+    elif not isinstance(configured, list):
+        print(
+            "REPO_CONTAINMENT: warning: repo_containment.protected_paths must be "
+            "a list of strings; using defaults (fail-closed).",
+            file=sys.stderr,
+        )
+        base = list(_DEFAULT_PROTECTED_PATHS)
+    else:
+        normalized = [normalize_protected_path(value) for value in configured]
+        if any(value is None for value in normalized):
+            print(
+                "REPO_CONTAINMENT: warning: repo_containment.protected_paths "
+                "contains an invalid path; using defaults (fail-closed).",
+                file=sys.stderr,
+            )
+            base = list(_DEFAULT_PROTECTED_PATHS)
+        else:
+            base = normalized
+    paths = [normalize_protected_path(value) for value in base]
+    paths = [value for value in paths if value is not None]
+    paths.extend(_gitmodules_paths(root))
+    return _dedupe_protected_paths(paths)
+
+
+_UNSET = object()
 
 
 def path_error(path):
@@ -138,30 +237,53 @@ def resolved_scratch_path(project_path, config_file):
     return ".tmp"
 
 
-def emit(enabled, sink_enabled, sink_path, rejected=False):
+def emit(enabled, sink_enabled, sink_path, rejected=False, protected_paths=None):
     # SINK_REJECTED is observed only by tests/test_tmp_sink_path_parity.py
     # (AC-97); the shell consumer deliberately ignores it (silent fallback).
     print("ENABLED=%d" % (1 if enabled else 0))
     print("SINK_ENABLED=%d" % (1 if sink_enabled else 0))
     print("SINK_PATH=%s" % sink_path)
     print("SINK_REJECTED=%d" % (1 if rejected else 0))
+    if protected_paths is not None:
+        print("PROTECTED_PATHS_JSON=%s" % json.dumps(
+            protected_paths, ensure_ascii=True, separators=(",", ":")
+        ))
 
 
 def main(argv: list[str], stdin: str) -> int:
-    """Print ENABLED/SINK_ENABLED/SINK_PATH/SINK_REJECTED/SCRATCH_PATH."""
+    """Print containment values and optionally structured protected paths.
+
+    The two-argument form preserves the existing reader contract. The shell
+    passes ``--include-protected-paths`` to receive one JSON-encoded line that
+    can be forwarded as a single quoted argv value without eval or splitting.
+    """
     del stdin
-    if len(argv) != 2:
+    if len(argv) not in (2, 3):
         return 1
-    config_file, provider = argv
+    if len(argv) == 3 and argv[2] != "--include-protected-paths":
+        return 1
+    config_file, provider = argv[:2]
+    include_protected = len(argv) == 3
 
     try:
         import yaml
 
         with open(config_file, encoding="utf-8") as handle:
             config = yaml.safe_load(handle) or {}
+        if not isinstance(config, dict):
+            raise ValueError("config root must be a mapping")
 
         raw = config.get("repo_containment")  # runtime-reader:repo_containment
+        if raw is not None and not isinstance(raw, dict):
+            print(
+                "REPO_CONTAINMENT: warning: repo_containment must be a mapping; "
+                "using framework defaults (fail-closed).",
+                file=sys.stderr,
+            )
         rc = raw if isinstance(raw, dict) else {}
+        protected = (
+            effective_protected_paths(config_file, config) if include_protected else None
+        )
 
         # Master switch: provider-override > project value > default True.
         # A present-but-non-boolean value resolves safe-side to True (F4).
@@ -190,7 +312,7 @@ def main(argv: list[str], stdin: str) -> int:
         rejected = path_error(path) is not None
         path = ".tmp" if rejected else canonical_path(path)
 
-        emit(enabled, sink_enabled, path, rejected)
+        emit(enabled, sink_enabled, path, rejected, protected)
         # T24 (D1): SCRATCH_PATH is the effective path after precedence; SINK_PATH
         # above stays the raw project.yaml value so the parity suite keeps its pin.
         print("SCRATCH_PATH=%s" % resolved_scratch_path(path, config_file))
@@ -207,7 +329,10 @@ def main(argv: list[str], stdin: str) -> int:
             + " or run the project sync.",
             file=sys.stderr,
         )
-        emit(True, True, ".tmp")
+        protected = (
+            effective_protected_paths(config_file, None) if include_protected else None
+        )
+        emit(True, True, ".tmp", protected_paths=protected)
         # Fail-closed: an unreadable config must not let the env/matrix widen the jail.
         print("SCRATCH_PATH=.tmp")
     return 0

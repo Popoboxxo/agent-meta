@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.8.0
-# changelog: 1.8.0: issue #1238b1 -- extract config resolution, path verdicts and Bash write-target detection into flat hook_containment_*.py modules deployed beside hook_common.sh; preserve output, exit codes and fail-closed behavior, with only the trivial realpath -c one-liner retained; 1.7.0: issue #1251 -- fixed jail root and Bash variable expansion use adapter-owned AM_PROJECT_DIR exclusively; deployment-layout and payload-anchor fallbacks remain unchanged; 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, the hook-environment project-dir variable and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
+# version: 1.10.0
+# changelog: 1.10.0: issue #1275b -- resolve repo_containment.protected_paths with the syncer's default-replace-plus-gitmodules merge contract, emit the effective list as one JSON line, forward it to the path module as a single quoted argv without eval/splitting, fail safe to defaults plus gitmodules on invalid/unreadable config, and describe .gitmodules as conditional; 1.9.0: issue #1275a -- block Write/Edit/NotebookEdit and detected Bash writes under external/, .agent-meta/ and existing .gitmodules submodule paths; AM_ALLOW_PROTECTED_WRITE=1 bypasses only the protected-path gate, never root containment or the tmp-sink rule; mirror the decision in the non-deployed kernel and pin hook/kernel parity; convention boundary only; 1.8.0: issue #1238b1 -- extract config resolution, path verdicts and Bash write-target detection into flat hook_containment_*.py modules deployed beside hook_common.sh; preserve output, exit codes and fail-closed behavior, with only the trivial realpath -c one-liner retained; 1.7.0: issue #1251 -- fixed jail root and Bash variable expansion use adapter-owned AM_PROJECT_DIR exclusively; deployment-layout and payload-anchor fallbacks remain unchanged; 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, the hook-environment project-dir variable and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -18,7 +18,11 @@
 #                    special carve-out: allowed when the sink is enabled,
 #                    blocked when it is disabled (spec §7: ".tmp mit aktivem
 #                    Sink -> 0; .tmp ohne Sink -> 2"), even though it sits
-#                    inside the root.
+#                    inside the root. Protected paths default to external/,
+#                    .agent-meta/ and existing .gitmodules entries; a configured
+#                    repo_containment.protected_paths list replaces the defaults.
+#                    Writes are blocked unless AM_ALLOW_PROTECTED_WRITE=1 is set;
+#                    that override never widens the jail root or the sink rule.
 #   * Bash        -> best-effort tokenized detection of write-ish commands /
 #                    redirections; block obvious writes outside the allowed
 #                    roots, allow reads.
@@ -50,6 +54,18 @@
 # protected provider directories are embedded in hook_containment_config.py
 # (config/ai-providers.yaml is not deployed); the parity test fails when they
 # drift from provider_root_dirs.
+#
+# Protected write paths (#1275b) live in the deployed flat
+# hook_containment_path.py: repo_containment.protected_paths replaces the
+# defaults external/ and .agent-meta/ when present; an existing
+# <root>/.gitmodules always contributes every valid root-relative path = entry.
+# Without .gitmodules and without config only the defaults apply. The config
+# module emits the effective list as one JSON line; the shell forwards it as a
+# single quoted argv value (never eval/splitting). Without
+# AM_ALLOW_PROTECTED_WRITE=1 the gate stays active; root containment and the
+# tmp-sink rule stay active even with the override. This is a convention
+# boundary, not a security boundary. The non-deployed kernel/containment.py
+# mirrors the default/gitmodules block/allow decision (tests/test_protected_paths.py).
 #
 # T24 (D1): the SCRATCH SINK PATH has a single source with this precedence:
 # ARTIFACT_SCRATCH_DIR env -> classes[scratch].path from
@@ -555,10 +571,12 @@ fi
 CONFIG_FILE="$REPO_ROOT/.meta-config/project.yaml"
 
 # --- Effective config resolution (mirrors scripts/lib/repo_containment.py) ---
-# Prints ENABLED/SINK_ENABLED/SINK_PATH/SINK_REJECTED plus SCRATCH_PATH, the
-# effective T24 sink path. Config failures exit 0 with safe defaults.
+# Prints ENABLED/SINK_ENABLED/SINK_PATH/SINK_REJECTED, PROTECTED_PATHS_JSON and
+# SCRATCH_PATH. Config failures exit 0 with safe defaults. The JSON list stays
+# on one physical line and is passed to the path module as one quoted argv.
 read_effective_containment() {
-  "$_PY" "$SCRIPT_DIR/lib/hook_containment_config.py" "$1" "$2"
+  "$_PY" "$SCRIPT_DIR/lib/hook_containment_config.py" "$1" "$2" \
+    "--include-protected-paths"
 }
 
 CONFIG_OUT="$(read_effective_containment "$CONFIG_FILE" "$PROVIDER")"
@@ -566,12 +584,14 @@ ENABLED="1"
 SINK_ENABLED="1"
 SINK_PATH=".tmp"
 SCRATCH_PATH=""
+PROTECTED_PATHS_JSON="null"
 while IFS='=' read -r _key _value; do
   case "$_key" in
     ENABLED) ENABLED="$_value" ;;
     SINK_ENABLED) SINK_ENABLED="$_value" ;;
     SINK_PATH) SINK_PATH="$_value" ;;
     SCRATCH_PATH) SCRATCH_PATH="$_value" ;;
+    PROTECTED_PATHS_JSON) PROTECTED_PATHS_JSON="$_value" ;;
   esac
 done < <(printf '%s\n' "$CONFIG_OUT")
 
@@ -594,19 +614,24 @@ if [ "$ENABLED" != "1" ]; then
 fi
 
 # --- Path containment verdict -----------------------------------------
-# Prints ALLOW / BLOCK_SINK / BLOCK for the (possibly relative) target.
-# Semantics (spec §7 test table): a target inside the repo root is allowed;
-# a target inside <repo root>/<tmp-sink.path> is allowed ONLY while the sink
-# is enabled — a disabled sink excludes its own subtree even though that
-# subtree physically sits inside the root (`.tmp` with sink -> 0, `.tmp`
-# without sink -> 2). Everything else is BLOCK.
+# Prints ALLOW / BLOCK_SINK / BLOCK_PROTECTED / BLOCK for the (possibly
+# relative) target. Semantics (spec §7 test table): a target inside a protected
+# submodule path is blocked unless AM_ALLOW_PROTECTED_WRITE=1; otherwise a
+# target inside the repo root is allowed; a target inside
+# <repo root>/<tmp-sink.path> is allowed ONLY while the sink is enabled — a
+# disabled sink excludes its own subtree even though that subtree physically
+# sits inside the root (`.tmp` with sink -> 0, `.tmp` without sink -> 2).
+# Everything else is BLOCK.
 # Uses os.path.realpath so symlinks pointing outside the root are refused
 # too; realpath also normalises a not-yet-existing Write target (equivalent
 # to `realpath -m`). On any python error nothing is printed, which the caller
 # treats as BLOCK (fail closed).
 containment_verdict() {
+  # PROTECTED_PATHS_JSON defaults to JSON null on config-reader failure, which
+  # selects the path module's legacy defaults + existing .gitmodules fallback.
   "$_PY" "$SCRIPT_DIR/lib/hook_containment_path.py" \
-    "$REPO_ROOT" "$WORKDIR" "$SINK_ENABLED" "$SINK_PATH" "$1"
+    "$REPO_ROOT" "$WORKDIR" "$SINK_ENABLED" "$SINK_PATH" "$1" \
+    "$PROTECTED_PATHS_JSON"
 }
 
 # How the anchor was obtained, for block messages (the no-root message keeps
@@ -626,6 +651,15 @@ block_write() {
     echo "  target:    $target (relative to an unknown directory)" >&2
     echo "  reason:    a cd/pushd/popd to a computed path ('\$VAR', 'cd -', popd) hides where it lands (#1151)." >&2
     echo "  repair:    use a literal directory or an absolute target inside $REPO_ROOT" >&2
+  elif [ "$reason" = "protected" ]; then
+    echo "REPO_CONTAINMENT: write target is inside a protected path (prison mode)." >&2
+    echo "  target:    $absolute" >&2
+    echo "  reason:    protected paths come from repo_containment.protected_paths" >&2
+    echo "             (default external/, .agent-meta/) plus all valid path =" >&2
+    echo "             entries in an existing .gitmodules file." >&2
+    echo "  override:  AM_ALLOW_PROTECTED_WRITE=1 allows this protected-path write only;" >&2
+    echo "             writes outside $REPO_ROOT remain blocked." >&2
+    echo "  boundary:  best-effort convention boundary, not a security boundary." >&2
   elif [ "$reason" = "sink-disabled" ]; then
     echo "REPO_CONTAINMENT: write target is inside the configured but DISABLED tmp-sink (prison mode)." >&2
     echo "  target:    $absolute" >&2
@@ -658,6 +692,10 @@ block_write() {
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
   case "$(containment_verdict "$FILE_PATH")" in
     ALLOW) exit 0 ;;
+    BLOCK_PROTECTED)
+      block_write "$FILE_PATH" "protected"
+      exit 2
+      ;;
     BLOCK_SINK)
       block_write "$FILE_PATH" "sink-disabled"
       exit 2
@@ -707,6 +745,11 @@ if [ "$TOOL_NAME" = "Bash" ]; then
       fi
       case "$(containment_verdict "$candidate")" in
         ALLOW) ;;
+        BLOCK_PROTECTED)
+          BLOCKED_TARGET="$candidate"
+          BLOCKED_REASON="protected"
+          break
+          ;;
         BLOCK_SINK)
           BLOCKED_TARGET="$candidate"
           BLOCKED_REASON="sink-disabled"
