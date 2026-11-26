@@ -1721,6 +1721,18 @@ def _handle_validate(ctx: _SyncContext, *, source_checks: bool = True) -> None:
                 Severity.WARNING, "mcp-deny.missing-rule", Path(config_path).name,
                 _message,
             ))
+    # #1262 (C1): syntactic MCP URL/secret-reference checks — no network.
+    # ERROR findings fail --validate via print_report()'s rc-from-ERROR rule;
+    # WARNING findings (unset env refs) leave the exit code unchanged.
+    from lib.mcp_health import validate_mcp_health
+    for _mcp_server, _mcp_severity, _mcp_message in validate_mcp_health(
+        agent_meta_root, project_root, config,
+        registry=_mcp_registry, active=_mcp_active,
+    ):
+        _strict_findings.append(Finding(
+            Severity.ERROR if _mcp_severity == "ERROR" else Severity.WARNING,
+            "mcp-health.invalid", Path(config_path).name, _mcp_message,
+        ))
     # #1269: hand-edited extension managed blocks; error only with --strict (Q5).
     from lib.extensions import CLAUDE_EXT_DIR, EXT_SUFFIX
     from lib.managed_block import ManagedBlockError, has_block, has_drift

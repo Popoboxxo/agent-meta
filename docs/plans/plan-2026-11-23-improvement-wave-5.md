@@ -367,7 +367,7 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 33: #1262 MCP-URL/Secret-Validate (developer, S)
 **Files:** Modify `scripts/lib/mcp_health.py`, Validate-Aufrufstelle (Importer von `mcp_health`: `grep -rn "mcp_health" scripts/lib` zu Task-Beginn ausführen, Fundort im Ledger notieren; höchstens 1 zusätzliche Datei); Test: Modify `tests/test_mcp_health.py`.
 **Interfaces:** Produces `list[tuple[server, severity, message]]`; URL via `urllib.parse` (http/https/ws/wss); Secrets nur `${VAR}`, Klartext -> Fehler (Wert NICHT in Meldung); ungesetzte Env-Var -> Warnung; kein Netzwerk; Fehler -> `--validate` exit 1.
-- [ ] Step 1: Tests (fail): AC-1..3. Step 2: implementieren. Step 3: `--validate` (Repo-Config exit 0); `pytest tests/test_mcp_health.py`.
+- [x] Step 1: Tests (fail): AC-1..3. Step 2: implementieren. Step 3: `--validate` (Repo-Config exit 0); `pytest tests/test_mcp_health.py`.
 - [ ] Step 4: Commit `feat: validate mcp urls and secret references in validate`
 - AC: C1 AC-1..AC-3. Rebaseline: nein.
 
