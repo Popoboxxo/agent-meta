@@ -15,10 +15,14 @@
 | lifecycle-tasks | Session-Start, pending-tasks.md vorhanden |
 | session-conclusion | Feature-Abschluss |
 | provider-agnostic | agents/1-generic editieren |
+| mcp-home-assistant | HA-Gerätestatus/Sensoren/Datetime lesen (read-only) |
+| mcp-influxdb | Historische Zeitreihen/Flux-Trends abfragen |
 | mcp-reqogniloom | ReqogniLoom-MCP-Tools |
 | mcp-honcho | Honcho-MCP-Memory-Tools |
 | mcp-playwright | Playwright-MCP-Browser-Tools |
+| mcp-projectatlas | Repo-Wissensgraph über Projekte traversieren |
 | mcp-viz-logger | viz-logger Event-Logging |
+| mcp-headroom | Große Tool-Outputs/Logs komprimieren und wiederherstellen |
 | tool-graphify | Architektur-/Datei-Fragen mit graphify |
 | se-cascade-adr-standard | ADRs in aktiver SE-Kaskade |
 | se-cascade-artifact-taxonomy | SE-Artefakte, Ablageorte, Namensregeln |

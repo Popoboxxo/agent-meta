@@ -374,9 +374,11 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 34: #1274 Scaffold + Checklisten-Test (developer, S)
 **Files:** Create `docs/howto/new-mcp-server.md`, `tests/test_mcp_server_checklist.py`.
 **Interfaces:** Consumes Task 33; parametrisiert über alle Registry-Server: Eintrag vollständig, `mcp-<server>/SKILL.md`, Guardrail-Eintrag (falls Verbotsliste), #1262-Check besteht.
-- [ ] Step 1: Test (fail bei künstlichem Server ohne Skill, Servername in Meldung). Step 2: Doc + Test. Step 3: `pytest tests/test_mcp_server_checklist.py`; `--validate`.
-- [ ] Step 4: Commit `test: add mcp server checklist test and howto`
-- AC: C2 AC-1, AC-2.
+- [x] Step 1: Test (fail bei künstlichem Server ohne Skill, Servername in Meldung). Step 2: Doc + Test. Step 3: `pytest tests/test_mcp_server_checklist.py`; `--validate`.
+- [x] Step 4: Commit `test: add mcp server checklist test and howto` — nicht ausgeführt (Auftrag T34: kein Commit); Commit-Freigabe im finalen Report.
+- AC: C2 AC-1, AC-2. Rebaseline: nein.
+- Umsetzung: Alle 9 Katalog-Server sind abgedeckt — 8 `mcp-*`-Einträge plus `tool-graphify` (graphify ist `kind: cli-tool`, der generierte Stem ist `tool-<name>`; `mcp-graphify` wäre tote Config). Skill-Quelle bleibt `config/rules-presets.yaml` (`channel: skill`) + bestehende Generatoren `scripts/lib/mcp.py` / `external_tools.py` (unverändert, keine Duplikation). Der Checklisten-Test rendert in ein Temp-Projekt (keine handgepflegten ignored Dateien), deckt Katalog-Vollständigkeit, Preset, Pointer-Tabelle, Guardrail und #1262 ab; AC-1 ist über einen synthetischen Server belegt, der mit seinem Namen rot wird.
+- Verifikation: `python3 scripts/sync.py --validate` exit 0. `pytest tests/test_mcp_server_checklist.py tests/test_mcp_health.py tests/test_mcp_guardrails_sync.py` exit 0 (97 passed, 3 skipped). Der im Auftrag genannte Pfad `tests/test_rules_presets.py` existiert im Repo nicht (exakter Befehl: exit 4, Collection-Error); Ersatzlauf `tests/test_lazy_skills_channel.py tests/test_rules_activation_gate.py tests/test_rules_skill_channel.py` exit 0 (71 passed, 8 skipped).
 
 ### Task 35: #1239a Provider-Entry-Schema + Validate (senior-developer, M-Teil 1)
 **Files:** Create `schemas/provider-entry.schema.json`; Modify `scripts/lib/config.py` (Muster L130, `jsonschema` optional mit Fallback), `scripts/lib/providers.py`; Test: Create `tests/test_provider_entry_schema.py`.

@@ -138,21 +138,33 @@ presets:
     provider-agnostic:
       channel: skill
       skill-description: "Use when editing templates in agents/1-generic — covers the provider-agnostic policy."
+    mcp-home-assistant:
+      channel: skill
+      skill-description: "Use when reading Home Assistant device state, sensors or datetime — read-only state access, while device control stays in the HA app; details in `config/plugin-catalog.yaml`."
+    mcp-influxdb:
+      channel: skill
+      skill-description: "Use when querying historical time-series trends with Flux — read-only history, while live device state comes from mcp-home-assistant; details in `config/plugin-catalog.yaml`."
     mcp-reqogniloom:
       channel: skill
-      skill-description: "Use when calling ReqogniLoom MCP tools — full allowed-tool list and usage hints."
+      skill-description: "Use when reading or updating requirements, architecture, tests or traceability in ReqogniLoom — the RE single source of truth, not general code search; details in `config/plugin-catalog.yaml`."
     mcp-honcho:
       channel: skill
-      skill-description: "Use when calling Honcho MCP memory tools — allowed-tool list and usage hints."
+      skill-description: "Use when persisting or recalling cross-session memory such as decisions, preferences or learnings — not for live repo state or file knowledge; details in `config/plugin-catalog.yaml`."
     mcp-playwright:
       channel: skill
-      skill-description: "Use when calling Playwright MCP browser tools — allowed-tool list and usage hints."
+      skill-description: "Use when driving browser E2E flows, screenshots or accessibility snapshots — interactive browser automation, while graphify/projectatlas answer repo-structure questions; details in `config/plugin-catalog.yaml`."
+    mcp-projectatlas:
+      channel: skill
+      skill-description: "Use when traversing repo knowledge graphs across projects via MCP — multi-project structural queries, while graphify covers single-codebase questions; details in `config/plugin-catalog.yaml`."
     mcp-viz-logger:
       channel: skill
-      skill-description: "Use when logging agent visualization events via the viz-logger MCP server."
+      skill-description: "Use when logging agent start, delegation or end events for agent-meta visualizations — a write-only event logger, not general-purpose storage; details in `config/plugin-catalog.yaml`."
+    mcp-headroom:
+      channel: skill
+      skill-description: "Use when compressing large tool outputs or logs before context injection and restoring originals by hash — reversible compression, not summarisation; details in `config/plugin-catalog.yaml`."
     tool-graphify:
       channel: skill
-      skill-description: "Use when asking architecture or file-relationship questions with graphify — hooks and permitted injections."
+      skill-description: "Use when asking architecture or file-relationship questions about this single repo with graphify — for multi-project traversal use Project Atlas; details in `config/plugin-catalog.yaml`."
     # Artifact-location matrix (issue #1186): where every artifact class is
     # written — 23 classes, files|inline|off modes, naming and role guidance.
     # Generator pointer table is owned by #1180; until then hand-maintained in
