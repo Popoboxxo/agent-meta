@@ -1062,6 +1062,17 @@ def _validate_provider_registry(config_path: Path) -> None:
         # Optional-file semantics: an unreadable framework registry is not a
         # project-config error (load_providers_config has its own guard).
         return
+    except Exception as exc:  # noqa: BLE001 — never crash load_config (#1155 F8)
+        # Unexpected schema/validator build failures (e.g.
+        # jsonschema.exceptions.UnknownType) must warn and skip, exactly like
+        # the project-config schema block below: a broken validator is not a
+        # hard provider-registry finding, and load_config must not crash.
+        print(
+            f"  !  WARNING: schema validation skipped: "
+            f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return
     if not errors:
         return
     print(
