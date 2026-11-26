@@ -224,8 +224,8 @@ def test_modules_deploy_flat_and_emitters_work_from_target_layout(tmp_path):
 
 def test_hook_common_inventory_and_version():
     source = _LIB_PATH.read_text(encoding="utf-8")
-    assert "# version: 1.12.0" in source
-    assert "v1.12.0" in source
+    assert "# version: 1.13.0" in source
+    assert "v1.13.0" in source
     assert "#1238a" in source
     assert not re.search(r"(?m)^\s*cat\s+<<-?\s*(['\"])PY\1", source)
     for filename, _expected_hash in _MODULES.values():
