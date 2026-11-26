@@ -343,8 +343,9 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ### Task 30: #1263a MCP-Deny-Liste aus Registry (senior-developer, S/M-Teil 1)
 **Files:** Modify `scripts/lib/mcp.py`, `scripts/lib/mcp_deny.py`, `rules/1-generic/mcp-guardrails.md`; Test: Create `tests/test_mcp_guardrails_sync.py`; Modify `tests/test_mcp_deny.py`.
 **Interfaces:** Produces maschinenlesbare Deny-Liste (Quelle: MCP-Registry-Verbotsliste, z.B. `playwright`) -> `permissions.deny` (Provider mit Capability), Prosa in `mcp-guardrails.md` aus derselben Quelle (ADR-3, Rule wird generiert/geprüft, nicht manuell editiert); leere Liste -> kein Eintrag.
-- [ ] Step 1: Tests (fail): Settings enthalten genau die Tools; Prosa == Deny-Liste; leere Liste. Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_mcp_guardrails_sync.py tests/test_mcp_deny.py`.
-- [ ] Step 4: Commit `feat: derive mcp deny list from registry for settings and rule`
+- [x] Step 1: Tests (fail): Settings enthalten genau die Tools; Prosa == Deny-Liste; leere Liste. Step 2: implementieren. Step 3: `--validate`; `pytest tests/test_mcp_guardrails_sync.py tests/test_mcp_deny.py`.
+- [x] Step 4: Commit `feat: derive mcp deny list from registry for settings and rule` — nicht ausgeführt (Auftrag T30: kein Commit); Commit-Freigabe im finalen Report.
+**Verify-first-Befund:** Produktpfad (Registry → `permissions.deny` + Prosa) war bereits umgesetzt; nur der Leerlisten-Defekt (spurious `.claude/settings.json` mit `"deny": []`) wurde behoben. `scripts/lib/mcp.py` und `rules/1-generic/mcp-guardrails.md` unverändert.
 - AC: B5 AC-1, AC-2.
 
 ### Task 31: #1263b Hook-Fallback-Check (senior-developer, S)

@@ -129,6 +129,16 @@ def sync_mcp_deny(
     settings_path, state_path = target
     rules = build_mcp_deny_rules(registry, active_servers)
 
+    # Empty deny list and no existing settings file: there is nothing to
+    # enforce and nothing to clean up, so do not materialise a file that would
+    # only carry ``"deny": []``. Same rationale as the empty companion state
+    # file below — a freshly created empty surface is a foreign injection for
+    # the external-tools drift scanner. An EXISTING file still runs through the
+    # merge, so managed rules of a deactivated server are removed.
+    if not rules and not settings_path.exists():
+        log.note("mcp-deny", f"{provider}: no blocked MCP tools — nothing to write")
+        return
+
     existing = _load_json_object(settings_path)
     if existing is None and settings_path.exists():
         log.warning("mcp-deny: settings file unparseable — skipping to avoid data loss")

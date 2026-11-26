@@ -170,6 +170,38 @@ def test_sync_mcp_deny_tolerates_missing_settings_file(tmp_path):
     assert "mcp__alpha__delete" in deny
 
 
+def test_sync_mcp_deny_writes_exactly_the_blocked_tools(tmp_path):
+    """AC-1 (exactness): the machine list is the blocked list — no more, no less."""
+    settings = _settings(tmp_path)
+    settings.write_text(
+        json.dumps({"permissions": {"deny": ["Bash(rm -rf:*)"]}}), encoding="utf-8",
+    )
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["alpha", "beta", "quiet"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    deny = _read_json(settings)["permissions"]["deny"]
+    assert {entry for entry in deny if entry.startswith("mcp__")} == set(
+        build_mcp_deny_rules(_REGISTRY, ["alpha", "beta", "quiet"])
+    )
+    assert deny[0] == "Bash(rm -rf:*)"
+
+
+def test_sync_mcp_deny_does_not_create_a_settings_file_without_rules(tmp_path):
+    """Empty deny list → no entry, and no spurious settings artifact.
+
+    Mirrors the empty-companion-state-file guard: a freshly created
+    ``{"permissions": {"deny": []}}`` file would be a foreign injection for the
+    drift scanner even though nothing is prohibited.
+    """
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["quiet"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    assert not (tmp_path / ".claude" / "settings.json").exists()
+    assert not (tmp_path / ".claude" / "agent-meta-state.json").exists()
+
+
 def test_sync_mcp_deny_keeps_unparseable_settings_file(tmp_path):
     settings = _settings(tmp_path)
     original = "{not json"
