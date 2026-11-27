@@ -454,10 +454,10 @@ Resolves #1115
 - Attribution-Zeile laut Harness-Vorgabe am Ende.
 
 ### Task 42: Push + PR (git — ausschliesslich git-Agent)
-- [ ] Push `feat/provider-agnostic-sync-hooks-wave-5`, PR gegen `main` mit Body aus Task 41. Kein Worktree, kein Merge ohne User-OK.
+- [x] Push `feat/provider-agnostic-sync-hooks-wave-5`, PR gegen `main` mit Body aus Task 41. Kein Worktree, kein Merge ohne User-OK.
 
 ### Task 43: Kommentar an #1198 (git)
-- [ ] `/home/hermes/.local/bin/gh issue comment 1198`: 0 Single-Brace-Treffer in `agents/ rules/ scripts/ config/` (Stand 2026-11-23), Regressions-Check in Task 15 hinzugefügt, Verweis auf PR.
+- [x] `/home/hermes/.local/bin/gh issue comment 1198`: 0 Single-Brace-Treffer in `agents/ rules/ scripts/ config/` (Stand 2026-11-23), Regressions-Check in Task 15 hinzugefügt, Verweis auf PR.
 
 ## Re-Planning
 
