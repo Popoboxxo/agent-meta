@@ -1,0 +1,25 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Continue
+- Opencode
+- Gemini
+- Codex
+- KimiCode
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- documenter
+- git
+project:
+  name: scenario-commands-system
+  prefix: s107
+  short: scenario-commands
+variables:
+  PROJECT_NAME: scenario-commands-system
+  PROJECT_DESCRIPTION: Commands system test across command-capable and command-less providers.
+  PROJECT_GOAL: Verify capability-driven command emission (markdown, toml, continue index) and no output for providers without a command surface.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-commands
