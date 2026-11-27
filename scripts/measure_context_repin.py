@@ -1,12 +1,24 @@
 """Dev helper: print an insert-ready re-pin block for context budgets (#1115).
 
-Measures the same rendered projects and artifacts as the ``measured`` fixture
-in ``tests/test_context_budgets.py``; no provider is called and nothing is
-written to the repository. Every deviation from the pin is reported (verification
-stays human); an artifact above its tolerance ceiling is flagged explicitly.
+Measures the same rendered projects and artifacts as the budget fixtures in
+``tests/test_context_budgets.py`` — ``full`` like the ``measured`` fixture,
+``compact`` like the ``measured_compact`` fixture (through
+``render_into_work_dir(..., profile="compact")`` + ``measure_artifacts``); no
+provider is called and nothing is written to the repository. Every deviation
+from the pin is reported (verification stays human); an artifact above its
+tolerance ceiling is flagged explicitly.
+
+Usage::
+
+    python3 scripts/measure_context_repin.py                  # `full` pins
+    python3 scripts/measure_context_repin.py --profile compact # `compact` pins
+
+Exit 0 when every artifact matches its pin (second run after adopting the
+block), exit 1 when a block is printed.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
@@ -15,6 +27,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 for _entry in (str(_REPO_ROOT / "scripts"), str(_REPO_ROOT)):
     if _entry not in sys.path:
         sys.path.insert(0, _entry)
+
+#: Budget profiles a re-pin block can be produced for.
+PROFILES = ("full", "compact")
 
 
 def _ceiling(ist: int) -> int:
@@ -71,28 +86,80 @@ def format_repin_block(
     ) + "\n"
 
 
+def _measure_full(root: Path) -> dict:
+    """Measure the ``full`` matrix exactly like the ``measured`` budget fixture."""
+    from lib import context_report as cr
+    from lib.providers import load_provider_capabilities, load_providers_config
+    from tests.test_ac01_render_identity import _make_project
+    from tests.test_context_budgets import _PROVIDERS
+
+    mappings = cr.merge_provider_mappings(
+        load_providers_config(_REPO_ROOT, {}),
+        load_provider_capabilities(_REPO_ROOT),
+    )
+    report: dict = {}
+    for provider in _PROVIDERS:
+        report.update(cr.measure_artifacts(_make_project(root, provider), [provider], mappings))
+    return report
+
+
+def _measure_compact(root: Path) -> dict:
+    """Measure the ``compact`` matrix exactly like the ``measured_compact`` fixture.
+
+    Reuses the budget module's own ``_matrix_config``/``_matrix_mappings``
+    helpers instead of duplicating the matrix setup, so the helper cannot drift
+    away from the fixture it is meant to reproduce.
+    """
+    from lib import context_report as cr
+    from lib.tmp_paths import resolve_tmp_paths
+    from tests.test_context_budgets import _PROVIDERS, _matrix_config, _matrix_mappings
+
+    mappings = _matrix_mappings()
+    report: dict = {}
+    for provider in _PROVIDERS:
+        config = _matrix_config(root, provider, [provider])
+        work = root / (provider + "-work")
+        paths = resolve_tmp_paths(root / provider, {})
+        cr.render_into_work_dir(_REPO_ROOT, config, work, profile="compact", paths=paths)
+        report.update(cr.measure_artifacts(work, [provider], mappings))
+    return report
+
+
+def _measure_report(profile: str, root: Path) -> dict:
+    """Dispatch on *profile* (``full``/``compact``); sole seam the tests patch."""
+    if profile == "compact":
+        return _measure_compact(root)
+    return _measure_full(root)
+
+
+def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="measure_context_repin.py",
+        description="Print an insert-ready context-budget re-pin block (#1115).",
+    )
+    parser.add_argument(
+        "--profile",
+        choices=PROFILES,
+        default="full",
+        help="budget profile to measure (default: full)",
+    )
+    return parser.parse_args(argv)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Measure the rendered artifacts; print a block on deviation (exit 1)."""
+    args = _parse_args(argv)
+
     import tempfile
 
     import yaml  # noqa: F401  (PyYAML is the documented runtime exception)
 
-    from lib import context_report as cr
-    from lib.providers import load_provider_capabilities, load_providers_config
-    from tests.test_ac01_render_identity import _make_project
-    from tests.test_context_budgets import _IST_FULL, _PROVIDERS
+    from tests.test_context_budgets import _IST_COMPACT, _IST_FULL
 
+    pins = _IST_COMPACT if args.profile == "compact" else _IST_FULL
     with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        mappings = cr.merge_provider_mappings(
-            load_providers_config(_REPO_ROOT, {}),
-            load_provider_capabilities(_REPO_ROOT),
-        )
-        projects = {provider: _make_project(root, provider) for provider in _PROVIDERS}
-        report: dict = {}
-        for provider, project in projects.items():
-            report.update(cr.measure_artifacts(project, [provider], mappings))
-    block = format_repin_block(report, _IST_FULL, "full")
+        report = _measure_report(args.profile, Path(tmp))
+    block = format_repin_block(report, pins, args.profile)
     if block:
         print(block)
         return 1

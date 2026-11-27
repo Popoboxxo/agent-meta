@@ -107,6 +107,7 @@ from lib.mcp_deny import sync_mcp_deny
 from lib.mcp_health import check_mcp_health
 from lib.opencode_v2_config import (
     sync_opencode_cli_file,
+    opencode_writers_reachable,
     sync_opencode_v2_managed_keys,
     v2_active,
 )
@@ -461,6 +462,19 @@ def resolve_discovery_paths(provider_cfg: dict) -> dict:
     return resolved
 
 
+def _legacy_path_exists(paths: list[Path], log: SyncLog, stage: str) -> bool:
+    """Gate predicate for one-time migration stages (#1242).
+
+    True when at least one legacy path exists. Fail-open: an unreadable check
+    logs a warning and returns True so the stage runs as before.
+    """
+    try:
+        return any(p.exists() for p in paths)
+    except (OSError, ValueError) as exc:
+        log.warn(f"{stage}: legacy-path check failed ({exc}); running migration")
+        return True
+
+
 def migrate_discovery_artifacts(
     project_root: Path,
     provider_cfg: dict,
@@ -539,6 +553,16 @@ def apply_discovery_migration(
     resolved = resolve_discovery_paths(provider_cfg)
     if not (isinstance(provider_cfg, dict) and provider_cfg.get("agent-discovery") is True):
         return resolved, []
+    discovery = provider_cfg.get("discovery")
+    if isinstance(discovery, dict):
+        legacy = [
+            project_root / provider_cfg[k]
+            for k in _DISCOVERY_PATH_KEYS
+            if isinstance(provider_cfg.get(k), str) and provider_cfg[k]
+            and isinstance(discovery.get(k), str) and discovery[k] != provider_cfg[k]
+        ]
+        if not _legacy_path_exists(legacy, log, "discovery-migration"):
+            return resolved, []
     results = migrate_discovery_artifacts(project_root, provider_cfg, log, dry_run=dry_run, ts=ts)
     return resolved, results
 
@@ -674,6 +698,13 @@ def migrate_provider_paths(
     requires_flag = spec.get("requires-flag")
     if requires_flag and provider_cfg.get(requires_flag) is not True:
         return []
+    try:
+        legacy = [safe_path(project_root, e["remove"]) for e in spec.get("removals", [])]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        log.warn(f"provider-migration[{provider}]: legacy-path check failed ({exc}); running migration")
+    else:
+        if not _legacy_path_exists(legacy, log, f"provider-migration[{provider}]"):
+            return []
     from datetime import datetime
 
     removal_ts = ts or datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -1732,19 +1763,24 @@ def _sync_stage_per_provider(
         # Deliberately outside the ``== "permission"`` block above (Spec-A
         # freeze): the writer is a no-op for non-owners and without v2/state,
         # and the run-scoped registry makes it order-independent.
-        sync_opencode_v2_managed_keys(
-            project_root, config, provider, provider_config,
-            agent_meta_root, log, args.dry_run,
-            claimed_files=opencode_claimed_files,
+        _opencode_v2_reachable = opencode_writers_reachable(
+            project_root, provider_config, provider
         )
+        if _opencode_v2_reachable:
+            sync_opencode_v2_managed_keys(
+                project_root, config, provider, provider_config,
+                agent_meta_root, log, args.dry_run,
+                claimed_files=opencode_claimed_files,
+            )
         # D2 / AC-D7: the dedicated ``cli_file`` of the same surface, directly
         # after the managed-key merge and outside the ``== "permission"`` block.
         # A no-op for non-owners, without ``cli_file`` (v1) or without a
         # configured ``cli`` object (except a recorded rollback).
-        sync_opencode_cli_file(
-            project_root, config, provider, provider_config,
-            log, args.dry_run,
-        )
+        if _opencode_v2_reachable:
+            sync_opencode_cli_file(
+                project_root, config, provider, provider_config,
+                log, args.dry_run,
+            )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,

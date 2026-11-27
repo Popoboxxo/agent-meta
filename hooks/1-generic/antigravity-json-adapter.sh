@@ -1,7 +1,8 @@
 #!/bin/bash
 # antigravity-json-adapter — Antigravity <-> Claude Code hook-contract adapter
-# version: 1.2.0
+# version: 1.3.0
 # hook_protocol: antigravity-hooks-json
+# changelog: 1.3.0: issue #1251 -- discard inherited AM_PROJECT_DIR and derive the provider-neutral project anchor solely from the deployed adapter path (bounded 64-level walk to .meta-config/); payload cwd/workspacePaths never select the root
 # description: Translates Google Antigravity's verified hook contract (hooks.json) to the Claude Code contract hooks/1-generic/*.sh are written against (issue #674 Phase 3.1)
 #
 # NOT a hook itself — no `# hook:`/`# event:` header, so scripts/lib/hooks.py
@@ -52,6 +53,27 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_NAME="${1:-}"
 INPUT=$(cat)
+
+# --- Provider-neutral project anchor (issue #1251) -------------------------
+# The deployed adapter path is the only trusted location signal. Discard any
+# inherited value, then walk at most 64 parents upward looking for .meta-config/.
+# Payload cwd, tool arguments and workspacePaths remain payload data and must
+# never retarget the hook's project root. No match leaves AM_PROJECT_DIR unset.
+unset AM_PROJECT_DIR
+_ROOT_CANDIDATE="$SCRIPT_DIR"
+_ROOT_DEPTH=0
+while [ "$_ROOT_DEPTH" -le 64 ]; do
+  if [ -d "$_ROOT_CANDIDATE/.meta-config" ]; then
+    AM_PROJECT_DIR="$_ROOT_CANDIDATE"
+    export AM_PROJECT_DIR
+    break
+  fi
+  _ROOT_PARENT="$(dirname -- "$_ROOT_CANDIDATE")"
+  [ "$_ROOT_PARENT" = "$_ROOT_CANDIDATE" ] && break
+  _ROOT_CANDIDATE="$_ROOT_PARENT"
+  _ROOT_DEPTH=$((_ROOT_DEPTH + 1))
+done
+unset _ROOT_CANDIDATE _ROOT_DEPTH _ROOT_PARENT
 
 if [ -z "$TARGET_NAME" ]; then
   echo "ANTIGRAVITY_ADAPTER: no target hook script argument — registration bug, skipping hook (fail-open)." >&2

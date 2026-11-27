@@ -23,12 +23,12 @@
 registry-version: 1
 readers:
   - key: repo_containment
-    reader: hooks/1-generic/repo-containment-impl.sh
-    evidence: ".claude/hooks/repo-containment-impl.sh#runtime-reader:repo_containment"
+    reader: hooks/1-generic/lib/hook_containment_config.py
+    evidence: ".claude/hooks/lib/hook_containment_config.py#runtime-reader:repo_containment"
     effect: "Schreib-Containment der Agenten"
   - key: orchestrator
-    reader: hooks/1-generic/orchestrator-guard-impl.sh
-    evidence: ".claude/hooks/orchestrator-guard-impl.sh#runtime-reader:orchestrator"
+    reader: hooks/1-generic/lib/hook_guard_policy.py
+    evidence: ".claude/hooks/lib/hook_guard_policy.py#runtime-reader:orchestrator"
     effect: "Strict-Mode/Guard"
   - key: variables.TEST_COMMAND
     reader: hooks/1-generic/dod-push-check.sh

@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.conftest import ALL_PROVIDERS
+
 _ROOT = Path(__file__).resolve().parent.parent
 _CAPS = yaml.safe_load(
     (_ROOT / "config" / "provider-capabilities.yaml").read_text(encoding="utf-8")
@@ -48,10 +50,6 @@ def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
 
 
-_EXPECTED_PROVIDERS = {
-    "Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
-    "Codex", "ZCode", "KimiCode",
-}
 # Every provider with a written rules directory now declares a file read channel
 # (native-rules-dir / path-scoped): Gemini with IC-15 Nr. 8 (embedded via
 # context.fileName), Copilot with IC-15 Nr. 3 (Task 1.29: .github/instructions
@@ -60,8 +58,11 @@ _EXPECTED_PROVIDERS = {
 
 
 def test_providers_present():
-    assert len(_PROVIDERS) == 9
-    assert set(_PROVIDERS) == _EXPECTED_PROVIDERS
+    # The registry (ai-providers.yaml union provider-capabilities.yaml) is the
+    # expected set: a provider that exists without carrying every capability key
+    # fails here. Central constant instead of a local copy (issue #1240), so a
+    # newly registered provider is checked automatically.
+    assert set(_PROVIDERS) == set(ALL_PROVIDERS)
 
 
 @pytest.mark.parametrize("provider", _PROVIDERS)

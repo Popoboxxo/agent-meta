@@ -30,6 +30,7 @@ import pytest
 
 from scripts.lib.config import build_variables, load_config
 from scripts.lib.context_templates.builder import TemplateBuilder
+from tests.conftest import ALL_PROVIDERS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -731,8 +732,6 @@ def test_540_d3b_opencode_core_rules_inline_mcp_sections_lazy(seeded_project):
 #   3. has_rules:false Opencode embeds those rules in the COMPACT variant.
 # ---------------------------------------------------------------------------
 
-_ALL_PROVIDERS = ("Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
-                  "Codex", "ZCode", "KimiCode")
 _LEFTOVER_MARKERS = ("{{#if", "{{else}}", "{{/if}}", "{{#each", "{{/each}}",
                      "{{#unless", "{{/unless}}", "{{>")
 # OVERVIEW section headings dropped from the three platform rules in compact
@@ -778,7 +777,7 @@ def _render_provider_context(provider: str, workdir: Path):
     return context_file, target.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("provider", _ALL_PROVIDERS)
+@pytest.mark.parametrize("provider", ALL_PROVIDERS)
 def test_540_compact_matrix_no_leftover_markers(provider, tmp_path):
     # Every provider's compact context file must render without a single
     # unresolved handlebars marker — the failure mode raw {{#if COMPACT_MODE}}

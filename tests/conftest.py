@@ -19,6 +19,7 @@ See ``docs/concepts/repo-containment-prison-mode.md`` §5.5.
 
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -26,6 +27,45 @@ import pytest
 from pytest import PytestWarning
 
 _AGENT_META_ROOT = Path(__file__).resolve().parents[1]
+
+#: Single source of truth for "which providers exist" in the test suite
+#: (issue #1240 / spec C4). Derived from the framework registry -- never
+#: hardcoded, so a newly registered provider appears in every parametrised
+#: test automatically.
+_SCRIPTS_DIR = _AGENT_META_ROOT / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+
+def _load_all_providers():
+    """Provider names from the registry, or a loud failure (no fallback).
+
+    ``lib.providers.registered_provider_names`` is the loader delivered by
+    #1239 (spec C3): the union of ``config/ai-providers.yaml`` and
+    ``config/provider-capabilities.yaml``, sorted. An empty or unreadable
+    registry is a framework defect -- raising here turns it into a collection
+    error instead of letting tests paper over it with a stale local list.
+    """
+    from lib.providers import registered_provider_names
+
+    try:
+        names = registered_provider_names(_AGENT_META_ROOT)
+    except Exception as exc:  # noqa: BLE001 -- re-raised with context below
+        raise RuntimeError(
+            "Cannot read the provider registry "
+            f"({_AGENT_META_ROOT / 'config'}) for tests.ALL_PROVIDERS: {exc}"
+        ) from exc
+    if not names or any(not str(name).strip() for name in names):
+        raise RuntimeError(
+            "Provider registry is empty: config/ai-providers.yaml and "
+            "config/provider-capabilities.yaml yielded no usable provider "
+            "names. tests.ALL_PROVIDERS has no silent fallback -- repair the "
+            "registry instead of hardcoding a provider list in a test."
+        )
+    return tuple(names)
+
+
+ALL_PROVIDERS = _load_all_providers()
 
 #: The hint names the framework token, never a system-temp literal: the value
 #: behind ``PYTEST_BASETEMP`` is what sync.py resolves from

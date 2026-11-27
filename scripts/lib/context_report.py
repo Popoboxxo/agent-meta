@@ -41,6 +41,7 @@ from typing import Mapping, Optional, Sequence
 import yaml
 
 from lib.context_profile import resolve_context_profile
+from lib.providers import merge_capability_sources
 from lib.rules import CLAUDE_RULES_DIR
 from lib.repo_containment import (
     TmpSinkError,
@@ -203,17 +204,20 @@ def find_over_hard_cap(report: Mapping[str, Mapping]) -> list:
 
 
 def merge_provider_mappings(provider_config: Mapping, capabilities: Mapping) -> dict:
-    """Merge ai-providers entries with the capability matrix per provider."""
-    merged: dict = {}
-    for name, entry in (provider_config.get("providers") or provider_config).items():
-        if not isinstance(entry, Mapping):
-            continue
-        combined = dict(entry)
-        combined.update(capabilities.get(name) or {})
+    """Merge ai-providers entries with the capability matrix per provider.
+
+    ``config/ai-providers.yaml`` is the leading capability source (Q6): its
+    values are copied verbatim and never overridden; the capability matrix only
+    adds keys. A key both sources declare with different values raises
+    :class:`lib.providers.ProviderSourceConflict` naming both file locations —
+    never a silent override in either direction
+    (``lib.providers.merge_capability_sources``).
+    """
+    merged = merge_capability_sources(provider_config, capabilities)
+    for combined in merged.values():
         if combined.get("has_rules") and not combined.get("rules_dir"):
             # Same fallback sync_rules() applies to rules_dir-less providers.
             combined["rules_dir"] = CLAUDE_RULES_DIR
-        merged[name] = combined
     return merged
 
 

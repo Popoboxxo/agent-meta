@@ -232,6 +232,7 @@
     "release.versioning",
     "repo_containment",
     "repo_containment.enabled",
+    "repo_containment.protected_paths",
     "repo_containment.provider-overrides",
     "repo_containment.tmp-sink",
     "repo_containment.tmp-sink.cleanup",

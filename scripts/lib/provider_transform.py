@@ -409,7 +409,7 @@ def _apply_agent_transform(
                                        — legacy alias; `tools-format` wins when
                                          both are present
       strip-fields: [name, ...]       — frontmatter keys to remove
-      strip-claude-lines: bool        — strip Claude-only body lines + reassemble
+      (Extension-Hook line stripping is capability-driven: see should_strip_extension_hook)
       body-note: gemini-registration  — inject the Gemini registration note
       body-sanitize-hr: bool          — replace body `^---$` lines with `___`
       frontmatter-mechanism: opencode-native
@@ -632,6 +632,7 @@ def _apply_agent_transform(
                 deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
                 subagent_shell=_subagent_shell,
                 subagent_shell_verified_state=_subagent_shell_state,
+                strip_ext_hook=should_strip_extension_hook(provider_config.get(provider)),
             )
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
@@ -639,6 +640,7 @@ def _apply_agent_transform(
             deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
             subagent_shell=_subagent_shell,
             subagent_shell_verified_state=_subagent_shell_state,
+            strip_ext_hook=should_strip_extension_hook(provider_config.get(provider)),
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -657,8 +659,8 @@ def _apply_agent_transform(
             _model_note(model)
         _fm = _parse_frontmatter_yaml(content)
         body = _strip_frontmatter(content)
-        if spec.get('strip-claude-lines'):
-            body = _strip_claude_specific_lines(body)
+        if should_strip_extension_hook(provider_config.get(provider)):
+            body = _strip_extension_hook_lines(body)
         # IC-15 Nr. 21: a provider whose capability is
         # `read_only_enforcement: sandbox` maps read-only roles (template tools
         # without Write/Edit) to the read-only sandbox value declared under
@@ -800,9 +802,9 @@ def _apply_agent_transform(
         content = _remove_frontmatter_fields(content, list(fields_to_strip))
 
     # --- 7. body rewrite ---
-    if spec.get('strip-claude-lines'):
+    if should_strip_extension_hook(provider_config.get(provider)):
         body = _strip_frontmatter(content)
-        body = _strip_claude_specific_lines(body)
+        body = _strip_extension_hook_lines(body)
         if spec.get('body-sanitize-hr'):
             body = re.sub(r'(?m)^---$', '___', body)
         if spec.get('body-note') == 'gemini-registration':
@@ -1094,6 +1096,7 @@ def _transform_frontmatter_for_opencode(
     edit_allow_paths: tuple[str, ...] = (),
     subagent_shell=_SHELL_GRANT_UNSET,
     subagent_shell_verified_state=_SHELL_GRANT_UNSET,
+    strip_ext_hook: bool = True,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -1130,7 +1133,8 @@ def _transform_frontmatter_for_opencode(
     default ``deny_edit=False`` renders byte-identically to before.
     """
     body = _strip_frontmatter(content)
-    body = _strip_claude_specific_lines(body)
+    if strip_ext_hook:
+        body = _strip_extension_hook_lines(body)
 
     template_fm = _parse_frontmatter_yaml(content)
     strip_fields = strip_fields or []
@@ -1369,6 +1373,7 @@ def _transform_frontmatter_for_opencode_v2(
     edit_allow_paths: tuple[str, ...] = (),
     subagent_shell=_SHELL_GRANT_UNSET,
     subagent_shell_verified_state=_SHELL_GRANT_UNSET,
+    strip_ext_hook: bool = True,
 ) -> str:
     """Build the native opencode **v2** agent frontmatter.
 
@@ -1396,7 +1401,8 @@ def _transform_frontmatter_for_opencode_v2(
     `edit_allow_paths` allows, so the gate survives on the agent level too.
     """
     body = _strip_frontmatter(content)
-    body = _strip_claude_specific_lines(body)
+    if strip_ext_hook:
+        body = _strip_extension_hook_lines(body)
 
     template_fm = _parse_frontmatter_yaml(content)
     strip_fields = strip_fields or []
@@ -1450,21 +1456,22 @@ def _transform_frontmatter_for_opencode_v2(
         new_body = f"{provenance_comment}\n{new_body}"
     return _reassemble_body(content, new_body)
 
-def _strip_claude_specific_lines(content: str) -> str:
-    """Remove Claude Code-specific lines that are meaningless in other providers.
+def should_strip_extension_hook(provider_entry: dict | None) -> bool:
+    """True when the provider lacks the `extension_hook_path` capability (empty = missing)."""
+    return not (provider_entry or {}).get('extension_hook_path')
 
-    Currently strips:
-    - Extension-Hook lines: > **Extension:** Falls `.claude/3-project/...` existiert → ...
-    - Read-Tool instructions referencing .claude/ paths
-    """
-    lines = content.splitlines(keepends=True)
+
+def _strip_extension_hook_lines(content: str) -> str:
+    """Remove Extension-Hook lines (`> **Extension:** ... .claude/3-project/ ...`)."""
+    hook_path = ".claude/3-project/"
     out = []
-    for line in lines:
+    for line in content.splitlines(keepends=True):
         stripped = line.strip()
-        if stripped.startswith("> **Extension:**") and ".claude/3-project/" in stripped:
+        if stripped.startswith("> **Extension:**") and hook_path in stripped:
             continue
         out.append(line)
     return "".join(out)
+
 
 def _make_slim_body(content: str) -> str:
     """Reduce agent body to a compact prompt-friendly version.

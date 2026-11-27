@@ -34,6 +34,11 @@ pytestmark = pytest.mark.skipif(
 def _env(**extra: str) -> dict:
     env = dict(os.environ)
     env.pop("CLAUDE_PROJECT_DIR", None)
+    # An inherited anchor/override would point the hooks at the developer's
+    # real project instead of the tmp fixture.
+    for key in ("AM_PROJECT_DIR", "SOC_AGENT_META_ROOT", "SOC_SYNC_ON_CONFIG_CHANGE",
+                "SOC_TEST_MARKER", "SOC_TEST_SLEEP", "SOC_SYNC_TIMEOUT"):
+        env.pop(key, None)
     env.update(extra)
     return env
 
@@ -73,20 +78,35 @@ def test_lifecycle_check_writes_the_configured_merge_task(tmp_path):
     assert "- [ ] **[tester]** smoke-merge-task" in pending.read_text(encoding="utf-8")
 
 
-def test_sync_on_config_change_queues_a_resync_task(tmp_path):
+def test_sync_on_config_change_runs_sync_for_a_config_write(tmp_path):
+    """MB-3: the hook runs the project's sync.py, not a lifecycle task queue.
+
+    A stub sync.py in the .agent-meta submodule layout records the call, so
+    the tmp project is never rewritten by a real sync.
+    """
     root = _project(tmp_path, {"ai-providers": ["Claude"]})
+    (root / ".meta-config").mkdir()
+    (root / ".meta-config" / "project.yaml").write_text("name: demo\n", encoding="utf-8")
+    stubs = root / ".agent-meta" / "scripts"
+    stubs.mkdir(parents=True)
+    (stubs / "sync.py").write_text(
+        "import os, pathlib\n"
+        "pathlib.Path(os.environ['SOC_TEST_MARKER']).write_text('called', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    marker = tmp_path / "sync-called"
+    env = _env(AM_PROJECT_DIR=str(root), SOC_TEST_MARKER=str(marker))
     hook = _HOOKS / "sync-on-config-change.sh"
     other = {"tool_name": "Write", "tool_input": {"file_path": str(root / "README.md")}}
     payload = {"tool_name": "Write",
                "tool_input": {"file_path": str(root / ".meta-config" / "project.yaml")}}
 
-    assert _run(hook, root, other).returncode == 0
-    pending = root / ".claude" / "pending-tasks.md"
-    assert not pending.exists(), "only a project.yaml write may queue the re-sync"
+    assert _run(hook, root, other, env).returncode == 0
+    assert not marker.exists(), "only a project.yaml write may trigger sync.py"
 
-    result = _run(hook, root, payload)
+    result = _run(hook, root, payload, env)
     assert result.returncode == 0, result.stderr
-    assert "scripts/sync.py" in pending.read_text(encoding="utf-8")
+    assert marker.exists(), "a project.yaml write must run sync.py"
 
 
 def test_viz_log_appends_one_event_per_tool_call(tmp_path):

@@ -98,6 +98,9 @@ providers:
     isolation-mechanism: claude-settings-deny
     isolation-display-name: Claude Code
     bash_tool_name: Bash
+    # Capability: path of the project extension dir this provider reads; providers
+    # without it get the Extension-Hook lines stripped (#1255).
+    extension_hook_path: .claude/3-project/
     provider_root_dirs:
     - .claude/
     gitignore_entries:
@@ -250,7 +253,6 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
-      strip-claude-lines: true
       body-note: gemini-registration
       tools-format: filter
       # G-2: Antigravity subagent tool vocabulary (Claude -> provider name);
@@ -529,7 +531,6 @@ providers:
       tools-format: remove
       tool-name-map: {}
       reject-fields: []
-      strip-claude-lines: true
       body-sanitize-hr: true
   Copilot:
     # PRE-4/OQ-5 + AC-8: GitHub-cloud canonical paths; agent files use the
@@ -608,7 +609,6 @@ providers:
       tools-format: skip
       tool-name-map: {}
       reject-fields: []
-      strip-claude-lines: true
   Mammouth:
     agents_dir: .mammouth/agents
     agent_ext: .md
@@ -727,7 +727,6 @@ providers:
       - stop_sequences
       - max_output_tokens
       reject-fields: []
-      strip-claude-lines: true
   Codex:
     agents_dir: .codex/agents
     agent_ext: .toml
@@ -817,7 +816,6 @@ providers:
       tools-format: skip
       tool-name-map: {}
       reject-fields: []
-      strip-claude-lines: true
   ZCode:
     agents_dir: .zcode/agents
     agent_ext: .md
@@ -889,7 +887,6 @@ providers:
       tools-format: skip
       tool-name-map: {}
       reject-fields: []
-      strip-claude-lines: true
   KimiCode:
     agents_dir: .kimi-code/agents
     agent_ext: .md
@@ -972,4 +969,3 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
-      strip-claude-lines: true

@@ -1,6 +1,6 @@
 #!/bin/bash
-# version: 1.6.1
-# changelog: 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, $CLAUDE_PROJECT_DIR (hook environment) and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
+# version: 1.10.0
+# changelog: 1.10.0: issue #1275b -- resolve repo_containment.protected_paths with the syncer's default-replace-plus-gitmodules merge contract, emit the effective list as one JSON line, forward it to the path module as a single quoted argv without eval/splitting, fail safe to defaults plus gitmodules on invalid/unreadable config, and describe .gitmodules as conditional; 1.9.0: issue #1275a -- block Write/Edit/NotebookEdit and detected Bash writes under external/, .agent-meta/ and existing .gitmodules submodule paths; AM_ALLOW_PROTECTED_WRITE=1 bypasses only the protected-path gate, never root containment or the tmp-sink rule; mirror the decision in the non-deployed kernel and pin hook/kernel parity; convention boundary only; 1.8.0: issue #1238b1 -- extract config resolution, path verdicts and Bash write-target detection into flat hook_containment_*.py modules deployed beside hook_common.sh; preserve output, exit codes and fail-closed behavior, with only the trivial realpath -c one-liner retained; 1.7.0: issue #1251 -- fixed jail root and Bash variable expansion use adapter-owned AM_PROJECT_DIR exclusively; deployment-layout and payload-anchor fallbacks remain unchanged; 1.6.1: issue #1161 Pkt5 -- all payload fields are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of five separate field-read interpreter starts; the hook_json_usable / hook_known_tool_name fail-closed probes are unchanged; 1.6.0: issue #1151 (audit G1) -- NotebookEdit (tool_input.notebook_path) and MultiEdit are judged like Edit, PowerShell like Bash (F6-01); '~', '$HOME' and '${HOME}' targets are expanded, and curl -o/--output/--output-dir, wget -O/-o/-a/-P, tar -C (extract) / -f (create), unzip -d and git clone <dir> are write targets (F6-06); cd/pushd/popd are tracked: a relative target is judged against every directory the command may be in ('&&' moves it, any other separator keeps the old one too) and an unresolvable cd target blocks a later relative write (F6-07); a cd inside $(...) or a '( ... )' subshell is scoped to it and does not move the outer command, the hook-environment project-dir variable and $PWD (current directory set) are resolved as cd/write targets, and an old-style tar cluster ('tar cf /etc/x.tar .') yields its -f/-C values (review follow-up); bodies of $(...)/backtick substitutions are scanned (shared splitter, F6-03); the provider placeholder is no longer spelled out in a comment the sync-time replace rewrote (F6-12).
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -18,7 +18,11 @@
 #                    special carve-out: allowed when the sink is enabled,
 #                    blocked when it is disabled (spec §7: ".tmp mit aktivem
 #                    Sink -> 0; .tmp ohne Sink -> 2"), even though it sits
-#                    inside the root.
+#                    inside the root. Protected paths default to external/,
+#                    .agent-meta/ and existing .gitmodules entries; a configured
+#                    repo_containment.protected_paths list replaces the defaults.
+#                    Writes are blocked unless AM_ALLOW_PROTECTED_WRITE=1 is set;
+#                    that override never widens the jail root or the sink rule.
 #   * Bash        -> best-effort tokenized detection of write-ish commands /
 #                    redirections; block obvious writes outside the allowed
 #                    roots, allow reads.
@@ -31,11 +35,12 @@
 # We deliberately do NOT import scripts/lib/repo_containment.py at runtime:
 # that module is an agent-meta-internal, sync-time library and is NOT deployed
 # into target projects together with the hooks (only hooks/ is), so importing
-# it would fail in exactly the projects this guard protects. Instead we reuse
-# the SAME config-reading mechanism as orchestrator-guard-impl.sh (python3 +
-# yaml.safe_load on .meta-config/project.yaml, passing the path as argv so
-# backslash-bearing Windows paths are never string-interpolated) and mirror
-# the resolver's precedence and safe-side rules inline. The tmp-sink path is
+# it would fail in exactly the projects this guard protects. Instead the
+# deployed hook_containment_config.py uses the SAME config-reading mechanism
+# as orchestrator-guard-impl.sh (python3 + yaml.safe_load on
+# .meta-config/project.yaml, passing the path as argv so backslash-bearing
+# Windows paths are never string-interpolated) and mirrors the resolver's
+# precedence and safe-side rules. The tmp-sink path is
 # re-validated before it widens the allow-list with the SAME rule set as
 # scripts/lib/repo_containment.py::tmp_sink_path_error (IC-15 Nr. 27 a/b, hook
 # mirror f; parity enforced by tests/test_tmp_sink_path_parity.py over the
@@ -46,9 +51,21 @@
 # accepted path is used in its canonical form (backslash -> slash before
 # normpath). An invalid path keeps falling back to '.tmp' (never aborts at
 # runtime); only the decision and canonical form must match Python. The
-# protected provider directories are embedded below (config/ai-providers.yaml
-# is not deployed); the parity test fails when they drift from
-# provider_root_dirs.
+# protected provider directories are embedded in hook_containment_config.py
+# (config/ai-providers.yaml is not deployed); the parity test fails when they
+# drift from provider_root_dirs.
+#
+# Protected write paths (#1275b) live in the deployed flat
+# hook_containment_path.py: repo_containment.protected_paths replaces the
+# defaults external/ and .agent-meta/ when present; an existing
+# <root>/.gitmodules always contributes every valid root-relative path = entry.
+# Without .gitmodules and without config only the defaults apply. The config
+# module emits the effective list as one JSON line; the shell forwards it as a
+# single quoted argv value (never eval/splitting). Without
+# AM_ALLOW_PROTECTED_WRITE=1 the gate stays active; root containment and the
+# tmp-sink rule stay active even with the override. This is a convention
+# boundary, not a security boundary. The non-deployed kernel/containment.py
+# mirrors the default/gitmodules block/allow decision (tests/test_protected_paths.py).
 #
 # T24 (D1): the SCRATCH SINK PATH has a single source with this precedence:
 # ARTIFACT_SCRATCH_DIR env -> classes[scratch].path from
@@ -84,7 +101,7 @@
 #
 # Fixed jail root (v1.4.0, #944 SR-B-18): the repo root prefers an anchor that
 # does NOT come from the payload, in this order:
-#   1. $CLAUDE_PROJECT_DIR, when it carries `.meta-config/`;
+#   1. $AM_PROJECT_DIR, when it carries `.meta-config/`;
 #   2. the deployment layout `<root>/.claude/hooks/` this file lives in, when
 #      `<root>` carries `.meta-config/`.
 # Before this, a session whose shell was outside the project (or a forged
@@ -296,6 +313,20 @@ case "$AGENT_META_PROVIDER" in
   *) PROVIDER="$AGENT_META_PROVIDER" ;;
 esac
 
+# The executable Python lives in flat modules beside hook_common.sh so sync.py
+# deploys the same files to every provider's hooks/lib directory. A partial
+# deployment must fail CLOSED (#595), never fall back to embedded Python.
+for _containment_module in \
+  hook_containment_config.py \
+  hook_containment_path.py \
+  hook_containment_shell.py; do
+  if [ ! -r "$SCRIPT_DIR/lib/$_containment_module" ]; then
+    echo "REPO_CONTAINMENT: required module $SCRIPT_DIR/lib/$_containment_module is missing or unreadable." >&2
+    echo "Failing closed (issue #595) — re-run sync.py to redeploy the hooks/lib/ directory." >&2
+    exit 2
+  fi
+done
+
 # --- Realpath helper ---------------------------------------------------
 # stdlib-only (python is already required above), works for a path that does
 # not exist yet, and normalizes symlinks on every platform. Prints "" when the
@@ -325,7 +356,7 @@ fi
 
 # --- Fixed jail root (issue #944 SR-B-18) -----------------------------
 # Preferred over every payload-derived anchor. 1) the harness-set
-# $CLAUDE_PROJECT_DIR when it carries .meta-config/; 2) the deployment layout
+# $AM_PROJECT_DIR when it carries .meta-config/; 2) the deployment layout
 # <root>/.claude/hooks/ this script was synced into. Running straight from the
 # source tree (agent-meta's hooks/1-generic/) matches neither, so the tests
 # and ad-hoc runs keep the documented payload-anchor behaviour below.
@@ -338,8 +369,8 @@ fi
 # (review finding F5): that silently lets a payload cwd choose the jail.
 resolve_fixed_root() {
   local candidate root
-  if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR/.meta-config" ]; then
-    root="$(resolve_realpath "$CLAUDE_PROJECT_DIR")"
+  if [ -n "${AM_PROJECT_DIR:-}" ] && [ -d "$AM_PROJECT_DIR/.meta-config" ]; then
+    root="$(resolve_realpath "$AM_PROJECT_DIR")"
     if [ -z "$root" ]; then
       return 2
     fi
@@ -372,7 +403,7 @@ FIXED_ROOT="$(resolve_fixed_root)" || _FIXED_ROOT_RC=$?
 if [ "$_FIXED_ROOT_RC" -eq 1 ] && [ -z "$FIXED_ROOT" ]; then
   : # no fixed root applies; the payload anchor is the documented fallback
 elif [ "$_FIXED_ROOT_RC" -ne 0 ] || [ -z "$FIXED_ROOT" ]; then
-  echo "REPO_CONTAINMENT: the fixed jail root (\$CLAUDE_PROJECT_DIR or the deployment layout) could not be resolved." >&2
+  echo "REPO_CONTAINMENT: the fixed jail root (\$AM_PROJECT_DIR or the deployment layout) could not be resolved." >&2
   echo "Failing closed (review finding F5) — a selected root must never degrade to the payload anchor." >&2
   exit 2
 fi
@@ -540,214 +571,12 @@ fi
 CONFIG_FILE="$REPO_ROOT/.meta-config/project.yaml"
 
 # --- Effective config resolution (mirrors scripts/lib/repo_containment.py) ---
-# Prints three KEY=VALUE lines (ENABLED/SINK_ENABLED/SINK_PATH, the raw
-# project.yaml values pinned by the parity suite) plus SCRATCH_PATH, the
-# effective T24 sink path. ALWAYS exits 0. Any failure prints safe defaults.
+# Prints ENABLED/SINK_ENABLED/SINK_PATH/SINK_REJECTED, PROTECTED_PATHS_JSON and
+# SCRATCH_PATH. Config failures exit 0 with safe defaults. The JSON list stays
+# on one physical line and is passed to the path module as one quoted argv.
 read_effective_containment() {
-  "$_PY" - "$1" "$2" <<'PYEOF'
-import json
-import os
-import posixpath
-import re
-import sys
-
-CONFIG_FILE, PROVIDER = sys.argv[1], sys.argv[2]
-
-# Mirrors scripts/lib/repo_containment.py::tmp_sink_path_error (lexical rules).
-_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
-_RESERVED = frozenset(
-    ["CON", "PRN", "AUX", "NUL"]
-    + ["COM%d" % i for i in range(1, 10)]
-    + ["LPT%d" % i for i in range(1, 10)]
-)
-_FORBIDDEN_CHARS = frozenset('<>"|?*')
-# Lower-cased protected segment prefixes (framework dirs + provider_root_dirs).
-_PROTECTED = (
-    (".git",), (".claude",), (".meta-config",), (".agents",), (".codex",),
-    (".continue",), (".gemini",), (".github", "copilot"), (".kimi-code",),
-    (".mammouth",), (".opencode",), (".zcode",),
-)
-
-
-def canonical_path(path):
-    """Backslash -> slash BEFORE normpath, always POSIX-style."""
-    return posixpath.normpath(path.replace("\\", "/"))
-
-
-def path_error(path):
-    """Return an error string for an unsafe sink path, else None."""
-    if not isinstance(path, str) or not path.strip():
-        return "empty or not a string"
-    if _WINDOWS_DRIVE_RE.match(path):
-        return "drive-letter path"
-    if path[:1] in ("/", "\\"):
-        return "absolute or UNC path"
-    if any(ord(ch) < 32 for ch in path):
-        return "control character"
-    if path in (".", ".."):
-        return "root or parent"
-    segments = path.replace("\\", "/").split("/")
-    if any(segment == ".." for segment in segments):
-        return "'..' segment"
-    for segment in segments:
-        if segment in ("", "."):
-            continue
-        if ":" in segment:
-            return "':' in segment"
-        if any(ch in _FORBIDDEN_CHARS for ch in segment):
-            return "forbidden character"
-        if segment[-1] in (".", " "):
-            return "trailing dot or space"
-        if segment.split(".", 1)[0].rstrip(" ").upper() in _RESERVED:
-            return "reserved Windows name"
-    normalized = canonical_path(path)
-    if normalized in ("", ".", "..") or normalized.startswith("../"):
-        return "escapes the root"
-    lowered = tuple(seg.lower() for seg in normalized.split("/"))
-    for prefix in _PROTECTED:
-        if lowered[: len(prefix)] == prefix:
-            return "protected directory"
-    return None
-
-
-def resolved_scratch_path(project_path, config_file):
-    """T24 (D1): resolve the single scratch source without widening the jail.
-
-    Precedence: ARTIFACT_SCRATCH_DIR env -> classes[scratch].path in the
-    resolved matrix data file -> repo_containment.tmp-sink.path -> '.tmp'.
-    Every candidate is checked with the SAME unchanged path_error() above; an
-    unsafe value is ignored with a warning and the next source is tried. A
-    missing or broken data file falls back to the legacy key (fail closed) --
-    it never opens the prison. project_path is already validated/canonical.
-    """
-    sources = []
-    env_path = os.environ.get("ARTIFACT_SCRATCH_DIR")
-    if env_path:
-        sources.append(("environment ARTIFACT_SCRATCH_DIR", env_path))
-
-    data_file = os.path.join(
-        os.path.dirname(config_file), "artifact-locations.resolved.json"
-    )
-    if os.path.isfile(data_file):
-        try:
-            with open(data_file, encoding="utf-8") as handle:
-                data = json.load(handle)
-            # T15 emits classes as a name-keyed mapping; the path-guard
-            # contract also documents a name-tagged list. Accept both.
-            classes = data.get("classes") if isinstance(data, dict) else None
-            scratch = classes.get("scratch") if isinstance(classes, dict) else None
-            if scratch is None and isinstance(classes, list):
-                scratch = next(
-                    (c for c in classes
-                     if isinstance(c, dict) and c.get("name") == "scratch"),
-                    None,
-                )
-            data_path = scratch.get("path") if isinstance(scratch, dict) else None
-            if isinstance(data_path, str) and data_path.strip():
-                sources.append(("artifact-locations.classes.scratch.path", data_path))
-            else:
-                print(
-                    "REPO_CONTAINMENT: warning: " + data_file
-                    + " has no artifact-locations.classes.scratch.path; falling back"
-                    + " to repo_containment.tmp-sink.path (fail-closed).",
-                    file=sys.stderr,
-                )
-        except Exception as exc:
-            print(
-                "REPO_CONTAINMENT: warning: could not read " + data_file
-                + " (" + type(exc).__name__ + "); falling back to"
-                + " repo_containment.tmp-sink.path (fail-closed).",
-                file=sys.stderr,
-            )
-    else:
-        print(
-            "REPO_CONTAINMENT: warning: " + data_file
-            + " not found; falling back to repo_containment.tmp-sink.path"
-            + " for the scratch sink (fail-closed).",
-            file=sys.stderr,
-        )
-
-    sources.append(("repo_containment.tmp-sink.path", project_path))
-    for label, candidate in sources:
-        if path_error(candidate) is None:
-            return canonical_path(candidate)
-        print(
-            "REPO_CONTAINMENT: warning: unsafe scratch path from " + label
-            + " (" + repr(candidate) + "); ignored (fail-closed).",
-            file=sys.stderr,
-        )
-    return ".tmp"
-
-
-def emit(enabled, sink_enabled, sink_path, rejected=False):
-    # SINK_REJECTED is observed only by tests/test_tmp_sink_path_parity.py
-    # (AC-97); the shell consumer deliberately ignores it (silent fallback).
-    print("ENABLED=%d" % (1 if enabled else 0))
-    print("SINK_ENABLED=%d" % (1 if sink_enabled else 0))
-    print("SINK_PATH=%s" % sink_path)
-    print("SINK_REJECTED=%d" % (1 if rejected else 0))
-
-
-try:
-    import yaml
-
-    with open(CONFIG_FILE, encoding="utf-8") as handle:
-        config = yaml.safe_load(handle) or {}
-
-    raw = config.get("repo_containment")  # runtime-reader:repo_containment
-    rc = raw if isinstance(raw, dict) else {}
-
-    # Master switch: provider-override > project value > default True.
-    # A present-but-non-boolean value resolves safe-side to True (F4).
-    enabled = True
-    handled = False
-    overrides = rc.get("provider-overrides")
-    if isinstance(overrides, dict) and isinstance(PROVIDER, str) and PROVIDER:
-        entry = overrides.get(PROVIDER)
-        if isinstance(entry, dict) and "enabled" in entry:
-            value = entry["enabled"]
-            enabled = value if isinstance(value, bool) else True
-            handled = True
-    if not handled and "enabled" in rc:
-        value = rc["enabled"]
-        enabled = value if isinstance(value, bool) else True
-
-    # tmp-sink settings (independent of the master switch; framework defaults).
-    sink_raw = rc.get("tmp-sink")
-    sink = sink_raw if isinstance(sink_raw, dict) else {}
-    sink_enabled = sink.get("enabled", True)
-    if not isinstance(sink_enabled, bool):
-        sink_enabled = True
-
-    path = sink.get("path", ".tmp")
-    # Same decision and canonical form as Python; invalid => safe fallback.
-    rejected = path_error(path) is not None
-    path = ".tmp" if rejected else canonical_path(path)
-
-    emit(enabled, sink_enabled, path, rejected)
-    # T24 (D1): SCRATCH_PATH is the effective path after precedence; SINK_PATH
-    # above stays the raw project.yaml value so the parity suite keeps its pin.
-    print("SCRATCH_PATH=%s" % resolved_scratch_path(path, CONFIG_FILE))
-except Exception as exc:
-    # F4 safe-side: missing/unreadable/unparseable config never opens silently.
-    # SR-B-20: this used to be silent, so a project that had explicitly set
-    # repo_containment.enabled: false (and whose hook interpreter lacks
-    # PyYAML) kept failing closed with no explanation. The guard still fails
-    # CLOSED -- honouring the opt-out here would need the shared stdlib YAML
-    # subset reader, and a misparse must never open the jail -- but the
-    # ignored opt-out is now visible on stderr.
-    print(
-        "REPO_CONTAINMENT: warning: could not read " + CONFIG_FILE
-        + " with PyYAML (" + type(exc).__name__ + "); containment stays ENABLED."
-        + " A configured repo_containment.enabled: false is NOT honoured in"
-        + " this state (fail-closed). Install PyYAML for the hook interpreter"
-        + " or run the project sync.",
-        file=sys.stderr,
-    )
-    emit(True, True, ".tmp")
-    # Fail-closed: an unreadable config must not let the env/matrix widen the jail.
-    print("SCRATCH_PATH=.tmp")
-PYEOF
+  "$_PY" "$SCRIPT_DIR/lib/hook_containment_config.py" "$1" "$2" \
+    "--include-protected-paths"
 }
 
 CONFIG_OUT="$(read_effective_containment "$CONFIG_FILE" "$PROVIDER")"
@@ -755,12 +584,14 @@ ENABLED="1"
 SINK_ENABLED="1"
 SINK_PATH=".tmp"
 SCRATCH_PATH=""
+PROTECTED_PATHS_JSON="null"
 while IFS='=' read -r _key _value; do
   case "$_key" in
     ENABLED) ENABLED="$_value" ;;
     SINK_ENABLED) SINK_ENABLED="$_value" ;;
     SINK_PATH) SINK_PATH="$_value" ;;
     SCRATCH_PATH) SCRATCH_PATH="$_value" ;;
+    PROTECTED_PATHS_JSON) PROTECTED_PATHS_JSON="$_value" ;;
   esac
 done < <(printf '%s\n' "$CONFIG_OUT")
 
@@ -783,52 +614,24 @@ if [ "$ENABLED" != "1" ]; then
 fi
 
 # --- Path containment verdict -----------------------------------------
-# Prints ALLOW / BLOCK_SINK / BLOCK for the (possibly relative) target.
-# Semantics (spec §7 test table): a target inside the repo root is allowed;
-# a target inside <repo root>/<tmp-sink.path> is allowed ONLY while the sink
-# is enabled — a disabled sink excludes its own subtree even though that
-# subtree physically sits inside the root (`.tmp` with sink -> 0, `.tmp`
-# without sink -> 2). Everything else is BLOCK.
+# Prints ALLOW / BLOCK_SINK / BLOCK_PROTECTED / BLOCK for the (possibly
+# relative) target. Semantics (spec §7 test table): a target inside a protected
+# submodule path is blocked unless AM_ALLOW_PROTECTED_WRITE=1; otherwise a
+# target inside the repo root is allowed; a target inside
+# <repo root>/<tmp-sink.path> is allowed ONLY while the sink is enabled — a
+# disabled sink excludes its own subtree even though that subtree physically
+# sits inside the root (`.tmp` with sink -> 0, `.tmp` without sink -> 2).
+# Everything else is BLOCK.
 # Uses os.path.realpath so symlinks pointing outside the root are refused
 # too; realpath also normalises a not-yet-existing Write target (equivalent
 # to `realpath -m`). On any python error nothing is printed, which the caller
 # treats as BLOCK (fail closed).
 containment_verdict() {
-  "$_PY" - "$REPO_ROOT" "$WORKDIR" "$SINK_ENABLED" "$SINK_PATH" "$1" <<'PYEOF'
-import os
-import sys
-
-root = os.path.realpath(sys.argv[1])
-workdir = os.path.realpath(sys.argv[2])
-sink_enabled = sys.argv[3] == "1"
-sink_path = sys.argv[4]
-raw = sys.argv[5]
-
-if not raw:
-    print("BLOCK")
-    sys.exit(0)
-
-target = os.path.realpath(raw if os.path.isabs(raw) else os.path.join(workdir, raw))
-sink_root = os.path.realpath(os.path.join(root, sink_path))
-
-
-def within(base):
-    try:
-        return os.path.commonpath([base, target]) == base
-    except ValueError:
-        return False
-
-
-if within(sink_root):
-    print("ALLOW" if sink_enabled else "BLOCK_SINK")
-    sys.exit(0)
-
-if within(root):
-    print("ALLOW")
-    sys.exit(0)
-
-print("BLOCK")
-PYEOF
+  # PROTECTED_PATHS_JSON defaults to JSON null on config-reader failure, which
+  # selects the path module's legacy defaults + existing .gitmodules fallback.
+  "$_PY" "$SCRIPT_DIR/lib/hook_containment_path.py" \
+    "$REPO_ROOT" "$WORKDIR" "$SINK_ENABLED" "$SINK_PATH" "$1" \
+    "$PROTECTED_PATHS_JSON"
 }
 
 # How the anchor was obtained, for block messages (the no-root message keeps
@@ -848,6 +651,15 @@ block_write() {
     echo "  target:    $target (relative to an unknown directory)" >&2
     echo "  reason:    a cd/pushd/popd to a computed path ('\$VAR', 'cd -', popd) hides where it lands (#1151)." >&2
     echo "  repair:    use a literal directory or an absolute target inside $REPO_ROOT" >&2
+  elif [ "$reason" = "protected" ]; then
+    echo "REPO_CONTAINMENT: write target is inside a protected path (prison mode)." >&2
+    echo "  target:    $absolute" >&2
+    echo "  reason:    protected paths come from repo_containment.protected_paths" >&2
+    echo "             (default external/, .agent-meta/) plus all valid path =" >&2
+    echo "             entries in an existing .gitmodules file." >&2
+    echo "  override:  AM_ALLOW_PROTECTED_WRITE=1 allows this protected-path write only;" >&2
+    echo "             writes outside $REPO_ROOT remain blocked." >&2
+    echo "  boundary:  best-effort convention boundary, not a security boundary." >&2
   elif [ "$reason" = "sink-disabled" ]; then
     echo "REPO_CONTAINMENT: write target is inside the configured but DISABLED tmp-sink (prison mode)." >&2
     echo "  target:    $absolute" >&2
@@ -880,6 +692,10 @@ block_write() {
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
   case "$(containment_verdict "$FILE_PATH")" in
     ALLOW) exit 0 ;;
+    BLOCK_PROTECTED)
+      block_write "$FILE_PATH" "protected"
+      exit 2
+      ;;
     BLOCK_SINK)
       block_write "$FILE_PATH" "sink-disabled"
       exit 2
@@ -907,502 +723,8 @@ fi
 if [ "$TOOL_NAME" = "Bash" ]; then
   # BASH_CMD was extracted above (an empty one already exited 0 before the
   # anchor step).
-  _DETECTOR_SRC=$(hook_shell_scan_py
-hook_shell_resolver_py
-cat <<'PYEOF'
-import os
-import re
-import shlex
-import sys
-
-# Bytes-in (surrogateescape): invalid UTF-8 / a lone surrogate in the command
-# must not crash the detector (the crash used to be a silent allow).
-command = sys.stdin.buffer.read().decode('utf-8', 'surrogateescape')
-
-# Commands whose operands are created / modified / removed outright.
-WRITE_ALL = {
-    "touch", "mkdir", "rmdir", "rm", "truncate", "mkfifo", "mknod", "tee",
-}
-# Commands whose LAST non-flag operand (or -t/--target-directory value) is
-# the destination write target.
-WRITE_DEST = {"cp", "install", "rsync", "scp", "ln"}
-# In-place editors: only the operands are written when -i/--in-place is set.
-INPLACE = {"sed", "perl", "ruby"}
-# Short options of the INPLACE editors that consume a value: the rest of a
-# cluster after them is a script/program, not a flag (so '-e' does not hide a
-# later 'i' in a script argument, and '-e' alone is not an in-place edit).
-INPLACE_VALUE_OPTS = {"e", "f"}
-
-
-def tokenize(chunk):
-    if not chunk.strip():
-        return []
-    try:
-        lex = shlex.shlex(chunk, posix=True, punctuation_chars="();<>|&")
-        lex.whitespace_split = True
-        lex.commenters = ""
-        return list(lex)
-    except Exception:
-        return chunk.split()
-
-
-def is_flag(token):
-    return token.startswith("-") and token != "-"
-
-
-def is_dev_target(target):
-    return (
-        target in ("/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty", "/dev/zero")
-        or target.startswith("/dev/fd/")
-        or target.startswith("/proc/self/fd/")
-    )
-
-
-HOME = os.environ.get("HOME") or os.path.expanduser("~")
-# Variables whose value the hook knows; an unset one stays a '$' word.
-KNOWN_VARS = {"HOME": HOME, "CLAUDE_PROJECT_DIR": os.environ.get("CLAUDE_PROJECT_DIR")}
-
-
-def expand_home(target):
-    # '~', '~/x', '~user/x', '$HOME/x' and '${HOME}/x' name a real place
-    # outside the repo (#1151 F6-06: they used to be skipped as literal text
-    # or as a '$' variable); $CLAUDE_PROJECT_DIR is expanded from the hook
-    # environment the same way. Any other '$VAR' stays unresolved (known gap).
-    if target.startswith("~"):
-        return os.path.expanduser(target)
-    for name, value in KNOWN_VARS.items():
-        if not value:
-            continue
-        for prefix in ("$" + name, "${" + name + "}"):
-            if target == prefix or target.startswith(prefix + "/"):
-                return value + target[len(prefix):]
-    return target
-
-
-def is_skippable(target):
-    target = expand_home(target)
-    return (
-        not target
-        or target == "-"
-        or target.startswith("&")
-        or target.startswith("$")
-        or is_dev_target(target)
-    )
-
-
-# Options whose value is a write destination (#1151 F6-06). A short option
-# may also carry its value glued ('-o/x') or end a cluster ('-sSLo /x').
-OUTPUT_OPTS = {
-    "curl": ({"-o", "--output", "--output-dir"}, "o"),
-    "wget": ({"-O", "--output-document", "-o", "--output-file", "-a",
-              "--append-output", "-P", "--directory-prefix"}, "OoaP"),
-    "unzip": ({"-d"}, "d"),
-}
-
-
-def option_values(args, long_short, cluster_chars):
-    values = []
-    i = 0
-    while i < len(args):
-        a = args[i]
-        i += 1
-        if a.startswith("--"):
-            name, eq, val = a.partition("=")
-            if name in long_short:
-                if eq:
-                    values.append(val)
-                elif i < len(args):
-                    values.append(args[i])
-                    i += 1
-            continue
-        if a.startswith("-") and a != "-":
-            for k, ch in enumerate(a[1:], start=1):
-                if ch in cluster_chars and "-" + ch in long_short:
-                    if k + 1 < len(a):
-                        values.append(a[k + 1:])
-                    elif i < len(args):
-                        values.append(args[i])
-                        i += 1
-                    break
-    return values
-
-
-# Old-style tar letters that take the next words as values, in order.
-TAR_OLD_VALUE_LETTERS = "fCbTXLNgKVHI"
-
-
-def tar_targets(args):
-    # Extraction writes into -C/--directory; creation writes the -f archive.
-    # An old-style first word ('cf', 'xzfC') is a cluster whose value letters
-    # consume the following words in order ('tar cf /etc/x.tar .').
-    old = {}
-    rest = args
-    flags = ""
-    if args and not args[0].startswith("-"):
-        flags = args[0]
-        rest = args[1:]
-        for ch in flags:
-            if ch in TAR_OLD_VALUE_LETTERS and rest:
-                old.setdefault(ch, rest[0])
-                rest = rest[1:]
-    flags +="".join(a.lstrip("-") for a in rest if a.startswith("-") and not a.startswith("--"))
-    longs = {a.split("=", 1)[0] for a in rest if a.startswith("--")}
-    extract = "x" in flags or longs & {"--extract", "--get"}
-    create = any(c in flags for c in "cruA") or longs & {"--create", "--append", "--update", "--concatenate"}
-    targets = []
-    if extract:
-        targets += ([old["C"]] if "C" in old else []) + option_values(rest, {"-C", "--directory"}, "C")
-    if create:
-        targets += ([old["f"]] if "f" in old else []) + option_values(rest, {"-f", "--file"}, "f")
-    return targets
-
-
-GIT_GLOBAL_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                              "--config-env", "--exec-path", "--super-prefix"}
-CLONE_OPTS_WITH_VALUE = {"-b", "--branch", "-o", "--origin", "-u", "--upload-pack",
-                         "--depth", "--reference", "--reference-if-able",
-                         "--separate-git-dir", "--template", "-c", "--config",
-                         "-j", "--jobs", "--filter", "--shallow-since",
-                         "--shallow-exclude", "--server-option", "--bundle-uri"}
-
-
-def git_clone_targets(args):
-    # 'git [-C DIR] clone [opts] <repo> [<dir>]' writes <dir> (default: the
-    # repo's basename) under DIR or the cwd.
-    base = ""
-    i = 0
-    while i < len(args) and args[i].startswith("-"):
-        if args[i] == "-C" and i + 1 < len(args):
-            base = os.path.join(base, args[i + 1])
-        i += 2 if args[i] in GIT_GLOBAL_OPTS_WITH_VALUE else 1
-    if i >= len(args) or args[i] != "clone":
-        return []
-    positionals = []
-    rest = args[i + 1:]
-    j = 0
-    while j < len(rest):
-        a = rest[j]
-        j += 1
-        if a == "--":
-            positionals += rest[j:]
-            break
-        if a in CLONE_OPTS_WITH_VALUE:
-            j += 1
-            continue
-        if a.startswith("-"):
-            continue
-        positionals.append(a)
-    if not positionals:
-        return []
-    if len(positionals) >= 2:
-        dest = positionals[1]
-    else:
-        dest = os.path.basename(positionals[0].rstrip("/"))
-        if dest.endswith(".git"):
-            dest = dest[:-4]
-    return [os.path.join(base, expand_home(dest)) if base else dest]
-
-
-def split_flags(args):
-    """Return (positionals, target_dir) with flags and -t values removed.
-
-    Trailing flags must not be mistaken for the destination: `cp a /etc/b -v`
-    used to append '-v' (inside the repo) as the "destination" and allow the
-    command (issue #944 SR-B-19).
-    """
-    positionals = []
-    target_dir = None
-    i = 0
-    while i < len(args):
-        a = args[i]
-        if a == "--":
-            i += 1
-            continue
-        if a in ("-t", "--target-directory"):
-            if i + 1 < len(args):
-                target_dir = args[i + 1]
-                i += 2
-            else:
-                i += 1
-            continue
-        if a.startswith("--target-directory="):
-            target_dir = a.split("=", 1)[1]
-            i += 1
-            continue
-        if a.startswith("-t") and len(a) > 2:
-            target_dir = a[2:]
-            i += 1
-            continue
-        if is_flag(a):
-            i += 1
-            continue
-        if not is_skippable(a):
-            positionals.append(a)
-        i += 1
-    return positionals, target_dir
-
-
-def inplace_requested(args):
-    for a in args:
-        if a == "--in-place" or a.startswith("--in-place="):
-            return True
-        if a == "-i" or a.startswith("-i."):
-            return True
-        if a.startswith("-") and not a.startswith("--") and a != "-":
-            for c in a[1:]:
-                if c == "i":
-                    return True
-                if c in INPLACE_VALUE_OPTS:
-                    break
-    return False
-
-
-def inplace_operands(args):
-    """Operands that the editor writes: script values are not targets."""
-    operands = []
-    used_e = False
-    skip_next = False
-    for a in args:
-        if skip_next:
-            skip_next = False
-            continue
-        if a in ("-e", "--expression"):
-            used_e = True
-            skip_next = True
-            continue
-        if a.startswith("-e") and len(a) > 2 and not a.startswith("--"):
-            used_e = True
-            continue
-        if a in ("-f", "--file"):
-            skip_next = True
-            continue
-        if a.startswith("-f") and len(a) > 2 and not a.startswith("--"):
-            continue
-        if is_flag(a):
-            continue
-        if not is_skippable(a):
-            operands.append(a)
-    if not used_e and operands:
-        # sed/perl/ruby: the first non-option operand is the script itself.
-        operands = operands[1:]
-    return operands
-
-
-UNRESOLVED_CWD = "\x01"  # marks a relative target under an unknown directory
-
-
-def cd_destination(args, cwds):
-    # Directories a cd/pushd/popd may land in; None = cannot be resolved.
-    positionals = [a for a in args if not (a.startswith("-") and a != "-")]
-    if not positionals:
-        return {expand_home("~")}
-    dest = expand_home(positionals[0])
-    for prefix in ("$PWD", "${PWD}"):
-        # $PWD is whichever directory the command is in: relative to each cwd.
-        if dest == prefix or dest.startswith(prefix + "/"):
-            dest = "." + dest[len(prefix):]
-    if dest == "-" or any(ch in dest for ch in "$`*?[{"):
-        return {None}
-    if os.path.isabs(dest):
-        return {dest}
-    return {os.path.join(c, dest) if c is not None else None for c in cwds}
-
-
-CASE_WORD = re.compile(r"(?<![\w-])(case|esac)(?![\w-])")
-
-
-def subshell_parens(statement):
-    """('(' count, closing ')' positions, masked text, unquoted text).
-
-    The masked text is the statement with every unquoted $(...) replaced by
-    '$_': its body is scanned as separate 'subst' statements, and a 'cd' in
-    'X=$(cd ...)' must not be read as the outer command. Only parens outside
-    quotes, backticks and $(...) count; the ')' of an empty '()' pair
-    (function definition) does not. Positions refer to the masked text.
-    """
-    n = len(statement)
-    opens = 0
-    closes = []
-    masked = []
-    unquoted = []
-    last = ""  # last non-blank unquoted character
-    i = 0
-    while i < n:
-        c = statement[i]
-        if c == "\\":
-            masked.append(statement[i:i + 2])
-            i += 2
-            continue
-        if c in ("'", '"', "`"):
-            j = _skip_quoted(statement, i + 1, c)
-            masked.append(statement[i:j])
-            i = j
-            continue
-        if c == "$" and statement[i + 1:i + 2] == "(":
-            depth, i = 1, i + 2
-            while i < n and depth:
-                ch = statement[i]
-                if ch in ("'", '"'):
-                    i = _skip_quoted(statement, i + 1, ch)
-                    continue
-                depth += (ch == "(") - (ch == ")")
-                i += 2 if ch == "\\" else 1
-            masked.append("$_")
-            continue
-        if c == "(" and not statement[i + 1:].lstrip().startswith(")"):
-            opens += 1
-        if c == ")" and last != "(":
-            closes.append(sum(map(len, masked)))
-        masked.append(c)
-        unquoted.append(c)
-        if not c.isspace():
-            last = c
-        i += 1
-    return opens, closes, "".join(masked), "".join(unquoted)
-
-
-def detect(tokens):
-    """Return (write targets, command word, its arguments) for one statement."""
-    found = []
-
-    # Redirection operators `>`, `>>`, `>|` (and `&>` once the `&` split above
-    # has peeled it); the following token is the write target. shlex emits the
-    # punctuation as single-character tokens, so collapse a run of '>'/'|'
-    # before taking the target ('>> file' must not target '>').
-    i = 0
-    while i < len(tokens):
-        if tokens[i] in (">", ">>", ">|"):
-            j = i + 1
-            while j < len(tokens) and tokens[j] in (">", "|", ">>", ">|"):
-                j += 1
-            if j < len(tokens) and not is_skippable(tokens[j]):
-                found.append(tokens[j])
-            i = j + 1
-            continue
-        i += 1
-
-    # Locate the command with the SHARED resolver (hook_common.sh
-    # hook_shell_resolver_py): keywords, `case … in` arms, function bodies,
-    # grouping, KEY=VALUE assignments, wrappers (with their positional
-    # arity) and a transparent `--` are all handled there, not here. See the
-    # header note for the shapes this closed in v1.5.0.
-    idx = command_start(tokens)
-    cmd = os.path.basename(tokens[idx]) if idx < len(tokens) else ""
-    args = tokens[idx + 1:]
-
-    if cmd in WRITE_ALL:
-        positionals, _target_dir = split_flags(args)
-        found.extend(positionals)
-    elif cmd in WRITE_DEST:
-        positionals, target_dir = split_flags(args)
-        if target_dir is not None:
-            if not is_skippable(target_dir):
-                found.append(target_dir)
-        elif positionals:
-            found.append(positionals[-1])
-    elif cmd == "mv":
-        positionals, _target_dir = split_flags(args)
-        found.extend(positionals)
-    elif cmd == "dd":
-        for arg in args:
-            if arg.startswith("of=") and not is_skippable(arg[3:]):
-                found.append(arg[3:])
-    elif cmd in INPLACE:
-        if inplace_requested(args):
-            found.extend(inplace_operands(args))
-    elif cmd in OUTPUT_OPTS:
-        found.extend(v for v in option_values(args, *OUTPUT_OPTS[cmd]) if not is_skippable(v))
-    elif cmd == "tar":
-        found.extend(v for v in tar_targets(args) if not is_skippable(v))
-    elif cmd == "git":
-        found.extend(v for v in git_clone_targets(args) if not is_skippable(v))
-    return found, cmd, args
-
-
-def judge(found, cwds):
-    for target in found:
-        target = expand_home(target)
-        if os.path.isabs(target):
-            targets.append(target)
-            continue
-        for cwd in cwds:
-            targets.append(UNRESOLVED_CWD + target if cwd is None
-                           else os.path.join(cwd, target))
-
-
-workdir = sys.argv[1] if len(sys.argv) > 1 else ""
-# Every directory the command may be in at this point (#1151 F6-07). A cd
-# joined by '&&' moves the command (it ran only when cd succeeded); after
-# any other separator, a failed cd leaves the old directory in place, so the
-# set is widened instead of replaced. A relative target is judged against
-# every member; an unresolvable member blocks it.
-# A cd inside $(...) or a '( ... )' subshell does not move the outer command:
-# the set is restored once the substitution / subshell ends. Inside, it is
-# tracked as usual (a substitution starts from the directories before AND
-# after its parent statement, and its inner separators count as ';').
-cwds = {workdir}
-before_parent = cwds
-dirstack = []
-subshells = []    # cwds saved at each open '(' subshell
-in_subst = None   # (cwds, len(subshells)) to restore after a substitution run
-case_depth = 0
-targets = []
-
-for statement, _heredocs, op in split_shell_statements_with_ops(command):
-    if op == "subst":
-        if in_subst is None:
-            in_subst = (cwds, len(subshells))
-            cwds = cwds | before_parent
-    else:
-        if in_subst is not None:
-            cwds, depth = in_subst
-            del subshells[depth:]
-            in_subst = None
-        before_parent = cwds
-    tokens = tokenize(statement)
-    if not tokens:
-        continue
-
-    opens, closes, statement, unquoted = subshell_parens(statement)
-    words = CASE_WORD.findall(unquoted)
-    if case_depth or words:
-        # shortcut: a case arm's ')' looks like a subshell close; inside a
-        # case no subshell is scoped, so a cd there stays in play (over-block).
-        opens, closes = 0, []
-    case_depth = max(0, case_depth + words.count("case") - words.count("esac"))
-    subshells.extend([cwds] * opens)
-
-    # Text after the last closing ')' (e.g. '> log' in '(cd x && make) > log')
-    # runs in the directory restored by that close.
-    head, tail = statement, ""
-    if closes:
-        head, tail = statement[:closes[-1]], statement[closes[-1] + 1:]
-    found, cmd, args = detect(tokenize(head))
-    judge(found, cwds)
-
-    if cmd in ("cd", "pushd", "popd"):
-        if cmd == "popd":
-            dest = dirstack.pop() if dirstack else {None}
-        elif cmd == "pushd" and not [a for a in args if not a.startswith("-")]:
-            dest = {None}  # bare pushd swaps the top two stack entries
-        else:
-            dest = cd_destination(args, cwds)
-        if cmd == "pushd":
-            dirstack.append(set(cwds))
-        cwds = dest if op == "&&" else (cwds | dest)
-
-    for _ in closes:
-        if subshells:
-            cwds = subshells.pop()
-    if tail.strip():
-        judge(detect(tokenize(tail))[0], cwds)
-
-for target in targets:
-    print(target)
-PYEOF
-)
   _DETECTOR_RC=0
-  WRITE_TARGETS=$(printf '%s' "$BASH_CMD" | "$_PY" -c "$_DETECTOR_SRC" "$WORKDIR" 2>/dev/null) || _DETECTOR_RC=$?
+  WRITE_TARGETS=$(printf '%s' "$BASH_CMD" | "$_PY" "$SCRIPT_DIR/lib/hook_containment_shell.py" "$WORKDIR" 2>/dev/null) || _DETECTOR_RC=$?
   if [ "$_DETECTOR_RC" != "0" ]; then
     echo "REPO_CONTAINMENT: the Bash write-target detector exited rc=$_DETECTOR_RC." >&2
     echo "Failing closed (#944) — a command the detector cannot evaluate must not be allowed." >&2
@@ -1423,6 +745,11 @@ PYEOF
       fi
       case "$(containment_verdict "$candidate")" in
         ALLOW) ;;
+        BLOCK_PROTECTED)
+          BLOCKED_TARGET="$candidate"
+          BLOCKED_REASON="protected"
+          break
+          ;;
         BLOCK_SINK)
           BLOCKED_TARGET="$candidate"
           BLOCKED_REASON="sink-disabled"

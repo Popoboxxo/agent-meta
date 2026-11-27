@@ -208,7 +208,8 @@ def _rendered_guard(tmp_path: Path, agent_id_cap: str, role_field_cap: str) -> P
     (hooks_dir / "lib").mkdir(parents=True, exist_ok=True)
     shutil.copy(_HOOK_PATH, hooks_dir / _HOOK_PATH.name)
     shutil.copy(_LIB_PATH, hooks_dir / "lib" / "hook_common.sh")
-    shutil.copy(_MODULE_PATH, hooks_dir / "lib" / _MODULE_PATH.name)
+    for module_path in sorted(_LIB_DIR.glob("hook_*.py")):
+        shutil.copy(module_path, hooks_dir / "lib" / module_path.name)
     impl = (_IMPL_PATH.read_text(encoding="utf-8")
             .replace("{{AGENT_META_HOOK_AGENT_ID}}", agent_id_cap)
             .replace("{{AGENT_META_HOOK_ROLE_FIELD}}", role_field_cap))

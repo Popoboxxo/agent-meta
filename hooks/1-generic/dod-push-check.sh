@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.5.4
+# version: 2.7.0
 # event: PreToolUse
 # matcher: Bash
-# provider: Claude
+# protocol: tool-hook-v1
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.5.4: issue #1161 Pkt5 -- tool_name and tool_input.command are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of two separate field-read interpreter starts; the hook_json_usable probe and the R2-2 unreadable-payload re-check are unchanged. v2.5.3: a naive-split fragment cut out of the quoted text of a non-executing text consumer (gh --body "... && git push ...", echo, printf) is no longer blocked as a push with a quote spanning a command separator; wrappers (bash -c, eval, xargs) stay fail-closed. v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main; unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.7.0: issue #1238c1 -- MB-1 SRP split of what was left in Bash: the Branch-Guard verdict mapping, the test-gate state machine, the result-cache key and the test-result classification moved into hook_dod_push_policy.py (pure, side-effect free functions) and every user-visible message into hook_dod_push_report.py (one reporter scene per path, message to the stream the hook already used); the shell keeps orchestration only, its exit codes stay 0=allow/2=block and a missing module still fails closed. No message, exit or cache/timeout/branch-guard behaviour change. v2.6.0: issue #1238c1 -- move payload-state, config reading and push classification into flat deployed Python modules; reuse the T23 shell scanner and push-argument parser and keep fail-closed behavior without Python or modules. v2.5.4: issue #1161 Pkt5 -- tool_name and tool_input.command are read in ONE hook_json_get_many parse (ok-trailer fail-closed check) instead of two separate field-read interpreter starts; the hook_json_usable probe and the R2-2 unreadable-payload re-check are unchanged. v2.5.3: a naive-split fragment cut out of the quoted text of a non-executing text consumer (gh --body "... && git push ...", echo, printf) is no longer blocked as a push with a quote spanning a command separator; wrappers (bash -c, eval, xargs) stay fail-closed. v2.5.2: the Branch-Guard takes the branch from the push's effective directory (git -C <path> chain, or a leading cd <path> && ...) via git -C <dir> symbolic-ref instead of the hook cwd, so feature-branch worktrees can be pushed while the main checkout is on main; unresolvable targets (computed/glob/~, missing or non-repo path, detached HEAD, pushd/popd, non-leading or repeated cd, --git-dir/GIT_DIR) stay fail closed. v2.5.1: a heredoc line that also carries '&&', ';' or '|' BEFORE the operator ('mkdir d && cat > f <<EOF') is stripped when the statement owning the heredoc is a text consumer, so prose bodies are no longer classified as shell (false positive); '|', ';', '&' or a backtick AFTER the operator ('<<EOF | bash') still keeps the body (fail closed); convention boundary only, eval/variable indirection stays undetected; v2.5.0: the body of a $(...)/backtick command substitution -- also inside double quotes, where the tokenizer kept it as one opaque word -- is classified as its own command line, so 'echo "$(git push origin main)"' is blocked (shared scanner hook_shell_scan_py, #1151 F6-03); a "$'" inside double quotes is literal text and no longer triggers the ANSI-C path, and the word list of 'for VAR in WORDS' is data, not a command (F6-09: two false positives); v2.4.0: the push.recurseSubmodules override value is parsed where the command line carries it (-c/--config, GIT_CONFIG_VALUE_n): check/no/false stay inert even when the repository declares submodules, while --config-env stays value-blind (it names the variable, not the value) and is treated as recursing; the tag-only shortcut now uses the same submodule gate as the destination check, so a config recursion no longer blocks a release tag push in a repo without .gitmodules (#1041); v2.3.0: push.recurseSubmodules set through the effective config, -c/--config-env or GIT_CONFIG_* is honoured like the explicit flag: on-demand/only blocks when the repository declares submodules (same per-submodule destination check as #1051), the explicit --recurse-submodules/--no-recurse-submodules wins over the config (check/no and --no- stay inert), and the tag-only shortcut is skipped when the config recurses; the config of a foreign repo (-C/GIT_DIR) remains a documented gap (#1041); v2.2.0: --recurse-submodules=on-demand|only no longer blocks every repository that declares submodules: each submodule's own push destination (remote.<name>.push, then push.default / branch.<n>.merge, mirroring git's recurse push which forwards only the remote name) is checked against the protected-branch set, and a protected or undeterminable destination still fails closed, naming submodule path, destination and the way out (#1051, residual of #953); v2.1.7: the flag/short-cluster walk and the protected-branch set are built once in lib/hook_common.sh (hook_push_arg_parser_py, hook_protected_branches) instead of twice (tag-only vs. destination check, classifier vs. block message), so both consumers always agree on positionals (#949); the shared walk consumes --recurse-submodules' separately passed value, so the space form cannot slip past the submodule check (#953), an unreadable git config now fails closed on every path, the tag-only shortcut included (it used to read the config verdict before the config was read, so `git push --tags` still exited 0), and a python3 that exits 0 with garbage or non-zero is detected (#954); v2.1.6: the protected-branch list in the push-block message is de-duplicated (a configured GIT_MAIN_BRANCH of main/master no longer appears twice) (#1033); v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -80,6 +80,30 @@ if ! declare -F hook_protected_branches >/dev/null 2>&1 \
   exit 2
 fi
 
+# The extracted readers/classifier/reporter and their shared T23 dependencies
+# must be deployed together.  A missing module must not turn a config read into
+# an empty value (which could skip the test gate) or silently disable
+# classification or message rendering.
+for _module in \
+  hook_dod_push_payload.py \
+  hook_dod_push_config.py \
+  hook_dod_push_classify.py \
+  hook_dod_push_policy.py \
+  hook_dod_push_report.py \
+  hook_push_arg_parser.py \
+  hook_shell_scan.py; do
+  if [ ! -f "$SCRIPT_DIR/lib/$_module" ] || [ ! -r "$SCRIPT_DIR/lib/$_module" ]; then
+    echo "DoD-Check: required Python module $_module is missing or unreadable." >&2
+    echo "Failing closed (issue #595) — re-run sync.py to redeploy the hooks/lib/ directory." >&2
+    exit 2
+  fi
+done
+
+# The reporter renders every user-visible message and returns the hook action
+# as its exit status (see its module docstring); the policy module it imports
+# holds the decision rules.
+_REPORTER="$SCRIPT_DIR/lib/hook_dod_push_report.py"
+
 # Issue #954: a python3 that exits 0 with garbage (broken PATH shim) would
 # otherwise hand garbage back as tool_name/command, and the hook would treat
 # the call as "not Bash" and allow it. Verify the interpreter before trusting
@@ -119,20 +143,7 @@ COMMAND="$_P_COMMAND"
 # (or unidentifiable) call whose payload holds a non-empty command that did
 # not reach us is blocked. An empty command of a non-Bash tool stays allowed.
 if [ -z "$COMMAND" ] && { [ -z "$TOOL_NAME" ] || [ "$TOOL_NAME" = "Bash" ]; }; then
-  _PAYLOAD_STATE=$(printf '%s' "$INPUT" | python3 -c '
-import json, sys
-try:
-    d = json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))
-except Exception:
-    d = None
-ti = d.get("tool_input") if isinstance(d, dict) else None
-cmd = ti.get("command") if isinstance(ti, dict) else None
-tool = d.get("tool_name") if isinstance(d, dict) else None
-if not isinstance(d, dict) or (cmd not in (None, "") and tool in (None, "", "Bash")):
-    print("unreadable")
-else:
-    print("empty")
-' 2>/dev/null)
+  _PAYLOAD_STATE=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/lib/hook_dod_push_payload.py" 2>/dev/null)
   if [ "$_PAYLOAD_STATE" != "empty" ]; then
     echo "Branch-Guard: Push blocked — the Bash command could not be read from the hook payload (fail closed)." >&2
     echo "Re-issue the command; if it contains unusual bytes (lone surrogates, invalid UTF-8), remove them." >&2
@@ -183,45 +194,7 @@ done
 # stdlib-only scan of the top-level `variables:` block so the hook never needs
 # a third-party dependency in the target project.
 read_config_var() {
-  python3 - "$1" "$2" <<'PYEOF' 2>/dev/null
-import sys
-path, key = sys.argv[1], sys.argv[2]
-val = ""
-try:
-    if path.endswith(".json"):
-        import json
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f) or {}
-        val = str(data.get("variables", {}).get(key, ""))
-    else:
-        try:
-            import yaml
-            with open(path, encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-            val = str(data.get("variables", {}).get(key, ""))
-        except Exception:
-            # stdlib-only fallback: scan the top-level `variables:` block
-            in_vars = False
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.rstrip("\n")
-                    if line.startswith("variables:"):
-                        in_vars = True
-                        continue
-                    if in_vars:
-                        if line and not line[0].isspace():
-                            break
-                        s = line.strip()
-                        if s.startswith(key + ":"):
-                            v = s[len(key) + 1:].strip()
-                            if len(v) >= 2 and v[0] in "\"'" and v[-1] == v[0]:
-                                v = v[1:-1]
-                            val = v
-                            break
-except Exception:
-    val = ""
-print(val)
-PYEOF
+  python3 "$SCRIPT_DIR/lib/hook_dod_push_config.py" "$1" "$2" 2>/dev/null
 }
 
 # --- Tag-only push detection ---
@@ -267,7 +240,7 @@ PYEOF
 #
 # Classifier output (one line): none | tag | push | block <reason>.
 # Anything else (python crash, empty output) blocks (fail closed). The
-# command is passed on fd 3 (here-string): argv/env cap a single string at
+# command is passed on stdin (here-string): argv/env cap a single string at
 # 128 KB (E2BIG) and a pipe writer can die from SIGPIPE (SR-B-21).
 
 # Resolve GIT_MAIN_BRANCH: env var > project config > default "main"
@@ -290,1268 +263,42 @@ _BUDGET=()
 command -v timeout >/dev/null 2>&1 && _BUDGET=(timeout -k 2 "$CLASSIFY_BUDGET")
 # Protected set: main + master + the configured main branch, from one helper
 # (issue #949, #1033). Passed to the classifier (space-separated; ref names
-# cannot contain whitespace) AND used verbatim in the block message below, so
-# the classifier and the message can never disagree.
+# cannot contain whitespace) AND to the block message (comma-separated, same
+# substitution as before), so the classifier and the message can never
+# disagree.
 PROTECTED_LIST=$(hook_protected_branches "$MAIN_BRANCH")
-# The flag/short-cluster walk is emitted by the shared lib (issue #949) and
-# prepended to this hook's classifier: both the tag-only check and the
-# destination check call it, so there is exactly one implementation. A lib
-# that cannot emit it leaves the classifier without walk_push_args -> python
-# error -> no output -> block (fail closed).
-PUSH_CLASS=$({ hook_push_arg_parser_py; hook_shell_scan_py; cat <<'PYEOF'
-import collections, os, re, shlex, subprocess, sys
-
-# git global options that take a separate value token. KEEP IN SYNC with
-# GLOBAL_OPTS_WITH_VALUE in hooks/1-generic/orchestrator-guard-impl.sh (the
-# authoritative copy, issue #551) — duplicated only because the two hooks
-# share no Python lib. '-c'/'--config' are handled separately there.
-GLOBAL_OPTS_WITH_VALUE = {
-    "-C", "--git-dir", "--work-tree", "--namespace", "--exec-path",
-    "--super-prefix", "--config-env", "--attr-source",
-}
-GIT_OPTS_WITH_VALUE = GLOBAL_OPTS_WITH_VALUE | {"-c", "--config"}
-
-# `git push` flags allowed in a tag-only push (allowlist). Anything else —
-# --all/--branches/--mirror/--follow-tags/--recurse-submodules/--prune,
-# abbreviations, unknown flags — makes the statement NOT tag-only.
-PUSH_FLAGS_SAFE = {
-    "--dry-run", "--verbose", "--quiet", "--progress", "--no-progress",
-    "--porcelain", "--force", "--atomic", "--no-atomic", "--verify",
-    "--no-verify", "--thin", "--no-thin", "--ipv4", "--ipv6", "--delete",
-    "--set-upstream", "--force-if-includes", "--no-force-if-includes",
-    "--signed", "--no-signed", "--force-with-lease", "--no-force-with-lease",
-}
-# push long options taking a value ('--opt=v' or '--opt v'); short form: -o
-PUSH_OPTS_WITH_VALUE = {"--push-option", "--repo", "--receive-pack", "--exec"}
-# ... and the options the shared arg walk must consume a SEPARATE value for.
-# --recurse-submodules accepts both '=value' and ' value' (git parse-options
-# takes the next token, verified against git: '--recurse-submodules on-demand
-# origin x' consumes 'on-demand'), but it is not an "allowed" value option for
-# the tag-only allowlist: a tag push with it is not tag-only (#953).
-PUSH_VALUE_OPTS = PUSH_OPTS_WITH_VALUE | {"--recurse-submodules"}
-PUSH_SHORT_SAFE = set("vqnfud46")
-# --tags and its unique abbreviations; the last --tags/--no-tags wins (git
-# parse-options applies flags left to right). '--t'/'--no-t' are ambiguous
-# with --thin and fall through to "unknown" (fail closed).
-TAGS_FLAGS = {"--tags", "--tag", "--ta"}
-NO_TAGS_FLAGS = {"--no-tags", "--no-tag", "--no-ta"}
-# Statement looks like a git push but cannot be resolved -> fail closed.
-UNRESOLVED = object()
-# Shell redirections incl. their target ('2>&1', '>/dev/null', '> f',
-# '&>f', '>|f'), stripped before statement splitting so '2>&1' is neither
-# split on '&' nor misread as a ref. A digit prefix counts only as a whole
-# word (bash: 'v1>log' is ref 'v1' redirected to 'log').
-REDIRECT = re.compile(
-    r"(?:(?<![^\s;&|])\d+)?&?(?:>>?|<)(?:&(?:\d+|-)|\|?\s*[^\s;&|<>()]+)")
-
-
-_refs = None
-
-
-def ref_exists(ref):
-    # One for-each-ref snapshot instead of a git process per ref: 10,000 refs
-    # took ~22 s (hook timeout = not a block). Exact names only; anything
-    # else (e.g. 'v1^{}') counts as missing, i.e. not tag-only (fail closed).
-    global _refs
-    if _refs is None:
-        out = subprocess.run(["git", "for-each-ref", "--format=%(refname)",
-                              "refs/heads", "refs/tags"],
-                             capture_output=True, text=True)
-        _refs = set(out.stdout.splitlines())
-    return ref in _refs
-
-
-def is_tag_ref(ref):
-    ref = ref.lstrip("+")
-    if ":" in ref:
-        # refspec <src>:<dst> — only the destination decides what is updated
-        return ref.split(":", 1)[1].startswith("refs/tags/")
-    if ref.startswith("refs/tags/"):
-        return True
-    return ref_exists(f"refs/tags/{ref}") and not ref_exists(f"refs/heads/{ref}")
-
-
-def is_git(tok):
-    # 'git', '/usr/bin/git' and the dashed form 'git-push'
-    # ('/usr/lib/git-core/git-push')
-    return os.path.basename(tok) in ("git", "git-push")
-
-
-# A push recognised in a statement: its args after 'push', whether it runs in
-# another repository (-C/--git-dir/--work-tree/GIT_DIR: the cwd repo's HEAD
-# and config say nothing about it) and whether push/remote/branch config is
-# overridden on the command line (-c, --config-env, GIT_CONFIG*): the
-# overriding keys, lower-case (override), plus every (key, value) pair from
-# -c/--config/--config-env (config, value None when the value lives in the
-# environment because --config-env only names the variable).
-Push = collections.namedtuple(
-    "Push", "args foreign override config cdirs edir ebranch",
-    defaults=((), None, None))
-REPO_OPTS = {"--git-dir", "--work-tree"}  # -C is tracked in cdirs
-CONFIG_OPTS = {"-c", "--config", "--config-env"}
-CONFIG_KEYS = ("push.", "remote.", "branch.", "include")
-ENV_FOREIGN = ("GIT_DIR=", "GIT_WORK_TREE=", "GIT_COMMON_DIR=")
-ENV_OVERRIDE = ("GIT_CONFIG",)
-# GIT_CONFIG_KEY_n/GIT_CONFIG_VALUE_n pairs (lower-cased) in p.override
-ENV_CONFIG_PAIR = re.compile(r"git_config_(key|value)_(\d+)=(.*)", re.S)
-# push.recurseSubmodules values that actually recurse into submodules
-RECURSING_VALUES = ("on-demand", "only")
-# overrides that can remap an explicit destination-less ref (GIT_CONFIG_COUNT/
-# KEY/VALUE only set individual keys, so they are NOT listed here; #1041)
-MAP_KEYS = ("remote.", "include", "git_config_global", "git_config_system",
-            "git_config_parameters")
-# a word the shell expands at run time: $'..', $"..", $VAR, `..`, $(...), {a,b}
-# (brace groups found first, then checked: a single regex with a ',' between
-# two [^{}]* runs backtracks quadratically on '{,,,,...', R2-3)
-BRACE = re.compile(r"\{([^{}]*)\}")
-
-
-def computed(tok):
-    # '{}' is the xargs -I / find -exec placeholder: the real value is unknown
-    return "$" in tok or "`" in tok or "{}" in tok or any(
-        "," in g or ".." in g for g in BRACE.findall(tok))
-
-
-# a command string inside one argument ('man -P "git push ..."', 'bash -c ...'):
-# 'git' followed (anywhere later) by the word 'push'. Two linear searches
-# instead of r"git\b.*\bpush\b" (quadratic on many 'git' words, R2-3).
-GIT_WORD = re.compile(r"git\b")
-PUSH_WORD = re.compile(r"\bpush\b")
-
-
-def nested(tok):
-    m = GIT_WORD.search(tok)
-    return bool(m and PUSH_WORD.search(tok, m.end()))
-
-
-# R2-1/R2-5: config whose value git runs as a command. Set on the command
-# line of a push it can run anything around it -> fail closed.
-EXEC_KEYS = ("core.pager", "pager.", "core.sshcommand", "core.editor",
-             "sequence.editor", "core.askpass", "core.fsmonitor",
-             "core.hookspath", "diff.external", "gpg.", "credential.",
-             "uploadpack.", "include")
-# Subcommands whose arguments are text (messages, patterns, paths) and never
-# a command line; every other subcommand (rebase -x, bisect run, submodule
-# foreach, filter-branch, difftool -x, config, fetch --upload-pack, ...) is
-# treated as able to run one: a 'git ... push' string in its args blocks.
-TEXT_SUBCOMMANDS = {"commit", "tag", "notes", "stash", "merge", "log", "show",
-                    "shortlog", "status", "add", "rm", "mv", "branch",
-                    "switch", "checkout", "restore", "reset", "describe",
-                    "blame", "diff", "rev-parse", "reflog", "revert",
-                    "cherry-pick", "format-patch"}
-ALIAS_DEPTH = 16
-
-
-def git_subcommand(toks):
-    # toks[0] is git: skip global options (with their values) and return
-    # (subcommand or None, args after it, foreign, override, config, cdirs)
-    # where cdirs lists the -C values in order and config lists every (key lower-case, value) set by -c/--config-env
-    # (value None: taken from the environment, unknown).
-    j = 1
-    foreign, override, config, cdirs = False, (), [], ()
-    while j < len(toks) and toks[j].startswith("-"):
-        opt = toks[j]
-        name, _, val = opt.partition("=")
-        if opt in GIT_OPTS_WITH_VALUE:
-            val = toks[j + 1] if j + 1 < len(toks) else ""
-        foreign |= name in REPO_OPTS
-        if name == "-C":
-            cdirs += (val,)
-        if name in CONFIG_OPTS:
-            if val.lower().startswith(CONFIG_KEYS):
-                override += (val.lower(),)
-            key, _, value = val.partition("=")
-            config.append((key.lower(), None if name == "--config-env" else value))
-        j += 2 if opt in GIT_OPTS_WITH_VALUE else 1
-    if j < len(toks):
-        return toks[j], toks[j + 1:], foreign, override, config, cdirs
-    return None, [], foreign, override, config, cdirs
-
-
-def runs_push(sub, args):
-    # R2-1: a subcommand other than push that runs a command line from its
-    # args ('submodule foreach git push ...', 'bisect run git push ...').
-    # The unquoted scan (a git word followed by push) applies to every
-    # subcommand; the quoted one ('rebase -x "git push ..."') not to text
-    # subcommands, so 'git commit -m "... git push ..."' stays a commit.
-    g = next((k for k, t in enumerate(args) if is_git(t)), None)
-    if g is not None and any(PUSH_WORD.search(t) for t in args[g + 1:]):
-        return True  # also 'foreach git -c alias.p=push p'
-    if sub in TEXT_SUBCOMMANDS:
-        return False
-    if "push" in args and any(computed(t) for t in args[:args.index("push")]):
-        return True
-    return any(nested(t) for t in args)
-
-
-def git_push(toks, prefix):
-    # toks[0] is git or git-push, prefix = the tokens before it (assignments,
-    # wrapper words). Push, None (other subcommand) or UNRESOLVED (computed
-    # subcommand such as git $'push' / git {push,} / git $(echo push), a
-    # command-running subcommand or config that carries a push, an alias
-    # that cannot be resolved).
-    if os.path.basename(toks[0]) == "git-push":
-        sub, args, foreign, override, config, cdirs = "push", toks[1:], False, (), [], ()
-    else:
-        sub, args, foreign, override, config, cdirs = git_subcommand(toks)
-    env_config = [t for t in prefix if t.startswith(ENV_OVERRIDE)]
-    # #1041: GIT_CONFIG_KEY_n=push.recurseSubmodules (and its value) is plain
-    # push configuration, not an alias/command carrier — keep it so
-    # config_recurses() sees the recursion instead of blocking it as an
-    # unresolvable statement. Every other 'push' token still fails closed.
-    env_recursion = [t for t in env_config if "push.recursesubmodules" in t.lower()]
-    env_other = [t for t in env_config if t not in env_recursion]
-    if any("alias" in t.lower() or "push" in t or nested(t) for t in env_other):
-        return UNRESOLVED  # GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push ...
-    # aliases declared on this command line ('-c alias.p=push p ...') are
-    # expanded like git does: the value's words replace the alias word.
-    for _ in range(ALIAS_DEPTH):
-        if any(value is not None and nested(value) for _, value in config):
-            return UNRESOLVED  # -c core.pager='git push ...', -c alias.x='!git push'
-        if any(key.startswith("alias.") and value is None for key, value in config):
-            return UNRESOLVED  # --config-env=alias.<n>=VAR: value unknown
-        aliases = {key[len("alias."):]: value for key, value in config
-                   if key.startswith("alias.")}
-        if sub is None or sub.lower() not in aliases:
-            break
-        value = aliases[sub.lower()]
-        if value.startswith("!"):
-            # a shell alias runs anything; one that mentions push -> block
-            return UNRESOLVED if "push" in re.sub(r"[\"'\\$]", "", value) else None
-        try:
-            words = shlex.split(value)
-        except ValueError:
-            return UNRESOLVED
-        sub, more, f2, o2, c2, d2 = git_subcommand([toks[0]] + words)
-        args = more + args
-        foreign, override, config = foreign or f2, override + o2, config + c2
-        cdirs += d2
-    else:
-        return UNRESOLVED  # alias loop
-    if sub != "push":
-        if sub is not None and (computed(sub) or runs_push(sub, args)):
-            return UNRESOLVED
-        return None
-    if any(key.startswith(EXEC_KEYS) for key, _ in config):
-        return UNRESOLVED  # git -c core.sshCommand=... push
-    foreign |= any(t.startswith(ENV_FOREIGN) for t in prefix)
-    override += tuple(t.lower() for t in env_config)
-    return Push(args, foreign, override, tuple(config), tuple(cdirs))
-
-
-def push_args(toks, w):
-    # toks[w] is a non-git command word that may execute its arguments
-    # (sudo/env/timeout/xargs/unknown). Push, None if this is not a git push,
-    # or UNRESOLVED if it mentions git and push but does not resolve to a
-    # plain `git [opts] push` (e.g. 'sudo -u git git push', 'sudo $GIT push',
-    # a computed command word, 'bash -c "git push ..."') — never dropped.
-    if computed(toks[w]):
-        return UNRESOLVED
-    g = next((k for k in range(w + 1, len(toks)) if is_git(toks[k])), len(toks))
-    if g < len(toks):
-        res = git_push(toks[g:], toks[:g])
-        if res is not None:
-            if os.path.basename(toks[w]) == "xargs":
-                return UNRESOLVED  # refs arrive on stdin: destination unknown (#950)
-            return res
-    if "push" in toks[w:]:
-        before = toks[w:toks.index("push", w)]
-        if g < len(toks) or any(computed(t) for t in before):
-            return UNRESOLVED
-    if any(nested(t) for t in toks[w + 1:g]):
-        return UNRESOLVED
-    return None
-
-
-def stmt_is_tag_only(args):
-    # Option walk comes from the shared parser (issue #949): the positionals
-    # here and in destination_block are produced by the same code.
-    pos, opts = walk_push_args(args, PUSH_VALUE_OPTS)
-    tags = False
-    for name, value, _raw in opts:
-        if not name.startswith("--"):
-            # short cluster ('-o' and its value were already split off)
-            if name != "-o" and name[1] not in PUSH_SHORT_SAFE:
-                return False
-            continue
-        if name in TAGS_FLAGS or name in NO_TAGS_FLAGS:
-            if value is not None:  # '--tags=x' is not a tag flag
-                return False
-            tags = name in TAGS_FLAGS
-        elif name in PUSH_OPTS_WITH_VALUE:
-            continue  # value already consumed by the walk
-        elif name not in PUSH_FLAGS_SAFE:
-            return False
-    refs = pos[1:]  # pos[0] is the remote
-    if tags:
-        return not refs
-    if not refs:
-        return False  # bare push / push <remote> pushes the current branch
-    k = 0
-    while k < len(refs):
-        if refs[k] == "tag":
-            if k + 1 >= len(refs):
-                return False
-            k += 2
-            continue
-        if not is_tag_ref(refs[k]):
-            return False
-        k += 1
-    return True
-
-
-MAIN_BRANCH, CURRENT = sys.argv[1], sys.argv[2]  # CURRENT "" = detached
-# Protected set built by hook_protected_branches (issue #949) and passed in;
-# the fallback keeps main/master protected if the value were ever empty.
-PROTECTED = set(sys.argv[3].split()) or {"main", "master"}
-
-# Shell reserved words / prefixes that precede the real command word.
-RESERVED = {"!", "{", "}", "if", "then", "elif", "else", "while", "until",
-            "do", "time", "coproc"}
-ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
-# Command words that never execute their arguments: "git push" in their args
-# is text, not a push (SR-B-04). Every other non-git command word is treated
-# as a possible wrapper (sudo/env/timeout/xargs/...): fail closed. Pagers and
-# man are NOT here (man -P '<cmd>', less with LESSOPEN, ack --pager run
-# commands). Known limit: a user-defined `gh` alias with a '!' shell
-# expansion (gh alias set --shell) can run a push; gh stays here because
-# `gh pr create --body "..."` text must not count as a push. rg runs a
-# command only with --pre (checked before this set, like ack --pager).
-NON_EXEC = {"echo", "printf", "grep", "egrep", "fgrep", "rg", "ag",
-            "gh", "cat", "head", "tail", "wc", "ls"}
-PUNCT = set("();<>|&")
-# stands in for a $(...)/<(...) group inside its parent command
-COMPUTED = "$(...)"
-
-# push long options the destination check understands; anything else
-# (incl. unique abbreviations such as '--mirr' = --mirror) is ambiguous.
-PUSH_LONG_KNOWN = (PUSH_FLAGS_SAFE | PUSH_OPTS_WITH_VALUE | TAGS_FLAGS
-                   | NO_TAGS_FLAGS | {"--follow-tags", "--no-follow-tags",
-                                      "--prune", "--no-prune",
-                                      "--recurse-submodules",
-                                      "--no-recurse-submodules"})
-PUSH_BULK = {"--all", "--branches", "--mirror"}
-_remotes = None
-
-
-class _Buf:
-    # Token buffer for _Lexer: shlex grows its token with 'self.token +=
-    # char' on an attribute, which CPython cannot do in place — one long
-    # word cost O(n^2) (1 MB: ~30 s, a hook timeout is not a block, R2-3).
-    # Appending to a list keeps shlex's own state machine (no second
-    # tokenizer that could disagree with it) at linear cost.
-    __slots__ = ("parts", "size")
-
-    def __init__(self, text):
-        self.parts, self.size = [text], len(text)
-
-    def __iadd__(self, text):
-        self.parts.append(text)
-        self.size += len(text)
-        return self
-
-    def __bool__(self):
-        return self.size > 0
-
-    def __str__(self):
-        return "".join(self.parts)
-
-    def __eq__(self, other):
-        return str(self) == other
-
-    __hash__ = None
-
-
-class _Lexer(shlex.shlex):
-    # 'token += c' stores the same _Buf back; 'token = c' starts a new one
-    token = property(lambda self: self._buf, lambda self, v: setattr(
-        self, "_buf", v if isinstance(v, _Buf) else _Buf(v)))
-
-    def read_token(self):
-        tok = super().read_token()
-        return str(tok) if isinstance(tok, _Buf) else tok
-
-
-def segments(stmt):
-    # Tokenize like the shell (quotes, escapes) and nest at unquoted '(' /
-    # ')', so '(git push x)', '$(git push x)' and '<(...)' expose 'git' as a
-    # command word and 'x)' does not leak into a ref. A closed group leaves
-    # COMPUTED in its parent's place ('git push origin $(...)' has a ref the
-    # hook cannot know). Returns a list of token lists.
-    lex = _Lexer(stmt, posix=True, punctuation_chars=True)
-    lex.whitespace_split = True
-    lex.commenters = ""
-    # kinds: per open group how its value lands in the parent — "" plain
-    # subshell, "word" a standalone $(...) word, "attach" glued to the
-    # previous token ('x=$(...)', 'refs/heads/$(...)').
-    done, stack, kinds = [], [[]], []
-    for tok in lex:  # ValueError on unbalanced quotes
-        if not set(tok) <= PUNCT:
-            stack[-1].append(tok)
-            continue
-        for ch in tok:
-            if ch == "(":
-                kind = ""
-                if stack[-1] and stack[-1][-1].endswith("$"):
-                    stack[-1][-1] = stack[-1][-1][:-1]  # '$(' / 'x=$('
-                    kind = "attach"
-                    if not stack[-1][-1]:
-                        stack[-1].pop()
-                        kind = "word"
-                stack.append([])
-                kinds.append(kind)
-            elif ch == ")" and len(stack) > 1:
-                done.append(stack.pop())
-                kind = kinds.pop()
-                if kind == "attach":
-                    stack[-1][-1] += COMPUTED
-                elif kind or stack[-1]:
-                    # a $(...) command word ('$(which git) push') stays visible
-                    stack[-1].append(COMPUTED)
-    return [s for s in done + stack if s]
-
-
-def segments_ok(stmt):
-    try:
-        segments(stmt)
-        return True
-    except ValueError:
-        return False
-
-
-def segment_push_args(toks):
-    # args after 'push' / None / UNRESOLVED, decided by the command word.
-    i = 0
-    while i < len(toks) and (toks[i] in RESERVED or ASSIGNMENT.match(toks[i])):
-        i += 1
-    if i >= len(toks):
-        return None
-    word = toks[i]
-    if word in ("for", "select"):
-        # 'for VAR in WORDS': the words are data; the loop body is its own
-        # statement after 'do', and a $(...) in WORDS is its own segment
-        # (#1151 F6-09: 'for c in 'eval "git push"'' was blocked).
-        return None
-    if is_git(word):
-        return git_push(toks[i:], toks[:i])
-    if os.path.basename(word) in ("rg", "ack", "ack-grep") and any(
-            t.startswith(("--pre", "--pager")) for t in toks[i + 1:]):
-        return UNRESOLVED  # rg --pre / ack --pager run a command per file
-    if os.path.basename(word) in NON_EXEC:
-        return None
-    if os.path.basename(word) == "man":
-        # 'man git-push' reads a page; a pager/browser command (-P/--pager,
-        # -H/--html, MANPAGER=/PAGER=/MANOPT=) can run anything -> fail closed
-        runs = any(t.startswith(("--pager", "--html")) or (
-            t.startswith("-") and not t.startswith("--") and ("P" in t or "H" in t))
-            for t in toks[i + 1:])
-        runs |= any(t.startswith(("MANPAGER=", "PAGER=", "MANOPT=")) for t in toks[:i])
-        return UNRESOLVED if runs else None
-    return push_args(toks, i)
-
-
-def remotes():
-    global _remotes
-    if _remotes is None:
-        out = subprocess.run(["git", "remote"], capture_output=True, text=True)
-        _remotes = set(out.stdout.split())
-    return _remotes
-
-
-def is_remote_branch(name):
-    # '<remote>/<protected>' (remote names may contain '/'); an unknown
-    # remote prefix is judged by its first component (fail closed).
-    return (name.partition("/")[2] in PROTECTED
-            or any(name == f"{r}/{p}" for r in remotes() for p in PROTECTED))
-
-
-def is_protected(dst):
-    # git resolves a destination not starting with 'refs/' via DWIM
-    # (refs/%s, refs/tags/%s, refs/heads/%s, refs/remotes/%s): 'heads/main'
-    # is refs/heads/main (F1). Tags ('tags/main', 'refs/tags/main') are not
-    # branches; remote-tracking spellings are kept protected (fail closed).
-    full = dst.startswith("refs/")
-    name = dst[len("refs/"):] if full else dst
-    if name.startswith("heads/"):
-        return name[len("heads/"):] in PROTECTED
-    if name.startswith("remotes/"):
-        return is_remote_branch(name[len("remotes/"):])
-    if full:
-        return False
-    if name in PROTECTED:
-        return True
-    first, _, rest = name.partition("/")
-    return ((first in remotes() and rest in PROTECTED)
-            or any(name == f"{r}/{p}" for r in remotes() for p in PROTECTED))
-
-
-_cfg = None
-_cfg_ok = True
-
-
-def git_config():
-    # {key: [values]} of the effective config (one process; keys as printed
-    # by git: section/name lower-case, subsection verbatim). Empty on error,
-    # with _cfg_ok = False: an unreadable config may hide a push mapping, so
-    # the callers block instead of assuming the default (issue #954).
-    global _cfg, _cfg_ok
-    if _cfg is None:
-        try:
-            out = subprocess.run(["git", "config", "--list", "-z"],
-                                 capture_output=True, text=True,
-                                 errors="surrogateescape")
-            _cfg_ok = out.returncode == 0
-        except (OSError, subprocess.SubprocessError):
-            out, _cfg_ok = None, False
-        _cfg = {}
-        for entry in (out.stdout if out is not None else "").split("\0"):
-            key, _, val = entry.partition("\n")
-            _cfg.setdefault(key, []).append(val)
-    return _cfg
-
-
-def push_config_block():
-    # remote.<r>.push maps destination-less refs and refspec-less pushes
-    # (builtin/push.c). Any configured spec that may land on a protected
-    # branch (protected/empty dst, wildcard, ':' = matching) -> reason.
-    #
-    # The config is read FIRST (issue #954 follow-up). _cfg_ok starts as True
-    # and only turns False inside git_config(), so a caller that inspected it
-    # before the read saw "fine" while the read was the very thing failing:
-    # the tag-only shortcut (the first caller of this function, before any
-    # other config read) then treated an unreadable config as "no mapping" and
-    # returned "tag" -> exit 0, while the same command with a readable config
-    # was blocked. One read, then the verdict — never the stale default.
-    cfg = git_config()
-    if not _cfg_ok:
-        return "git config could not be read, destination cannot be determined"
-    for key, vals in cfg.items():
-        if not (key.startswith("remote.") and key.endswith(".push")):
-            continue
-        for v in vals:
-            src, _, dst = v.lstrip("+").partition(":")
-            dst = dst or src
-            if not dst or "*" in dst or is_protected(dst):
-                return f"{key}={v} may push to a protected branch"
-    return None
-
-
-def refspec_less_block():
-    # A3: where a refspec-less push from a non-protected branch goes is
-    # decided by config. Only a RESOLVED protected target blocks; an unset
-    # upstream is the normal case and never blocks.
-    reason = push_config_block()
-    if reason:
-        return reason
-    if [v.lower() for v in git_config().get("push.default", ["simple"])][-1] == "matching":
-        return "push.default=matching pushes every matching branch"
-    for merge in git_config().get(f"branch.{CURRENT}.merge", []):
-        if is_protected(merge):
-            return f"upstream of '{CURRENT}' is protected (branch.{CURRENT}.merge={merge})"
-    return None
-
-
-def repo_toplevel():
-    # Top level of the cwd repository; None when it cannot be resolved.
-    try:
-        out = subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    top = out.stdout.strip()
-    return top if out.returncode == 0 and top else None
-
-
-def last(values):
-    return values[-1] if values else None
-
-
-def config_map(raw):
-    # 'git config --list -z' -> {key: [values]}; keys exactly as git prints
-    # them (section/name lower-case, subsection verbatim).
-    cfg = {}
-    for entry in raw.split("\0"):
-        key, _, val = entry.partition("\n")
-        if key:
-            cfg.setdefault(key, []).append(val)
-    return cfg
-
-
-def submodule_paths(top):
-    # #1051: enumerate every submodule path with ONE read of .gitmodules (not
-    # one git process per test). None = unreadable/incomplete -> fail closed.
-    try:
-        out = subprocess.run(
-            ["git", "config", "-f", os.path.join(top, ".gitmodules"),
-             "--get-regexp", r"^submodule\..*\.path$"],
-            capture_output=True, text=True, errors="surrogateescape", timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode == 1 and not out.stdout.strip():
-        return []  # no submodule.<name>.path entries
-    if out.returncode != 0:
-        return None
-    paths = []
-    for line in out.stdout.splitlines():
-        key, _, val = line.partition(" ")
-        val = val.strip()
-        if not key.startswith("submodule.") or not key.endswith(".path") or not val:
-            return None
-        paths.append(val)
-    return paths
-
-
-def submodule_head(worktree):
-    # Current branch of a submodule, read from its gitdir HEAD file: no extra
-    # git invocation per submodule (budget, #1051). None = detached/unknown.
-    gitpath = os.path.join(worktree, ".git")
-    try:
-        if os.path.isdir(gitpath):
-            headfile = os.path.join(gitpath, "HEAD")
-        elif os.path.isfile(gitpath):
-            with open(gitpath, encoding="utf-8", errors="surrogateescape") as fh:
-                content = fh.read().strip()
-            if not content.startswith("gitdir:"):
-                return None
-            gitdir = content[len("gitdir:"):].strip()
-            if not os.path.isabs(gitdir):
-                gitdir = os.path.join(worktree, gitdir)
-            headfile = os.path.join(gitdir, "HEAD")
-        else:
-            return None
-        with open(headfile, encoding="utf-8", errors="surrogateescape") as fh:
-            head = fh.read().strip()
-    except OSError:
-        return None
-    if not head.startswith("ref: refs/heads/"):
-        return None
-    return head[len("ref: refs/heads/"):]
-
-
-def submodule_destinations(worktree, remote):
-    # Effective push destinations of one submodule. `git push
-    # --recurse-submodules` runs `git push <remote-name>` inside the
-    # submodule (submodule.c): it forwards the remote NAME but NOT the
-    # superproject's refspec, and the submodule's own push configuration
-    # decides the branch. Mirrors that: remote.<r>.push first, then
-    # push.default / branch.<n>.merge. None = cannot be determined.
-    try:
-        out = subprocess.run(["git", "-C", worktree, "config", "--list", "-z"],
-                             capture_output=True, text=True,
-                             errors="surrogateescape", timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode != 0:
-        return None
-    cfg = config_map(out.stdout)
-    branch = submodule_head(worktree)
-    if remote is None and branch:
-        remote = (last(cfg.get(f"branch.{branch}.pushremote"))
-                  or last(cfg.get(f"branch.{branch}.remote")))
-    remote = remote or "origin"
-    specs = cfg.get(f"remote.{remote}.push")
-    if specs:
-        dests = []
-        for spec in specs:
-            src, _, dst = spec.lstrip("+").partition(":")
-            dst = dst or src
-            if not dst or "*" in dst or dst == ":":
-                return None  # wildcard/empty destination: many refs
-            dests.append(dst)
-        return dests
-    mode = (last(cfg.get("push.default")) or "simple").lower()
-    if mode in ("nothing", "matching"):
-        return None
-    if mode in ("upstream", "tracking"):
-        merge = last(cfg.get(f"branch.{branch}.merge")) if branch else None
-        if not merge:
-            return None
-        return [merge[len("refs/heads/"):] if merge.startswith("refs/heads/") else merge]
-    if mode == "current":
-        return [branch] if branch else None
-    if mode == "simple":
-        if not branch:
-            return None
-        merge = last(cfg.get(f"branch.{branch}.merge"))
-        if merge:
-            if not merge.startswith("refs/heads/"):
-                return [merge]
-            if merge[len("refs/heads/"):] != branch:
-                # simple refuses a differently named upstream (git errors)
-                return None
-        return [branch]
-    return None
-
-
-SUBMODULE_WAY_OUT = ("way out: push the superproject without --recurse-submodules, "
-                     "then push each submodule explicitly to a feature branch")
-
-
-def submodule_block(raw, p, pos):
-    # #1051: resolve every submodule's own push destination and run the
-    # existing protected-branch test on it. Any protected or undeterminable
-    # destination blocks, naming the submodule (and destination, if known).
-    # Fail closed on unreadable/incomplete configuration, as before (#953).
-    if p.foreign:
-        return (f"'{raw}' in another repository (-C/--git-dir/--work-tree/GIT_DIR): "
-                f"submodule push destinations cannot be determined; {SUBMODULE_WAY_OUT}")
-    top = repo_toplevel()
-    if not top:
-        return (f"'{raw}': the repository top level cannot be resolved, submodule "
-                f"push destinations cannot be determined; {SUBMODULE_WAY_OUT}")
-    if not os.path.exists(os.path.join(top, ".gitmodules")):
-        return None  # no submodules: the flag is a no-op
-    # git forwards the remote NAME to the submodule only when the push target
-    # is a configured remote; a URL/path (REMOTE_UNCONFIGURED) makes the
-    # submodule run a plain `git push` with its own branch remote. Treat
-    # anything that is not a configured remote like that, or a protected
-    # remote.<name>.push could be missed (false allow).
-    remote = pos[0] if pos and pos[0] in remotes() else None
-    paths = submodule_paths(top)
-    if paths is None:
-        return (f"'{raw}': submodule paths could not be read from .gitmodules, "
-                f"destination cannot be determined; {SUBMODULE_WAY_OUT}")
-    realtop = os.path.realpath(top)
-    for path in paths:
-        worktree = os.path.realpath(os.path.join(top, path))
-        try:
-            inside = os.path.commonpath([realtop, worktree]) == realtop
-        except ValueError:  # different drives (Windows)
-            inside = False
-        if not inside:
-            return (f"'{raw}': submodule '{path}' lies outside the repository, "
-                    f"destination cannot be determined; {SUBMODULE_WAY_OUT}")
-        dests = submodule_destinations(worktree, remote)
-        if dests is None:
-            return (f"'{raw}': submodule '{path}' push destination cannot be "
-                    f"determined; {SUBMODULE_WAY_OUT}")
-        for dst in dests:
-            if is_protected(dst):
-                shown = dst[len("refs/heads/"):] if dst.startswith("refs/heads/") else dst
-                return (f"'{raw}': submodule '{path}' pushes to protected branch "
-                        f"'{shown}'; push the submodule to a feature branch instead")
-    return None
-
-
-def config_recurses(p):
-    # #1041: does this push recurse into submodules via configuration rather
-    # than an explicit --recurse-submodules? Sources: the last value of
-    # push.recurseSubmodules in the effective config (repo/global/system), an
-    # override on the command line (-c/--config -> p.config, value parsed) or
-    # a GIT_CONFIG_KEY_n/VALUE_n pair in p.override. A later override wins,
-    # mirroring git's last-value-wins. --config-env only names the variable,
-    # the value stays in the environment: it is treated as recursing
-    # (fail closed, value-blind). An explicit
-    # --recurse-submodules/--no-recurse-submodules wins over the config
-    # (git parse-options applies it last): a non-recursing value (check/no/
-    # false, or the bare --no- form) turns config recursion off.
-    _pos, opts = walk_push_args(p.args, PUSH_VALUE_OPTS)
-    for name, val, _raw in opts:
-        if name == "--no-recurse-submodules":
-            return False
-        if name == "--recurse-submodules" and (
-                val is None or val in ("check", "no", "false")):
-            return False
-    value = last(git_config().get("push.recursesubmodules", []))
-    recurses = value is not None and value.lower() in RECURSING_VALUES
-    for key, val in p.config:
-        if key == "push.recursesubmodules":
-            recurses = val is None or val.lower() in RECURSING_VALUES
-    keys, values = {}, {}
-    for tok in p.override:
-        m = ENV_CONFIG_PAIR.match(tok)
-        if m:
-            (keys if m.group(1) == "key" else values)[m.group(2)] = m.group(3)
-    for n, key in keys.items():
-        if key == "push.recursesubmodules":
-            val = values.get(n)  # a missing VALUE_n is treated as unknown
-            recurses = val is None or val.lower() in RECURSING_VALUES
-    return recurses
-
-
-def has_submodules():
-    # #1041: a config-driven recursion matters only when the repository
-    # declares submodules; the foreign-repo case is handled by the caller.
-    top = repo_toplevel()
-    return bool(top) and os.path.exists(os.path.join(top, ".gitmodules"))
-
-
-def config_recursion_block(p, pos):
-    # Same per-submodule destination check as the explicit flag (#1051),
-    # labelled with the config key that caused the recursion (#1041).
-    return submodule_block("push.recurseSubmodules", p, pos)
-
-
-def destination_block(p):
-    # Judge the push in its effective directory: cwd, HEAD, remotes
-    # and config are all read from there, then restored.
-    global CURRENT, _refs, _remotes, _cfg, _cfg_ok
-    if not p.edir:
-        return destination_block_here(p)
-    saved = (os.getcwd(), CURRENT)
-    os.chdir(p.edir)
-    CURRENT, _refs, _remotes, _cfg, _cfg_ok = p.ebranch, None, None, None, True
-    try:
-        return destination_block_here(p)
-    finally:
-        os.chdir(saved[0])
-        CURRENT, _refs, _remotes, _cfg, _cfg_ok = saved[1], None, None, None, True
-
-
-def destination_block_here(p):
-    # Reason string if this (non-tag-only) push statement may update a
-    # protected branch or its destination cannot be determined; else None.
-    current = "" if p.foreign else CURRENT
-    # Same shared walk as stmt_is_tag_only (issue #949).
-    pos, opts = walk_push_args(p.args, PUSH_VALUE_OPTS)
-    for name, val, raw in opts:
-        if not name.startswith("--"):
-            ch = name[1]  # short cluster, value of '-o' already split off
-            if ch != "o" and ch not in PUSH_SHORT_SAFE:
-                return f"unknown push option '-{ch}', destination cannot be determined"
-            continue
-        if name in PUSH_BULK:
-            return f"'{name}' pushes many refs, destination cannot be determined"
-        if name not in PUSH_LONG_KNOWN:
-            return f"unknown push option '{name}', destination cannot be determined"
-        if name == "--force-with-lease" and val and is_protected(val.split(":", 1)[0]):
-            return f"'{raw}' targets protected branch"
-        if name == "--recurse-submodules" and val in ("on-demand", "only"):
-            # #1051: check the submodules' own push destinations instead of
-            # blocking every repo that merely declares submodules (#953).
-            reason = submodule_block(raw, p, pos)
-            if reason:
-                return reason
-    if config_recurses(p) and (p.foreign or has_submodules()):
-        # #1041: the same recursion set through config/-c/GIT_CONFIG_*.
-        reason = config_recursion_block(p, pos)
-        if reason:
-            return reason
-    where = "in another repository (-C/--git-dir/--work-tree/GIT_DIR)" if p.foreign \
-        else "on a detached HEAD (or outside a repo)"
-    refs = pos[1:]  # pos[0] is the remote
-    if not refs:
-        if not current:
-            return f"no explicit refspec {where}, destination cannot be determined"
-        if p.override:
-            return "push/remote/branch config overridden on the command line, destination cannot be determined"
-        # pushes the current branch (checked by the caller) or what config says
-        return refspec_less_block()
-    k = 0
-    while k < len(refs):
-        ref = refs[k]
-        k += 1
-        if ref == "tag":
-            k += 1  # 'tag <name>' only touches refs/tags/
-            continue
-        spec = ref.lstrip("+")
-        # incl. COMPUTED, brace expansion and glob characters ('ma?n' matches
-        # a file named main): the shell decides the real refspec
-        if computed(spec) or "?" in spec or "[" in spec:
-            return (f"refspec '{ref}' is computed at run time, destination cannot be "
-                    "determined (use a literal branch name or HEAD instead)")
-        if "*" in spec or spec == ":":
-            return f"refspec '{ref}' pushes many refs, destination cannot be determined"
-        src, colon, dst = spec.partition(":")
-        if not colon or not dst:
-            dst = src
-            # a destination-less ref is mapped through remote.<r>.push. A
-            # GIT_CONFIG_KEY_n/VALUE_n pair only sets that one key; it does
-            # not redirect the config source like GIT_CONFIG_GLOBAL does, so
-            # 'GIT_CONFIG_VALUE_n=no' (a non-recursing push.recurseSubmodules)
-            # must not block here (#1041).
-            if any(key.startswith(MAP_KEYS) for key in p.override):
-                return f"refspec '{ref}' without destination while push config is overridden on the command line"
-            reason = push_config_block()
-            if reason:
-                return f"refspec '{ref}' without destination: {reason}"
-        if dst in ("HEAD", "@"):
-            if not current:
-                return f"refspec '{ref}' {where}, destination cannot be determined"
-            dst = current
-        if is_protected(dst):
-            return f"destination '{dst}' of refspec '{ref}' is a protected branch"
-    return None
-
-
-def quoted_statements(cmd):
-    # Split on control operators OUTSIDE quotes (bash quoting: '...' takes
-    # everything literally, backslash escapes elsewhere). Linear scan.
-    out, start, q = [], 0, ""
-    for m in re.finditer(r"\\.|[\"';|&\n]", cmd, re.S):
-        t = m.group()
-        if q == "'":
-            if t[-1] == "'":
-                q = ""
-        elif t[0] == "\\":
-            continue
-        elif q == '"':
-            if t == '"':
-                q = ""
-        elif t in "'\"":
-            q = t
-        else:
-            out.append(cmd[start:m.start()])
-            start = m.end()
-    out.append(cmd[start:])
-    return out
-
-
-CD_LEAD = re.compile(
-    r"\s*cd\s+(?:--\s+)?(\"[^\"$`\\]*\"|'[^']*'|[^\s\"'$`\\;&|()<>{}*?\[~!#-][^\s\"'$`\\;&|()<>{}*?\[~!#]*)\s*(?:&&|;|\n)(.*)",
-    re.S)
-UNSAFE_DIR = re.compile(r"[$`{}*?\[~\\\"'\n]")
-
-
-def effective_dir(p, lead_dir):
-    # (abs dir, branch) the push runs in, from a leading cd and the -C chain
-    # (relative -C resolves against the previous dir, last one wins); None
-    # when there is no dir change or it cannot be resolved to a branch.
-    dirs = ([lead_dir] if lead_dir else []) + list(p.cdirs)
-    if not dirs:
-        return None
-    base = os.getcwd()
-    for d in dirs:
-        if not d or d.startswith("-") or UNSAFE_DIR.search(d) or computed(d):
-            return None
-        base = os.path.normpath(os.path.join(base, d))
-    try:
-        out = subprocess.run(["git", "-C", base, "symbolic-ref", "-q", "HEAD"],
-                             capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    ref = out.stdout.strip()
-    if out.returncode != 0 or not ref.startswith("refs/heads/"):
-        return None  # not a repo / detached HEAD
-    return base, ref[len("refs/heads/"):]
-
-
-CHDIR = re.compile(r"(?:^|[\s;&|(])(?:cd|pushd|popd)(?!\S*[\w-])(?:\s+(?!\.(?:/)?(?:\s|$|;|&|\|))|\s*$|\s*[;&|)])")
-
-# --- comment + heredoc preprocessing (#947, #948) ---------------------------
-def strip_comment(stmt):
-    # Cut an unquoted, word-start '#' comment (bash: '#' only starts a comment
-    # at the beginning of a word; 'a#b', '"#x"', '${#x}' and '$#' stay text).
-    # Only whitespace/start counts as word start: anything unusual keeps the
-    # text, which can only add blocks, never hide a push.
-    q, i, n = "", 0, len(stmt)
-    while i < n:
-        c = stmt[i]
-        if q == "'":
-            if c == "'":
-                q = ""
-        elif c == "\\":
-            i += 1
-        elif q == '"':
-            if c == '"':
-                q = ""
-        elif c in "'\"":
-            q = c
-        elif c == "#" and (i == 0 or stmt[i - 1] in " \t"):
-            return stmt[:i]
-        i += 1
-    return stmt
-
-
-HEREDOC = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
-HEREDOC_OWNERS = {"cat", "gh", "tee"}
-HEREDOC_OUTER = {"echo", "printf", "gh", "cat", "tee"}
-HEREDOC_GIT_TEXT = {"commit", "tag", "notes"}
-
-
-def _command_words(text):
-    words = re.findall(r"[^\s|&;()<>]+", text)
-    while words and (words[0] in RESERVED or ASSIGNMENT.match(words[0])):
-        words.pop(0)
-    return words
-
-
-def _text_command(words):
-    # does this command only treat stdin / its arguments as text?
-    if not words:
-        return False
-    first = os.path.basename(words[0])
-    if first == "git":
-        rest = [w for w in words[1:] if not w.startswith("-")]
-        if "-C" in words:  # -C <path>: the path is not the subcommand
-            rest = [w for w in rest if w != words[words.index("-C") + 1]]
-        return bool(rest) and rest[0] in HEREDOC_GIT_TEXT
-    return first in HEREDOC_OUTER
-
-
-def _heredoc_operator(line):
-    # The first '<<WORD' in command position (outside quotes; a double-quoted
-    # '$(' re-enters command position), or None.
-    stack = [""]
-    i, n = 0, len(line)
-    while i < n:
-        c, top = line[i], stack[-1]
-        if top == "'":
-            if c == "'":
-                stack.pop()
-        elif c == "\\":
-            i += 1
-        elif c == "$" and line[i + 1:i + 2] == "(" and top in ("", '"'):
-            stack.append("")
-            i += 1
-        elif top == "" and c == ")" and len(stack) > 1:
-            stack.pop()
-        elif top == '"':
-            if c == '"':
-                stack.pop()
-        elif c in "'\"":
-            stack.append(c)
-        elif top == "" and c == "<":
-            m = HEREDOC.match(line, i)
-            if m:
-                return m
-        i += 1
-    return None
-
-
-def strip_heredoc_bodies(cmd):
-    # Drop the body of a heredoc whose consumer only handles text: `cat`
-    # (usually inside "$(...)" for gh --body / git commit -m), gh, tee, or a
-    # text-only outer command. A body fed to a shell, interpreter, eval, xargs,
-    # a pipe or anything unknown is KEPT, since it may be executed. An
-    # unterminated heredoc keeps everything (fail closed).
-    lines = cmd.split("\n")
-    out, i = [], 0
-    while i < len(lines):
-        line = lines[i]
-        out.append(line)
-        i += 1
-        m = _heredoc_operator(line)
-        # Text AFTER the operator ('<<EOF | bash', '<<EOF; sh f') may hand the
-        # body to a shell: keep it. Statements BEFORE it on the line ('mkdir d
-        # && cat > f <<EOF') are irrelevant; only the heredoc owner counts.
-        if not m or re.search(r"[|;&`]", line[m.end():]):
-            continue
-        pre = line[:m.start()]
-        owner_seg = pre[pre.rfind("$(") + 2:] if "$(" in pre else pre
-        owner_seg = re.split(r"&&|\|\||;|\||&", owner_seg)[-1]
-        if "`" in owner_seg:
-            continue
-        owner = _command_words(owner_seg)
-        owner_ok = bool(owner) and (
-            os.path.basename(owner[0]) in HEREDOC_OWNERS or _text_command(owner))
-        outer = _command_words(re.split(r"&&|\|\||;|\||&", pre)[-1])
-        if not (owner_ok and _text_command(outer)):
-            continue
-        delim, dash = m.group(3), bool(m.group(1))
-        j = i
-        while j < len(lines) and (lines[j].lstrip("\t") if dash else lines[j]) != delim:
-            j += 1
-        if j < len(lines):
-            i = j  # skip the body; the terminator line is kept
-    return "\n".join(out)
-
-
-def substitution_bodies(text, depth=0):
-    # All $(...)/backtick bodies, nested ones included (shared scanner).
-    out = []
-    for inner in command_substitutions(text):
-        if depth >= _MAX_SUBST_DEPTH:
-            raise ValueError("command substitution nested too deeply")
-        out.append(inner)
-        out += substitution_bodies(inner, depth + 1)
-    return out
-
-
-def has_ansi_c(cmd):
-    # Can a "$'" in this command be ANSI-C quoting? Only outside "..." --
-    # inside double quotes it is two literal characters (#1151 F6-09:
-    # grep -n "\"x\"\|'\$'" f was blocked as ANSI-C). A substitution can
-    # open a new quoting context, so any $( or backtick keeps it True.
-    if "$'" not in cmd:
-        return False
-    if "$(" in cmd or "`" in cmd:
-        return True
-    q, i = "", 0
-    while i < len(cmd):
-        c = cmd[i]
-        if q == "'":
-            if c == "'":
-                q = ""
-        elif c == "\\":
-            i += 1
-        elif q == '"':
-            if c == '"':
-                q = ""
-        elif c == "$" and cmd[i + 1:i + 2] == "'":
-            return True
-        elif c in "'\"":
-            q = c
-        i += 1
-    return False
-
-
-def is_text_consumer(stmt):
-    # True when every command of the (quote-aware) statement is a NON_EXEC
-    # text consumer (echo, gh, ...): its quoted text never executes. Anything
-    # unparseable or not clearly such a consumer -> False (fail closed).
-    try:
-        segs = list(segments(stmt))
-    except ValueError:
-        return False
-    for toks in segs:
-        i = 0
-        while i < len(toks) and (toks[i] in RESERVED or ASSIGNMENT.match(toks[i])):
-            i += 1
-        if (i >= len(toks) or os.path.basename(toks[i]) not in NON_EXEC
-                or segment_push_args(toks) is not None):
-            return False
-    return bool(segs)
-
-
-def classify(cmd):
-    # bash drops backslash-newline before parsing: join continued lines first
-    cmd = REDIRECT.sub(" ", strip_heredoc_bodies(cmd.replace("\\\n", "")))
-    pushes = []
-    # Fragments split on EVERY control operator (a quote may hide a push: a
-    # multi-line quoted 'bash -c' body stays visible line by line) PLUS the
-    # quote-aware statements: a quoted ';', '|', '&' or newline must not cut
-    # off the refspec ('git push -o "a;b" origin HEAD:main', QF1). Both views
-    # are classified; any block wins.
-    # #1151 F6-03: the body of a $(...)/backtick substitution -- also inside
-    # double quotes, where the tokenizer keeps it as one opaque word -- is
-    # classified like a command line of its own.
-    try:
-        texts = [cmd] + substitution_bodies(cmd)
-    except ValueError:
-        return "block command substitution nested too deeply to classify"
-    stmts = list(dict.fromkeys(
-        strip_comment(s).strip()
-        for text in texts
-        for s in re.split(r"&&|\|\||;|\||&|\n", text) + quoted_statements(text)))
-    qstmts = [strip_comment(s).strip() for text in texts for s in quoted_statements(text)]
-    ansi_c = has_ansi_c(cmd)
-    parsed = {}  # stmt -> parses as-is (each statement is tokenized once)
-    for stmt in stmts:
-        plain = re.sub(r"[\"'\\$]", "", stmt)
-        # 'alias': '-c alias.p=push p', '--config-env=alias.p=VAR p' (R2-5)
-        if ("push" not in plain and not (ansi_c and "$'" in stmt)
-                and "alias" not in plain.lower()):
-            continue
-        # The naive split cut this fragment out of another command's quoted
-        # text (gh --body "... && git push ..."): data, not a push. A fragment
-        # that is itself a quote-aware statement is never skipped.
-        # shortcut: gh alias --shell can still run a push; known limit, see NON_EXEC comment
-        if stmt not in qstmts and any(stmt in q and is_text_consumer(q) for q in qstmts):
-            continue
-        segs = None
-        # A quote opened here and closed on a later line (multi-line -m/--body
-        # text) leaves the command word intact: re-parse with the quote
-        # closed. Still unparseable and mentions git -> fail closed.
-        for suffix in ("", '"', "'"):
-            try:
-                segs = list(segments(stmt + suffix))
-                break
-            except ValueError:
-                pass
-        parsed[stmt] = segs is not None and not suffix
-        if segs is None:
-            if "git" in plain:
-                return "block unparseable statement mentions git push"
-            continue
-        for toks in segs:
-            args = segment_push_args(toks)
-            if args is UNRESOLVED:
-                return "block unresolvable git push statement"
-            if args is None:
-                continue
-            # The push only parsed after a quote was closed artificially: the
-            # rest of it (refspec) sits behind a quoted separator — fail closed.
-            if suffix:
-                return "block git push statement with a quote spanning a command separator"
-            # ANSI-C quoting can hide separators/escapes ($'a\';b') that the
-            # tokenizer reads differently from bash — fail closed.
-            if "$'" in stmt:
-                return "block git push statement with ANSI-C quoting ($'...')"
-            pushes.append(args)
-    if not pushes:
-        return "none"
-    # A cd/pushd/popd anywhere in the command may move the push into another
-    # repository whose HEAD and config the hook cannot see (#952): judge it
-    # like -C. 'cd .' is a no-op and does not count.
-    # Worktree branch detection: a leading `cd <literal>` and/or `-C <literal>` whose directory
-    # resolves to a worktree on a branch is judged by THAT HEAD; everything
-    # else (computed/missing path, detached, pushd/popd, later cd, --git-dir)
-    # stays foreign = fail closed.
-    lead = CD_LEAD.match(cmd)
-    lead_dir, rest = (lead.group(1).strip("\"'"), lead.group(2)) if lead else (None, cmd)
-    chdir = bool(CHDIR.search(rest))
-    judged = []
-    for p in pushes:
-        found = None if chdir or p.foreign else effective_dir(p, lead_dir)
-        if found:
-            p = p._replace(edir=found[0], ebranch=found[1])
-        elif chdir or lead_dir or p.cdirs:
-            p = p._replace(foreign=True)
-        judged.append(p)
-    pushes = judged
-    # #1041: a tag-only statement is not a shortcut when the config recurses
-    # into submodules — that push still updates submodule branches. A
-    # configured recursion can only recurse when the repository declares
-    # submodules (or it runs in a foreign repo), exactly like the same gate
-    # in destination_block: without .gitmodules the tag push stays allowed.
-    non_tag = [p for p in pushes
-               if p.foreign or p.edir or p.override or not stmt_is_tag_only(p.args)
-               or (config_recurses(p) and (p.foreign or has_submodules()))]
-    # B-01: any unparseable statement (a quote may hide a push) -> not tag-only;
-    # A3: a remote.<r>.push mapping may land a tag ref on a branch
-    if not non_tag and all(parsed[s] if s in parsed else segments_ok(s) for s in stmts) \
-            and not push_config_block():
-        return "tag"
-    for p in pushes if push_config_block() else non_tag:
-        reason = destination_block(p)
-        if reason:
-            return "block " + reason
-    # Branch-Guard: the branch the push runs on (effective dir, else hook cwd)
-    for p in pushes:
-        here = p.ebranch if p.edir else CURRENT
-        if here in PROTECTED:
-            return "onbranch " + here
-    return "push"
-
-
-try:
-    with os.fdopen(3, encoding="utf-8", errors="surrogateescape") as fh:
-        print(classify(fh.read()))
-except Exception as exc:  # fail closed on any classifier bug
-    print(f"block classifier error ({type(exc).__name__})")
-PYEOF
-} | ${_BUDGET[@]+"${_BUDGET[@]}"} python3 - "$MAIN_BRANCH" "$CURRENT_BRANCH" "$PROTECTED_LIST" 3<<<"$COMMAND" 2>/dev/null
+# The deployed classifier imports the shared T23 argument walk and shell
+# scanner.  Its three shared-walk consumers are documented here because the
+# implementation moved out of this hook:
+# walk_push_args( — tag-only classification.
+# walk_push_args( — destination validation.
+# walk_push_args( — config-recursion checks.
+# It receives the command on stdin (here-string, like the former fd 3)
+# and keeps the hard time budget: timeout -> empty output -> fail closed.
+PUSH_CLASS=$(${_BUDGET[@]+"${_BUDGET[@]}"} python3 \
+  "$SCRIPT_DIR/lib/hook_dod_push_classify.py" \
+  "$MAIN_BRANCH" "$CURRENT_BRANCH" "$PROTECTED_LIST" \
+  0<<<"$COMMAND" 2>/dev/null
 )
 _CLASS_RC=$?
 
-case "$PUSH_CLASS" in
-  none) exit 0 ;;
-  tag) IS_TAG_ONLY_PUSH=true ;;
-  push) IS_TAG_ONLY_PUSH=false ;;
-  # Branch-Guard (worktree branch detection): the classifier names the branch the push runs on
-  # (effective -C/cd directory, else the hook cwd) when it is protected.
-  "onbranch "*)
-    echo "Branch-Guard: Push blocked — you are on '${PUSH_CLASS#onbranch }'." >&2
-    echo "Create a feature branch first: git checkout -b feat/<topic>" >&2
-    echo "Direct pushes to $MAIN_BRANCH are not allowed by DoD policy." >&2
-    echo "" >&2
-    echo "If this is intentional (release, hotfix), disable the hook temporarily:" >&2
-    echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable." >&2
-    exit 2
-    ;;
+# Branch-Guard verdict: the reporter maps the classifier line to the hook
+# action and renders the block reason (on stderr, issue #593). Its exit
+# status is an internal protocol with this shell, not the hook's status:
+#   0 = tag-only or plain push -> run the test gate below
+#   3 = not a push at all       -> allow
+#   2 = blocked                  -> the reason is already on stderr
+# Any other status (crash) is a broken deployment and blocks.
+python3 "$_REPORTER" branch \
+  "$_CLASS_RC" "$CLASSIFY_BUDGET" "$MAIN_BRANCH" "${PROTECTED_LIST// /, }" \
+  0<<<"$PUSH_CLASS"
+_VERDICT_RC=$?
+case "$_VERDICT_RC" in
+  0) : ;;
+  3) exit 0 ;;
+  2) exit 2 ;;
   *)
-    _REASON="${PUSH_CLASS#block }"
-    [ "${PUSH_CLASS%% *}" = "block" ] || _REASON="push classification failed (fail closed)"
-    [ "$_CLASS_RC" -eq 124 ] && _REASON="push classification exceeded ${CLASSIFY_BUDGET}s (fail closed)"
-    echo "Branch-Guard: Push blocked — $_REASON." >&2
-    # #949/#1033: the same helper that built the classifier's PROTECTED set
-    # built this message's list — one definition, no duplicate branch names.
-    _PROTECTED_BRANCHES="${PROTECTED_LIST// /, }"
-    echo "Protected branches: $_PROTECTED_BRANCHES. Push a feature branch and open a PR instead." >&2
-    echo "" >&2
-    echo "If this is intentional (release, hotfix), disable the hook temporarily:" >&2
-    echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable." >&2
+    echo "DoD-Check: Branch-Guard verdict reporter failed (fail closed)." >&2
     exit 2
     ;;
 esac
@@ -1564,25 +311,6 @@ if [ -z "$TEST_CMD" ] && [ -n "$CONFIG_FILE" ]; then
   TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")  # runtime-reader:variables.TEST_COMMAND
 fi
 
-if [ -z "$TEST_CMD" ] && [ -z "$CONFIG_FILE" ]; then
-  # No config file located at all — surface this instead of silently skipping.
-  # Not a block (exit 0) so stdout is fine here (issue #593 only requires
-  # stderr for messages on a *blocking* path).
-  echo "DoD-Check: no project config found (.meta-config/project.yaml)."
-  echo "The test gate could not be evaluated. Either run from within the project,"
-  echo "or export AGENT_META_TEST_COMMAND='<your-test-command>' to enable it."
-  echo "Push allowed (Branch-Guard passed, but test gate was NOT enforced)."
-  exit 0
-fi
-
-if [ -z "$TEST_CMD" ]; then
-  echo "DoD-Check: TEST_COMMAND not configured — skipping test gate."
-  echo "Set variables.TEST_COMMAND in .meta-config/project.yaml or"
-  echo "export AGENT_META_TEST_COMMAND='<your-test-command>' to enable."
-  echo "Push allowed (Branch-Guard passed, no test gate configured)."
-  exit 0
-fi
-
 # --- Result cache keyed by commit SHA (issue #594) ----------------------
 # A full test suite run inline on every single `git push` can block for
 # minutes with no cap, even when nothing test-relevant changed since the
@@ -1591,17 +319,13 @@ fi
 # (HEAD sha, TEST_CMD) pair per-repo under .git/ (never synced, never
 # committed) and skip straight to "allow" on a cache hit. Any change to
 # either the commit or the configured TEST_CMD invalidates the cache.
+# The reporter reads the file and applies the key rule (hook_dod_push_policy
+# cache_matches); this shell only resolves the paths.
 GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || echo "")
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 CACHE_FILE=""
 if [ -n "$GIT_DIR" ] && [ -n "$HEAD_SHA" ]; then
   CACHE_FILE="$GIT_DIR/agent-meta-dod-push-check-cache"
-  if [ -f "$CACHE_FILE" ] && [ "$(cat "$CACHE_FILE" 2>/dev/null)" = "$HEAD_SHA
-$TEST_CMD" ]; then
-    echo "DoD-Check: tests already passed for commit ${HEAD_SHA:0:12} with this TEST_COMMAND (cached) — skipping re-run."
-    echo "Delete $CACHE_FILE to force a re-run."
-    exit 0
-  fi
 fi
 
 # --- Timeout (issue #594) ------------------------------------------------
@@ -1612,33 +336,46 @@ if [ -z "$TEST_TIMEOUT" ] && [ -n "$CONFIG_FILE" ]; then
 fi
 TEST_TIMEOUT="${TEST_TIMEOUT:-300}"
 
-echo "DoD-Check: Running '$TEST_CMD' (timeout: ${TEST_TIMEOUT}s)..."
+_HAS_TIMEOUT=0
+command -v timeout >/dev/null 2>&1 && _HAS_TIMEOUT=1
+
+# Test-gate state, cache key and the "Running ..." announcement are rendered
+# by the reporter. Its exit status is the internal protocol:
+#   0 = run the tests now    3 = allow, no config found
+#   4 = allow, no TEST_COMMAND     5 = allow, cached pass for this commit
+# Anything else (crash) is a broken deployment and blocks.
+python3 "$_REPORTER" gate \
+  "$CONFIG_FILE" "$TEST_CMD" "$CACHE_FILE" "$HEAD_SHA" \
+  "$TEST_TIMEOUT" "$_HAS_TIMEOUT"
+_GATE_RC=$?
+case "$_GATE_RC" in
+  0) : ;;
+  3|4|5) exit 0 ;;
+  *)
+    echo "DoD-Check: test-gate reporter failed (fail closed)." >&2
+    exit 2
+    ;;
+esac
+
 _TEST_RC=0
-if command -v timeout >/dev/null 2>&1; then
+if [ "$_HAS_TIMEOUT" -eq 1 ]; then
   # Note: TEST_CMD executed via bash -c (no eval) — value from project.yaml
   # Issue #753: inject set -uo pipefail so pipeline exit codes are not masked
   timeout "${TEST_TIMEOUT}s" bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 else
-  echo "DoD-Check: 'timeout' command not available on this system — running the test gate without a hard time limit." >&2
   bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 fi
 
-if [ "$_TEST_RC" -ne 0 ]; then
-  echo "" >&2
-  if [ "$_TEST_RC" -eq 124 ] && command -v timeout >/dev/null 2>&1; then
-    echo "DoD-Check TIMED OUT after ${TEST_TIMEOUT}s: '$TEST_CMD'." >&2
-    echo "Raise the limit via variables.TEST_TIMEOUT in .meta-config/project.yaml (or AGENT_META_TEST_TIMEOUT), or fix a hanging test." >&2
-  else
-    echo "DoD-Check FAILED: Tests must pass before pushing." >&2
-  fi
-  echo "Fix failing tests and retry, or disable the hook temporarily." >&2
-  exit 2
-fi
+# Pass/fail/timeout message: the reporter blocks (exit 2) on a failing or
+# timed-out run; any other non-zero status is a broken deployment and blocks
+# as well (the tests passed, but the gate cannot report them).
+python3 "$_REPORTER" result "$_TEST_RC" "$TEST_TIMEOUT" "$_HAS_TIMEOUT" "$TEST_CMD"
+_RESULT_RC=$?
+[ "$_RESULT_RC" -eq 0 ] || exit 2
 
 if [ -n "$CACHE_FILE" ]; then
   mkdir -p "$(dirname "$CACHE_FILE")" 2>/dev/null || true
   printf '%s\n%s' "$HEAD_SHA" "$TEST_CMD" > "$CACHE_FILE" 2>/dev/null || true
 fi
 
-echo "DoD-Check passed."
 exit 0

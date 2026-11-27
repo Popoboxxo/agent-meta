@@ -46,6 +46,7 @@ from lib.variables import (  # noqa: E402
     strip_inactive_conditional_blocks,
     substitute,
 )
+from tests.conftest import ALL_PROVIDERS  # noqa: E402
 
 # Markdown inline link target, same shape the docs consistency checks use.
 _LINK_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")
@@ -130,17 +131,7 @@ def test_concept_doc_marks_multi_instance_as_p3_shipped():
 def test_concept_doc_carries_the_provider_matrix():
     content = _text(_CONCEPT)
     lowered = _normalized(content)
-    for provider in (
-        "Claude",
-        "Opencode",
-        "Gemini",
-        "Continue",
-        "Copilot",
-        "Mammouth",
-        "Codex",
-        "ZCode",
-        "KimiCode",
-    ):
+    for provider in ALL_PROVIDERS:
         assert provider in content, (
             f"orchestrator-topology.md must list '{provider}' in the support "
             "matrix (config/provider-capabilities.yaml)."

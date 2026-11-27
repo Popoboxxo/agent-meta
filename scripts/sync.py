@@ -116,6 +116,16 @@ from lib.knowledge import sync_knowledge_engine  # noqa: F401  (deliberate re-ex
 # Entry point
 # ---------------------------------------------------------------------------
 
+class _BackupLabelAction(argparse.Action):
+    """Store the label; hint on stderr when the deprecated --label spelling is used."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if option_string == "--label":
+            print("[DEPRECATED] --label is deprecated, use --backup-label",
+                  file=sys.stderr)
+        setattr(namespace, self.dest, values)
+
+
 def _normalize_check_dry_run(args) -> None:
     """--check is a read-only CI gate: it must never allow real writes.
 
@@ -131,7 +141,8 @@ def _validate_doctor_flags(parser, args) -> None:
         return
     out_allowed = getattr(args, "optimize_config", False)
     stray = [flag for flag, used in (
-        ("--strict", args.strict), ("--provider", args.provider is not None),
+        ("--strict", args.strict and not getattr(args, "validate", False)),
+        ("--provider", args.provider is not None),
         ("--out", args.out is not None and not out_allowed)) if used]
     if stray:
         parser.error(f"{', '.join(stray)} can only be used together with --doctor")
@@ -314,7 +325,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "The sync-pending check runs 'sync.py --check --dry-run' "
                              "(about 25 s).")
     parser.add_argument("--strict", action="store_true",
-                        help="With --doctor: WARNING findings exit 1, an invalid registry "
+                        help="With --validate: extension managed-block drift exits 1. "
+                             "With --doctor: WARNING findings exit 1, an invalid registry "
                              "entry (doctor.registry-invalid) is an ERROR and exits 2")
     parser.add_argument("--provider", nargs="+", action="extend", metavar="P", default=None,
                         help="With --doctor: only check these active providers")
@@ -334,7 +346,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="Create extension file for ROLE (or 'all'). "
                              "Does not overwrite existing files.")
     parser.add_argument("--update-ext", action="store_true",
-                        help="Update managed block in all existing extension files")
+                        help="Update managed block in all existing extension files. Hand-edited "
+                             "blocks are skipped (warning) unless --force; --role ROLE limits "
+                             "the run; --check lists drift without writing (exit 1)")
     parser.add_argument("--create-rule", metavar="NAME",
                         help="Create .claude/rules/<NAME>.md template (never overwrites)")
     parser.add_argument("--create-hook", metavar="NAME",
@@ -490,15 +504,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                          default=None,
                          help="Create a timestamped backup of provider directories "
                               "and project config. Pass provider names or omit for all. "
-                              "Use --label to add a description.")
+                              "Use --backup-label to add a description.")
     # #1203: `--labels` is reserved for the issue-taxonomy CLI (#1188).
     # `allow_abbrev=False` above already keeps `--labels` from silently
-    # binding to `--label`; the explicit alias gives callers a permanent,
-    # unambiguous spelling while `--label` stays backward compatible.
-    parser.add_argument("--label", "--backup-label", metavar="TEXT", default=None,
+    # binding to `--label`; `--backup-label` is the canonical, unambiguous
+    # spelling while `--label` stays as a deprecated alias (same dest).
+    parser.add_argument("--backup-label", "--label", metavar="TEXT", default=None,
+                        dest="label", action=_BackupLabelAction,
                         help="Optional label/description for --backup. "
-                             "--backup-label is the unambiguous alias; "
-                             "--label is kept for backward compatibility.")
+                             "--label is a deprecated alias of --backup-label.")
     parser.add_argument("--restore", metavar="ARCHIVE",
                         help="Restore provider directories from a backup archive. "
                              "Use --restore-providers to select specific providers.")
@@ -506,7 +520,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         default=None,
                         help="Which providers to restore from --restore (default: all)")
     parser.add_argument("--force", action="store_true",
-                        help="Clean restore: remove the existing provider "
+                        help="With --update-ext: overwrite hand-edited managed blocks. "
+                             "With --restore: clean restore, remove the existing provider "
                              "directory before restoring it (--restore). Without "
                              "it, backup files are merged over the existing tree.")
     parser.add_argument("--list-backups", action="store_true",
@@ -554,7 +569,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", metavar="PATH",
                         help="Path to skill directory within the submodule repo")
     parser.add_argument("--role", metavar="ROLE",
-                        help="Agent role name for the generated wrapper agent")
+                        help="Agent role name (--add-skill: wrapper agent; --update-ext: "
+                             "only that role's extension)")
     parser.add_argument("--entry", metavar="FILE", default="SKILL.md",
                         help="Entry file within the skill directory (default: SKILL.md)")
     return parser

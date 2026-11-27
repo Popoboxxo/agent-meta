@@ -43,8 +43,8 @@ REFILL_MARK = "refilled-by-defaults"
 TEST_TIMEOUT_PATH = "variables.TEST_TIMEOUT"
 TEST_COMMAND_PATH = "variables.TEST_COMMAND"
 DOD_READER = "hooks/1-generic/dod-push-check.sh"
-REPO_READER = "hooks/1-generic/repo-containment-impl.sh"
-ORCHESTRATOR_READER = "hooks/1-generic/orchestrator-guard-impl.sh"
+REPO_READER = "hooks/1-generic/lib/hook_containment_config.py"
+ORCHESTRATOR_READER = "hooks/1-generic/lib/hook_guard_policy.py"
 
 
 def _mandatory_text(reader: str) -> str:

@@ -62,7 +62,9 @@ from lib.consistency.frontmatter import check_agent_frontmatter, check_based_on_
 from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.model_contracts import check_model_contracts
-from lib.consistency.placeholders import check_placeholders, load_project_vars
+from lib.consistency.placeholders import (
+    check_placeholders, check_single_brace_known_vars, load_project_vars,
+)
 from lib.consistency.project_context_injection import check_project_context_injection
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
 from lib.consistency.reference_standards import check_reference_standards
@@ -258,6 +260,7 @@ def run_checks(
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)
+        findings += check_single_brace_known_vars(root)
         findings += check_based_on_stale(root)  # ERROR since IC-15 Nr. 24 (#885 F-09)
 
         # Temp-literal check (SPEC-tmp-sink-injection AC-21/IC-11, WARNING only):

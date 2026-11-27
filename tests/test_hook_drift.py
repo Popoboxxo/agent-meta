@@ -193,3 +193,14 @@ def test_sync_time_placeholders_only_appear_on_their_assignment_lines():
                 if token in line and line.strip() != assignment:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
     assert offenders == []
+
+
+def test_generic_hooks_carry_no_provider_header() -> None:
+    """#1248: hook headers name a protocol, never a provider (the header is
+    read as a provider filter by parse_hook_metadata)."""
+    offenders = [
+        str(p.relative_to(REPO_ROOT))
+        for p in sorted((REPO_ROOT / "hooks" / "1-generic").rglob("*.sh"))
+        if any(line.startswith("# provider:") for line in p.read_text(encoding="utf-8").splitlines()[:15])
+    ]
+    assert offenders == []

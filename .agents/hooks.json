@@ -2,6 +2,19 @@
   "_agent-meta": {
     "managed": "agent-meta managed — do not edit manually"
   },
+  "dod-push-check": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./hooks/antigravity-json-adapter.sh dod-push-check.sh"
+          }
+        ]
+      }
+    ]
+  },
   "orchestrator-guard": {
     "PreToolUse": [
       {

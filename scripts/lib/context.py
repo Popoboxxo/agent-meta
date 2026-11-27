@@ -20,6 +20,9 @@ from .io import (
 )
 from .json_persistence import save_json_document
 from .log import SyncLog
+from .managed_block import (
+    MANAGED_BLOCK_RE, ManagedBlockError, replace_line_block,
+)
 from .rules import load_speech_rule_text
 from .plugins import resolve_plugin_compact
 from .rule_index import (
@@ -45,10 +48,7 @@ _CONTEXT_HASHES_FILE = "context-hashes.json"
 _CONTEXT_HASHES_DIR = ".meta-config"
 
 # Marker that separates the static header from the managed block in context files.
-_MANAGED_BLOCK_RE = re.compile(
-    r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-    re.DOTALL,
-)
+_MANAGED_BLOCK_RE = MANAGED_BLOCK_RE
 
 
 def _has_duplicate_managed_block(text: str) -> bool:
@@ -675,11 +675,7 @@ def _update_managed_html_block(
     """
 
     existing = target_path.read_text(encoding="utf-8")
-    managed_pattern = re.compile(
-        r"<!--\s*agent-meta:managed-begin\s*-->"
-        r".*?<!--\s*agent-meta:managed-end\s*-->",
-        re.DOTALL,
-    )
+    managed_pattern = MANAGED_BLOCK_RE
     rel = str(target_path.relative_to(project_root))
     if _has_duplicate_managed_block(existing):
         log.warning(
@@ -1066,10 +1062,7 @@ def _sync_opencode_context(
             agent_meta_root=agent_meta_root,
         )
 
-    managed_pattern = re.compile(
-        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-        re.DOTALL,
-    )
+    managed_pattern = MANAGED_BLOCK_RE
     if dry_run and not target_path.exists():
         log.action("UPDATE", context_file, "managed block (agent hints + rules)")
     else:
@@ -1331,7 +1324,11 @@ def _sync_continue_context(
             )
             # IC-15 Nr. 10 (F-14): omit lines with unset project variables.
             new_managed = omit_unresolved_placeholder_lines(new_managed, log, context_file)
-            updated = update_managed_block(existing, new_managed)
+            try:
+                updated = update_managed_block(existing, new_managed)
+            except ManagedBlockError as exc:
+                log.warn(f"{ctx_path.relative_to(project_root)}: {exc} — skipped")
+                updated = existing
             if updated != existing:
                 log.action("UPDATE", str(ctx_path.relative_to(project_root)),
                            "managed block refreshed")
@@ -2061,13 +2058,10 @@ def _update_continue_config_managed_block(
     existing = settings_path.read_text(encoding="utf-8")
     rel = str(settings_path.relative_to(project_root))
 
-    managed_re = re.compile(
-        rf"^{re.escape(_CONTINUE_MANAGED_BEGIN)}.*?^{re.escape(_CONTINUE_MANAGED_END)}",
-        re.MULTILINE | re.DOTALL,
+    updated = replace_line_block(
+        existing, _CONTINUE_MANAGED_BEGIN, _CONTINUE_MANAGED_END, new_block
     )
-    if managed_re.search(existing):
-        # Function replacement keeps the generated metadata block verbatim (#674).
-        updated = managed_re.sub(lambda _m: new_block, existing, count=1)
+    if updated is not None:
         if updated != existing:
             log.action("UPDATE", rel, "managed comment block")
             if not dry_run:
@@ -3667,7 +3661,11 @@ def sync_prompts_for_continue(
         extract_frontmatter_field,
         target_filename,
     )
-    from .provider_transform import _make_slim_body, _strip_claude_specific_lines
+    from .provider_transform import (
+        _make_slim_body,
+        _strip_extension_hook_lines,
+        should_strip_extension_hook,
+    )
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
@@ -3727,7 +3725,8 @@ def sync_prompts_for_continue(
 
         # Strip original frontmatter, optionally slim the body
         body = _strip_frontmatter(content)
-        body = _strip_claude_specific_lines(body)
+        if should_strip_extension_hook((provider_config or {}).get(provider)):
+            body = _strip_extension_hook_lines(body)
         if prompt_mode == "slim":
             body = _make_slim_body(body)
 

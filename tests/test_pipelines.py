@@ -1,32 +1,87 @@
 """Test suite for quality pipeline configuration management."""
 
+import ast
 from pathlib import Path
 
 import pytest
 
 from scripts.lib.pipelines import (
-    KNOWN_PROVIDERS,
     _pipeline_active_for_provider,
+    _registered_providers,
     _validate_task_review_rounds,
     build_pipeline_variables,
     validate_pipelines,
 )
+from scripts.lib.providers import registered_provider_names
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+_PIPELINES_MODULE = REPO_ROOT / "scripts" / "lib" / "pipelines.py"
 
 
-def test_known_providers_fallback_stays_in_parity_with_registry():
-    """D7 drift guard: the fail-soft fallback tuple must not silently omit a
-    registered provider (Copilot was missing from the original 8-tuple)."""
-    from scripts.lib.providers import registered_provider_names
+def _provider_literal_collections(module_path: Path, names: set) -> list:
+    """Module-level tuple/list/set literals holding >= 2 registered provider names.
 
-    assert set(KNOWN_PROVIDERS) == set(registered_provider_names(REPO_ROOT))
-    assert "Copilot" in KNOWN_PROVIDERS
+    AC-4: the provider list must come from the registry, not from a literal.
+    """
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Tuple, ast.List, ast.Set)) or len(node.elts) < 2:
+            continue
+        values = [
+            elt.value for elt in node.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        ]
+        hits = [value for value in values if value in names]
+        if len(hits) >= 2:
+            offenders.append((node.lineno, hits))
+    return offenders
+
+
+def test_registered_providers_are_derived_from_the_registry():
+    """AC-4: the pipeline provider list IS the provider registry."""
+    assert _registered_providers(REPO_ROOT) == registered_provider_names(REPO_ROOT)
+
+
+def test_pipelines_module_has_no_provider_literal_list():
+    """AC-4: no hardcoded provider collection may remain in pipelines.py."""
+    names = set(registered_provider_names(REPO_ROOT))
+    assert names, "registry must declare providers for this guard to be meaningful"
+    assert _provider_literal_collections(_PIPELINES_MODULE, names) == []
+
+
+def test_empty_registry_is_fail_safe(tmp_path, caplog):
+    """An empty registry yields no providers — no literal-list fallback, no crash."""
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "ai-providers.yaml").write_text("providers: {}\n", encoding="utf-8")
+
+    with caplog.at_level("WARNING"):
+        assert _registered_providers(tmp_path) == []
+
+    assert any("registry" in record.message.lower() for record in caplog.records)
+    # Rendering still works: the provider block map is simply empty.
+    variables = build_pipeline_variables(
+        {"p1": {"stages": [{"id": "s", "agent": "tester", "task": "t"}]}},
+        {},
+        agent_meta_root=tmp_path,
+    )
+    assert variables["PIPELINE_P1_PROVIDER_BLOCKS"] == {}
+
+
+def test_unreadable_registry_is_fail_safe(tmp_path, caplog, monkeypatch):
+    """An unreadable registry must not resurrect a hardcoded provider list."""
+    monkeypatch.setattr(
+        "scripts.lib.pipelines.registered_provider_names",
+        lambda _root: (_ for _ in ()).throw(OSError("boom")),
+    )
+    with caplog.at_level("WARNING"):
+        assert _registered_providers(tmp_path) == []
+    assert any("unreadable" in record.message.lower() for record in caplog.records)
 
 
 def test_pipeline_active_for_provider_no_field_means_everywhere_active():
     pipeline = {"stages": []}
-    for provider in KNOWN_PROVIDERS:
+    for provider in registered_provider_names(REPO_ROOT):
         assert _pipeline_active_for_provider(pipeline, provider) is True
 
 

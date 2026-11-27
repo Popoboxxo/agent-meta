@@ -20,6 +20,7 @@ Run: python -m pytest tests/test_hook_registration_invariant.py -v
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from lib.hooks import (  # noqa: E402
     NON_RUNTIME_HOOK_EVENTS,
+    _hook_settings_command,
     collect_hook_sources,
     parse_hook_metadata,
     parse_hook_settings_command,
@@ -152,6 +154,17 @@ def test_protocol_scoped_adapter_only_deployed_for_its_protocol(tmp_path):
     assert (gemini_project / ".agents" / "hooks" / "antigravity-json-adapter.sh").exists()
 
 
+def test_generic_hook_registered_for_antigravity_when_enabled(tmp_path):
+    """#1248: without a `provider:` header dod-push-check reaches Antigravity."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root, provider="Gemini", hooks_cfg={"dod-push-check": {"enabled": True}})
+
+    config = (project_root / ".agents" / "hooks.json").read_text(encoding="utf-8")
+    assert "dod-push-check" in config
+
+
 def test_manual_hook_is_never_registered_even_when_enabled(tmp_path):
     """`event: Manual` is not a native runtime event — enabling it must not
     write a 'Manual' bucket into settings.json."""
@@ -188,7 +201,7 @@ def test_all_hook_scripts_are_valid_shell(tmp_path):
         assert result.returncode == 0, f"{script}: {result.stderr}"
 
 
-# --- issue #851: cwd-independent hook command anchoring -----------------------
+# --- issue #1251: adapter-owned project directory ----------------------------
 
 
 def _commands(settings: dict) -> list[str]:
@@ -201,8 +214,7 @@ def _commands(settings: dict) -> list[str]:
 
 
 def test_generated_claude_commands_are_anchored(tmp_path):
-    """Registered Claude hook commands are anchored to ${CLAUDE_PROJECT_DIR}
-    so they resolve regardless of the session cwd (issue #851)."""
+    """Claude commands pass the harness root through the adapter contract."""
     project_root = tmp_path / "project"
     project_root.mkdir()
     _sync(project_root)
@@ -212,49 +224,118 @@ def test_generated_claude_commands_are_anchored(tmp_path):
     )
     commands = _commands(settings)
     assert commands, "sanity: at least one hook must be registered"
-    assert all(c.startswith("bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/") for c in commands), commands
+    prefix = (
+        "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash "
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/"
+    )
+    assert all(c.startswith(prefix) for c in commands), commands
 
 
-def test_parser_recognises_anchored_and_legacy_forms():
-    """Inverse parser accepts both the anchored and the legacy relative form,
-    and still rejects unrelated commands."""
-    assert parse_hook_settings_command(
-        "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh", _CLAUDE_HOOKS_DIR
-    ) == "x.sh"
-    assert parse_hook_settings_command(
-        "bash .claude/hooks/x.sh", _CLAUDE_HOOKS_DIR
-    ) == "x.sh"
-    assert parse_hook_settings_command("bash /tmp/x.sh", _CLAUDE_HOOKS_DIR) is None
+@pytest.mark.parametrize("command", [
+    "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh",
+    "bash .claude/hooks/x.sh",
+    "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh",
+    "AM_PROJECT_DIR=${TEST_PROJECT_DIR} bash ${TEST_PROJECT_DIR}/.claude/hooks/x.sh",
+])
+def test_parser_recognises_supported_forms(command):
+    """Old anchored, legacy-relative and env-prefixed commands stay managed."""
+    assert parse_hook_settings_command(command, _CLAUDE_HOOKS_DIR) == "x.sh"
 
 
-def test_legacy_relative_entry_is_clean_replaced_not_duplicated(tmp_path):
-    """Migration regression (issue #851): a settings.json carrying the legacy
-    relative command for a managed hook is recognised as managed and clean-
-    replaced by the anchored form — no duplicate entry."""
+@pytest.mark.parametrize("command", [
+    "bash /tmp/x.sh",
+    "bash .claude/hooks/x.sh --extra",
+    "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash .claude/hooks/x.sh",
+    "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash ${OTHER_DIR}/.claude/hooks/x.sh",
+    "env AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh",
+    "sh .claude/hooks/x.sh",
+    "bash .claude/hooks/x.sh;evil",
+    "bash .claude/hooks/x.sh&&evil",
+    "bash .claude/hooks/x.sh|evil",
+    "bash .claude/hooks/$(evil).sh",
+    "bash .claude/hooks/`evil`.sh",
+    "bash .claude/hooks/x.sh`evil`",
+])
+def test_parser_rejects_foreign_commands(command):
+    assert parse_hook_settings_command(command, _CLAUDE_HOOKS_DIR) is None
+
+
+@pytest.mark.parametrize("old_command", [
+    "bash .claude/hooks/{filename}",
+    "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/{filename}",
+    "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/{filename}",
+])
+def test_existing_entry_is_clean_replaced_not_duplicated(tmp_path, old_command):
+    """Every supported deployed form migrates once, then remains idempotent."""
     project_root = tmp_path / "project"
     project_root.mkdir()
     _sync(project_root)
 
     settings_path = project_root / ".claude" / "settings.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
-    # Simulate a project deployed before the anchor existed.
     for entries in settings["hooks"].values():
         for entry in entries:
-            for h in entry["hooks"]:
-                h["command"] = h["command"].replace(
-                    "bash ${CLAUDE_PROJECT_DIR}/", "bash "
-                )
+            for handler in entry["hooks"]:
+                filename = handler["command"].rsplit("/", 1)[-1]
+                handler["command"] = old_command.replace("{filename}", filename)
     settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    legacy_commands = _commands(settings)
-    assert all(c.startswith("bash .claude/hooks/") for c in legacy_commands)
+    old_commands = _commands(settings)
 
     _sync(project_root)
 
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
     commands = _commands(settings)
-    assert all(c.startswith("bash ${CLAUDE_PROJECT_DIR}/") for c in commands), commands
+    prefix = (
+        "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash "
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/"
+    )
+    assert all(c.startswith(prefix) for c in commands), commands
     assert len(commands) == len(set(commands)), f"duplicate entries: {commands}"
-    assert len(commands) == len(legacy_commands)
+    assert len(commands) == len(old_commands)
+
+    second = _sync(project_root)
+    assert "[SAME]   .claude/settings.json" in second.unchanged
+    assert not any("settings.json" in action for action in second.actions)
+
+
+def test_anchor_key_emits_adapter_env_without_provider_branch():
+    assert _hook_settings_command(
+        "x.sh", ".testprov/hooks", "${TEST_PROJECT_DIR}"
+    ) == (
+        "AM_PROJECT_DIR=${TEST_PROJECT_DIR} bash "
+        "${TEST_PROJECT_DIR}/.testprov/hooks/x.sh"
+    )
+
+
+def test_generic_hooks_do_not_reference_claude_project_dir():
+    matches = [
+        str(path.relative_to(_REPO_ROOT))
+        for path in (_REPO_ROOT / "hooks" / "1-generic").rglob("*")
+        if path.is_file() and path.suffix in {".sh", ".py"}
+        and "CLAUDE_PROJECT_DIR" in path.read_text(encoding="utf-8")
+    ]
+    assert matches == []
+
+
+def test_hook_common_exports_am_project_dir_without_resolving(tmp_path):
+    common = _REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_common.sh"
+    command = (
+        'source "$1"; '
+        'bash -c \'printf "%s|%s" "${AM_PROJECT_DIR+x}" "${AM_PROJECT_DIR-}"\''
+    )
+    for value in (None, "/adapter/selected/root"):
+        env = dict(os.environ)
+        env.pop("AM_PROJECT_DIR", None)
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        if value is not None:
+            env["AM_PROJECT_DIR"] = value
+        result = subprocess.run(
+            [_BASH, "-c", command, "_", str(common)],
+            capture_output=True, text=True, cwd=tmp_path, env=env,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == f"x|{value or ''}"
 
 
 def test_provider_without_anchor_key_stays_relative(tmp_path):

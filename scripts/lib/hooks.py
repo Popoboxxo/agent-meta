@@ -42,17 +42,39 @@ HOOK_TEMPLATE_SH = """\
 # description: %(description)s
 # enabled_by_default: false
 
-# Claude Code passes hook context as JSON on stdin.
-# Exit 0 = allow, exit 2 = block (stdout shown to Claude as context).
-# See docs/guides/hooks.md for full documentation.
+# The harness passes the hook context as JSON on stdin.
+# Exit 0 = allow, exit 2 = block. On exit 2 only stderr reaches the agent —
+# write the block reason to stderr (stdout is ignored).
+# Full reference: docs/guides/features/hooks.md — section "Hook-Laufzeit"
+#
+# This starter allows every call. Replace the policy check below.
+
+set -uo pipefail
+
+# Shared helpers (hook_json_get, hook_json_get_many, hook_have_python).
+# sync.py deploys them to <hooks_dir>/lib/hook_common.sh next to this script.
+# A project hook is not a security control, so it fails OPEN here: a missing
+# lib or interpreter lets the call through. Security gates fail CLOSED instead
+# (source ... || exit 2 plus hook_json_usable) -- see hook_common.sh.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null || exit 0
+hook_have_python || exit 0
 
 INPUT=$(cat)
 
-# TODO: implement hook logic here
-# tip: use python3 to parse JSON from $INPUT
-# example check:
-#   TOOL_NAME=$(echo "$INPUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('tool_name',''))")
+# Read one payload field: hook_json_get <json> <dotted.path> [default]
+TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
+# Only act on the tool this hook is registered for (see matcher above).
+[ "$TOOL_NAME" = "Bash" ] || exit 0
+
+# ---- policy check ---------------------------------------------------------
+# Inspect more fields the same way, e.g.
+#   COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
+# hook_json_get_many reads several fields in ONE interpreter start
+# (NUL-terminated fields plus an "ok" trailer) -- see lib/hook_common.sh.
+# To block a call: print the reason to stderr and exit 2.
+# ---------------------------------------------------------------------------
 exit 0
 """
 
@@ -132,13 +154,20 @@ def collect_hook_sources(
     return [(src, name) for name, src in seen.items()]
 
 
-#: Optional cwd-independent anchor prefix (e.g. ``${CLAUDE_PROJECT_DIR}/``)
-#: accepted by `parse_hook_settings_command()` in front of the hooks dir. It
-#: matches ANY ``${VAR}`` expression so already-deployed entries from the
-#: legacy relative form AND from an anchored form are both recognised — the
-#: clean-replace in `_update_settings_hooks()` must not duplicate them during
-#: migration (issue #851).
-_COMMAND_ANCHOR_PREFIX = r"(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}/)?"
+#: Shell-variable anchor expression (e.g. ``${CLAUDE_PROJECT_DIR}``). The
+#: settings writer prefixes an anchored command with ``AM_PROJECT_DIR=<anchor>``
+#: so provider adapters and generic hooks share one environment contract.
+_COMMAND_ANCHOR_VAR = r"\$\{[A-Za-z_][A-Za-z0-9_]*\}"
+
+#: Supported command prefixes: the current env-prefixed anchored form (whose
+#: path anchor must match its AM_PROJECT_DIR value), the old anchored form and
+#: the legacy cwd-relative form. Keeping all three in the inverse parser makes
+#: migration a clean replace rather than a duplicate registration (issue #851).
+_COMMAND_PREFIX = (
+    rf"(?:AM_PROJECT_DIR=(?P<env_anchor>{_COMMAND_ANCHOR_VAR})\s+"
+    rf"bash\s+(?P=env_anchor)/"
+    rf"|bash\s+(?:{_COMMAND_ANCHOR_VAR}/)?)"
+)
 
 
 def _hook_settings_command(
@@ -150,33 +179,39 @@ def _hook_settings_command(
 
     ``anchor`` is a provider-config-driven prefix (e.g.
     ``${CLAUDE_PROJECT_DIR}``) that makes the command independent of the
-    process cwd. When empty, the legacy cwd-relative form is emitted so
-    providers without the config key stay byte-stable."""
+    process cwd. A non-empty anchor is also exported as ``AM_PROJECT_DIR`` for
+    the provider-neutral hook contract. When empty, the legacy cwd-relative
+    form is emitted so providers without the config key stay byte-stable."""
     anchor = (anchor or "").rstrip("/")
     if anchor:
-        return f"bash {anchor}/{hooks_dir}/{output_filename}"
+        return (
+            f"AM_PROJECT_DIR={anchor} bash "
+            f"{anchor}/{hooks_dir}/{output_filename}"
+        )
     return f"bash {hooks_dir}/{output_filename}"
 
 
 def parse_hook_settings_command(command: str, hooks_dir: str = CLAUDE_HOOKS_DIR) -> str | None:
     """Inverse of `_hook_settings_command`: extract the hook filename from a
-    registered ``bash [<anchor>/]<hooks_dir>/<filename>`` command string.
+    registered command string.
 
-    Recognises BOTH the anchored form (``bash ${CLAUDE_PROJECT_DIR}/...``) and
-    the legacy cwd-relative form (``bash .claude/hooks/...``), so a project
-    migrated from the legacy form keeps recognising its already-deployed
-    entries as managed (no duplicates on clean replace).
+    Recognises the current env-prefixed anchored form, the old anchored form
+    (``bash ${CLAUDE_PROJECT_DIR}/...``) and the legacy cwd-relative form
+    (``bash .claude/hooks/...``), so already-deployed entries remain managed
+    during migration and no duplicates are created.
 
     Returns the filename, or None if `command` does not match the canonical
-    format this module writes. Kept here next to the writer so both sides of
-    the format live in one place (consumers like consistency.hook_drift must
-    not re-derive the format with their own regex — a format change would
-    silently desync otherwise)."""
+    format this module writes. Foreign commands and additional arguments are
+    rejected. Kept here next to the writer so both sides of the format live in
+    one place (consumers like consistency.hook_drift must not re-derive the
+    format with their own regex — a format change would silently desync
+    otherwise)."""
     m = re.match(
-        r"^bash\s+" + _COMMAND_ANCHOR_PREFIX + re.escape(hooks_dir) + r"/(\S+)\s*$",
+        r"^" + _COMMAND_PREFIX + re.escape(hooks_dir)
+        + r"/([A-Za-z0-9][A-Za-z0-9._-]*\.sh)\s*$",
         command.strip(),
     )
-    return m.group(1) if m else None
+    return m.group(2) if m else None
 
 
 def _update_settings_hooks(
@@ -214,7 +249,7 @@ def _update_settings_hooks(
     if settings_path.exists():
         settings = load_json_file(settings_path, on_error="default", default=None)
         if settings is None:
-            log.warning("settings.json could not be parsed — hooks section not updated")
+            log.warning(f"{settings_path_rel} could not be parsed — hooks section not updated")
             return
     else:
         if not active_entries:
@@ -581,6 +616,7 @@ def sync_hooks(
         hook_stem = Path(output_name).stem
 
 
+        # `protocol:` is descriptive only; `hook_protocol:` scopes deployment.
         # Provider filter: skip hook if it declares a specific provider that doesn't match
         hook_provider = meta.get("provider", "")
         if hook_provider and hook_provider != provider:

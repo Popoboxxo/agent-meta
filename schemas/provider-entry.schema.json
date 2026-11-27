@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Popoboxxo/agent-meta/provider-entry.schema.json",
+  "title": "agent-meta Provider Registry Entries",
+  "description": "Schema for the provider registry map in config/ai-providers.yaml (optionally wrapped in a top-level 'providers:' key). Enforces the provider-entry contract: known keys only, declared value types and the required identity fields (agents_dir, context_file). Unknown keys and type errors are hard validation errors (exit 1) so a typo cannot silently degrade into a provider-specific code path. Format/command keys and provider capabilities stay data (key/value), never a provider-name branch — see the provider-agnostic policy.",
+  "type": "object",
+  "minProperties": 1,
+  "additionalProperties": {
+    "$ref": "#/definitions/providerEntry"
+  },
+  "definitions": {
+    "stringList": {
+      "type": "array",
+      "description": "List of strings (paths, field names, model ids).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stringMap": {
+      "type": "object",
+      "description": "Free-form string-to-string map (tool-name maps, model tiers, rename/alias tables).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "MCP registration surface of the provider. 'format' is the dispatch key every MCP writer reads; surface-formats maps a surface-version value to a format key.",
+      "additionalProperties": false,
+      "properties": {
+        "committed-file": {
+          "type": "string",
+          "description": "Committed MCP document the sync writes."
+        },
+        "secrets-file": {
+          "type": "string",
+          "description": "Gitignored MCP document that may carry secrets."
+        },
+        "format": {
+          "type": "string",
+          "description": "Resolved MCP format key (dispatch value, never a provider name)."
+        },
+        "surface-formats": {
+          "type": "object",
+          "description": "surface-version value -> MCP format key. Selects 'mcp-config.format' at load time.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "discoveryBlock": {
+      "type": "object",
+      "description": "Optional .agents/* discovery surface (reachable only when agent-discovery is true).",
+      "additionalProperties": false,
+      "properties": {
+        "agents_dir": {
+          "type": "string",
+          "description": "Agent output directory of the discovery surface."
+        },
+        "rules_dir": {
+          "type": "string",
+          "description": "Rules output directory of the discovery surface."
+        },
+        "skills_dir": {
+          "type": "string",
+          "description": "Skills output directory of the discovery surface."
+        },
+        "mcp-config": {
+          "$ref": "#/definitions/mcpConfig"
+        }
+      }
+    },
+    "agentTransform": {
+      "type": "object",
+      "description": "Agent-frontmatter transform contract. Every key is read by provider_transform / context writers; none of them branches on a provider name.",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Model emission strategy (inject, skip, keep, ...)."
+        },
+        "model-note-flat": {
+          "type": "boolean",
+          "description": "Emit the model note as a flat frontmatter field."
+        },
+        "model-inherit-fallback": {
+          "type": "boolean",
+          "description": "Allow the model-inherit fallback chain."
+        },
+        "inject-memory": {
+          "type": "boolean",
+          "description": "Emit the memory frontmatter field."
+        },
+        "inject-permission-mode": {
+          "type": "boolean",
+          "description": "Emit the permissionMode frontmatter field."
+        },
+        "inject-subagent-depth": {
+          "type": "boolean",
+          "description": "Emit subagent_depth from the required_depth capability."
+        },
+        "tools": {
+          "type": "string",
+          "description": "Tools emission strategy (keep, filter, skip, remove, ...)."
+        },
+        "tools-format": {
+          "type": "string",
+          "description": "Shape of the emitted tools block (keep, filter, map, skip)."
+        },
+        "tool-name-map": {
+          "$ref": "#/definitions/stringMap"
+        },
+        "reject-fields": {
+          "$ref": "#/definitions/stringList"
+        },
+        "strip-fields": {
+          "$ref": "#/definitions/stringList"
+        },
+        "body-note": {
+          "type": "string",
+          "description": "Body note key added for this surface."
+        },
+        "body-sanitize-hr": {
+          "type": "boolean",
+          "description": "Sanitize horizontal rules in the agent body."
+        },
+        "frontmatter-mechanism": {
+          "type": "string",
+          "description": "Resolved frontmatter mechanism key (dispatch value, never a provider name)."
+        },
+        "surface-mechanisms": {
+          "type": "object",
+          "description": "surface-version value -> frontmatter mechanism key.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "surface-model-patterns": {
+          "type": "object",
+          "description": "surface-version value -> model-id regex.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "surface-v2-fields": {
+          "$ref": "#/definitions/stringList"
+        },
+        "allowed-fields": {
+          "$ref": "#/definitions/stringList"
+        },
+        "extra-fields": {
+          "type": "object",
+          "description": "Literal frontmatter fields emitted verbatim for this surface."
+        },
+        "read-only-extra-fields": {
+          "type": "object",
+          "description": "Frontmatter overrides applied to roles without Write/Edit."
+        },
+        "rename-fields": {
+          "$ref": "#/definitions/stringMap"
+        },
+        "primary-role-tools": {
+          "$ref": "#/definitions/stringList"
+        },
+        "subagents-allowlist": {
+          "type": "string",
+          "description": "Subagent allow-list strategy (e.g. routable)."
+        }
+      }
+    },
+    "providerEntry": {
+      "type": "object",
+      "description": "One provider registry entry. Identity fields are required; every other key is optional data.",
+      "required": [
+        "agents_dir",
+        "context_file"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "agents_dir": {
+          "type": "string",
+          "description": "Directory the generated agent files are written to."
+        },
+        "agent_ext": {
+          "type": "string",
+          "description": "File extension of a generated agent file."
+        },
+        "surface-version": {
+          "type": "string",
+          "description": "Declared generation surface version (v1 is the byte-stable default)."
+        },
+        "agent-discovery": {
+          "type": "boolean",
+          "description": "Enables the .agents/* discovery surface."
+        },
+        "model-format": {
+          "type": "string",
+          "description": "Model-id format template applied exactly once at emission (e.g. '{model}')."
+        },
+        "model-literal": {
+          "type": "string",
+          "description": "Literal model value emitted instead of a resolved model id."
+        },
+        "model-catalog": {
+          "$ref": "#/definitions/stringList"
+        },
+        "model-tiers": {
+          "$ref": "#/definitions/stringMap"
+        },
+        "model-aliases": {
+          "$ref": "#/definitions/stringMap"
+        },
+        "context_file": {
+          "type": "string",
+          "description": "Context filename the provider actually reads."
+        },
+        "context_template": {
+          "type": "string",
+          "description": "Template path for the generated context file."
+        },
+        "context_adapter": {
+          "type": "boolean",
+          "description": "Enables the context-adapter capability (per-provider topology only)."
+        },
+        "context_adapter_file": {
+          "type": "string",
+          "description": "Adapter filename the provider reads instead of the shared core."
+        },
+        "context_adapter_import": {
+          "type": "string",
+          "description": "Import line template written into the adapter."
+        },
+        "context_adapter_import_supported": {
+          "type": "boolean",
+          "description": "Whether the provider's adapter supports an import directive."
+        },
+        "context_adapter_settings": {
+          "type": "boolean",
+          "description": "Whether the adapter is activated through the settings file."
+        },
+        "context_filename_settings_key": {
+          "type": "string",
+          "description": "Native settings key that points the provider at the context filename."
+        },
+        "has_dedicated_context_file": {
+          "type": "boolean",
+          "description": "Provider owns a dedicated context file (base-sync path)."
+        },
+        "personal_agents_file": {
+          "type": "boolean",
+          "description": "Whether AGENTS.personal.md is generated for this provider."
+        },
+        "has_rules": {
+          "type": "boolean",
+          "description": "Whether rules are written to a dedicated rules directory."
+        },
+        "rules_dir": {
+          "type": "string",
+          "description": "Rules output directory."
+        },
+        "rules_apply_to": {
+          "type": "string",
+          "description": "applyTo frontmatter value of path-scoped rule files."
+        },
+        "retired_rules_dirs": {
+          "$ref": "#/definitions/stringList"
+        },
+        "has_hooks": {
+          "type": "boolean",
+          "description": "Whether a hooks directory / settings surface is configured."
+        },
+        "hook_protocol": {
+          "type": "string",
+          "description": "Hook event/payload contract key (verified protocol only is synced)."
+        },
+        "hook-command-anchor": {
+          "type": "string",
+          "description": "Prefix prepended to every registered hook command."
+        },
+        "hooks_dir": {
+          "type": "string",
+          "description": "Hooks output directory."
+        },
+        "hooks_config_file": {
+          "type": "string",
+          "description": "Provider hook registration document."
+        },
+        "has_commands": {
+          "type": "boolean",
+          "description": "Whether the provider owns a project-level command surface."
+        },
+        "has_prompt_commands": {
+          "type": "boolean",
+          "description": "Whether commands are emitted as prompt files."
+        },
+        "commands_dir": {
+          "type": "string",
+          "description": "Commands output directory."
+        },
+        "commands_ext": {
+          "type": "string",
+          "description": "File extension of a generated command file."
+        },
+        "commands_format": {
+          "type": "string",
+          "description": "Command file format key (dispatch value, never a provider name)."
+        },
+        "commands_managed_index": {
+          "type": "string",
+          "description": "Managed-index filename for the commands directory."
+        },
+        "has_settings": {
+          "type": "boolean",
+          "description": "Whether a settings document is written."
+        },
+        "settings_file": {
+          "type": "string",
+          "description": "Committed settings document."
+        },
+        "settings_template": {
+          "type": "string",
+          "description": "Template path for the committed settings document."
+        },
+        "settings_local_file": {
+          "type": "string",
+          "description": "Gitignored local settings document."
+        },
+        "settings_local_template": {
+          "type": "string",
+          "description": "Template path for the local settings document."
+        },
+        "settings-allow-dirs-key": {
+          "type": "string",
+          "description": "Dotted native settings key that carries the additional-directories allow-list."
+        },
+        "has_plugins": {
+          "type": "boolean",
+          "description": "Static plugin capability flag (surface-version may override via data)."
+        },
+        "plugin_dir": {
+          "type": "string",
+          "description": "Plugin output directory."
+        },
+        "plugin_ext": {
+          "type": "string",
+          "description": "File extension of a generated plugin file."
+        },
+        "plugin_protocol": {
+          "type": "string",
+          "description": "Verified native plugin runtime protocol key."
+        },
+        "surface-plugin-protocols": {
+          "type": "object",
+          "description": "surface-version value -> verified plugin protocol key.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "surface-has-plugins": {
+          "type": "object",
+          "description": "surface-version value -> plugin capability flag.",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "runtime_gate-mechanism": {
+          "type": "string",
+          "description": "Runtime-gate mechanism key (dispatch value, never a provider name)."
+        },
+        "bash_tool_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Native shell tool name, or null when the provider has no shell tool."
+        },
+        "capabilities": {
+          "$ref": "#/definitions/stringList"
+        },
+        "artifact_dir": {
+          "type": "string",
+          "description": "Artifact output directory."
+        },
+        "checkpoint_dir": {
+          "type": "string",
+          "description": "Checkpoint/progress state directory."
+        },
+        "skills_dir": {
+          "type": "string",
+          "description": "Skills output directory."
+        },
+        "snippets_dir": {
+          "type": "string",
+          "description": "Snippets output directory."
+        },
+        "pending_tasks_file": {
+          "type": "string",
+          "description": "Pending-tasks document of the provider."
+        },
+        "extension_dir": {
+          "type": "string",
+          "description": "Project extension directory this provider owns."
+        },
+        "extension_hook_path": {
+          "type": "string",
+          "description": "Extension hook path the provider reads; providers without it get the Extension-Hook lines stripped."
+        },
+        "external_plugins_file": {
+          "type": "object",
+          "description": "User-level file that lists externally installed plugins (duplicate-plugin warning).",
+          "required": [
+            "path",
+            "enabled_key"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path of the user-level plugin document."
+            },
+            "enabled_key": {
+              "type": "string",
+              "description": "Key inside that document which lists the enabled plugins."
+            }
+          }
+        },
+        "provider_root_dirs": {
+          "$ref": "#/definitions/stringList"
+        },
+        "gitignore_entries": {
+          "$ref": "#/definitions/stringList"
+        },
+        "isolation-dirs": {
+          "$ref": "#/definitions/stringList"
+        },
+        "isolation-mechanism": {
+          "type": "string",
+          "description": "Isolation mechanism key (dispatch value, never a provider name)."
+        },
+        "isolation-display-name": {
+          "type": "string",
+          "description": "Human-readable provider name in isolation diagnostics."
+        },
+        "display-name": {
+          "type": "string",
+          "description": "Human-readable provider name."
+        },
+        "orchestrator_hint": {
+          "type": "string",
+          "description": "Routing hint rendered into the project context file."
+        },
+        "planning_mode_hint": {
+          "type": "string",
+          "description": "Planning-mode hint rendered into the project context file."
+        },
+        "primary-role": {
+          "type": "string",
+          "description": "Role promoted to the provider's primary agent (e.g. orchestrator)."
+        },
+        "infra_known_names": {
+          "$ref": "#/definitions/stringList"
+        },
+        "mcp-config": {
+          "$ref": "#/definitions/mcpConfig"
+        },
+        "discovery": {
+          "$ref": "#/definitions/discoveryBlock"
+        },
+        "agent-transform": {
+          "$ref": "#/definitions/agentTransform"
+        },
+        "cli-files": {
+          "type": "object",
+          "description": "surface-version value -> committed CLI settings filename.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

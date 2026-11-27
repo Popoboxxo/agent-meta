@@ -187,6 +187,14 @@ def sync_provider_isolation(
         # isolation mechanism implemented yet.
         mechanism = provider_config.get(provider, {}).get("isolation-mechanism")
         handler = _ISOLATION_MECHANISM_HANDLERS.get(mechanism)
+        if mechanism is not None and handler is None:
+            # A declared-but-unknown key is a config typo, not "no mechanism".
+            log.error(
+                f"provider-isolation/{provider}",
+                f"unknown isolation-mechanism '{mechanism}' — valid keys: "
+                f"{', '.join(sorted(_ISOLATION_MECHANISM_HANDLERS))}",
+            )
+            raise SystemExit(1)
         if handler:
             handler(project_root, foreign_dirs, dir_owner, provider_config, log, dry_run)
         else:

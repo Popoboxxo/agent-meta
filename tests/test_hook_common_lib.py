@@ -1,5 +1,5 @@
 """Regression tests for hooks/1-generic/lib/hook_common.sh (issue #601 dedup,
-#596 redaction, #599 GRAPHIFY_BIN validation).
+#596 redaction, #599 GRAPHIFY_BIN validation, #1238a module emitters).
 
 This shared helper lib is sourced by other hook scripts (orchestrator-guard.sh,
 dod-push-check.sh, lifecycle-check.sh, sync-on-config-change.sh, and the
@@ -12,6 +12,7 @@ Run: python -m pytest tests/test_hook_common_lib.py -v
 """
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import shutil
@@ -79,6 +80,20 @@ def test_hook_have_python_true_when_python3_present():
 def test_hook_python_bin_prefers_python3():
     r = _call("hook_python_bin")
     assert r.stdout.strip() == "python3"
+
+
+@pytest.mark.parametrize("emitter", [
+    "hook_shell_scan_py",
+    "hook_shell_resolver_py",
+    "hook_push_arg_parser_py",
+])
+def test_python_source_emitters_fail_closed_without_python(tmp_path, emitter):
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    r = _call(emitter, {"PATH": str(empty)})
+    assert r.returncode == 1
+    assert r.stdout == ""
+    assert r.stderr == ""
 
 
 # --- hook_json_get --------------------------------------------------------
@@ -410,6 +425,87 @@ def test_hook_known_tool_name_matches_documented_tool_table():
     unknown = [n for n in _DOCUMENTED_CLAUDE_TOOLS if _known(n) != "known"]
     assert unknown == []
     assert [n for n in _DELIBERATELY_REJECTED if _known(n) == "known"] == []
+
+
+# --- hook_mcp_tool_denied / deny-manifest fallback (issue #1263b) ---------
+#
+# The manifest is written by scripts/lib/mcp_deny.py for providers WITHOUT a
+# native permission-deny capability and deployed next to this lib file. The
+# tests copy the lib (plus an optional manifest) to a temp dir, so the real
+# checkout's lib directory is never touched.
+
+_DENIED_TOOL = "mcp__playwright__browser_evaluate"
+
+
+def _lib_with_manifest(tmp_path: Path, rules: list[str] | None) -> Path:
+    """Copy hook_common.sh to tmp/lib, with a deny manifest when rules given."""
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    shutil.copy2(_LIB_PATH, lib_dir / "hook_common.sh")
+    if rules is not None:
+        (lib_dir / "mcp-deny.json").write_text(
+            json.dumps({
+                "_agent-meta": "agent-meta managed — do not edit manually",
+                "rules": rules,
+            }),
+            encoding="utf-8",
+        )
+    return lib_dir / "hook_common.sh"
+
+
+def _call_lib(lib: Path, func_call: str) -> subprocess.CompletedProcess:
+    script = f'source "{lib}"\n{func_call}\n'
+    return subprocess.run(
+        [_BASH, "-c", script], capture_output=True, text=True,
+        env=dict(os.environ), cwd=str(_PROJECT_ROOT), timeout=SCRIPT_TIMEOUT,
+    )
+
+
+def _known_from_lib(lib: Path, name: str) -> subprocess.CompletedProcess:
+    return _call_lib(lib, f"hook_known_tool_name {shlex.quote(name)}")
+
+
+def test_hook_known_tool_name_blocks_a_manifest_listed_mcp_tool(tmp_path):
+    """A denied MCP tool is refused with a reason naming the tool and source."""
+    r = _known_from_lib(_lib_with_manifest(tmp_path, [_DENIED_TOOL]), _DENIED_TOOL)
+    assert r.returncode != 0
+    assert _DENIED_TOOL in r.stderr
+    assert "blocked" in r.stderr
+
+
+def test_hook_guard_contract_exits_2_for_a_denied_tool(tmp_path):
+    """AC-3: the fail-closed guards block on a non-zero known-tool result.
+
+    Both guards call `hook_known_tool_name ... || { ...; exit 2; }`; this pins
+    the exact exit code the harness turns into a refused tool call.
+    """
+    lib = _lib_with_manifest(tmp_path, [_DENIED_TOOL])
+    r = _call_lib(lib, f"hook_known_tool_name {shlex.quote(_DENIED_TOOL)} || exit 2")
+    assert r.returncode == 2
+    assert _DENIED_TOOL in r.stderr
+
+
+def test_hook_known_tool_name_allows_unlisted_mcp_tool(tmp_path):
+    lib = _lib_with_manifest(tmp_path, [_DENIED_TOOL])
+    r = _known_from_lib(lib, "mcp__playwright__browser_navigate")
+    assert r.returncode == 0
+    assert r.stderr == ""
+
+
+def test_hook_known_tool_name_matches_exact_tool_not_prefix(tmp_path):
+    lib = _lib_with_manifest(tmp_path, [_DENIED_TOOL])
+    assert _known_from_lib(lib, _DENIED_TOOL + "_extra").returncode == 0
+
+
+def test_hook_known_tool_name_allows_when_manifest_rules_empty(tmp_path):
+    lib = _lib_with_manifest(tmp_path, [])
+    assert _known_from_lib(lib, _DENIED_TOOL).returncode == 0
+
+
+def test_hook_known_tool_name_allows_without_manifest(tmp_path):
+    """Documented fail-open (convention boundary): no manifest deployed."""
+    lib = _lib_with_manifest(tmp_path, None)
+    assert _known_from_lib(lib, _DENIED_TOOL).returncode == 0
 
 
 # --- hook_is_meta_submodule_dir (issue #943 (l)) --------------------------

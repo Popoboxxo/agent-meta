@@ -225,7 +225,8 @@ def test_claude_registration_path_unchanged(agent_meta_root, project_root):
     )
     entry = settings["hooks"]["PreToolUse"][0]
     assert entry["hooks"][0]["command"] == (
-        "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/test-guard.sh"
+        "AM_PROJECT_DIR=${CLAUDE_PROJECT_DIR} bash "
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/test-guard.sh"
     )
     assert not (project_root / ".agents" / "hooks.json").exists()
 
@@ -282,8 +283,14 @@ def _adapter_fixture(tmp_path: Path, target_body: str) -> Path:
 
 def _run_adapter(fixture_dir: Path, payload: str, target: str = "target.sh",
                  env_out: Path | None = None,
-                 tmp_dir: Path | None = None) -> subprocess.CompletedProcess:
+                 tmp_dir: Path | None = None,
+                 extra_env: dict | None = None,
+                 cwd: Path | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ)
+    env.pop("AM_PROJECT_DIR", None)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    if extra_env:
+        env.update(extra_env)
     if env_out is not None:
         env["ADAPTER_TEST_OUT"] = str(env_out)
     if tmp_dir is not None:
@@ -292,8 +299,8 @@ def _run_adapter(fixture_dir: Path, payload: str, target: str = "target.sh",
         env["TMPDIR"] = str(tmp_dir)
         env["TMP"] = str(tmp_dir)
     return subprocess.run(  # noqa: S603
-        ["bash", "antigravity-json-adapter.sh", target],
-        input=payload, capture_output=True, text=True, cwd=fixture_dir, env=env,
+        ["bash", str(fixture_dir / "antigravity-json-adapter.sh"), target],
+        input=payload, capture_output=True, text=True, cwd=cwd or fixture_dir, env=env,
         timeout=SCRIPT_TIMEOUT,
     )
 
@@ -365,6 +372,89 @@ def test_adapter_translates_agy_payload_to_claude_shape(tmp_path):
     # Original AGY fields kept for forward compatibility:
     assert received["toolCall"]["name"] == "run_command"
     assert received["hookEventName"] == "PreToolUse"
+
+
+def test_adapter_discovers_project_root_from_deployed_path(tmp_path):
+    """The adapter anchor comes from its own path, never payload or inheritance."""
+    root = tmp_path / "project"
+    (root / ".meta-config").mkdir(parents=True)
+    hooks = root / ".agents" / "hooks"
+    hooks.mkdir(parents=True)
+    shutil.copy(_ADAPTER_SOURCE, hooks / _ADAPTER_SOURCE.name)
+    (hooks / "target.sh").write_text(
+        '#!/bin/bash\nprintf "%s" "${AM_PROJECT_DIR-}" > "$ADAPTER_TEST_OUT"\nexit 0\n',
+        encoding="utf-8",
+    )
+    out_file = tmp_path / "project-dir.txt"
+    decoy = tmp_path / "payload-decoy"
+    decoy.mkdir()
+    payload = json.dumps({
+        "hookEventName": "PreToolUse",
+        "toolCall": {
+            "name": "run_command",
+            "args": {"CommandLine": "ls", "Cwd": str(decoy / "args")},
+        },
+        "cwd": str(decoy / "payload"),
+        "workspacePaths": [str(decoy / "workspace")],
+    })
+
+    result = _run_adapter(
+        hooks, payload, env_out=out_file, cwd=decoy,
+        extra_env={"AM_PROJECT_DIR": str(decoy / "inherited")},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert out_file.read_text(encoding="utf-8") == str(root.resolve())
+
+
+def test_adapter_leaves_project_dir_unset_without_project_marker(tmp_path):
+    fixture = _adapter_fixture(
+        tmp_path,
+        '#!/bin/bash\n'
+        'if [ "${AM_PROJECT_DIR+x}" = x ]; then printf set; else printf unset; fi '
+        '> "$ADAPTER_TEST_OUT"\nexit 0\n',
+    )
+    out_file = tmp_path / "project-dir-state.txt"
+    payload = json.dumps({
+        "hookEventName": "PreToolUse",
+        "toolCall": {"name": "run_command", "args": {}},
+        "workspacePaths": [str(tmp_path / "payload-root")],
+    })
+
+    result = _run_adapter(
+        fixture, payload, env_out=out_file,
+        extra_env={"AM_PROJECT_DIR": str(tmp_path / "inherited-root")},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert out_file.read_text(encoding="utf-8") == "unset"
+
+
+@pytest.mark.parametrize("distance,found", [(64, True), (65, False)])
+def test_adapter_project_root_search_is_bounded(tmp_path, distance, found):
+    root = tmp_path / "bounded-project"
+    (root / ".meta-config").mkdir(parents=True)
+    hooks = root.joinpath(*(["level"] * distance))
+    hooks.mkdir(parents=True)
+    shutil.copy(_ADAPTER_SOURCE, hooks / _ADAPTER_SOURCE.name)
+    (hooks / "target.sh").write_text(
+        '#!/bin/bash\n'
+        'if [ "${AM_PROJECT_DIR+x}" = x ]; then printf "%s" "$AM_PROJECT_DIR"; '
+        'else printf "<unset>"; fi > "$ADAPTER_TEST_OUT"\nexit 0\n',
+        encoding="utf-8",
+    )
+    out_file = tmp_path / "bounded-project-dir.txt"
+    payload = json.dumps({
+        "hookEventName": "PreToolUse",
+        "toolCall": {"name": "run_command", "args": {}},
+        "workspacePaths": [str(tmp_path / "payload-root")],
+    })
+
+    result = _run_adapter(hooks, payload, env_out=out_file)
+
+    assert result.returncode == 0, result.stderr
+    expected = str(root.resolve()) if found else "<unset>"
+    assert out_file.read_text(encoding="utf-8") == expected
 
 
 def test_adapter_normalizes_edit_tool_names(tmp_path):

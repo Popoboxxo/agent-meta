@@ -1,9 +1,9 @@
 """Parity of the tmp-sink path rules across all implementations (AC-97).
 
 The shared corpus ``tests/fixtures/tmp-sink-path-corpus.json`` is evaluated by
-``tmp_sink_path_error`` (Python), the inline-Python block of
-``hooks/1-generic/repo-containment-impl.sh`` (extracted, run as subprocess)
-and ``progress_path_error``. All three must take the same accept/reject
+``tmp_sink_path_error`` (Python), the shared config reader
+``hooks/1-generic/lib/hook_containment_config.py`` (run as subprocess) and
+``progress_path_error``. All three must take the same accept/reject
 decision and agree on the canonical form (hook: rejected => fallback ``.tmp``).
 
 Run: python -m pytest tests/test_tmp_sink_path_parity.py -q
@@ -11,11 +11,10 @@ Run: python -m pytest tests/test_tmp_sink_path_parity.py -q
 
 from __future__ import annotations
 
-import ast
+import importlib.util
 import json
 import ntpath
 import posixpath
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +29,7 @@ from lib.consistency.hook_drift import check_stale_deployed_hooks  # noqa: E402
 from lib.progress_paths import progress_path_error  # noqa: E402
 
 HOOK_IMPL = REPO_ROOT / "hooks" / "1-generic" / "repo-containment-impl.sh"
+CONFIG_READER = REPO_ROOT / "hooks" / "1-generic" / "lib" / "hook_containment_config.py"
 CORPUS = json.loads(
     (REPO_ROOT / "tests" / "fixtures" / "tmp-sink-path-corpus.json").read_text(encoding="utf-8")
 )["cases"]
@@ -37,25 +37,14 @@ IDS = [repr(c["path"]) for c in CORPUS]
 FALLBACK = ".tmp"
 
 
-def _hook_python_block() -> str:
-    text = HOOK_IMPL.read_text(encoding="utf-8")
-    match = re.search(
-        r'read_effective_containment\(\) \{\n  "\$_PY" - "\$1" "\$2" <<\'PYEOF\'\n(.*?)\nPYEOF\n',
-        text,
-        re.DOTALL,
-    )
-    assert match, "inline python block of read_effective_containment not found"
-    return match.group(1)
-
-
 def _hook_decision(tmp_path: Path, path: str) -> tuple:
-    """Run the extracted hook block; return (rejected, effective sink path)."""
+    """Run the shared config reader; return (rejected, effective sink path)."""
     config = tmp_path / "project.yaml"
     config.write_text(
         "repo_containment:\n  tmp-sink:\n    path: %s\n" % json.dumps(path), encoding="utf-8"
     )
     result = subprocess.run(
-        [sys.executable, "-c", _hook_python_block(), str(config), ""],
+        [sys.executable, str(CONFIG_READER), str(config), ""],
         capture_output=True, text=True, check=True,
     )
     values = dict(line.split("=", 1) for line in result.stdout.splitlines())
@@ -98,9 +87,12 @@ def test_progress_path_error_resolves_links(tmp_path):
 
 
 def _hook_protected_prefixes() -> set:
-    match = re.search(r"^_PROTECTED = (\(.*?\n\))$", _hook_python_block(), re.DOTALL | re.M)
-    assert match, "_PROTECTED tuple not found in hook python block"
-    return {tuple(seg.lower() for seg in entry) for entry in ast.literal_eval(match.group(1))}
+    spec = importlib.util.spec_from_file_location(
+        "hook_containment_config", CONFIG_READER
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return {tuple(seg.lower() for seg in entry) for entry in module._PROTECTED}
 
 
 def _expected_protected_prefixes() -> set:
@@ -150,17 +142,20 @@ def test_hook_version_bumped_and_old_version_is_drift(tmp_path):
     # download/unpack targets, cd tracking, substitution bodies).
     # 1.6.0 -> 1.6.1 (#1161 Pkt5: all payload fields read in ONE
     # hook_json_get_many parse; fail-closed probes unchanged).
-    assert re.search(r"^# version: 1\.6\.1$", HOOK_IMPL.read_text(encoding="utf-8"), re.M)
+    # 1.6.1 -> 1.10.0 (#1238b1/#1275b: the inline config reader moved into the
+    # shared hooks/1-generic/lib/hook_containment_config.py module, which also
+    # emits the structured protected-path list).
+    source = HOOK_IMPL.read_text(encoding="utf-8")
+    version_lines = [ln for ln in source.splitlines() if ln.startswith("# version: ")]
+    assert version_lines == ["# version: 1.10.0"]
     meta = tmp_path / "meta"
     (meta / "hooks" / "1-generic").mkdir(parents=True)
     name = HOOK_IMPL.name
-    (meta / "hooks" / "1-generic" / name).write_text(
-        HOOK_IMPL.read_text(encoding="utf-8"), encoding="utf-8"
-    )
+    (meta / "hooks" / "1-generic" / name).write_text(source, encoding="utf-8")
     project = tmp_path / "project"
     hooks = project / ".claude" / "hooks"
     hooks.mkdir(parents=True)
-    old = HOOK_IMPL.read_text(encoding="utf-8").replace("# version: 1.6.1", "# version: 1.0.0", 1)
+    old = source.replace("# version: 1.10.0", "# version: 1.0.0", 1)
     (hooks / name).write_text(old, encoding="utf-8")
     (hooks / ".agent-meta-managed").write_text(name + "\n", encoding="utf-8")
     findings = check_stale_deployed_hooks(

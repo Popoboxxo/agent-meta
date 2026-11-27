@@ -2,26 +2,37 @@
 
 The ``blocked`` list in ``config/plugin-catalog.yaml`` is rendered into the
 always-on MCP guardrail rule, but a prompt convention is not enforcement.
-This module projects the same source into the provider's native permission
-deny surface for providers that declare the capability.
+This module projects the same source into two enforcement surfaces, chosen by
+declared capability only:
+
+* providers that declare ``supports-permission-deny`` get the rule merged into
+  their native ``permissions.deny`` (Claude-style settings file);
+* providers with a verified hook protocol but WITHOUT that capability get a
+  flat ``mcp-deny.json`` manifest next to the deployed hook lib, which
+  ``hooks/1-generic/lib/hook_common.sh`` (``hook_mcp_tool_denied``) consults
+  for every ``mcp__<server>__<tool>`` call — the hook fallback (issue #1263b);
+* providers with neither capability keep the prompt convention and are logged.
 
 Provider-agnostic by construction: the decision is keyed on the declared
-``isolation-mechanism`` and the ``supports-permission-deny`` capability in
-``config/provider-capabilities.yaml`` — never on a provider name. Providers
-without the capability keep the prompt-convention behaviour and are logged.
+``isolation-mechanism``, the ``supports-permission-deny`` capability in
+``config/provider-capabilities.yaml`` and the verified ``hook_protocol`` in
+``config/ai-providers.yaml`` — never on a provider name.
 
 No file is deleted here; managed deny entries are merged with user entries and
 tracked in the companion state file so a re-sync cannot orphan or duplicate
-them.
+them. Both surfaces are fed by :func:`build_mcp_deny_rules` — one deny source,
+never a second list.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+from .hook_plugins import HOOK_LIB_SUBDIR
+from .hooks import CLAUDE_HOOKS_DIR
 from .io import read_json_lenient, safe_path, write_atomic, write_checked
 from .log import SyncLog
-from .providers import load_provider_capabilities
+from .providers import load_provider_capabilities, provider_hooks_supported
 
 #: Capability in ``config/provider-capabilities.yaml`` (opt-in, fail-safe).
 MCP_DENY_CAPABILITY = "supports-permission-deny"
@@ -33,6 +44,8 @@ MCP_TOOL_PREFIX = "mcp__"
 _DENY_MECHANISM = "claude-settings-deny"
 _STATE_PROVENANCE_KEY = "_agent-meta"
 _STATE_PROVENANCE_VALUE = "agent-meta managed — do not edit manually"
+#: Hook-fallback manifest, deployed next to ``hook_common.sh`` in ``lib/``.
+MCP_HOOK_MANIFEST_NAME = "mcp-deny.json"
 
 
 def build_mcp_deny_rules(registry: dict, active_servers: list[str]) -> list[str]:
@@ -100,6 +113,92 @@ def _capabilities(
     return load_provider_capabilities(agent_meta_root) or {}
 
 
+def hook_deny_manifest_path(
+    project_root: Path, provider: str, provider_config: dict,
+) -> Path | None:
+    """Resolve the hook-fallback manifest path or ``None`` if unsupported.
+
+    Only a provider with a verified hook protocol has a deployed
+    ``<hooks_dir>/lib/`` to read the manifest from. The location is derived
+    from the provider's declared ``hooks_dir`` — never a provider name.
+    """
+    pc = provider_config.get(provider) or {}
+    if not provider_hooks_supported(pc):
+        return None
+    hooks_dir = pc.get("hooks_dir") or CLAUDE_HOOKS_DIR
+    return safe_path(
+        project_root, hooks_dir, HOOK_LIB_SUBDIR, MCP_HOOK_MANIFEST_NAME,
+    )
+
+
+def _is_managed_hook_manifest(path: Path) -> bool:
+    """True when *path* exists and carries our provenance marker."""
+    if not path.exists():
+        return False
+    data = _load_json_object(path)
+    return isinstance(data, dict) and data.get(_STATE_PROVENANCE_KEY) == _STATE_PROVENANCE_VALUE
+
+
+def _drop_hook_manifest(
+    project_root: Path, path: Path, log: SyncLog, dry_run: bool,
+) -> None:
+    rel = path.relative_to(project_root).as_posix()
+    if not dry_run:
+        path.unlink()
+    log.action("DELETE", rel, "mcp-deny: hook fallback rules no longer apply")
+
+
+def _sync_hook_deny_manifest(
+    project_root: Path,
+    provider: str,
+    provider_config: dict,
+    rules: list[str],
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Write (or clear) the hook-fallback manifest for a provider.
+
+    Fail-open by design (convention boundary): the manifest is only an
+    additional blocking surface. A provider without a verified hook protocol
+    keeps the prompt convention and is logged, exactly like an absent
+    manifest at runtime.
+    """
+    manifest_path = hook_deny_manifest_path(project_root, provider, provider_config)
+    if manifest_path is None:
+        log.note(
+            "mcp-deny",
+            f"{provider}: no permission-deny or hook capability — prompt convention only",
+        )
+        return
+
+    exists = manifest_path.exists()
+    if exists and not _is_managed_hook_manifest(manifest_path):
+        if _load_json_object(manifest_path) is None:
+            log.warning("mcp-deny: hook manifest unparseable — skipping to avoid data loss")
+        else:
+            log.warning(
+                "mcp-deny: hook manifest without agent-meta provenance — skipping",
+            )
+        return
+
+    if not rules:
+        if exists:
+            _drop_hook_manifest(project_root, manifest_path, log, dry_run)
+        else:
+            log.note("mcp-deny", f"{provider}: no blocked MCP tools — nothing to write")
+        return
+
+    payload = {_STATE_PROVENANCE_KEY: _STATE_PROVENANCE_VALUE, "rules": rules}
+    content = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    rel = manifest_path.relative_to(project_root).as_posix()
+    if not dry_run:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(manifest_path, content, log, rel, dry_run=dry_run):
+        log.action("WRITE", rel, f"mcp-deny hook fallback: {len(rules)} rule(s)")
+    else:
+        log.note_unchanged(rel)
+
+
 def sync_mcp_deny(
     project_root: Path,
     provider: str,
@@ -113,21 +212,41 @@ def sync_mcp_deny(
 ) -> None:
     """Merge native MCP deny rules into the provider settings file.
 
+    Providers without the native capability fall through to the hook manifest
+    (:func:`_sync_hook_deny_manifest`); a provider with neither mechanism keeps
+    the prompt convention and is logged.
+
     Previously managed rules are removed from ``permissions.deny`` before the
     current rules are appended, so deactivating a server cannot orphan its
     deny entry. User-authored deny entries (everything not in the managed state
     namespace) survive verbatim.
     """
     caps = _capabilities(agent_meta_root, capabilities)
+    rules = build_mcp_deny_rules(registry, active_servers)
     target = _deny_target(project_root, provider, provider_config, caps)
     if target is None:
-        log.note(
-            "mcp-deny",
-            f"{provider}: no permission-deny capability — prompt convention only",
+        _sync_hook_deny_manifest(
+            project_root, provider, provider_config, rules, log, dry_run,
         )
         return
+    # A provider that gained the native capability must not keep a stale hook
+    # fallback: two surfaces would block on different rule sets after a config
+    # flip. Only a manifest carrying our provenance marker is removed.
+    stale_manifest = hook_deny_manifest_path(project_root, provider, provider_config)
+    if stale_manifest is not None and _is_managed_hook_manifest(stale_manifest):
+        _drop_hook_manifest(project_root, stale_manifest, log, dry_run)
+
     settings_path, state_path = target
-    rules = build_mcp_deny_rules(registry, active_servers)
+
+    # Empty deny list and no existing settings file: there is nothing to
+    # enforce and nothing to clean up, so do not materialise a file that would
+    # only carry ``"deny": []``. Same rationale as the empty companion state
+    # file below — a freshly created empty surface is a foreign injection for
+    # the external-tools drift scanner. An EXISTING file still runs through the
+    # merge, so managed rules of a deactivated server are removed.
+    if not rules and not settings_path.exists():
+        log.note("mcp-deny", f"{provider}: no blocked MCP tools — nothing to write")
+        return
 
     existing = _load_json_object(settings_path)
     if existing is None and settings_path.exists():

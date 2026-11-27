@@ -125,6 +125,9 @@ def _run(
     strict: bool = False,
     tool: str = "Write",
     write_data: bool = True,
+    project_dir: Path | str | None = None,
+    payload_cwd: Path | str | None = None,
+    extra_env: dict | None = None,
     **data_kwargs,
 ) -> subprocess.CompletedProcess:
     """Run the hook as a real subprocess against a synthetic PreToolUse payload."""
@@ -133,16 +136,23 @@ def _run(
     payload = {
         "tool_name": tool,
         "tool_input": {"file_path": target},
-        "cwd": str(root),
+        "cwd": str(root if payload_cwd is None else payload_cwd),
     }
-    env = os.environ.copy()
-    env["CLAUDE_PROJECT_DIR"] = str(root)
+    env = dict(os.environ)
+    env.pop("AM_PROJECT_DIR", None)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    if project_dir is None:
+        env["AM_PROJECT_DIR"] = str(root)
+    elif str(project_dir):
+        env["AM_PROJECT_DIR"] = str(project_dir)
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
-        cwd=str(root),
+        cwd=str(root if payload_cwd is None else payload_cwd),
         env=env,
         timeout=SCRIPT_TIMEOUT,
     )
@@ -150,6 +160,46 @@ def _run(
 
 def _combined(result: subprocess.CompletedProcess) -> str:
     return result.stdout + result.stderr
+
+
+# ---------------------------------------------------------------------------
+# 0. Adapter-owned project root
+# ---------------------------------------------------------------------------
+def test_am_project_dir_wins_over_payload_cwd(project, tmp_path):
+    elsewhere = tmp_path / "payload-project"
+    elsewhere.mkdir()
+    result = _run(
+        project, "docs/spikes/x.md", strict=True, payload_cwd=elsewhere,
+    )
+    assert result.returncode == 2
+    assert "docs/spikes-2" in _combined(result)
+
+
+@pytest.mark.parametrize("anchor", ["", "/nonexistent/am-project-dir", "<no-meta>"])
+def test_unusable_am_project_dir_falls_back_to_payload_cwd(project, tmp_path, anchor):
+    if anchor == "<no-meta>":
+        empty = tmp_path / "no-meta"
+        empty.mkdir()
+        anchor = str(empty)
+    sub = project / "sub"
+    sub.mkdir()
+    result = _run(
+        project, "docs/reviews/x.md", project_dir=anchor, payload_cwd=sub,
+    )
+    assert result.returncode == 0, _combined(result)
+    assert _combined(result).strip() == ""
+
+
+def test_claude_project_dir_is_ignored(project, tmp_path):
+    elsewhere = tmp_path / "payload-project"
+    elsewhere.mkdir()
+    result = _run(
+        project, "docs/spikes/x.md", strict=True,
+        project_dir="", payload_cwd=elsewhere,
+        extra_env={"CLAUDE_PROJECT_DIR": str(project)},
+    )
+    assert result.returncode == 0
+    assert "missing" in _combined(result).lower()
 
 
 # ---------------------------------------------------------------------------

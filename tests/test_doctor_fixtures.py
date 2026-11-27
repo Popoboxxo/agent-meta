@@ -152,8 +152,27 @@ _REAL = {
     "load_known_issues": doctor.load_known_issues,
     "compute_active_set": doctor.compute_active_set,
     "load_provider_capabilities": doctor.load_provider_capabilities,
+    "load_providers_config": doctor.load_providers_config,
     "find_spec": importlib.util.find_spec,
 }
+
+
+def _apply_capability_stub(provider_map, seed):
+    """Overlay ``STUB_CAPABILITIES[seed]`` onto a provider mapping (in place).
+
+    Applied to *both* capability sources: since Q6/T36 ``ai-providers.yaml`` leads
+    and a key both sources declare differently raises ``ProviderSourceConflict``.
+    Stubbing only the secondary source would therefore break every doctor run of
+    a fixture that restores a retired provider shape, so the fixture restores the
+    shape symmetrically and still exercises the intended detector.
+    """
+    for provider, overrides in STUB_CAPABILITIES.get(seed, {}).items():
+        entry = provider_map.get(provider)
+        if isinstance(entry, dict):
+            entry.update(overrides)
+        else:
+            provider_map[provider] = dict(overrides)
+    return provider_map
 
 
 def _cached_active_set(config, agent_meta_root, project_root, **kwargs):
@@ -188,14 +207,21 @@ def _run_case(project, seed, kind, providers=None):
             for entry in caps.values():
                 entry["surface_verified_state"] = {
                     k: "DOCUMENTED" for k in entry.get("surface_verified_state", {})}
-        for provider, overrides in STUB_CAPABILITIES.get(seed, {}).items():
-            caps.setdefault(provider, {}).update(overrides)
-        return caps
+        return _apply_capability_stub(caps, seed)
+
+    def fake_providers_config(agent_meta_root, project_config=None):
+        # Same retired-shape overlay on the leading source (Q6): without it the
+        # merge would report a ProviderSourceConflict for the stub and the run
+        # would never reach the detector under test.
+        return _apply_capability_stub(
+            copy.deepcopy(_REAL["load_providers_config"](agent_meta_root, project_config)),
+            seed)
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(doctor, "load_known_issues", _cached_registry)
         mp.setattr(doctor, "compute_active_set", _cached_active_set)
         mp.setattr(doctor, "load_provider_capabilities", fake_capabilities)
+        mp.setattr(doctor, "load_providers_config", fake_providers_config)
         mp.setattr(doctor_detectors.subprocess, "run", fake_run)
         mp.setattr(importlib.util, "find_spec", fake_find_spec)
         report = doctor.run_doctor(project, _ROOT, config, providers=providers)

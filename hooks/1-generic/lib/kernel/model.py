@@ -3,8 +3,9 @@
 The contract follows the approved target architecture in
 ``docs/analysis/2026-11-14-fable-provider-hooks-audit.md`` section D.2:
 
-* ``NormEvent`` carries only normalized fields -- no provider name, no
-  ``CLAUDE_PROJECT_DIR``, no harness-specific payload shape.
+* ``NormEvent`` carries only normalized fields -- no provider name and no
+  harness-specific environment variable or payload shape. Its ``project_dir``
+  is supplied by adapter normalization of ``AM_PROJECT_DIR``.
 * ``Decision`` is ``allow | deny | ask`` with a reason and a structured audit
   payload. ``ask`` is prepared here but no adapter maps it to a provider
   protocol yet (migration step 3).
@@ -21,7 +22,11 @@ OUTCOMES = frozenset({"allow", "deny", "ask"})
 
 @dataclass(frozen=True)
 class NormEvent:
-    """A provider-normalized PreToolUse-style event."""
+    """A provider-normalized PreToolUse-style event.
+
+    Adapters own ``AM_PROJECT_DIR`` and pass its normalized value as
+    ``project_dir``; the kernel never reads provider environment variables.
+    """
 
     tool_kind: str
     path: Optional[str] = None

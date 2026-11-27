@@ -47,15 +47,11 @@ _PIPELINE_NOTATION_KEYS = (
     "sequential_item",
 )
 
-# Deprecated (AC-11/F11 D7): the authoritative provider list is
-# ``providers.registered_provider_names(agent_meta_root)``. This tuple is kept
-# only as a last-resort fallback when the registry is unreadable and so the
-# long-standing public import in tests/test_pipelines.py keeps working; a
-# drift-guard test asserts it stays in parity with the live registry.
-KNOWN_PROVIDERS = (
-    "Claude", "Opencode", "Gemini", "Continue", "Mammouth",
-    "Codex", "ZCode", "KimiCode", "Copilot",
-)
+# The provider list is registry-derived (AC-4): ``registered_provider_names``
+# (``config/ai-providers.yaml`` ∪ ``config/provider-capabilities.yaml``) is the
+# single source of truth. There is deliberately NO hardcoded provider tuple —
+# a fallback list silently omitted newly registered providers (Copilot, D7) and
+# would resurrect them after the registry was fixed.
 DEFAULT_MAX_DEPTH = 4
 
 # Non-string private variable carrying the one `effective` quality-pipelines dict
@@ -69,22 +65,33 @@ def pipeline_var_stem(name: str) -> str:
 
 
 def _registered_providers(agent_meta_root=None) -> list[str]:
-    """Return the registry-driven provider list, failing soft to the legacy tuple.
+    """Return the registry-driven provider list (single source of truth, AC-4).
 
-    ``providers.registered_provider_names()`` unions ``provider-capabilities.yaml``
-    and ``ai-providers.yaml`` — the fix for D7 (Copilot was missing from the
-    former hardcoded ``KNOWN_PROVIDERS``).
+    ``providers.registered_provider_names()`` unions ``config/ai-providers.yaml``
+    and ``config/provider-capabilities.yaml``. There is no hardcoded fallback
+    provider list: an unreadable or empty registry is fail-safe — it yields no
+    providers and logs a WARNING, so callers surface the broken registry through
+    their own guards (``validate_pipelines`` flags every non-empty
+    ``providers.include``/``exclude`` entry) instead of rendering a stale
+    provider set that silently misses a newly registered one.
     """
     root = Path(agent_meta_root) if agent_meta_root is not None else _FRAMEWORK_ROOT
     try:
-        return registered_provider_names(root)
-    except (OSError, ValueError) as exc:
+        names = registered_provider_names(root)
+    except (OSError, ValueError, SyncError) as exc:
         _logger.warning(
-            "provider registry unreadable (%s: %s); falling back to the legacy "
-            "KNOWN_PROVIDERS tuple — this may omit registered providers",
-            type(exc).__name__, exc,
+            "provider registry unreadable (%s: %s) — no providers, no fallback "
+            "list; fix the registry under %s",
+            type(exc).__name__, exc, root,
         )
-        return list(KNOWN_PROVIDERS)
+        return []
+    if not names:
+        _logger.warning(
+            "provider registry under %s declares no providers — no provider "
+            "blocks are rendered; add the providers to config/ai-providers.yaml",
+            root,
+        )
+    return names
 
 
 @lru_cache(maxsize=None)

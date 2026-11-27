@@ -39,6 +39,12 @@ _PROVIDER_CONFIG = {
     "Claude": {
         "settings_file": ".claude/settings.json",
         "isolation-mechanism": "claude-settings-deny",
+        # Real Claude config: hooks are mirrored, so a stale hook fallback
+        # manifest can exist and must be cleaned up when the native capability
+        # applies.
+        "hooks_dir": ".claude/hooks",
+        "has_hooks": True,
+        "hook_protocol": "claude-code-json",
     },
     "Opencode": {
         "settings_file": "opencode.json",
@@ -134,6 +140,8 @@ def test_sync_mcp_deny_skips_provider_without_capability(tmp_path):
     )
     assert settings.read_text(encoding="utf-8") == original
     assert not (tmp_path / ".claude" / "agent-meta-state.json").exists()
+    # No hook capability either: no manifest fallback is materialised.
+    assert not (tmp_path / ".claude" / "hooks" / "lib" / "mcp-deny.json").exists()
 
 
 def test_sync_mcp_deny_dry_run_writes_nothing(tmp_path):
@@ -170,6 +178,38 @@ def test_sync_mcp_deny_tolerates_missing_settings_file(tmp_path):
     assert "mcp__alpha__delete" in deny
 
 
+def test_sync_mcp_deny_writes_exactly_the_blocked_tools(tmp_path):
+    """AC-1 (exactness): the machine list is the blocked list — no more, no less."""
+    settings = _settings(tmp_path)
+    settings.write_text(
+        json.dumps({"permissions": {"deny": ["Bash(rm -rf:*)"]}}), encoding="utf-8",
+    )
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["alpha", "beta", "quiet"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    deny = _read_json(settings)["permissions"]["deny"]
+    assert {entry for entry in deny if entry.startswith("mcp__")} == set(
+        build_mcp_deny_rules(_REGISTRY, ["alpha", "beta", "quiet"])
+    )
+    assert deny[0] == "Bash(rm -rf:*)"
+
+
+def test_sync_mcp_deny_does_not_create_a_settings_file_without_rules(tmp_path):
+    """Empty deny list → no entry, and no spurious settings artifact.
+
+    Mirrors the empty-companion-state-file guard: a freshly created
+    ``{"permissions": {"deny": []}}`` file would be a foreign injection for the
+    drift scanner even though nothing is prohibited.
+    """
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["quiet"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    assert not (tmp_path / ".claude" / "settings.json").exists()
+    assert not (tmp_path / ".claude" / "agent-meta-state.json").exists()
+
+
 def test_sync_mcp_deny_keeps_unparseable_settings_file(tmp_path):
     settings = _settings(tmp_path)
     original = "{not json"
@@ -179,6 +219,115 @@ def test_sync_mcp_deny_keeps_unparseable_settings_file(tmp_path):
         SyncLog(), False, capabilities=_CAPABILITIES,
     )
     assert settings.read_text(encoding="utf-8") == original
+
+
+# --- hook fallback manifest (issue #1263b) --------------------------------
+#
+# Providers WITHOUT the native permission-deny capability get the same rules as
+# a manifest next to the deployed hook lib, where hook_common.sh reads them
+# (hook_mcp_tool_denied). Same source, different transport — never a second
+# deny list.
+
+_HOOK_PROVIDER = "HookOnly"
+_HOOK_PROVIDER_CONFIG = {
+    _HOOK_PROVIDER: {
+        "hooks_dir": ".hookonly/hooks",
+        "has_hooks": True,
+        "hook_protocol": "claude-code-json",
+    },
+}
+_HOOK_CAPABILITIES = {_HOOK_PROVIDER: {MCP_DENY_CAPABILITY: False}}
+
+
+def _hook_manifest(tmp_path: Path) -> Path:
+    return tmp_path / ".hookonly" / "hooks" / "lib" / "mcp-deny.json"
+
+
+def _sync_hook_provider(tmp_path: Path, active: list[str], dry_run: bool = False) -> None:
+    sync_mcp_deny(
+        tmp_path, _HOOK_PROVIDER, _HOOK_PROVIDER_CONFIG, _REGISTRY, active,
+        SyncLog(), dry_run, capabilities=_HOOK_CAPABILITIES,
+    )
+
+
+def test_sync_mcp_deny_writes_hook_manifest_without_capability(tmp_path):
+    """AC-1: the hook manifest carries exactly the same rules as the native list."""
+    _sync_hook_provider(tmp_path, ["alpha", "beta"])
+    manifest = _read_json(_hook_manifest(tmp_path))
+    assert manifest["rules"] == build_mcp_deny_rules(_REGISTRY, ["alpha", "beta"])
+    assert manifest["rules"] == [
+        "mcp__alpha__admin.restore",
+        "mcp__alpha__delete",
+        "mcp__beta__drop",
+    ]
+
+
+def test_sync_mcp_deny_hook_manifest_is_agent_meta_managed(tmp_path):
+    """Provenance marker: sync may later remove/replace only its own file."""
+    _sync_hook_provider(tmp_path, ["alpha"])
+    manifest = _read_json(_hook_manifest(tmp_path))
+    assert manifest["_agent-meta"] == (
+        "agent-meta managed — do not edit manually"
+    )
+
+
+def test_sync_mcp_deny_hook_manifest_not_written_with_capability(tmp_path):
+    """Capability providers keep the native surface; no duplicate hook copy."""
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["alpha"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    assert not (tmp_path / ".claude" / "hooks" / "lib" / "mcp-deny.json").exists()
+    assert _read_json(_settings(tmp_path))["permissions"]["deny"]
+
+
+def test_sync_mcp_deny_hook_manifest_absent_without_blocked_tools(tmp_path):
+    _sync_hook_provider(tmp_path, ["quiet"])
+    assert not _hook_manifest(tmp_path).exists()
+
+
+def test_sync_mcp_deny_hook_manifest_removes_stale_managed_rules(tmp_path):
+    _sync_hook_provider(tmp_path, ["alpha", "beta"])
+    _sync_hook_provider(tmp_path, ["beta"])
+    assert _read_json(_hook_manifest(tmp_path))["rules"] == ["mcp__beta__drop"]
+
+
+def test_sync_mcp_deny_hook_manifest_removed_when_list_becomes_empty(tmp_path):
+    _sync_hook_provider(tmp_path, ["alpha"])
+    assert _hook_manifest(tmp_path).exists()
+    _sync_hook_provider(tmp_path, ["quiet"])
+    assert not _hook_manifest(tmp_path).exists()
+
+
+def test_sync_mcp_deny_hook_manifest_dry_run_writes_nothing(tmp_path):
+    _sync_hook_provider(tmp_path, ["alpha"], dry_run=True)
+    assert not _hook_manifest(tmp_path).exists()
+
+
+def test_sync_mcp_deny_keeps_unparseable_hook_manifest(tmp_path):
+    manifest = _hook_manifest(tmp_path)
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{not json", encoding="utf-8")
+    _sync_hook_provider(tmp_path, ["alpha"])
+    assert manifest.read_text(encoding="utf-8") == "{not json"
+
+
+def test_sync_mcp_deny_native_capability_drops_managed_hook_manifest(tmp_path):
+    """A provider that gains the capability must not keep the hook fallback."""
+    manifest = tmp_path / ".claude" / "hooks" / "lib" / "mcp-deny.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps({
+            "_agent-meta": "agent-meta managed — do not edit manually",
+            "rules": ["mcp__alpha__delete"],
+        }),
+        encoding="utf-8",
+    )
+    sync_mcp_deny(
+        tmp_path, "Claude", _PROVIDER_CONFIG, _REGISTRY, ["alpha"],
+        SyncLog(), False, capabilities=_CAPABILITIES,
+    )
+    assert not manifest.exists()
 
 
 # --- --validate coverage ---------------------------------------------------
