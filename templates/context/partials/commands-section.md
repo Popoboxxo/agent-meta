@@ -1,10 +1,10 @@
 ---
 name: "Commands Section"
-version: 1.0.0
+version: 1.0.2
 ---
 ## Commands
 
-Slash-Commands werden aus drei Quell-Schichten in das Command-Verzeichnis des Providers synchronisiert. Pfadbasen: `commands/`, `config/`, `docs/` relativ zu agent-meta (im Zielprojekt `.agent-meta/`); Zielordner relativ zum Projekt. Bei gleichem Namen gewinnt die spätere Schicht.
+Slash-Commands werden aus drei Quell-Schichten in das Command-Verzeichnis des Providers synchronisiert. Pfadbasen: `commands/`, `config/` relativ zu agent-meta (im Zielprojekt `.agent-meta/`); Zielordner relativ zum Projekt. Bei gleichem Namen gewinnt die spätere Schicht.
 
 | Schicht (Quelle) | Zweck |
 |---|---|
@@ -20,4 +20,3 @@ Für alle Schichten gilt:
 - **Stale-Cleanup:** entfernte Commands werden beim Sync gelöscht (nur indexierte Dateien).
 - **Gate:** nur Provider mit Capability `commands: true` (`config/provider-capabilities.yaml`) erhalten Commands.
 - **Projekteigene Commands:** nicht-indexierte Dateien in jedem `commands_dir` bleiben unangetastet. Bei Namenskollision wird die Projektdatei ohne Backup durch den agent-meta-Command überschrieben. Anlegen (nur Claude): `python3 .agent-meta/scripts/sync.py --create-command <name>`.
-- **Command-Liste und Details:** `docs/guides/features/commands.md`.

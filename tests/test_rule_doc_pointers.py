@@ -176,3 +176,18 @@ def test_requirements_pointer_only_when_file_exists(tmp_path):
     out = run("--check")
     assert out.returncode == 0, out.stdout[-800:] + out.stderr[-800:]
     assert "docs/REQUIREMENTS.md" in _generated_text(project)
+
+
+def test_no_unresolvable_doc_pointers_in_context_partials_and_templates():
+    # Partials and *.project-template.md are rendered into target projects, where
+    # agent-meta's docs/ does not exist -> no docs/ pointers (except REQUIREMENTS.md).
+    paths = list((REPO_ROOT / "templates" / "context" / "partials").glob("*.md"))
+    paths += list((REPO_ROOT / "templates" / "configs").glob("*.project-template.md"))
+    paths += list((REPO_ROOT / "templates" / "context").glob("*.md"))
+    assert paths, "scan found no partials/templates"
+    hits = []
+    for path in paths:
+        for doc in _pointers(path):
+            if doc != "docs/REQUIREMENTS.md":
+                hits.append((path.name, doc))
+    assert hits == []

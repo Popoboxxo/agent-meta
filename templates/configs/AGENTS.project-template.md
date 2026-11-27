@@ -2,6 +2,7 @@
 
 {{> project-metadata }}
 
+{{> commands-section }}
 <!-- agent-meta:managed-begin -->
 {{PROVIDER_ROUTING}}
 <!-- agent-meta:managed-end -->
