@@ -417,18 +417,18 @@ Hash-/Golden-Pins werden im Trigger-Commit rot und sind bis zum R-Task **nicht**
 ## Abschluss
 
 ### Task 39: Volle Verifikation (tester)
-- [ ] Step 1: `python3 scripts/sync.py --validate` exit 0 (BAC-1).
-- [ ] Step 2: voller `pytest`; Testanzahl >= Ausgangsstand aus Task 0 (BAC-2).
-- [ ] Step 3: BAC-5-Greps (beide Regex, 6 A4-Module + `sync_pipeline.py`; `# provider:` in `hooks/`) mit Ausnahme-Nachweis; B3-AC-3: `INLINE_PY_RX` (Precondition 2) = 0 Treffer ausser dokumentierter Allowlist; BAC-7: `git diff main -- pyproject.toml requirements.txt` leer.
-- [ ] Step 4: Commit-Zählung: je Item >= 1 Commit (BAC-3), Rebaseline-Commits separat.
+- [x] Step 1: `python3 scripts/sync.py --validate` exit 0 (BAC-1).
+- [x] Step 2: voller `pytest`; Testanzahl >= Ausgangsstand aus Task 0 (BAC-2).
+- [x] Step 3: BAC-5-Greps (beide Regex, 6 A4-Module + `sync_pipeline.py`; `# provider:` in `hooks/`) mit Ausnahme-Nachweis; B3-AC-3: `INLINE_PY_RX` (Precondition 2) = 0 Treffer ausser dokumentierter Allowlist; BAC-7: `git diff main -- pyproject.toml requirements.txt` leer.
+- [x] Step 4: Commit-Zählung: je Item >= 1 Commit (BAC-3), Rebaseline-Commits separat.
 
 ### Task 40: Secret-Scan (security-reviewer)
-- [ ] Projekt-Secret-Scan über alle geänderten Dateien (`git diff --name-only main...HEAD`); Fund blockiert (BAC-8), manuelle Eskalation.
+- [x] Projekt-Secret-Scan über alle geänderten Dateien (`git diff --name-only main...HEAD`); Fund blockiert (BAC-8), manuelle Eskalation.
 
 ### Task 41: PR-Body-Entwurf (documenter)
 **Files:** Create `.tmp/pr-body-wave-5.md` (Scratch-Sink, nicht committen).
-- [ ] Gliederung nach Cluster A/B/C + Commit-Bereichen; Hinweise R3 (Deny wirkt nach Sync/Neustart), R4 (`AM_ALLOW_PROTECTED_WRITE=1`), R6 (`--label`-Alias); BAC-5-Ausnahmeliste; Swaps (falls vorhanden); `#1238`-Befund (Deploy flach, kernel nicht deployt); Abweichung Spec B4: `repo-containment-impl.sh` ruft `kernel/containment.py` nicht auf (Grep 0), daher zwei Implementierungen + Paritätstest (T27); `INLINE_PY_RX`-Scope-Entscheid und Allowlist; Verweis: Optionen (a)/(b)/(d) bleiben in Issue #1337.
-- [ ] Footer: je Issue **eine eigene Zeile** (nur das erste `#N` pro Zeile schliesst zuverlässig):
+- [x] Gliederung nach Cluster A/B/C + Commit-Bereichen; Hinweise R3 (Deny wirkt nach Sync/Neustart), R4 (`AM_ALLOW_PROTECTED_WRITE=1`), R6 (`--label`-Alias); BAC-5-Ausnahmeliste; Swaps (falls vorhanden); `#1238`-Befund (Deploy flach, kernel nicht deployt); Abweichung Spec B4: `repo-containment-impl.sh` ruft `kernel/containment.py` nicht auf (Grep 0), daher zwei Implementierungen + Paritätstest (T27); `INLINE_PY_RX`-Scope-Entscheid und Allowlist; Verweis: Optionen (a)/(b)/(d) bleiben in Issue #1337.
+- [x] Footer: je Issue **eine eigene Zeile** (nur das erste `#N` pro Zeile schliesst zuverlässig):
 ```
 Resolves #1243
 Resolves #1242
