@@ -114,7 +114,7 @@ agent-meta/
 |-------------|-------|-------|--------|----------------------|
 | `.claude/rules/*.md` | **Alle** Agenten + Hauptchat | Automatisch | agent-meta + Projekt | Ja (agent-meta-Rules) / Nein (projekt-eigene) |
 | `.claude/3-project/*-ext.md` | **Ein** Agenten-Typ | Explizit per Read-Hook | Projekt | Nein |
-| `.claude/commands/*.md` | Hauptchat (kein isolierter Kontext) | Als Slash-Command `/project:<name>` | Projekt | Nein |
+| `.claude/commands/*.md` | Hauptchat (kein isolierter Kontext) | Als Slash-Command `/project:<name>` | agent-meta + Projekt | Ja (agent-meta-Commands) / Nein (projekt-eigene) |
 
 **Wann was:**
 - Regel gilt für alle Agenten und Hauptchat → `.claude/rules/`

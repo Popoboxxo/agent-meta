@@ -523,7 +523,7 @@ Registriert im Consistency-Lauf (`scripts/consistency-check.py`, u. a. über
 ## Stale-Tracking
 
 Jeder Provider verwaltet seinen eigenen `.agent-meta-managed`-Index — für Agenten
-in `<agents_dir>/`, für Rules in `<rules_dir>/`:
+in `<agents_dir>/`, für Rules in `<rules_dir>/`, für Commands in `<commands_dir>/`:
 
 **Agenten-Index (alle Provider):**
 
@@ -543,6 +543,11 @@ in `<agents_dir>/`, für Rules in `<rules_dir>/`:
 - `.gemini/rules/.agent-meta-managed`
 - `.continue/rules/.agent-meta-managed`
 - `.github/copilot/rules/.agent-meta-managed`
+
+**Commands-Index (Provider mit Commands-Verzeichnis):**
+
+- `<commands_dir>/.agent-meta-managed` (z. B. `.claude/commands/.agent-meta-managed`)
+- Sonderfall Continue: `.continue/prompts/.agent-meta-commands-managed` (Key `commands_managed_index` in `config/ai-providers.yaml`, getrennt vom Rollen-Index)
 
 Generierte MCP-/Tool-Rules nutzen eigene Sidecar-Indizes im selben Rules-Verzeichnis
 (`.agent-meta-managed-mcp` bzw. `.agent-meta-managed-tools`).

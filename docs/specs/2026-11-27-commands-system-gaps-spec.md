@@ -80,7 +80,7 @@ Format Given/When/Then; Testverweis in Klammern. Alle Tests vom Entwickler zu sc
 **Lücke 3 — REQ-09 Doku**
 - AC-3.1 `templates/configs/CLAUDE.project-template.md` enthält Commands-Abschnitt (Verzeichnisstruktur `commands/0-external|1-generic|2-platform`, Sync-Verhalten-Tabelle je `commands_dir`); nach Sync enthält `CLAUDE.md` und `AGENTS.md` den Abschnitt (Test: Szenario 107 Assert grep + `--validate` rc 0).
 - AC-3.2 `docs/guides/features/commands.md` ist widerspruchsfrei: `:69` und `:143` nennen beide die Ausnahme Continue (`.agent-meta-commands-managed`); `:70`/`:222-223` analog. (Test: Doku-Konsistenztest, der in der Datei jedes Vorkommen von `.agent-meta-managed` im Continue-Kontext prüft, oder manuelle Review-Checkliste — OF-4.)
-- AC-3.3 `instantiate-project.md:67` verweist auf `.claude/commands/` (3-project-Schicht, nie überschrieben), nicht auf `.claude/3-project/commands/`; Guide `:15`/`:35` identisch. (Test: Grep-Assertion „`3-project/commands`" nicht in Doku.)
+- AC-3.3 `instantiate-project.md` und Guide beschreiben projekt-eigene Commands direkt in `.claude/commands/` (keine 3-project-Schicht); bei Namenskollision mit einem agent-meta-Command wird die Projektdatei ohne Backup überschrieben; die Doku nennt `3-project/commands` nicht. (Test: Grep-Assertion „`3-project/commands`" nicht in Guide und instantiate-project.md.)
 - AC-3.4 Command-Liste in Guide (`:181-192`) deckt alle `commands/1-generic/*.md` ab (aktuell 24, Guide 10), vorzugsweise generiert/geprüft: Test vergleicht Dateiliste mit Guide-Tabelle (IC-11; Test `tests/test_commands_gate_consistency.py` oder eigener Doku-Test).
 
 **Lücke 4 — REQ-01 Layer**

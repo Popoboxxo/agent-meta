@@ -64,7 +64,7 @@ Slash Commands laufen im **Haupt-Kontext** (kein isoliertes Context Window wie A
 Geeignet für schnelle, wiederkehrende Einzel-Aktionen.
 
 agent-meta verwaltet einen Teil der Commands automatisch (generisch und plattformspezifisch,
-analog zu Agenten). Projekt-eigene Commands in `.claude/3-project/commands/` werden nie überschrieben.
+analog zu Agenten). Projekt-eigene Commands liegen in `.claude/commands/` und werden nie überschrieben (außer bei Namenskollision mit einem agent-meta-Command: dann ohne Backup überschrieben).
 
 > Vollständige Dokumentation: [howto/features/commands.md](../features/commands.md) — Layer-System, Frontmatter-Felder, `$ARGUMENTS`, `--create-command`, Stale-Tracking.
 
