@@ -23,9 +23,8 @@ one-line change in ``PHASE1_PROMOTED``. Sync end stays report-only (ERROR lands
 in the sync.log error list, exit code unchanged); ``--doctor`` exits 1 on an
 effective ERROR.
 
-Not part of this module: ``context.token-report`` (0a report).
-Known gap, Phase 1: the Copilot soft cap is per instruction file; it is only
-checked here against the entry file.
+Not part of this module: ``context.token-report`` (0a report). Known gap, Phase 1:
+the Copilot soft cap is per instruction file (checked here only against the entry file).
 
 ``active_set`` is part of the shared signature; none of the checks here
 depends on the role set (rules and skills are not roles), so it is unused.
@@ -63,12 +62,10 @@ SPEC_SEVERITY = {
 }
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
-# 9 providers x rules presets reports zero findings (AC-11). rule-unreachable
-# (AC-12) was promoted in the 1.24 follow-up: after Copilot declares its
-# path-scoped .github/instructions channel (Task 1.29), the 9x4 matrix reports
-# zero findings. declared-surface-empty keeps its WARN: it is gated by
-# ``content_expected`` (surfaces empty by design -- skills without lazy rules,
-# MCP without active servers -- are not reported), so no global exemption is needed.
+# 9 providers x rules presets reports zero findings (AC-11); rule-unreachable
+# (AC-12) followed in the 1.24 follow-up (Copilot declares its path-scoped
+# .github/instructions channel, Task 1.29). declared-surface-empty keeps its
+# WARN: gated by ``content_expected``, empty-by-design surfaces are not reported.
 PHASE1_PROMOTED = frozenset({
     "context.dangling-pointer", "context.rule-unreachable",
     "context-profile.marker-in-rule", "context.dangling-doc-pointer",

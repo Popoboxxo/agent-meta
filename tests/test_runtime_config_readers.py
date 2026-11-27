@@ -37,7 +37,8 @@ SCRIPTS_ROOT = _ROOT / "scripts"
 # Machine-readable exception reasons (AC-89 / spec IC-35 Rev. 3.1).
 SYNC_RENDER_PATH = "sync-render-path"       # sync/render path whose effect L0 covers
 NO_RUNTIME_EFFECT = "no-runtime-effect"     # maintenance/migration tool without runtime effect
-_REASONS = {SYNC_RENDER_PATH, NO_RUNTIME_EFFECT}
+DELEGATED_READER = "delegated-to-registered-reader"  # carries the config path, value read in a registered reader
+_REASONS = {SYNC_RENDER_PATH, NO_RUNTIME_EFFECT, DELEGATED_READER}
 
 # --- Ratchet start list (may only SHRINK) -----------------------------------
 # Plan Rev. 3.1 start classification minus the now-registered files
@@ -58,6 +59,9 @@ PY_EXCEPTION_START = {
 # Hook hits that are not runtime value readers: the release-gate values are
 # baked in at sync time (hook_common.sh:214-217, L0-covered) and the remaining
 # references are comments / enablement decisions rendered by the sync.
+# `orchestrator-guard-impl.sh` / `repo-containment-impl.sh` only carry the config
+# path as argv for their Python module; the key value is read in the registered
+# reader (`hooks/1-generic/lib/hook_{guard_policy,containment_config}.py`).
 HOOK_EXCEPTION_START = {
     "hooks/1-generic/lib/hook_common.sh": SYNC_RENDER_PATH,
     "hooks/1-generic/sync-on-config-change.sh": SYNC_RENDER_PATH,
@@ -65,6 +69,8 @@ HOOK_EXCEPTION_START = {
     "hooks/1-generic/release-gates/action-pin-validation.sh": SYNC_RENDER_PATH,
     "hooks/1-generic/release-gates/artifact-freshness.sh": SYNC_RENDER_PATH,
     "hooks/1-generic/release-gates/docker-image-scan.sh": SYNC_RENDER_PATH,
+    "hooks/1-generic/orchestrator-guard-impl.sh": DELEGATED_READER,
+    "hooks/1-generic/repo-containment-impl.sh": DELEGATED_READER,
 }
 
 
@@ -590,6 +596,6 @@ def test_d_registry_shape():
 
     registered = _registered_reader_files()
     assert {"scripts/admin-server.py", "scripts/lifecycle_check.py"} <= registered
-    assert {"hooks/1-generic/repo-containment-impl.sh",
-            "hooks/1-generic/orchestrator-guard-impl.sh",
+    assert {"hooks/1-generic/lib/hook_containment_config.py",
+            "hooks/1-generic/lib/hook_guard_policy.py",
             "hooks/1-generic/dod-push-check.sh"} <= registered

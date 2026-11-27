@@ -48,7 +48,10 @@ from tests.test_ac01_render_identity import _make_project, _run_sync  # noqa: E4
 # project costs ~10 s). Mammouth/Continue share the same empty-skills-dir defect
 # (measured in the docstring above) but are not re-rendered here.
 DEFAULT_MATRIX = ["Gemini", "Claude", "Codex"]
-LAZY_TABLE_SKILLS = 19
+# Skills listed in the source lazy table (rules/1-generic/use-lazy-rules.md):
+# 19 non-MCP skills after T34 plus the 4 MCP rows (mcp-home-assistant,
+# mcp-influxdb, mcp-reqogniloom, mcp-honcho) = 23.
+LAZY_TABLE_SKILLS = 23
 
 
 def _make_lazy_project(root: Path, provider: str) -> Path:

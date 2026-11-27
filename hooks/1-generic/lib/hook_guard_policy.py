@@ -122,7 +122,7 @@ def _strict(argv: list[str]) -> int:
 
         with open(config_file) as handle:
             config = yaml.safe_load(handle) or {}
-        orchestrator = config.get('orchestrator', {})
+        orchestrator = config.get('orchestrator', {})  # runtime-reader:orchestrator
         mode = _resolve_mode(orchestrator, provider)
         if mode is not None:
             mode = str(mode).strip().lower()
