@@ -1675,6 +1675,31 @@ class ConfigManager:
 # --------------------------------------------------------------------------- #
 
 
+def _project_config_path(root: Path) -> Path:
+    """Return the fixed ``<root>/.meta-config/project.yaml`` path (never from input)."""
+    return Path(root) / ".meta-config" / "project.yaml"
+
+
+def _publish_create_only(tmp: Path, target: Path) -> None:
+    """Atomically publish ``tmp`` as ``target``; raise FileExistsError if it exists.
+
+    Prefers ``os.link`` (atomic, create-only). On filesystems without hard-link
+    support (EPERM/ENOTSUP/EXDEV) falls back to ``O_CREAT|O_EXCL`` plus a byte copy.
+    """
+    try:
+        os.link(str(tmp), str(target))
+        return
+    except FileExistsError:
+        raise
+    except OSError as exc:
+        if exc.errno not in (errno.EPERM, errno.ENOTSUP, errno.EXDEV):
+            raise
+    data = tmp.read_bytes()
+    fd = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+
+
 class SyncExecutor:
     """Run ``sync.py`` as a subprocess and capture its output."""
 
@@ -1693,7 +1718,7 @@ class SyncExecutor:
         Guards plain sync runs so a not-yet-configured project never spawns
         ``sync.py`` (which would abort or hang without a config).
         """
-        if (self.root / ".meta-config" / "project.yaml").exists():
+        if _project_config_path(self.root).exists():
             return None
         return {"success": False, "output": "project.yaml missing", "returncode": -1}
 
@@ -1778,6 +1803,15 @@ class SyncExecutor:
             return missing
         return self._run([])
 
+    def init_run(self) -> dict:
+        """Execute ``sync.py --init`` against the fixed project.yaml path.
+
+        Only fixed arguments reach argv (no form data). Not blocked by the
+        missing-config guard: the caller (``/api/setup/init-sync``) checks
+        existence itself.
+        """
+        return self._run(["--config", str(_project_config_path(self.root)), "--init"])
+
     def cleanup_preview(self) -> dict:
         """Run ``sync.py --cleanup-preview`` and parse its single JSON object.
 
@@ -1789,6 +1823,12 @@ class SyncExecutor:
         method returns ``{"success": False, "error": "sync_preview_failed",
         "output": "..."}``.
         """
+        if self._config_missing_result() is not None:
+            return {
+                "success": False,
+                "error": "sync_preview_failed",
+                "output": "project.yaml missing",
+            }
         result = self._run(["--cleanup-preview"])
         output = result.get("output", "") or ""
         if not result.get("success"):
@@ -4184,6 +4224,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         "/favicon.png": "_serve_favicon",
         "/api/health": "_route_get_health",
         "/api/mode": "_route_get_mode",
+        "/api/setup/options": "_route_get_setup_options",
         "/api/project": "_route_get_project",
         "/api/schema/project": "_route_get_schema_project",
         "/api/help": "_route_get_help",
@@ -4246,6 +4287,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     _POST_EXACT_ROUTES: ClassVar[dict[str, str]] = {
         "/api/sync/dry-run": "_route_post_sync_dry_run",
         "/api/sync/run": "_route_post_sync_run",
+        "/api/setup/config": "_route_post_setup_config",
+        "/api/setup/init-sync": "_route_post_setup_init_sync",
         "/api/sync/render-standalone": "_route_post_sync_render_standalone",
         "/api/config-audit/apply": "_route_post_config_audit_apply",
         "/api/models/update": "_handle_post_models_update",
@@ -4334,9 +4377,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "root": str(self.__class__.root),
             "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
             # Computed, not persisted: true while no project.yaml exists yet.
-            "setup_required": not (
-                self.__class__.root / ".meta-config" / "project.yaml"
-            ).exists(),
+            "setup_required": not _project_config_path(self.__class__.root).exists(),
         }
         # In super_admin mode the project.yaml of the meta-repo is also
         # available as the "target repo" view.  Signal this to the UI so
@@ -4648,6 +4689,72 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return self._send_json(self._audit_service().test_plugin(plugin_id))
 
         raise FileNotFoundError(path)
+
+    # ------------------------------------------------------------------ #
+    # Setup mode (first-time project.yaml creation)                       #
+    # ------------------------------------------------------------------ #
+
+    #: Static wizard defaults exposed by ``GET /api/setup/options``. Per-platform
+    #: prefill of dod_preset/test_commands (CLI wizard) is intentionally not applied.
+    _SETUP_DEFAULTS: ClassVar[dict[str, Any]] = {
+        "dod_preset": "standard",
+        "git_platform": "GitHub",
+        "git_branch": "main",
+        "ignore_secrets": True,
+    }
+
+    def _route_get_setup_options(self) -> None:
+        from lib.providers import load_providers_config
+        from lib.setup import DOD_PRESETS, GIT_PLATFORMS
+
+        root = self._agent_meta_root()
+        return self._send_json({
+            "providers": list(load_providers_config(root).keys()),
+            "git_platforms": list(GIT_PLATFORMS),
+            "dod_presets": list(DOD_PRESETS),
+            "defaults": dict(self._SETUP_DEFAULTS),
+        })
+
+    def _route_post_setup_config(self) -> None:
+        from lib.setup import _write_config, build_setup_config, validate_setup_answers
+
+        answers = self._read_body()
+        if not isinstance(answers, dict):
+            return self._send_json(
+                {"error": "bad_request", "detail": ["body must be a JSON object"]},
+                status=400,
+            )
+        meta_root = self._agent_meta_root()
+        errors = validate_setup_answers(answers, meta_root)
+        if errors:
+            return self._send_json({"error": "bad_request", "detail": errors}, status=400)
+        target = _project_config_path(self.__class__.root)
+        if target.exists():
+            return self._send_json({"error": "already_configured"}, status=409)
+        config = build_setup_config(answers, meta_root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Write to a private temp file (owner-only via _write_config), then
+        # os.link() it to the target: atomic AND create-only (EEXIST -> 409).
+        tmp = target.parent / f".project.yaml.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+        try:
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(fd)
+            _write_config(tmp, config)
+            try:
+                _publish_create_only(tmp, target)
+            except FileExistsError:
+                return self._send_json({"error": "already_configured"}, status=409)
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        return self._send_json({"success": True, "path": str(target)})
+
+    def _route_post_setup_init_sync(self) -> None:
+        if not _project_config_path(self.__class__.root).exists():
+            return self._send_json({"error": "setup_required"}, status=409)
+        return self._send_json(self.__class__.sync_executor.init_run())
 
     def _route_post_sync_dry_run(self) -> None:
         return self._send_json(self.__class__.sync_executor.dry_run())
