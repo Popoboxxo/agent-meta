@@ -412,3 +412,150 @@ class TestInitRun:
         assert body["returncode"] == 0, body["output"][-2000:]
         assert body["success"] is True
         assert (root / "CLAUDE.md").exists() or (root / ".claude" / "agents").is_dir()
+
+
+# --------------------------------------------------------------------------- #
+# Task 5: ADM-03 - read-only project.yaml sections stay unwritable (AC-11/12)
+# --------------------------------------------------------------------------- #
+
+_RO_YAML = "project:\n  name: demo\nvariables:\n  KEEP: original\n"
+
+
+def _ro_root(tmp_path: Path) -> Path:
+    root = _REPO_ROOT_COPY(tmp_path)
+    (root / ".meta-config").mkdir()
+    _cfg(root).write_text(_RO_YAML, encoding="utf-8")
+    return root
+
+
+class TestReadonlySectionWrites:
+    def test_ro_section_is_not_whitelisted(self):
+        assert "variables" not in admin_server.PROJECT_WRITABLE_SECTIONS
+
+    @pytest.mark.parametrize("body", [
+        {"section": "variables", "data": {"EVIL": "1"}},
+        {"key": "variables", "value": {"EVIL": "1"}},
+        {"section": "no-such-section", "data": 1},
+    ])
+    def test_ac11_put_section_400_file_identical(self, token_server, tmp_path, body):
+        root = _ro_root(tmp_path)
+        before = _cfg(root).read_bytes()
+        port = token_server(root)
+        status, resp = _req(port, "/api/config/project/section", body,
+                            token=_TOKEN, method="PUT")
+        assert status == 400, resp
+        assert "section not allowed" in json.dumps(resp)
+        assert _cfg(root).read_bytes() == before
+
+    def test_ac11_put_section_post_method_not_a_write_path(self, token_server, tmp_path):
+        root = _ro_root(tmp_path)
+        before = _cfg(root).read_bytes()
+        port = token_server(root)
+        status, _ = _req(port, "/api/config/project/section",
+                         {"section": "variables", "data": {"EVIL": "1"}}, token=_TOKEN)
+        assert status != 200
+        assert _cfg(root).read_bytes() == before
+
+    @pytest.mark.parametrize("body", [
+        {"variables": {"EVIL": "1"}},
+        {"variables": {"KEEP": "changed"}},
+        {"brand-new-ro": 1},
+        # writable change must not be persisted when a read-only change rides along
+        {"speech-mode": "short", "variables": {"EVIL": "1"}},
+    ])
+    def test_ac11_put_full_changed_readonly_400_file_identical(
+            self, token_server, tmp_path, body):
+        root = _ro_root(tmp_path)
+        before = _cfg(root).read_bytes()
+        port = token_server(root)
+        status, resp = _req(port, "/api/config/project", body,
+                            token=_TOKEN, method="PUT")
+        assert status == 400, resp
+        assert "section not allowed" in json.dumps(resp)
+        assert _cfg(root).read_bytes() == before
+
+    def test_ac12_put_full_unchanged_readonly_200(self, token_server, tmp_path):
+        root = _ro_root(tmp_path)
+        port = token_server(root)
+        body = {"project": {"name": "demo"}, "variables": {"KEEP": "original"}}
+        status, resp = _req(port, "/api/config/project", body,
+                            token=_TOKEN, method="PUT")
+        assert status == 200, resp
+        assert "original" in _cfg(root).read_text(encoding="utf-8")
+
+    def test_ac12_put_full_unchanged_readonly_plus_writable_change(
+            self, token_server, tmp_path):
+        root = _ro_root(tmp_path)
+        port = token_server(root)
+        body = {"variables": {"KEEP": "original"}, "speech-mode": "short"}
+        status, resp = _req(port, "/api/config/project", body,
+                            token=_TOKEN, method="PUT")
+        assert status == 200, resp
+        text = _cfg(root).read_text(encoding="utf-8")
+        assert "speech-mode" in text and "original" in text
+
+
+class _FakeHandler:
+    """Bare AdminRequestHandler wired to a temp root, capturing JSON replies.
+
+    Class attributes are set through ``monkeypatch`` so nothing leaks.
+    """
+
+    def __init__(self, monkeypatch, root: Path, body):
+        cls = admin_server.AdminRequestHandler
+        self.handler = cls.__new__(cls)
+        monkeypatch.setattr(cls, "root", root, raising=False)
+        monkeypatch.setattr(
+            cls, "config_manager",
+            admin_server.ConfigManager(root, mode="project_admin"), raising=False)
+        self.replies: list[tuple[dict, int]] = []
+        self.handler._send_json = (
+            lambda payload, status=200: self.replies.append((payload, status)))
+        self.handler._read_body = lambda: body
+
+
+class TestInternalWritePathsRespectWhitelist:
+    """Internal writers with a fixed section must hit the same choke point."""
+
+    @pytest.mark.parametrize("section, method, body, setup", [
+        ("submodule-protection", "_write_submodule_protection",
+         {"enabled": True, "override_text": "x"}, None),
+        ("model-source-preference", "_handle_post_model_source",
+         {"provider": "Claude", "source": "modelsdev"}, None),
+        ("model-source-preference", "_handle_post_model_source_batch",
+         {"preferences": {"Claude": "modelsdev"}}, None),
+        ("model-inherit-main-chat", "_handle_post_model_inherit",
+         {"provider": "Claude", "enabled": True}, None),
+    ])
+    def test_ac11_internal_writer_blocked_when_not_whitelisted(
+            self, tmp_path, monkeypatch, section, method, body, setup):
+        root = tmp_path / "proj"
+        (root / ".meta-config").mkdir(parents=True)
+        _cfg(root).write_text(_RO_YAML, encoding="utf-8")
+        before = _cfg(root).read_bytes()
+        monkeypatch.setattr(
+            admin_server, "PROJECT_WRITABLE_SECTIONS",
+            admin_server.PROJECT_WRITABLE_SECTIONS - {section, "rules"})
+        fake = _FakeHandler(monkeypatch, root, body)
+        try:
+            getattr(fake.handler, method)()
+        except ValueError:
+            pass  # mapped to HTTP 400 by do_PUT/do_POST
+        else:
+            assert fake.replies and fake.replies[-1][1] == 400, fake.replies
+            assert "section not allowed" in json.dumps(fake.replies[-1][0]), fake.replies
+        assert _cfg(root).read_bytes() == before
+
+    def test_ac11_delete_environment_blocked_when_not_whitelisted(
+            self, tmp_path, monkeypatch):
+        root = tmp_path / "proj"
+        (root / ".meta-config").mkdir(parents=True)
+        _cfg(root).write_text(_RO_YAML + "environments:\n  FOO: bar\n", encoding="utf-8")
+        before = _cfg(root).read_bytes()
+        monkeypatch.setattr(
+            admin_server, "PROJECT_WRITABLE_SECTIONS",
+            admin_server.PROJECT_WRITABLE_SECTIONS - {"environments"})
+        fake = _FakeHandler(monkeypatch, root, None)
+        with pytest.raises(ValueError, match="section not allowed"):
+            fake.handler._delete_environment("FOO")
+        assert _cfg(root).read_bytes() == before

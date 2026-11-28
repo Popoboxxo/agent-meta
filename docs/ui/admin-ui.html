@@ -10532,7 +10532,7 @@ async function viewModels() {
             else Object.assign(modelSourceState.providerSource, changes);
             state.pendingSourceChanges = {};
           } catch (err) {
-            alert("Failed to save model source: " + (err && err.message || err));
+            toast("Failed to save model source: " + (err && err.message || err), "error");
           } finally {
             render();
           }

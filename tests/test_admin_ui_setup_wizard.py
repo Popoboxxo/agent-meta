@@ -108,3 +108,95 @@ def test_provider_step_gates_next_button():
     w = _wizard_body()
     assert 'nextBtn.disabled = s === "Provider" && !answers.providers.length' in w
     assert "nextBtn.disabled = !answers.providers.length" in w
+
+
+# --------------------------------------------------------------------------- #
+# Task 5 / AC-13: section-save error display (no browser, structure only)
+# --------------------------------------------------------------------------- #
+
+_WRITE_CALL = re.compile(
+    r'await api\.(?:put|post)\(\s*["`](/api/(?:config/project(?:/section)?["`]|'
+    r'submodule-protection|model-source/batch|model-inherit))'
+)
+
+
+def _balanced_block(src: str, open_idx: int) -> str:
+    """Return the text of the ``{...}`` block whose ``{`` is at ``open_idx``."""
+    depth = 0
+    for i in range(open_idx, len(src)):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[open_idx + 1:i]
+    raise AssertionError("unbalanced braces")
+
+
+def _catch_block(src: str, start: int) -> str:
+    """Return the body of the ``catch`` that belongs to the enclosing ``try``.
+
+    Braces are matched from the write call: the call must sit inside a
+    ``try {`` block that closes before the ``catch`` (no unrelated later catch).
+    """
+    pos = src.rfind("try {", max(0, start - 3000), start)
+    assert pos != -1, f"write call not inside try: {src[start:start + 120]!r}"
+    try_body = _balanced_block(src, pos + len("try "))
+    try_end = pos + len("try ") + 1 + len(try_body) + 1
+    assert try_end > start, f"try block closes before the call: {src[start:start + 120]!r}"
+    m = re.match(r"\s*catch\s*(?:\(\w+\))?\s*\{", src[try_end:])
+    assert m, f"no catch directly after try near: {src[start:start + 120]!r}"
+    return _balanced_block(src, try_end + m.end() - 1)
+
+
+def test_api_error_carries_server_detail():
+    cls = HTML[HTML.index("class APIError extends Error"):]
+    cls = cls[:cls.index("\n}\n")]
+    assert "body?.detail" in cls and "body?.error" in cls
+
+
+def test_save_project_section_helper_shows_error_and_rethrows():
+    start = HTML.index("async function saveProjectSection(")
+    body = HTML[start:HTML.index("/** Save multiple sections", start)]
+    ok_pos = body.index('"success"')
+    catch_pos = body.index("catch (err)")
+    assert ok_pos < catch_pos, "success toast must sit in the try branch"
+    err_branch = body[catch_pos:]
+    assert 'toast(`Save failed: ${err.message}`, "error")' in err_branch
+    assert "statusEl.textContent" in err_branch
+    assert '"success"' not in err_branch
+    assert "throw err;" in err_branch
+
+
+def test_save_project_sections_success_toast_only_after_all_saved():
+    start = HTML.index("async function saveProjectSections(")
+    body = HTML[start:HTML.index("/* ====", start)]
+    assert body.index("await saveProjectSection(") < body.index('"All sections saved"')
+    assert "catch" not in body  # a failing section propagates, no success toast
+
+
+def test_every_direct_project_write_has_error_branch_without_success_toast():
+    calls = list(_WRITE_CALL.finditer(HTML))
+    assert len(calls) >= 10, "expected the known direct project write sites"
+    for m in calls:
+        if m.group(1) == "/api/model-inherit":
+            continue  # setInherit() helper; callers covered by the inherit test
+        seg = _catch_block(HTML, m.start())
+        shown = ('"error"' in seg or "Failed" in seg or "Save failed" in seg)
+        assert shown, f"catch does not surface the error near: {HTML[m.start():m.start() + 120]!r}"
+        assert '"success"' not in seg, (
+            f"success toast in error branch near: {HTML[m.start():m.start() + 120]!r}")
+
+
+def test_model_source_batch_error_uses_toast_not_blocking_alert():
+    start = HTML.index('api.post("/api/model-source/batch"')
+    seg = _catch_block(HTML, start)
+    assert 'toast("Failed to save model source: "' in seg and '"error"' in seg
+    assert "alert(" not in seg
+
+
+def test_model_inherit_toggle_shows_server_error():
+    start = HTML.index("await setInherit(prov, enabled);")
+    seg = HTML[start:start + 700]
+    assert "catch (err)" in seg
+    assert 'toast(`model-inherit failed (${prov}): ${err.message}`, "error")' in seg

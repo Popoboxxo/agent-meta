@@ -5309,6 +5309,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 return self._send_json(
                     {"error": f"source must be one of {list(VALID_MODEL_SOURCES)}"}, status=400)
 
+            try:
+                self._assert_project_sections_writable(("model-source-preference",))
+            except ValueError as exc:
+                # Non-writable section: explicit 400, no write (ADM-03 / AC-11).
+                return self._send_json({"error": str(exc)}, status=400)
             project = self.__class__.config_manager.read("project")
             if not isinstance(project, dict):
                 project = {}
@@ -5317,7 +5322,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 prefs = {}
             prefs[provider] = source
             project["model-source-preference"] = prefs
-            self._assert_project_sections_writable(("model-source-preference",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
@@ -5356,6 +5360,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 return self._send_json(
                     {"error": f"source must be one of {list(VALID_MODEL_SOURCES)}"}, status=400)
 
+            try:
+                self._assert_project_sections_writable(("model-source-preference",))
+            except ValueError as exc:
+                # Non-writable section: explicit 400, no write (ADM-03 / AC-11).
+                return self._send_json({"error": str(exc)}, status=400)
             project = self.__class__.config_manager.read("project")
             if not isinstance(project, dict):
                 project = {}
@@ -5365,7 +5374,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             for provider, source in incoming.items():
                 prefs[str(provider)] = str(source)
             project["model-source-preference"] = prefs
-            self._assert_project_sections_writable(("model-source-preference",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
@@ -5423,6 +5431,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 return self._send_json(
                     {"error": f"unknown provider '{provider}'"}, status=400)
 
+            try:
+                self._assert_project_sections_writable(("model-inherit-main-chat",))
+            except ValueError as exc:
+                # Non-writable section: explicit 400, no write (ADM-03 / AC-11).
+                return self._send_json({"error": str(exc)}, status=400)
             project = self.__class__.config_manager.read("project")
             if not isinstance(project, dict):
                 project = {}
@@ -5455,7 +5468,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 project["model-inherit-main-chat"] = inherit
             else:
                 project.pop("model-inherit-main-chat", None)
-            self._assert_project_sections_writable(("model-inherit-main-chat",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
