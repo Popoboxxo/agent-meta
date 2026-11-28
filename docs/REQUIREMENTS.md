@@ -101,9 +101,9 @@
 
 | ID | Anforderung | Priorität |
 |----|-------------|-----------|
-| REQ-ADM-01 | Wenn `admin-server.py` in einem Projekt gestartet wird, in dem noch keine `.meta-config/project.yaml` existiert, bricht der Server nicht mehr ab, sondern startet in einem interaktiven Setup/Onboarding-Modus. | Must |
-| REQ-ADM-02 | Im Setup-Modus bietet die Admin UI einen geführten Assistenten (Wizard) an, mit dem die initiale `.meta-config/project.yaml` schrittweise visuell konfiguriert und anschließend `sync.py` zur Erst-Instanziierung ausgeführt werden kann. | Must |
-| REQ-ADM-03 | Ein Schreibversuch auf eine nicht-schreibbare Section der Admin UI wird mit einem expliziten 4xx-Status beantwortet. Die UI zeigt einen fehlgeschlagenen Save-Vorgang sichtbar als Fehler an. (Quelle: Issue #730) | Should |
+| REQ-ADM-01 | Wenn `admin-server.py` in einem Projekt gestartet wird, in dem noch keine `.meta-config/project.yaml` existiert, bricht der Server nicht mehr ab, sondern startet in einem interaktiven Setup/Onboarding-Modus. *Status: implementiert (Commits 18b5ca1f, 7f2ae830, 4a7cf636).* | Must |
+| REQ-ADM-02 | Im Setup-Modus bietet die Admin UI einen geführten Assistenten (Wizard) an, mit dem die initiale `.meta-config/project.yaml` schrittweise visuell konfiguriert und anschließend `sync.py` zur Erst-Instanziierung ausgeführt werden kann. *Status: implementiert (Commits 7f2ae830, 50451c49).* | Must |
+| REQ-ADM-03 | Ein Schreibversuch auf eine nicht-schreibbare Section der Admin UI wird mit einem expliziten 4xx-Status beantwortet. Die UI zeigt einen fehlgeschlagenen Save-Vorgang sichtbar als Fehler an. (Quelle: Issue #730) *Status: implementiert (Commit 0463641a).* | Should |
 
 ---
 

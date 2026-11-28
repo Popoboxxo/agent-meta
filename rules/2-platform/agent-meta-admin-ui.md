@@ -12,6 +12,34 @@ YAML/JSON-Configs des Frameworks bereitstellt.
 - `project_admin` — Server läuft in einem Ziel-Repo mit agent-meta als
   Submodul; nur `.meta-config/project.yaml` ist exponiert.
 
+## Setup-Modus (REQ-ADM-01..03)
+
+- **Zustand:** `GET /api/mode` liefert `setup_required: true`, solange
+  `<root>/.meta-config/project.yaml` fehlt (berechnet, nicht persistiert). Der
+  Server startet trotzdem (kein Abbruch).
+- **Endpunkte** (token-gated, sofern ein Token konfiguriert ist, Mutationen origin-geprüft):
+  - `GET /api/setup/options` — Provider, Git-Plattformen, DoD-Presets, Defaults.
+  - `POST /api/setup/config` — legt `project.yaml` an, nur create-only: 400 mit
+    `detail`-Liste bei ungültigen Antworten, 409 `already_configured`, wenn die
+    Datei existiert. Fester Zielpfad, Modus 0600, create-only (Link, Fallback O_EXCL-Kopie).
+  - `POST /api/setup/init-sync` — führt `sync.py --config … --init` aus
+    (Subprozess-Timeout 300 s). Ohne Config: 409 `setup_required`.
+- **Guard:** `SyncExecutor` (`run`, `dry_run`, `cleanup_preview`) startet ohne
+  `project.yaml` keinen Subprozess und meldet `project.yaml missing`. So hängt
+  kein interaktiver CLI-Wizard.
+- **Auth:** Im Setup-Modus existiert keine `project.yaml` und damit kein
+  `admin-ui.token`. Non-loopback (`--host`/`--mode network`) startet nur mit
+  Token aus `--admin-token`, Env `ADMIN_UI_TOKEN` oder dem Netzwerk-Modus
+  (Zufalls-Token); sonst fail-closed.
+- **Wizard-Ablauf** (`docs/ui/admin-ui.html`, `init()`): bei `setup_required`
+  nur der Wizard, keine Navigation. Schritte: Identity → Provider → Git →
+  DoD-Preset (optional) → Review → „Anlegen“ (`POST /api/setup/config`) →
+  „Erst-Sync starten“ (`POST /api/setup/init-sync`, Ausgabe in der UI) →
+  Reload in den Normalbetrieb.
+- **Fehleranzeige (REQ-ADM-03):** Schreibversuch auf eine nicht-schreibbare
+  Section → 400 (`section not allowed: …`), keine Datei-Änderung. Die UI zeigt
+  den fehlgeschlagenen Save als Toast plus Inline-Meldung.
+
 ## Server-Lifecycle
 
 ```bash
