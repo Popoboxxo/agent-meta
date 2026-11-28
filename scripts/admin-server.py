@@ -1687,6 +1687,16 @@ class SyncExecutor:
         # agent-meta under ``.agent-meta/``.
         self.sync_script = resolve_asset(self.root, "scripts", "sync.py")
 
+    def _config_missing_result(self) -> dict | None:
+        """Return a failure result when ``project.yaml`` is absent, else None.
+
+        Guards plain sync runs so a not-yet-configured project never spawns
+        ``sync.py`` (which would abort or hang without a config).
+        """
+        if (self.root / ".meta-config" / "project.yaml").exists():
+            return None
+        return {"success": False, "output": "project.yaml missing", "returncode": -1}
+
     def _run(self, extra_args: list[str]) -> dict:
         if not self.sync_script.exists():
             return {
@@ -1756,10 +1766,16 @@ class SyncExecutor:
         """Execute ``sync.py --validate``. The flag is used because ``--dry-run``
         in agent-meta still touches some artefacts; ``--validate`` is a pure
         read-only check that returns a diff-like report."""
+        missing = self._config_missing_result()
+        if missing is not None:
+            return missing
         return self._run(["--validate"])
 
     def run(self) -> dict:
         """Execute a real ``sync.py`` run (no extra flags)."""
+        missing = self._config_missing_result()
+        if missing is not None:
+            return missing
         return self._run([])
 
     def cleanup_preview(self) -> dict:
@@ -4317,6 +4333,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "mode": self.__class__.mode,
             "root": str(self.__class__.root),
             "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
+            # Computed, not persisted: true while no project.yaml exists yet.
+            "setup_required": not (
+                self.__class__.root / ".meta-config" / "project.yaml"
+            ).exists(),
         }
         # In super_admin mode the project.yaml of the meta-repo is also
         # available as the "target repo" view.  Signal this to the UI so
