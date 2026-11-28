@@ -40,7 +40,7 @@
 
 ---
 pipeline_stages:
-  implement: 3
+  implement: 1
 ---
 
 ## Umsetzungsstand (Ledger)
