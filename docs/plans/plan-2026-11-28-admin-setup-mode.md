@@ -1,5 +1,5 @@
 # Admin-UI Setup-Modus Implementation Plan
-> Status: geplant
+> Status: erledigt
 
 **Goal:** REQ-ADM-01..03 umsetzen: Admin UI erkennt fehlende `project.yaml` (Setup-Zustand), bietet einen Wizard für Config-Anlage und Erst-Sync, und belegt 4xx plus sichtbare Fehleranzeige bei Read-only-Writes.
 **Architecture:** `lib/setup.py` in pure Funktionen (`build_setup_config`, `validate_setup_answers`) aufteilen; CLI und Server teilen sie. `/api/mode` erhält `setup_required`. Neue create-only-Endpunkte `/api/setup/options|config|init-sync`; `SyncExecutor.init_run()` mit festen argv. UI-Wizard in `admin-ui.html`. ADM-03 ist Verifikations-/Härtungsarbeit (Backend liefert bereits 400).
@@ -44,12 +44,14 @@ pipeline_stages:
 ---
 
 ## Umsetzungsstand (Ledger)
-- [ ] T1 setup.py-Refactor (AC-5, AC-6) — implementiert / reviewt / committed
-- [ ] T2 /api/mode setup_required + Sync-Guard (AC-1..3) — implementiert / reviewt / committed
-- [ ] T3 /api/setup/* + init_run (AC-4, 7, 8, 9) — implementiert / reviewt / committed
-- [ ] T4 UI-Wizard (AC-10) — implementiert / reviewt / committed
-- [ ] T5 ADM-03 Tests + UI-Fehleranzeige (AC-11..13) — implementiert / reviewt / committed
-- [ ] T6 Doku (Skill-Quelle, REQUIREMENTS, CHANGELOG) — implementiert / reviewt / committed
+- [x] T1 setup.py-Refactor (AC-5, AC-6) — implementiert / reviewt / committed
+- [x] T2 /api/mode setup_required + Sync-Guard (AC-1..3) — implementiert / reviewt / committed
+- [x] T3 /api/setup/* + init_run (AC-4, 7, 8, 9) — implementiert / reviewt / committed
+- [x] T4 UI-Wizard (AC-10) — implementiert / reviewt / committed
+- [x] T5 ADM-03 Tests + UI-Fehleranzeige (AC-11..13) — implementiert / reviewt / committed
+- [x] T6 Doku (Skill-Quelle, REQUIREMENTS, CHANGELOG) — implementiert / reviewt / committed
+- Browser-Smoke 2026-11-28 bestanden (Setup-Wizard, 409, Validierungsfehler, ADM-03).
+- Follow-ups: Concurrency-Lock, `_write_config` fd, `stdin=DEVNULL`, statische Setup-Defaults, Wizard-Client-Validierung (Prefix), 404-Hinweis bei fehlendem `docs/ui`.
 
 ### Task 1: setup.py-Refactor
 **Rolle:** developer (Review: code-reviewer)
