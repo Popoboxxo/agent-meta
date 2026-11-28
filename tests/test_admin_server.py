@@ -1082,6 +1082,8 @@ class TestSyncExecutorDryRun(unittest.TestCase):
             scripts = root / "scripts"
             scripts.mkdir()
             (scripts / "sync.py").write_text("# stub", encoding="utf-8")
+            (root / ".meta-config").mkdir()
+            (root / ".meta-config" / "project.yaml").write_text("project: {}\n", encoding="utf-8")
 
             executor = admin_server.SyncExecutor(root)
             fake_result = mock.Mock(returncode=0, stdout="OK", stderr="")
@@ -1095,6 +1097,8 @@ class TestSyncExecutorDryRun(unittest.TestCase):
 
     def test_missing_sync_script_reports_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / ".meta-config").mkdir()
+            (Path(tmp) / ".meta-config" / "project.yaml").write_text("project: {}\n", encoding="utf-8")
             executor = admin_server.SyncExecutor(Path(tmp))
             result = executor.dry_run()
             self.assertFalse(result["success"])

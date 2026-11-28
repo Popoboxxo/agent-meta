@@ -1167,6 +1167,7 @@ class Router {
   constructor() {
     this.routes = new Map();
     this._dirty = false;
+    this.locked = false;  // setup mode: hashchange must not replace the wizard
     this._dirtyMsg = "You have unsaved changes. Discard them?";
     window.addEventListener("hashchange", (e) => {
       if (this._dirty) {
@@ -1190,6 +1191,7 @@ class Router {
     else this.resolve();
   }
   resolve() {
+    if (this.locked) return;
     const hash = location.hash.slice(1) || "/";
     const view = this.routes.get(hash) || this.routes.get("/") || (() => el("div", {}, ["Not found"]));
     const content = document.getElementById("content");
@@ -10530,7 +10532,7 @@ async function viewModels() {
             else Object.assign(modelSourceState.providerSource, changes);
             state.pendingSourceChanges = {};
           } catch (err) {
-            alert("Failed to save model source: " + (err && err.message || err));
+            toast("Failed to save model source: " + (err && err.message || err), "error");
           } finally {
             render();
           }
@@ -11984,6 +11986,167 @@ async function viewTierPresets() {
 }
 
 /* =========================================================================
+ * Setup wizard (shown instead of the normal UI while no project.yaml exists)
+ * ========================================================================= */
+async function viewSetupWizard(content) {
+  const wrap = el("div", { class: "setup-wizard", id: "setup-wizard" });
+  content.replaceChildren(wrap);
+  let opts;
+  try { opts = await api.get("/api/setup/options"); }
+  catch (err) { wrap.appendChild(renderError(err)); return; }
+  const defs = opts.defaults || {};
+
+  const answers = {
+    name: "", prefix: "", providers: [],
+    git_platform: defs.git_platform || (opts.git_platforms || [])[0] || "",
+    dod_preset: "", git_remote: "", git_branch: defs.git_branch || "main",
+    ignore_secrets: defs.ignore_secrets !== false,
+  };
+  const steps = ["Identity", "Provider", "Git", "DoD-Preset (optional)", "Review"];
+  let stepIdx = 0;
+  let created = false;
+
+  const field = (label, input) => el("div", { class: "field" }, [
+    el("label", { class: "field-label" }, [label]), input,
+  ]);
+  const textInput = (key, placeholder) => {
+    const i = el("input", { type: "text", value: answers[key] || "", placeholder: placeholder || "" });
+    i.addEventListener("input", () => { answers[key] = i.value.trim(); });
+    return i;
+  };
+  const selectInput = (key, values, allowEmpty) => {
+    const s = el("select", {}, [
+      ...(allowEmpty ? [el("option", { value: "" }, ["(default)"])] : []),
+      ...values.map(v => el("option", { value: v }, [String(v)])),
+    ]);
+    s.value = answers[key] || "";
+    s.addEventListener("change", () => { answers[key] = s.value; });
+    return s;
+  };
+
+  const body = el("div", { class: "setup-body" });
+  const feedback = el("div", { class: "setup-feedback" });
+  const syncOut = el("pre", { class: "setup-sync-output", style: "display:none; max-height: 320px; overflow-y: auto;" });
+  const backBtn = el("button", { class: "btn", type: "button" }, ["Zurück"]);
+  const nextBtn = el("button", { class: "btn btn-primary", type: "button" }, ["Weiter"]);
+  const createBtn = el("button", { class: "btn btn-primary", type: "button" }, ["Anlegen"]);
+  const syncBtn = el("button", { class: "btn btn-primary", type: "button" }, ["Erst-Sync starten"]);
+  const nav = el("div", { class: "setup-nav", style: "display:flex; gap: var(--space-3); margin-top: var(--space-4);" });
+
+  const showFeedback = (err) => {
+    feedback.replaceChildren();
+    if (!err) return;
+    if (err.status === 409) {
+      feedback.appendChild(el("div", { class: "error-box" }, [
+        "Projekt ist bereits konfiguriert (409). Seite neu laden, um in den Normalbetrieb zu wechseln.",
+      ]));
+      return;
+    }
+    const detail = err.body && Array.isArray(err.body.detail) ? err.body.detail : null;
+    const box = el("div", { class: "error-box" }, [detail ? "Ungültige Eingaben:" : String(err.message || err)]);
+    if (detail) box.appendChild(el("ul", {}, detail.map(d => el("li", {}, [String(d)]))));
+    feedback.appendChild(box);
+  };
+
+  const renderStep = () => {
+    body.replaceChildren(el("h2", {}, [`${stepIdx + 1}/${steps.length} ${steps[stepIdx]}`]));
+    const s = steps[stepIdx];
+    if (s === "Identity") {
+      body.appendChild(field("Projektname", textInput("name", "my-project")));
+      body.appendChild(field("Präfix", textInput("prefix", "mp")));
+    } else if (s === "Provider") {
+      for (const p of opts.providers || []) {
+        const cb = el("input", { type: "checkbox" });
+        cb.checked = answers.providers.includes(p);
+        cb.addEventListener("change", () => {
+          answers.providers = answers.providers.filter(x => x !== p);
+          if (cb.checked) answers.providers.push(p);
+          nextBtn.disabled = !answers.providers.length;
+        });
+        body.appendChild(el("label", { style: "display:block;" }, [cb, " " + String(p)]));
+      }
+    } else if (s === "Git") {
+      body.appendChild(field("Plattform", selectInput("git_platform", opts.git_platforms || [], false)));
+      body.appendChild(field("Remote (optional)", textInput("git_remote", "https://…")));
+      body.appendChild(field("Branch", textInput("git_branch", "main")));
+      const cb = el("input", { type: "checkbox" });
+      cb.checked = !!answers.ignore_secrets;
+      cb.addEventListener("change", () => { answers.ignore_secrets = cb.checked; });
+      body.appendChild(el("label", { style: "display:block;" }, [cb, " Secrets ignorieren (.gitignore)"]));
+    } else if (s.startsWith("DoD")) {
+      body.appendChild(field("DoD-Preset", selectInput("dod_preset", opts.dod_presets || [], true)));
+    } else {
+      body.appendChild(el("pre", {}, [JSON.stringify(payload(), null, 2)]));
+    }
+    backBtn.disabled = stepIdx === 0 || created;
+    nextBtn.style.display = stepIdx < steps.length - 1 ? "" : "none";
+    createBtn.style.display = stepIdx === steps.length - 1 && !created ? "" : "none";
+    syncBtn.style.display = created ? "" : "none";
+    // A provider is mandatory: gate "Weiter" on the Provider step.
+    nextBtn.disabled = s === "Provider" && !answers.providers.length;
+  };
+
+  const payload = () => {
+    const out = {};
+    for (const [k, v] of Object.entries(answers)) {
+      if (v === "" || (Array.isArray(v) && !v.length)) continue;
+      out[k] = v;
+    }
+    return out;
+  };
+
+  backBtn.addEventListener("click", () => { showFeedback(null); stepIdx = Math.max(0, stepIdx - 1); renderStep(); });
+  nextBtn.addEventListener("click", () => { showFeedback(null); stepIdx = Math.min(steps.length - 1, stepIdx + 1); renderStep(); });
+
+  createBtn.addEventListener("click", async () => {
+    createBtn.disabled = true;
+    showFeedback(null);
+    try {
+      await api.post("/api/setup/config", payload());
+      created = true;
+      toast("Konfiguration angelegt", "success");
+      body.replaceChildren(el("p", {}, ["Konfiguration angelegt. Nächster Schritt: Erst-Sync starten."]));
+      backBtn.disabled = true;
+      createBtn.style.display = "none";
+      syncBtn.style.display = "";
+    } catch (err) {
+      showFeedback(err);
+      createBtn.disabled = false;
+    }
+  });
+
+  syncBtn.addEventListener("click", async () => {
+    syncBtn.disabled = true;
+    syncBtn.textContent = "Sync läuft …";
+    showFeedback(null);
+    syncOut.style.display = "";
+    syncOut.textContent = "Running initial sync (kann mehrere Minuten dauern) …";
+    try {
+      const r = await api.post("/api/setup/init-sync", {});
+      syncOut.textContent = String(r.output || "");
+      if (r.success) {
+        toast("Erst-Sync abgeschlossen", "success");
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast("Erst-Sync fehlgeschlagen", "error");
+    } catch (err) {
+      syncOut.textContent = String(err.message || err);
+      showFeedback(err);
+      toast(String(err.message || err), "error");
+    }
+    syncBtn.disabled = false;
+    syncBtn.textContent = "Erst-Sync starten";
+  });
+
+  nav.append(backBtn, nextBtn, createBtn, syncBtn);
+  wrap.append(el("h1", {}, ["Projekt einrichten"]),
+    el("div", { class: "info-box" }, ["Keine .meta-config/project.yaml gefunden. Setup-Assistent starten."]),
+    body, feedback, nav, syncOut);
+  renderStep();
+}
+
+/* =========================================================================
  * Bootstrap
  * ========================================================================= */
 async function init() {
@@ -11996,6 +12159,13 @@ async function init() {
     const badge = document.getElementById("mode-badge");
     badge.textContent = mode.mode;
     badge.classList.toggle("project", mode.mode === "project_admin");
+    if (mode.setup_required) {
+      // Setup state: render only the wizard; no sidebar, no routes.
+      router.locked = true;
+      document.getElementById("nav").replaceChildren();
+      await viewSetupWizard(document.getElementById("content"));
+      return;
+    }
   } catch (err) {
     document.getElementById("content").innerHTML = "";
     document.getElementById("content").appendChild(renderError(err));

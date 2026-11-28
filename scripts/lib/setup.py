@@ -189,6 +189,136 @@ def _validate_nonempty(v: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Pure builders (no prompts, no writes, no prints; only reads VERSION) --
+# shared by CLI wizard and Admin-UI
+# ---------------------------------------------------------------------------
+
+GIT_PLATFORMS = ["GitHub", "GitLab", "Gitea", "Codeberg"]
+DOD_PRESETS = ["full", "standard", "rapid-prototyping"]
+_SECRET_GITIGNORE_PATTERNS = [
+    ".env*", "*.pem", "*.key", "credentials*.json", "secret*.y*ml",
+]
+_MAX_FIELD_LEN = 500
+_OPTIONAL_STRING_FIELDS = (
+    "short", "git_remote", "git_branch", "communication_language",
+    "user_input_language", "docs_language", "internal_docs_language",
+    "code_language", "agent_meta_repo", "project_context",
+    "project_languages", "dev_commands", "test_commands",
+)
+
+
+def validate_setup_answers(answers: dict, agent_meta_root: Path) -> list[str]:
+    """Validate setup answers. Returns a list of error messages (empty = ok)."""
+    errors: list[str] = []
+    name = answers.get("name")
+    prefix = answers.get("prefix")
+    err = _validate_nonempty(name if isinstance(name, str) else "")
+    if err:
+        errors.append(f"name: {err}")
+    err = _validate_prefix(prefix if isinstance(prefix, str) else "")
+    if err:
+        errors.append(f"prefix: {err}")
+
+    from .providers import load_providers_config
+    valid_providers = list(load_providers_config(agent_meta_root).keys())
+    providers = answers.get("providers")
+    if not isinstance(providers, list) or not providers:
+        errors.append("providers: at least one provider required.")
+    else:
+        unknown = [p for p in providers if p not in valid_providers]
+        if unknown:
+            errors.append(f"providers: unknown provider(s): {', '.join(map(str, unknown))}.")
+
+    git_platform = answers.get("git_platform")
+    if git_platform not in GIT_PLATFORMS:
+        errors.append(f"git_platform: must be one of {', '.join(GIT_PLATFORMS)}.")
+
+    if "dod_preset" in answers and answers["dod_preset"] not in DOD_PRESETS:
+        errors.append(f"dod_preset: must be one of {', '.join(DOD_PRESETS)}.")
+
+    for key in _OPTIONAL_STRING_FIELDS:
+        if key in answers:
+            value = answers[key]
+            if not isinstance(value, str):
+                errors.append(f"{key}: must be a string.")
+            elif len(value) > _MAX_FIELD_LEN:
+                errors.append(f"{key}: max {_MAX_FIELD_LEN} characters.")
+    for key in ("name", "prefix", "short"):
+        value = answers.get(key)
+        if isinstance(value, str) and len(value) > _MAX_FIELD_LEN:
+            errors.append(f"{key}: max {_MAX_FIELD_LEN} characters.")
+    if "ignore_secrets" in answers and not isinstance(answers["ignore_secrets"], bool):
+        errors.append("ignore_secrets: must be a boolean.")
+    if "platforms" in answers:
+        platforms = answers["platforms"]
+        if not (isinstance(platforms, list)
+                and all(isinstance(p, str) and 0 < len(p) <= _MAX_FIELD_LEN for p in platforms)):
+            errors.append("platforms: must be a list of non-empty strings.")
+    if isinstance(providers, list) and not all(isinstance(p, str) for p in providers):
+        errors.append("providers: entries must be strings.")
+    return errors
+
+
+def build_setup_config(answers: dict, agent_meta_root: Path) -> dict:
+    """Assemble the project.yaml config dict from setup answers.
+
+    No prompts, writes or prints; only reads the VERSION file.
+
+    Required keys: name, prefix, providers, git_platform. All others fall back
+    to the wizard defaults. Callers should run validate_setup_answers first.
+    """
+    name = answers["name"]
+    dev_commands = answers.get("dev_commands", "bun run build")
+    config: dict = {
+        "agent-meta-version": _read_version(agent_meta_root),
+        "ai-providers": list(answers["providers"]),
+        "roles": [
+            "orchestrator",
+            "agent-meta-manager",
+            "developer",
+            "documenter",
+            "meta-feedback",
+            "log-analyzer",
+            "git"
+        ]
+    }
+    platforms = list(answers.get("platforms") or [])
+    if platforms:
+        config["platforms"] = platforms
+
+    if answers.get("ignore_secrets", True):
+        config["gitignore"] = {"custom_entries": list(_SECRET_GITIGNORE_PATTERNS)}
+
+    config["dod-preset"] = answers.get("dod_preset", "standard")
+    config["project"] = {
+        "name": name,
+        "prefix": answers["prefix"],
+        "short": answers.get("short") or name,
+    }
+    config["variables"] = {
+        "PROJECT_CONTEXT": answers.get("project_context", f"{name} — short description."),
+        "PROJECT_GOAL": f"Primary goal of {name}.",
+        "PROJECT_LANGUAGES": answers.get("project_languages", "TypeScript"),
+        "COMMUNICATION_LANGUAGE": answers.get("communication_language", "English"),
+        "USER_INPUT_LANGUAGE": answers.get("user_input_language", "English"),
+        "DOCS_LANGUAGE": answers.get("docs_language", "English"),
+        "INTERNAL_DOCS_LANGUAGE": answers.get("internal_docs_language", "English"),
+        "CODE_LANGUAGE": answers.get("code_language", "English"),
+        "AGENT_META_REPO": answers.get("agent_meta_repo", "Popoboxxo/agent-meta"),
+        "GIT_PLATFORM": answers["git_platform"],
+        "GIT_REMOTE_URL": answers.get("git_remote", ""),
+        "GIT_MAIN_BRANCH": answers.get("git_branch", "main"),
+        "DEV_COMMANDS": dev_commands,
+        "TEST_COMMANDS": answers.get("test_commands", "bun test"),
+        "BUILD_COMMANDS": dev_commands,
+        "CODE_CONVENTIONS": "- TypeScript ES6+, no `any`, no `var`",
+        "ARCHITECTURE": "src/\\n  index.ts  # Entry-Point",
+        "REQ_CATEGORIES": "- Core features\\n- Non-functional requirements",
+    }
+    return config
+
+
+# ---------------------------------------------------------------------------
 # Wizard
 # ---------------------------------------------------------------------------
 
@@ -240,7 +370,7 @@ def run_setup_wizard(
 
     _section("3. Git Configuration")
     print("  INFO: Used by agents to interact with your repository.")
-    git_platform = _ask_choice("Git Platform", ["GitHub", "GitLab", "Gitea", "Codeberg"], default="GitHub")
+    git_platform = _ask_choice("Git Platform", GIT_PLATFORMS, default="GitHub")
     git_remote = _ask("Remote URL (e.g., https://github.com/owner/repo)", default="")
     git_branch = _ask("Main Branch", default="main")
 
@@ -294,7 +424,7 @@ def run_setup_wizard(
         print("  standard          — Tests required, REQ-IDs optional")
         print("  rapid-prototyping — All checks disabled for fast iteration")
         dod_preset = _ask_choice(
-            "DoD-Preset", ["full", "standard", "rapid-prototyping"],
+            "DoD-Preset", DOD_PRESETS,
             default=_platform_prefill(agent_meta_root, platforms, "dod-preset", "standard"),
         )
 
@@ -321,57 +451,31 @@ def run_setup_wizard(
         )
 
     # ------------------------------------------------------------------
-    # Assemble config
+    # Assemble config (pure builder, shared with the Admin-UI setup mode)
     # ------------------------------------------------------------------
-    config: dict = {
-        "agent-meta-version": _read_version(agent_meta_root),
-        "ai-providers": providers,
-        "roles": [
-            "orchestrator",
-            "agent-meta-manager",
-            "developer",
-            "documenter",
-            "meta-feedback",
-            "log-analyzer",
-            "git"
-        ]
-    }
-    if platforms:
-        config["platforms"] = platforms
-
-    if ignore_secrets == "yes":
-        config["gitignore"] = {
-            "custom_entries": [
-                ".env*", "*.pem", "*.key", "credentials*.json", "secret*.y*ml",
-            ]
-        }
-
-    config["dod-preset"] = dod_preset
-    config["project"] = {
+    answers = {
         "name": name,
         "prefix": prefix,
         "short": short,
+        "providers": providers,
+        "git_platform": git_platform,
+        "git_remote": git_remote,
+        "git_branch": git_branch,
+        "ignore_secrets": ignore_secrets == "yes",
+        "platforms": platforms,
+        "dod_preset": dod_preset,
+        "communication_language": comm_lang,
+        "user_input_language": input_lang,
+        "docs_language": docs_lang,
+        "internal_docs_language": internal_lang,
+        "code_language": code_lang,
+        "agent_meta_repo": agent_meta_repo,
+        "project_context": project_context,
+        "project_languages": project_langs,
+        "dev_commands": dev_commands,
+        "test_commands": test_commands,
     }
-    config["variables"] = {
-        "PROJECT_CONTEXT": project_context,
-        "PROJECT_GOAL": f"Primary goal of {name}.",
-        "PROJECT_LANGUAGES": project_langs,
-        "COMMUNICATION_LANGUAGE": comm_lang,
-        "USER_INPUT_LANGUAGE": input_lang,
-        "DOCS_LANGUAGE": docs_lang,
-        "INTERNAL_DOCS_LANGUAGE": internal_lang,
-        "CODE_LANGUAGE": code_lang,
-        "AGENT_META_REPO": agent_meta_repo,
-        "GIT_PLATFORM": git_platform,
-        "GIT_REMOTE_URL": git_remote,
-        "GIT_MAIN_BRANCH": git_branch,
-        "DEV_COMMANDS": dev_commands,
-        "TEST_COMMANDS": test_commands,
-        "BUILD_COMMANDS": dev_commands,
-        "CODE_CONVENTIONS": "- TypeScript ES6+, no `any`, no `var`",
-        "ARCHITECTURE": "src/\\n  index.ts  # Entry-Point",
-        "REQ_CATEGORIES": "- Core features\\n- Non-functional requirements",
-    }
+    config = build_setup_config(answers, agent_meta_root)
 
     # ------------------------------------------------------------------
     # Preview + write
