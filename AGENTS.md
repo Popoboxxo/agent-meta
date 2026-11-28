@@ -41,6 +41,10 @@ Kategorien für Anforderungen (`docs/REQUIREMENTS.md`):
 
 
 
+## Commands
+
+commands/0-external/ < commands/1-generic/ < commands/2-platform/ (spätere gewinnt); Kollision überschreibt Projektdatei ohne Backup.
+
 <!-- agent-meta:managed-begin -->
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).

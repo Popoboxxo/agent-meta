@@ -243,11 +243,8 @@ def sync_commands_for_provider(
 
     commands_dir_rel = pc.get("commands_dir")
     if not commands_dir_rel:
-        # No target directory to manage: keep the previous silent no-op when
-        # there is nothing to write at all; only a provider that declares
-        # commands support *and* has commands to write fails loudly.
-        if not sources:
-            return
+        # A provider that declares commands support but has no target
+        # directory fails loudly, independent of the number of sources (REQ-10).
         raise SyncError(
             f"Provider '{provider}' declares commands support "
             "(config/provider-capabilities.yaml: commands: true) but has no "

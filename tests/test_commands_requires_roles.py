@@ -187,3 +187,45 @@ def test_sync_survives_external_non_yaml_command(tmp_path):
 def test_consistency_accepts_block_style(tmp_path):
     findings = _findings(tmp_path, _BASE_FM + "requires_roles:\n  - documenter\n")
     assert [f.check for f in findings if "requires" in f.check] == []
+
+
+# --- AC-2.2: requires_roles directive removed, other keys byte-identical -----
+
+def _frontmatter_lines(text: str) -> dict[str, str]:
+    block = text.split("---\n")[1]
+    return {ln.split(":", 1)[0]: ln for ln in block.splitlines() if ":" in ln}
+
+
+def test_field_requires_roles_removed_and_substitution_applies(tmp_path):
+    root = tmp_path / "am"
+    shutil.copytree(REPO_ROOT / "config", root / "config")
+    gen = root / "commands" / "1-generic"
+    gen.mkdir(parents=True)
+    source = (
+        "---\n"
+        "description: Field test {{PROJECT_NAME}}\n"
+        'allowed-tools: ["Agent", "Read"]\n'
+        'argument-hint: "[focus]"\n'
+        "requires_roles: [documenter]\n"
+        "---\n\n"
+        "Project {{PROJECT_NAME}} $ARGUMENTS\n"
+    )
+    (gen / "field.md").write_text(source, encoding="utf-8")
+    project = tmp_path / "proj"
+    project.mkdir()
+    config = default_config()
+    active = compute_active_set(config, REPO_ROOT, project, warn_sink=[])
+    assert active.has("documenter")
+    sync_commands_for_provider(
+        root, project, config, SyncLog(), False, "Claude",
+        provider_config=load_providers_config(REPO_ROOT, config),
+        variables={"PROJECT_NAME": "Demo"}, active_set=active)
+    out = (_commands_dir(project) / "field.md").read_text(encoding="utf-8")
+    assert "requires_roles" not in out
+    assert "{{" not in out and "Project Demo $ARGUMENTS" in out
+    src_fm = _frontmatter_lines(source)
+    out_fm = _frontmatter_lines(out)
+    assert "requires_roles" not in out_fm
+    assert out_fm["allowed-tools"] == src_fm["allowed-tools"]
+    assert out_fm["argument-hint"] == src_fm["argument-hint"]
+    assert out_fm["description"] == "description: Field test Demo"
